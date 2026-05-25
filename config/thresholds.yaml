@@ -1,0 +1,93 @@
+# =============================================================================
+# THRESHOLDS — seuils d'alerte, pondérations de scoring, logique métier
+# =============================================================================
+
+# --- Logique "silence sur l'inactif" : seuil de mouvement 24h par tier ---
+mention_thresholds_pct:
+  1: 5.0
+  2: 5.0
+  3: 10.0
+  4: 30.0
+
+# Un coin est mentionné si l'une de ces conditions est vraie :
+#   - |change_24h| > mention_thresholds_pct[tier]
+#   - news_score > news_score_to_mention
+#   - tier 1 ET signal technique fort (STRONG_BUY/STRONG_SELL)
+#   - santé en dégradation (health_change == WORSENING)
+news_score_to_mention: 0.7
+
+# --- Alertes intra-day ---
+intraday_alerts:
+  price_spike_threshold_pct: 30.0   # variation sur la fenêtre courte
+  spike_window_hours: 4
+  ultra_urgent_keywords:
+    - hack
+    - exploit
+    - rug
+    - rugpull
+    - delisting
+    - delist
+    - regulatory action
+    - ban
+    - sec lawsuit
+    - lawsuit
+    - halt
+    - depeg
+    - insolvency
+    - bankruptcy
+
+# --- Pondérations du score composite (somme = 1.0) ---
+composite_weights:
+  technical: 0.30
+  on_chain: 0.20
+  fundamental: 0.20
+  sentiment: 0.15
+  macro_alignment: 0.15
+
+# --- Pondération des timeframes pour le score technique (somme = 1.0) ---
+technical_timeframe_weights:
+  "1w": 0.40
+  "1d": 0.30
+  "4h": 0.20
+  "1h": 0.10
+
+# Mapping recommandation TradingView -> score 0-100
+tv_signal_scores:
+  STRONG_BUY: 100
+  BUY: 75
+  NEUTRAL: 50
+  SELL: 25
+  STRONG_SELL: 0
+
+# --- Santé projet : critères critiques (verdict "sors-en") ---
+project_health:
+  critical:
+    dev_zero_commits_days: 60
+    site_down_days: 30
+    founder_silence_days: 90
+    min_total_liquidity_usd: 500000
+  warning:
+    dev_activity_ratio_min: 0.30      # <30% de la moyenne 12 mois
+    volume_drop_90d_pct: -70.0        # chute >70% du volume sur 90j
+    inflation_rate_max_pct: 20.0
+
+# --- Détermination du style de rapport (calme / normal / agité) ---
+report_style:
+  weights:
+    macro_high_impact_event: 30       # par événement high-impact aujourd'hui
+    positions_moving: 30              # si >3 positions bougent significativement
+    narrative_shift: 20
+    major_news: 20                    # si >5 news majeures
+  positions_moving_min: 3
+  major_news_min: 5
+  calm_max: 30
+  normal_max: 60
+
+# --- Cache (TTL en secondes) ---
+cache_ttl:
+  prices: 300        # 5 min
+  technical: 600     # 10 min
+  macro: 3600        # 1 h
+  dev_activity: 14400  # 4 h
+  news: 900          # 15 min
+  youtube: 21600     # 6 h

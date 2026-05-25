@@ -1,0 +1,189 @@
+# =============================================================================
+# PORTFOLIO — source de vérité du PTF
+# =============================================================================
+# Tiers :
+#   1 = analyse deep (mention si mouvement >5%, signal techn. fort, ou news)
+#   2 = analyse condensée (mention si mouvement >5% ou news significative)
+#   3 = silence sauf mouvement >10% ou news
+#   4 = poussières : silence sauf spike >30% ou news critique
+#
+# `symbol` est optionnel : par défaut on prend la clé. À renseigner quand le
+# ticker exchange diffère (ex. RENDER -> RNDR).
+#
+# Pour mettre à jour : éditer ce fichier puis `git commit && git push`.
+# Ou (bonus) : python -m src.utils.portfolio_loader --update "vendu 100 RNDR..."
+# =============================================================================
+
+meta:
+  base_currency: "USD"
+  total_cash_to_allocate_usd: 1000.0   # cash externe non encore dans le PTF
+  notes: "PTF ~-40% global. Cash gardé en réserve, mentionné seulement si opportunité majeure."
+
+portfolio:
+  # === TIER 1 (analyse deep) ===
+  USDC:
+    quantity: 1029.70
+    value_usd: 1029.45
+    tier: 1
+    role: "cash_reserve"
+  TAO:
+    quantity: 1.60
+    value_usd: 446.18
+    tier: 1
+    notes: "Plus grosse position non-cash · narrative AI"
+  BTC:
+    quantity: 0.005225
+    value_usd: 404.31
+    tier: 1
+  ETH:
+    quantity: 0.1753
+    value_usd: 370.90
+    tier: 1
+  RENDER:
+    symbol: RNDR
+    quantity: 39.58
+    value_usd: 82.66
+    tier: 1
+    notes: "narrative AI"
+  JASMY:
+    quantity: 14019.23
+    value_usd: 78.52
+    tier: 1
+  LINK:
+    quantity: 7.99
+    value_usd: 76.58
+    tier: 1
+  RSR:
+    quantity: 42688.39
+    value_usd: 71.17
+    tier: 1
+  CKB:
+    quantity: 50029.29
+    value_usd: 70.63
+    tier: 1
+  ANKR:
+    quantity: 13336.93
+    value_usd: 62.55
+    tier: 1
+  STX:
+    quantity: 232.17
+    value_usd: 57.92
+    tier: 1
+  INJ:
+    quantity: 10.06
+    value_usd: 54.66
+    tier: 1
+  QNT:
+    quantity: 0.6529
+    value_usd: 53.56
+    tier: 1
+  XRP:
+    quantity: 35.35
+    value_usd: 48.01
+    tier: 1
+  FET:
+    quantity: 186.18
+    value_usd: 39.73
+    tier: 1
+    notes: "narrative AI · alliance ASI"
+  CFX:
+    quantity: 671.06
+    value_usd: 36.78
+    tier: 1
+
+  # === TIER 2 (analyse condensée) ===
+  ATOM:
+    quantity: 15.75
+    value_usd: 33.60
+    tier: 2
+  HBAR:
+    quantity: 326.68
+    value_usd: 29.29
+    tier: 2
+  ACH:
+    quantity: 3566.21
+    value_usd: 23.60
+    tier: 2
+  IMX:
+    quantity: 116.70
+    value_usd: 19.76
+    tier: 2
+  ADA:
+    quantity: 50.20
+    value_usd: 12.32
+    tier: 2
+  GRT:
+    quantity: 433.85
+    value_usd: 11.49
+    tier: 2
+  ARB:
+    quantity: 102.49
+    value_usd: 11.03
+    tier: 2
+
+  # === TIER 3 (silence sauf mouvement >10%) ===
+  AR:
+    quantity: 4.05
+    value_usd: 8.59
+    tier: 3
+  NOT:
+    quantity: 15962.14
+    value_usd: 7.58
+    tier: 3
+  AXL:
+    quantity: 128.71
+    value_usd: 7.56
+    tier: 3
+  ZK:
+    quantity: 307.19
+    value_usd: 4.58
+    tier: 3
+  W:
+    symbol: W
+    quantity: 227.44
+    value_usd: 2.85
+    tier: 3
+    notes: "narrative AI (Wormhole)"
+
+  # === TIER 4 (poussières) ===
+  SXT:
+    quantity: 16.58
+    value_usd: 0.20
+    tier: 4
+  HMSTR:
+    quantity: 730.50
+    value_usd: 0.11
+    tier: 4
+  NMR:
+    quantity: 0.003623
+    value_usd: 0.03
+    tier: 4
+  ZEN:
+    quantity: 0.004549
+    value_usd: 0.029
+    tier: 4
+  WLD:
+    quantity: 0.07387
+    value_usd: 0.023
+    tier: 4
+    notes: "narrative AI"
+  YFI:
+    quantity: 0.000005021
+    value_usd: 0.013
+    tier: 4
+  SATS:
+    quantity: 787161.83
+    value_usd: 0.010
+    tier: 4
+  FIL:
+    quantity: 0.007351
+    value_usd: 0.007
+    tier: 4
+  TRB:
+    quantity: 0.0003366
+    value_usd: 0.006
+    tier: 4
+  CELO:
+    quantity: 0.05246
+    value_usd: 0.004
+    tier: 4
