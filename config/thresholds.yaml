@@ -91,3 +91,51 @@ cache_ttl:
   dev_activity: 14400  # 4 h
   news: 900          # 15 min
   youtube: 21600     # 6 h
+
+# ============================================================
+# REFACTOR V2 · seuils adaptatifs et pondérations de signaux
+# ============================================================
+
+# Seuils de signaux convergents requis pour une reco FERME, par tier.
+signal_thresholds:
+  btc_eth:            # Tier 0 (BTC, ETH) — déterminé dynamiquement
+    firm_reco_min_signals: 4
+  tier_1:             # value_usd > 50
+    firm_reco_min_signals: 3
+  tier_2:             # 10 <= value_usd <= 50
+    firm_reco_min_signals: 2
+  tier_3:             # 1 <= value_usd < 10
+    firm_reco_min_signals: 2
+  tier_4:             # value_usd < 1 (poussières)
+    firm_reco_min_signals: 999   # jamais de reco ferme
+    spike_threshold_pct: 30
+
+# Pondérations des 9 signaux du score composite (somme = 1.0).
+# IMPORTANT : les commits GitHub sont un sous-élément de "fundamental" et
+# ne peuvent dépasser 50% de ce poids -> ~5% du total.
+signal_weights:
+  technical_multi_tf: 0.20
+  volume_anomaly: 0.10
+  onchain_flows: 0.15
+  derivatives: 0.15
+  sector_rotation: 0.10
+  news_24h: 0.10
+  social_sentiment: 0.05
+  fundamental: 0.10
+  macro_alignment: 0.05
+
+# Mapping niveau de confiance -> taille d'action (bornes en %).
+confidence_to_action:
+  - {min: 85, max: 100, label: "taille pleine · 8-10% PTF", firm: true}
+  - {min: 70, max: 84,  label: "taille standard · 4-6% PTF", firm: true}
+  - {min: 55, max: 69,  label: "taille modérée · 2-3% PTF", firm: true}
+  - {min: 40, max: 54,  label: "pas d'action · surveiller avec trigger", firm: false}
+  - {min: 0,  max: 39,  label: "silence · pas de mention", firm: false}
+
+# Panic mode (remplace les alertes intraday régulières).
+panic_mode:
+  btc_1h_abs_pct: 15        # BTC ±15% en 1h
+  asset_1h_drop_pct: -25    # token PTF -25% en 1h
+  liquidation_cascade_usd: 500000000
+  hack_keywords: ["hack", "exploit", "breach"]
+  anti_spam_minutes: 60

@@ -51,7 +51,11 @@ def get_technical(symbol: str) -> dict[str, Any]:
         return {"available": False, "reason": "pas de paire Binance configurée"}
 
     def _fetch() -> dict[str, Any]:
-        from tradingview_ta import TA_Handler
+        try:
+            from tradingview_ta import TA_Handler
+        except ImportError as exc:
+            logger.warning("tradingview_ta indisponible : %s", exc)
+            return {"available": False, "reason": "tradingview_ta non installé"}
 
         signals: dict[str, Any] = {}
         for tf_name, tf_lib in _TF_MAP.items():

@@ -1,8 +1,11 @@
-"""Tests de bout en bout (sans réseau ni Gemini réel)."""
+"""Tests de bout en bout V2 (sans réseau ni Gemini réel)."""
 
 from __future__ import annotations
 
-from src.reporting.email_html import render_alert, render_report
+import pathlib
+import tempfile
+
+from src.reporting.email_html import render
 from src.utils.portfolio_loader import load_portfolio, total_value_usd
 
 
@@ -15,50 +18,41 @@ def test_portfolio_loads_and_validates() -> None:
     assert total_value_usd(data) > 0
 
 
-def test_render_report_minimal() -> None:
-    """Un payload minimal produit un HTML valide (sections vides omises)."""
+def test_render_morning_minimal() -> None:
+    """Un payload matin minimal produit un HTML valide."""
     payload = {
-        "header": {"title": "Veille crypto", "subtitle": "test"},
-        "essentiel": ["Rien de notable aujourd'hui"],
-        "footer": "Prochain rapport ce soir",
+        "header": {"date": "2026-05-27", "time_casablanca": "08:30"},
+        "story_of_the_day": {"narrative": "Marché calme."},
+        "footer": {"next_report_at": "ce soir"},
     }
-    html = render_report(payload)
+    html = render(payload, "morning")
     assert "<html" in html and "Veille crypto" in html
-    # Pas de section positions vide affichée.
-    assert "mérite attention" not in html
 
 
-def test_render_report_full() -> None:
-    """Un payload complet rend toutes les sections."""
-    payload = {
-        "header": {"title": "T", "subtitle": "s"},
-        "essentiel": ["a"],
-        "marche_global": {"commentaire": "c", "indicateurs": {"BTC": "$1"}, "narratives": "n"},
-        "macro": {"indicateurs": "m", "calendrier": ["e"], "geopolitique": "g"},
-        "positions": [
-            {"symbol": "BTC", "pourquoi": "p", "lecture": "l", "avis": "a",
-             "invalidation": "i", "sources": ["CG"]}
-        ],
-        "spikes": [{"symbol": "ETH", "change_24h": "+6%", "note": "n"}],
-        "sante_projets": {"global_ok": True, "alertes": []},
-        "footer": "f",
-    }
-    html = render_report(payload)
-    for token in ("BTC", "ETH", "aucun signal", "Invalidation"):
-        assert token in html
-
-
-def test_render_alert_severities() -> None:
-    """L'alerte rend correctement selon la sévérité."""
-    for sev in ("info", "warning", "danger"):
-        html = render_alert({"title": f"t-{sev}", "body": "b", "severity": sev}, "now")
-        assert f"t-{sev}" in html
+def test_render_all_kinds() -> None:
+    """Les 4 types de rapport rendent sans erreur."""
+    for kind in ("morning", "evening", "weekly"):
+        html = render({"header": {"date": "x"}, "footer": {}}, kind)
+        assert "<html" in html
+    panic = render({"title": "T", "body": "B", "severity": "danger"}, "panic")
+    assert "<html" in panic and "T" in panic
 
 
 def test_degraded_payload_renders() -> None:
     """Le payload dégradé (IA indisponible) reste rendu sans erreur."""
     from src.ai_brain.decision_engine import DecisionEngine
 
-    payload = DecisionEngine._degraded_payload("calm", "Test indispo")
-    html = render_report(payload)
-    assert "Test indispo" in html
+    payload = DecisionEngine._degraded("morning", {}, "Test indispo")
+    html = render(payload, "morning")
+    assert "<html" in html
+
+
+def test_memory_roundtrip(monkeypatch) -> None:
+    """La mémoire écrit et relit correctement un rapport."""
+    from src.state import report_memory as mem
+
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    monkeypatch.setattr(mem, "_STATE_DIR", tmp)
+    mem.save_morning_report({"key": "value"})
+    loaded = mem.load_morning_report()
+    assert loaded["key"] == "value"

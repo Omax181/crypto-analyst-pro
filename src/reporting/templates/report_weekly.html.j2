@@ -1,0 +1,54 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:{{c.bg}};font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:{{c.text}};line-height:1.5;">
+<div style="max-width:660px;margin:0 auto;padding:16px;">
+  <div style="padding:8px 4px 14px;border-bottom:2px solid {{c.accent}};">
+    <h1 style="margin:0;font-size:21px;color:{{c.accent}};">📊 Bilan hebdomadaire</h1>
+    <div style="font-size:13px;color:{{c.muted}};margin-top:3px;">{{header.week}}{% if header.ptf_perf_week_pct is not none %} · perf semaine {{header.ptf_perf_week_pct}}%{% endif %}</div>
+  </div>
+  {% if weekly_narrative %}
+  <div style="background:{{c.card}};border-left:3px solid {{c.info}};border-radius:6px;padding:12px 14px;margin-top:12px;">
+    <h2 style="margin:0 0 6px;font-size:15px;color:{{c.accent}};">📖 Bilan de la semaine</h2>
+    <p style="margin:0;font-size:14px;">{{weekly_narrative}}</p>
+  </div>{% endif %}
+  {% if weekly_predictions_scoring %}
+  <div style="background:{{c.card}};border-radius:6px;padding:12px 14px;margin-top:12px;">
+    <h2 style="margin:0 0 6px;font-size:15px;color:{{c.accent}};">🎯 Mes prédictions</h2>
+    <div style="font-size:14px;">Win rate : <strong>{{weekly_predictions_scoring.win_rate_pct}}%</strong>
+      {% if weekly_predictions_scoring.validated is not none %}· {{weekly_predictions_scoring.validated}} validées / {{weekly_predictions_scoring.invalidated}} invalidées{% endif %}</div>
+    {% if weekly_predictions_scoring.lesson %}<div style="font-size:13px;color:{{c.muted}};font-style:italic;margin-top:6px;">💡 Leçon : {{weekly_predictions_scoring.lesson}}</div>{% endif %}
+  </div>{% endif %}
+  {% if portfolio_overview %}
+  <div style="background:{{c.card}};border-radius:6px;padding:12px 14px;margin-top:10px;font-size:13px;">
+    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.accent}};">💼 Portfolio</h2>
+    Perf {{portfolio_overview.perf_week_pct}}% · drawdown {{portfolio_overview.drawdown_pct}}%
+    {% if portfolio_overview.sector_exposure_vs_market %}<table style="width:100%;border-collapse:collapse;margin-top:6px;">
+      {% for s in portfolio_overview.sector_exposure_vs_market %}<tr><td style="padding:3px 6px;border-bottom:1px solid {{c.border}};">{{s.sector}}</td><td style="padding:3px 6px;border-bottom:1px solid {{c.border}};">{{s.ptf_pct}}%</td><td style="padding:3px 6px;border-bottom:1px solid {{c.border}};color:{{c.muted}};">{{s.market_signal}}</td></tr>{% endfor %}
+    </table>{% endif %}
+  </div>{% endif %}
+  {% if next_week_calendar %}
+  <h2 style="margin:16px 4px 6px;font-size:15px;color:{{c.accent}};">📅 Semaine à venir</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    {% for e in next_week_calendar %}<tr><td style="padding:5px 6px;border-bottom:1px solid {{c.border}};font-weight:600;">{{e.date}}</td><td style="padding:5px 6px;border-bottom:1px solid {{c.border}};">{{e.event}}</td><td style="padding:5px 6px;border-bottom:1px solid {{c.border}};color:{{c.muted}};">{{e.impact}}</td></tr>{% endfor %}
+  </table>{% endif %}
+  {% if next_week_scenarios %}
+  <h2 style="margin:16px 4px 6px;font-size:15px;color:{{c.accent}};">🎲 3 scénarios</h2>
+  {% for s in next_week_scenarios %}
+  <div style="background:{{c.card}};border-left:3px solid {% if s.scenario=='bullish' %}{{c.success}}{% elif s.scenario=='bearish' %}{{c.danger}}{% else %}{{c.muted}}{% endif %};border-radius:6px;padding:10px 12px;margin-bottom:8px;font-size:13px;">
+    <strong>{{s.scenario|upper}}{% if s.probability_pct is not none %} · {{s.probability_pct}}%{% endif %}</strong>
+    <div style="margin-top:3px;">{{s.description}}</div>
+    {% if s.actions %}<ul style="margin:4px 0;padding-left:18px;">{% for a in s.actions %}<li>{{a}}</li>{% endfor %}</ul>{% endif %}
+  </div>{% endfor %}{% endif %}
+  {% if exit_plan_dust %}
+  <div style="background:#f9fafb;border-radius:6px;padding:12px 14px;margin-top:10px;font-size:13px;">
+    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.accent}};">🧹 Exit plan poussières</h2>
+    {% for d in exit_plan_dust %}<div style="margin:2px 0;">{{d.asset}} (${{d.value_usd}}) · {{d.status or 'attendre spike +30%'}}</div>{% endfor %}
+  </div>{% endif %}
+  {% if long_term_targets_review %}
+  <h2 style="margin:16px 4px 6px;font-size:15px;color:{{c.accent}};">🎯 Cibles long terme</h2>
+  {% for t in long_term_targets_review %}<div style="font-size:13px;padding:4px 8px;border-bottom:1px solid {{c.border}};"><strong>{{t.asset}}</strong> · {{t.target_6_12m_low}}–{{t.target_6_12m_high}}{% if t.rationale %} · <span style="color:{{c.muted}};">{{t.rationale}}</span>{% endif %}</div>{% endfor %}
+  {% endif %}
+  <div style="margin-top:18px;padding-top:10px;border-top:1px solid {{c.border}};font-size:11px;color:{{c.muted}};text-align:center;">
+    {% if footer.next_report_at %}Prochain rapport : {{footer.next_report_at}}. {% endif %}{{disclaimer}}
+  </div>
+</div></body></html>

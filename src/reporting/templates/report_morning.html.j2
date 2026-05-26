@@ -1,0 +1,100 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:{{c.bg}};font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:{{c.text}};line-height:1.5;">
+<div style="max-width:660px;margin:0 auto;padding:16px;">
+  <div style="padding:8px 4px 14px;border-bottom:2px solid {{c.accent}};">
+    <h1 style="margin:0;font-size:21px;color:{{c.accent}};">☀️ Veille crypto · matin</h1>
+    <div style="font-size:13px;color:{{c.muted}};margin-top:3px;">
+      {{header.date}} · {{header.time_casablanca}} · {{header.active_sources_count or '–'}} sources
+      {% if header.win_rate_30d is not none %} · win rate 30j {{header.win_rate_30d}}% ({{header.win_rate_total}}){% endif %}
+    </div>
+  </div>
+  {% if portfolio_snapshot %}
+  <div style="background:{{c.card}};border-radius:6px;padding:12px 14px;margin-top:12px;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;"><tr>
+      <td style="text-align:center;padding:4px;"><div style="color:{{c.muted}};font-size:11px;">VALEUR</div><div style="font-weight:600;">${{portfolio_snapshot.value_usd}}</div></td>
+      <td style="text-align:center;padding:4px;"><div style="color:{{c.muted}};font-size:11px;">24H</div><div style="font-weight:600;">{{portfolio_snapshot.change_24h_pct}}%</div></td>
+      <td style="text-align:center;padding:4px;"><div style="color:{{c.muted}};font-size:11px;">7J</div><div style="font-weight:600;">{{portfolio_snapshot.change_7d_pct}}%</div></td>
+      <td style="text-align:center;padding:4px;"><div style="color:{{c.muted}};font-size:11px;">DD ATH</div><div style="font-weight:600;">{{portfolio_snapshot.drawdown_ath_pct}}%</div></td>
+    </tr></table>
+  </div>{% endif %}
+  {% if story_of_the_day and story_of_the_day.narrative %}
+  <div style="background:{{c.card}};border-left:3px solid {{c.info}};border-radius:6px;padding:12px 14px;margin-top:12px;">
+    <h2 style="margin:0 0 6px;font-size:15px;color:{{c.accent}};">📖 L'histoire du jour</h2>
+    <p style="margin:0;font-size:14px;">{{story_of_the_day.narrative}}</p>
+  </div>{% endif %}
+  {% if self_critique_global %}
+  <div style="font-size:13px;color:{{c.muted}};font-style:italic;margin:10px 4px;border-left:2px solid {{c.border}};padding-left:10px;">🔍 {{self_critique_global}}</div>
+  {% endif %}
+  {% if active_recommendations_tracking %}
+  <h2 style="margin:16px 4px 6px;font-size:15px;color:{{c.accent}};">🎯 Recos actives</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    {% for r in active_recommendations_tracking %}<tr>
+      <td style="padding:5px 6px;border-bottom:1px solid {{c.border}};font-weight:600;">{{r.asset}}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid {{c.border}};">{{r.action}}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid {{c.border}};color:{{c.muted}};">{{r.status}} {% if r.progress_pct is not none %}· {{r.progress_pct}}%{% endif %}</td>
+    </tr>{% endfor %}
+  </table>{% endif %}
+  {% if macro_context %}
+  <div style="background:{{c.card}};border-radius:6px;padding:12px 14px;margin-top:14px;">
+    <h2 style="margin:0 0 6px;font-size:15px;color:{{c.accent}};">🌐 Contexte global</h2>
+    <div style="font-size:13px;">BTC ${{macro_context.btc_price}} · F&G {{macro_context.fear_greed}} · DXY {{macro_context.dxy}}{% if macro_context.polymarket_fed_cut_july is not none %} · Fed cut juillet {{macro_context.polymarket_fed_cut_july}}%{% endif %}</div>
+  </div>{% endif %}
+  {% if onchain_indicators %}
+  <div style="background:{{c.card}};border-radius:6px;padding:12px 14px;margin-top:10px;font-size:13px;">
+    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.accent}};">⛓️ On-chain</h2>
+    {% if onchain_indicators.btc_exchange_reserves_change_7d is not none %}Réserves BTC 7j {{onchain_indicators.btc_exchange_reserves_change_7d}} · {% endif %}
+    {% if onchain_indicators.eth_active_addresses %}Adresses actives ETH {{onchain_indicators.eth_active_addresses}}{% endif %}
+  </div>{% endif %}
+  {% if sector_rotation %}
+  <h2 style="margin:16px 4px 6px;font-size:15px;color:{{c.accent}};">🔄 Rotation sectorielle</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    {% for s in sector_rotation %}<tr>
+      <td style="padding:5px 6px;border-bottom:1px solid {{c.border}};font-weight:600;">{{s.sector}}</td>
+      <td style="padding:5px 6px;border-bottom:1px solid {{c.border}};">{{s.change_24h}}%</td>
+      <td style="padding:5px 6px;border-bottom:1px solid {{c.border}};color:{{c.muted}};">{% if s.your_holdings %}{{s.your_holdings|join(', ')}}{% endif %}</td>
+    </tr>{% endfor %}
+  </table>{% endif %}
+  {% if news_24h %}
+  <h2 style="margin:16px 4px 6px;font-size:15px;color:{{c.accent}};">📰 News &lt;24h</h2>
+  {% for n in news_24h %}
+  <div style="background:{{c.card}};border-radius:6px;padding:10px 12px;margin-bottom:8px;font-size:13px;">
+    <strong>{{n.title}}</strong><div style="color:{{c.muted}};font-size:11px;margin-top:2px;">{{n.source}} · {{n.timestamp}}{% if n.confidence %} · confiance {{n.confidence}}%{% endif %}</div>
+    {% if n.impact_on_ptf %}<div style="margin-top:4px;">{{n.impact_on_ptf}}</div>{% endif %}
+  </div>{% endfor %}{% endif %}
+  {% if today_alerts %}
+  <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:10px 12px;margin-top:10px;">
+    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.warning}};">⚠️ À surveiller aujourd'hui</h2>
+    <ul style="margin:0;padding-left:18px;font-size:13px;">{% for a in today_alerts %}<li style="margin:3px 0;">{{a}}</li>{% endfor %}</ul>
+  </div>{% endif %}
+  {% if thesis_of_the_day %}
+  <h2 style="margin:18px 4px 8px;font-size:16px;color:{{c.accent}};">💡 Thèses du jour</h2>
+  {% for t in thesis_of_the_day %}
+  <div style="background:{{c.card}};border-left:3px solid {% if t.action in ['RENFORCER','ALLEGER'] %}{{c.warning}}{% else %}{{c.info}}{% endif %};border-radius:6px;padding:12px 14px;margin-bottom:12px;">
+    <div style="font-weight:700;font-size:15px;">{{t.asset}} · {{t.action}}{% if t.confidence %} <span style="font-weight:400;color:{{c.muted}};font-size:13px;">· confiance {{t.confidence}}% · {{t.action_size}}</span>{% endif %}</div>
+    {% if t.observation %}<p style="margin:6px 0;font-size:14px;">{{t.observation}}</p>{% endif %}
+    {% if t.reasoning_signals %}<ul style="margin:4px 0;padding-left:18px;font-size:13px;">{% for s in t.reasoning_signals %}<li style="margin:2px 0;">{{s}}</li>{% endfor %}</ul>{% endif %}
+    {% if t.historical_pattern and t.historical_pattern.verified %}<div style="font-size:12px;color:{{c.muted}};">📊 Pattern {{t.historical_pattern.win_rate}} · move moyen {{t.historical_pattern.avg_move_pct}}% · {{t.historical_pattern.data_source}}</div>{% endif %}
+    {% if t.self_critique %}<div style="font-size:12px;color:{{c.muted}};font-style:italic;margin:6px 0;">🔍 {{t.self_critique}}</div>{% endif %}
+    {% if t.macro_coherence %}<div style="font-size:12px;margin:4px 0;">🌐 {{t.macro_coherence}}</div>{% endif %}
+    {% if t.targets %}<div style="font-size:13px;margin:6px 0;display:flex;gap:8px;">
+      <span style="background:#eff6ff;border-radius:4px;padding:4px 8px;">CT 30j : {{t.targets.short_term_30d}}</span>
+      <span style="background:#f0fdf4;border-radius:4px;padding:4px 8px;">LT 6-12m : {{t.targets.long_term_6_12m_low}}–{{t.targets.long_term_6_12m_high}}</span>
+    </div>{% endif %}
+    {% if t.action_plan %}<div style="background:#f9fafb;border-radius:4px;padding:8px 10px;font-size:13px;margin-top:6px;">
+      <strong>Plan :</strong> {{t.action_plan.entry}}{% if t.action_plan.take_profit %} · TP {{t.action_plan.take_profit['30pct']}}/{{t.action_plan.take_profit['30pct_b']}}/{{t.action_plan.take_profit['40pct']}}{% endif %} · stop {{t.action_plan.stop_loss}}
+      {% if t.action_plan.invalidation_conditions %}<div style="color:{{c.muted}};margin-top:3px;">Invalidation : {{t.action_plan.invalidation_conditions}}</div>{% endif %}
+    </div>{% endif %}
+    {% if t.sources_timestamps %}<div style="font-size:11px;color:{{c.muted}};margin-top:5px;">{{t.sources_timestamps}}</div>{% endif %}
+  </div>{% endfor %}{% endif %}
+  {% if macro_impact_on_ptf %}
+  <div style="background:{{c.card}};border-radius:6px;padding:12px 14px;margin-top:6px;font-size:13px;">
+    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.accent}};">📉 Macro → PTF</h2>
+    <div>{{macro_impact_on_ptf.trigger}} · {{macro_impact_on_ptf.historical_stat}}</div>
+    {% if macro_impact_on_ptf.implication %}<div style="margin-top:4px;font-weight:600;">{{macro_impact_on_ptf.implication}}</div>{% endif %}
+  </div>{% endif %}
+  {% if blind_spots %}<div style="font-size:12px;color:{{c.muted}};margin:14px 4px;border-top:1px dashed {{c.border}};padding-top:8px;">🕳️ Angles morts : {{blind_spots}}</div>{% endif %}
+  <div style="margin-top:18px;padding-top:10px;border-top:1px solid {{c.border}};font-size:11px;color:{{c.muted}};text-align:center;">
+    {% if footer.next_report_at %}Prochain rapport : {{footer.next_report_at}}. {% endif %}{{disclaimer}}
+  </div>
+</div></body></html>

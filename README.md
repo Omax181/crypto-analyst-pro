@@ -1,47 +1,37 @@
-# 🤖 Crypto Analyst Pro
+# 🤖 Crypto Analyst Pro · V2
 
-Agent d'analyse crypto personnel et autonome. Il t'envoie **2 rapports par jour**
-par email (matin + soir) plus des **alertes intra-day** en cas de mouvement
-majeur, en croisant **14 sources de données** gratuites et un **cerveau IA**
-(Gemini) qui rédige une analyse d'analyste senior — pas un perroquet de chiffres.
+Agent d'analyse crypto personnel et autonome. Analyste **multi-sources à voix
+critique** (et non plus résumeur monosource) : il croise jusqu'à 14 sources, un
+cerveau IA (Gemini), une mémoire inter-rapports et un tracking de ses propres
+prédictions, puis t'envoie par email :
 
-100 % gratuit, hébergé sur **GitHub Actions** (aucun serveur à gérer).
+- ☀️ **Rapport du matin** (~08h30 Casablanca) · point d'entrée complet : histoire
+  du jour, contexte macro/on-chain, rotation sectorielle, thèses fondées.
+- 🌙 **Rapport du soir** (~19h30) · différentiel : ce qui a évolué depuis le matin,
+  suivi des recos, setup pour demain.
+- 📊 **Bilan hebdo** (dimanche ~11h30) · win rate, leçons, 3 scénarios, cibles LT.
+- 🚨 **Panic mode** (check 5 min) · alerte flash uniquement sur événement majeur
+  (BTC ±15%/1h, hack, token −25%/1h).
 
----
-
-## Ce qu'il fait
-
-- **Rapport du matin** (~08:45 Casablanca) : état du marché, macro du jour,
-  positions qui méritent attention, santé des projets.
-- **Rapport du soir** (~19:45 Casablanca) : delta de la journée + setup pour demain.
-- **Alertes intra-day** (toutes les 15 min) : spike de prix > 30 % en 4 h, ou
-  news critique (hack, exploit, delisting, depeg…) sur une position détenue.
-- **Rapports adaptatifs** : courts les jours calmes, développés les jours agités.
-- **Silence sur l'inactif** : il ne parle que de ce qui bouge vraiment.
-
-## Philosophie d'analyse
-
-L'agent ne donne un **avis tranché** que lorsque 3 conditions sont réunies :
-plusieurs signaux indépendants convergent, les chiffres appuient, et les
-conditions d'invalidation sont nommées. Il croise en permanence
-**macro ↔ micro ↔ géopolitique** et fait des liens historiques chiffrés.
+100 % gratuit, hébergé sur **GitHub Actions** (aucun serveur).
 
 ---
 
-## Les 14 sources
+## Principes de la V2
 
-| Catégorie | Sources |
-|-----------|---------|
-| Prix / marché | CoinGecko (primaire), CoinMarketCap (cross-check), Binance (OHLCV) |
-| Technique | TradingView (multi-timeframe) |
-| Sentiment | Fear & Greed Index, CryptoPanic (news), Reddit |
-| On-chain | blockchain.info (BTC), Etherscan (ETH) |
-| Fondamental | GitHub (activité dev = santé projet) |
-| Macro | FRED (Fed, DXY, 10Y, VIX, CPI…), Trading Economics (calendrier) |
-| Contexte | YouTube (transcripts synthétisés), Gemini + Google Search (géopolitique) |
-
-Chaque source est **isolée** : une panne d'une API ne casse pas le rapport
-(le champ concerné est simplement marqué indisponible).
+1. **Score sur 9 signaux pondérés** · technique, volume, on-chain, dérivés,
+   rotation, news 24h, social, fondamental, macro. Les commits GitHub pèsent
+   ≤ 10 % du raisonnement (fini les "pas de commit → alléger").
+2. **Seuils adaptatifs par tier** · BTC/ETH exigent 4+ signaux convergents,
+   Tier 1 : 3+, Tier 2-3 : 2+, poussières : jamais de reco ferme.
+3. **Confiance → taille d'action** · une confiance < 55 % ne produit jamais de
+   reco ferme, seulement de la surveillance.
+4. **Mémoire inter-rapports** · le soir complète le matin, l'hebdo agrège la
+   semaine (dossier `state/`, commité par les workflows).
+5. **Tracking des prédictions** · chaque reco est évaluée sur prix réels ; le win
+   rate s'affiche dans les rapports.
+6. **Garde-fou factuel** · un `coherence_checker` rétrograde avant envoi toute
+   reco mal fondée, corrige les ATH impossibles, refuse les sources vagues.
 
 ---
 
@@ -49,87 +39,51 @@ Chaque source est **isolée** : une panne d'une API ne casse pas le rapport
 
 ```
 src/
-├── data_sources/     # 14 connecteurs (dégradation gracieuse)
-├── analytics/        # technique, score composite, santé projet,
-│                     #   patterns, narratives, cas historiques
-├── ai_brain/         # client Gemini + moteur de décision + prompts
-├── reporting/        # filtre de contenu, style adaptatif, template HTML, envoi
-├── utils/            # config, cache TTL, logs
-└── main.py           # orchestrateur (modes morning / evening / intraday)
-config/               # portfolio.yaml + sources/thresholds/youtube
-.github/workflows/    # 4 workflows (matin, soir, intraday, heartbeat)
-tests/                # tests analytics / sources / flux complet
+├── data_sources/     # 14+ connecteurs (dégradation gracieuse totale)
+│   ├── coingecko, coinmarketcap, binance, tradingview, fear_greed
+│   ├── cryptopanic (news <24h), reddit, fred, econ_calendar
+│   ├── onchain_btc/eth/advanced, coinglass (dérivés)
+│   ├── prediction_markets (Polymarket), etf_flows (Farside)
+│   ├── telegram_channels (Telethon), youtube / youtube_cpt
+├── analytics/        # composite_score (9 signaux), tier_resolver,
+│                     #   fundamentals (ATH safe), coherence_checker, narratives
+├── ai_brain/         # gemini_client, decision_engine, prompts (persona +
+│                     #   morning/evening/weekly/panic)
+├── state/            # report_memory (mémoire inter-rapports)
+├── tracking/         # prediction_scoring (win rate, leçons)
+├── reporting/        # email_html (dispatcher) + templates/*.j2 + email_sender
+└── main.py           # orchestrateur : morning / evening / weekly / panic_check
+config/               # portfolio, thresholds, sources, github_repos,
+                      #   youtube_channels, telegram_channels
+.github/workflows/    # morning, evening, weekly, panic_mode, heartbeat
+state/                # JSON de mémoire (commités automatiquement)
+tests/                # analytics, data_sources, full_flow, v2_refactor
 ```
-
-**Pipeline** : collecte (14 sources) → analyse (scores 0-100 par dimension) →
-filtrage (quoi mentionner) → évaluation de volatilité (style du rapport) →
-Gemini (rédaction JSON structurée) → rendu HTML → email.
 
 ---
 
-## Installation rapide (local)
+## Démarrage
+
+L'agent tourne dès maintenant avec **Gemini + Gmail**. Les autres sources sont
+optionnelles (sans leur clé, elles sont marquées "indisponibles" et n'empêchent
+rien). Voir **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** pour le pas-à-pas
+complet (secrets, Telegram, tests).
 
 ```bash
-git clone <ton-repo>
-cd crypto-analyst-pro
 pip install -r requirements.txt
-cp .env.example .env        # puis remplis tes clés
-python -m src.main morning  # test immédiat
+cp .env.example .env   # remplir les clés
+python -m src.main morning     # test immédiat
+pytest -q                      # suite de tests
 ```
-
-Pour le déploiement automatisé sur GitHub Actions (recommandé, gratuit),
-suis le guide pas-à-pas : **[DEPLOYMENT.md](DEPLOYMENT.md)**.
-
----
-
-## Configuration
-
-- **`config/portfolio.yaml`** — tes positions, réparties en 4 tiers. Chaque
-  actif a un `tier`, une `value_usd` et des `notes`. L'USDC est marqué
-  `role: cash_reserve` (mentionné uniquement si une opportunité majeure surgit).
-- **`config/thresholds.yaml`** — tous les seuils : déclenchement par tier
-  (T1 : 5 %, T2 : 5 %, T3 : 10 %, T4 : 30 %), alertes intra-day, pondérations
-  du score composite, TTL de cache, style de rapport.
-- **`config/sources.yaml`** — IDs et endpoints des sources.
-- **`config/youtube_channels.yaml`** — chaînes de référence (synthèse anonymisée).
-
-### Mettre à jour le portfolio en langage naturel
-
-```bash
-python -m src.utils.portfolio_loader --update "J'ai vendu la moitié de mon ETH et acheté 50$ de LINK"
-python -m src.utils.portfolio_loader --show
-```
-
-(nécessite `GEMINI_API_KEY`).
-
----
-
-## Choix du modèle Gemini
-
-Par défaut : **`gemini-2.5-flash`** (free tier fiable, ~1500 requêtes/jour,
-contexte 1M tokens). Le spec d'origine visait `gemini-2.5-pro`, mais celui-ci
-est désormais restreint au tier payant ou à un quota très bas selon la région.
-Pour basculer (si tu as un tier payant), change `GEMINI_MODEL=gemini-2.5-pro`.
 
 ---
 
 ## Coût
 
-**0 €.** Tous les services utilisés ont un free tier suffisant pour 2 rapports
-quotidiens + alertes, et GitHub Actions est gratuit pour les dépôts publics.
-
----
-
-## Tests
-
-```bash
-pip install -r requirements.txt
-pytest -q
-```
-
----
+**0 €.** Tous les services ont un free tier suffisant, GitHub Actions est gratuit
+pour les dépôts publics.
 
 ## Avertissement
 
-Cet agent produit une **analyse informative**, pas un conseil en investissement.
-Fais toujours tes propres recherches avant toute décision.
+Analyse **informative**, pas un conseil en investissement. Fais toujours tes
+propres recherches.

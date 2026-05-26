@@ -1,0 +1,49 @@
+<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:{{c.bg}};font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:{{c.text}};line-height:1.5;">
+<div style="max-width:660px;margin:0 auto;padding:16px;">
+  <div style="padding:8px 4px 14px;border-bottom:2px solid {{c.accent}};">
+    <h1 style="margin:0;font-size:21px;color:{{c.accent}};">🌙 Veille crypto · soir</h1>
+    <div style="font-size:13px;color:{{c.muted}};margin-top:3px;">
+      {{header.date}} · {{header.time_casablanca}}
+      {% if header.ptf_value_delta_since_morning is not none %} · delta depuis matin {{header.ptf_value_delta_since_morning}}$ ({{header.ptf_value_pct_since_morning}}%){% endif %}
+    </div>
+  </div>
+  {% if delta_of_the_day %}
+  <div style="background:{{c.card}};border-left:3px solid {{c.info}};border-radius:6px;padding:12px 14px;margin-top:12px;">
+    <h2 style="margin:0 0 6px;font-size:15px;color:{{c.accent}};">📌 Le delta du jour</h2>
+    <ul style="margin:0;padding-left:18px;font-size:14px;">{% for d in delta_of_the_day %}<li style="margin:3px 0;">{{d}}</li>{% endfor %}</ul>
+  </div>{% endif %}
+  {% if morning_reco_evolution %}
+  <h2 style="margin:16px 4px 6px;font-size:15px;color:{{c.accent}};">🎯 Évolution des recos du matin</h2>
+  {% for r in morning_reco_evolution %}
+  <div style="background:{{c.card}};border-radius:6px;padding:10px 12px;margin-bottom:8px;font-size:13px;">
+    <strong>{{r.asset}}</strong> · {{r.morning_action}} → <span style="color:{{c.muted}};">{{r.status}}</span>
+    {% if r.current_evidence %}<div style="margin-top:3px;">{{r.current_evidence}}</div>{% endif %}
+    {% if r.advice %}<div style="margin-top:3px;font-weight:600;">{{r.advice}}</div>{% endif %}
+  </div>{% endfor %}{% endif %}
+  {% if market_evolution %}
+  <h2 style="margin:16px 4px 6px;font-size:15px;color:{{c.accent}};">📈 Ce qui a évolué</h2>
+  {% for m in market_evolution %}
+  <div style="font-size:13px;padding:5px 8px;margin-bottom:4px;border-left:2px solid {% if m.change_type=='improvement' %}{{c.success}}{% elif m.change_type=='new' %}{{c.info}}{% else %}{{c.warning}}{% endif %};">{{m.fact}}</div>
+  {% endfor %}{% endif %}
+  {% if tonight_and_night %}
+  <div style="background:{{c.card}};border-radius:6px;padding:12px 14px;margin-top:12px;">
+    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.accent}};">🌃 Soirée et nuit</h2>
+    {% for e in tonight_and_night %}<div style="font-size:13px;margin:3px 0;"><strong>{{e.time}}</strong> · {{e.event}}</div>{% endfor %}
+  </div>{% endif %}
+  {% if tomorrow_morning_setup %}
+  <div style="background:#f9fafb;border-radius:6px;padding:12px 14px;margin-top:10px;">
+    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.accent}};">🔭 Setup demain matin</h2>
+    <ul style="margin:0;padding-left:18px;font-size:13px;">{% for s in tomorrow_morning_setup %}<li style="margin:2px 0;">{{s}}</li>{% endfor %}</ul>
+  </div>{% endif %}
+  {% if actions_tonight_optional %}
+  <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:10px 12px;margin-top:10px;">
+    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.warning}};">✅ Actions ce soir (optionnel)</h2>
+    <ul style="margin:0;padding-left:18px;font-size:13px;">{% for a in actions_tonight_optional %}<li style="margin:2px 0;">{{a}}</li>{% endfor %}</ul>
+  </div>{% endif %}
+  {% if blind_spots_evening %}<div style="font-size:12px;color:{{c.muted}};margin:14px 4px;border-top:1px dashed {{c.border}};padding-top:8px;">🕳️ Angles morts : {{blind_spots_evening}}</div>{% endif %}
+  <div style="margin-top:18px;padding-top:10px;border-top:1px solid {{c.border}};font-size:11px;color:{{c.muted}};text-align:center;">
+    {% if footer.next_report_at %}Prochain rapport : {{footer.next_report_at}}. {% endif %}{{disclaimer}}
+  </div>
+</div></body></html>

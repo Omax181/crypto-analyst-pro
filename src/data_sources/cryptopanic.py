@@ -7,6 +7,7 @@ demandé, filtrées par devises spécifiques du portfolio.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from src.data_sources.http import get_json
@@ -18,6 +19,32 @@ logger = get_logger(__name__)
 
 _SOURCES = load_config("sources")
 _BASE = _SOURCES["endpoints"]["cryptopanic"]
+
+# Mots-clés à fort impact pour le filtrage news (RÈGLE 8).
+HIGH_IMPACT_KEYWORDS = (
+    "hack", "exploit", "breach", "lawsuit", "sec ", "listing", "delisting",
+    "upgrade", "partnership", "etf", "halt", "depeg", "bankrupt", "ban",
+)
+
+
+def parse_timestamp(value: str) -> Optional[datetime]:
+    """Parse un timestamp ISO CryptoPanic en datetime aware (UTC).
+
+    Args:
+        value: chaîne ISO 8601 (ex. ``"2026-05-25T22:00:00Z"``).
+
+    Returns:
+        ``datetime`` timezone-aware en UTC, ou ``None`` si non parsable.
+    """
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _vote_sentiment(votes: dict[str, Any]) -> float:
@@ -98,3 +125,60 @@ def news_score_by_symbol(news: dict[str, Any], symbols: list[str]) -> dict[str, 
         raw = scores[sym] + 0.2 * counts[sym]
         out[sym] = round(min(raw, 1.0), 2)
     return out
+
+
+def get_recent_news(symbol: Optional[str] = None, hours: int = 24) -> list[dict[str, Any]]:
+    """Retourne UNIQUEMENT les news publiées dans les ``hours`` dernières heures.
+
+    Corrige le bug "news inventées/périmées" (RÈGLE 8) : tout item dont le
+    timestamp est plus ancien que la fenêtre est rejeté.
+
+    Args:
+        symbol: ticker à filtrer (``None`` = global).
+        hours: fenêtre temporelle en heures.
+
+    Returns:
+        Liste d'items news récents (``[]`` si aucun, ou si source indisponible).
+    """
+    currencies = [symbol] if symbol else None
+    news = get_news(currencies=currencies, limit=50)
+    if not news.get("available"):
+        return []
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    recent: list[dict[str, Any]] = []
+    for item in news.get("items", []):
+        ts = parse_timestamp(item.get("published_at"))
+        if ts is not None and ts > cutoff:
+            recent.append(item)
+    logger.info(
+        "CryptoPanic : %d news <%dh pour %s.", len(recent), hours, symbol or "global"
+    )
+    return recent
+
+
+def check_keywords_recent(
+    keywords: list[str], hours: int = 1, symbols: Optional[list[str]] = None
+) -> Optional[dict[str, Any]]:
+    """Détecte une news récente contenant un des mots-clés (pour le panic mode).
+
+    Args:
+        keywords: mots-clés à chercher dans les titres (insensible à la casse).
+        hours: fenêtre temporelle.
+        symbols: restreindre aux devises données (``None`` = global).
+
+    Returns:
+        Le premier item news matchant, ou ``None``.
+    """
+    news = get_news(currencies=symbols, limit=50)
+    if not news.get("available"):
+        return None
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    kws = [k.lower() for k in keywords]
+    for item in news.get("items", []):
+        ts = parse_timestamp(item.get("published_at"))
+        if ts is None or ts <= cutoff:
+            continue
+        title = (item.get("title") or "").lower()
+        if any(k in title for k in kws):
+            return item
+    return None
