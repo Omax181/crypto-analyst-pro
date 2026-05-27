@@ -39,6 +39,9 @@ from src.data_sources import (
     reddit,
     telegram_channels,
     tradingview,
+    gdelt,
+    geopolitics,
+    world_bank,
 )
 from src.reporting.email_sender import send_email
 from src.state import report_memory as mem
@@ -135,6 +138,9 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     rotation = sector_rotation(market)
 
     news_counts = {s: len(cryptopanic.get_recent_news(s, hours=24)) for s in symbols}
+    geopo = geopolitics.get_geopolitics()
+    gdelt_events = gdelt.get_gdelt_events()
+    worldbank = world_bank.get_world_bank_macro()
     telegram = telegram_channels.get_telegram_messages()
 
     enriched: dict[str, dict[str, Any]] = {}
@@ -186,13 +192,14 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
              "ath_distance_pct": enriched[s]["ath_distance_pct"]}
             for s in enriched
         ],
-        "blind_spots": _blind_spots(onchain, polymarket, etf, telegram),
+        "geopolitics": geopo, "gdelt": gdelt_events, "world_bank": worldbank,
+        "blind_spots": _blind_spots(onchain, polymarket, etf, telegram, geopo, gdelt_events, worldbank),
     }
 
 
 def _blind_spots(*sources: dict[str, Any]) -> str:
     """Construit la phrase d'angles morts à partir des sources indisponibles."""
-    labels = ["on-chain avancé", "Polymarket", "ETF flows", "Telegram"]
+    labels = ["on-chain avancé", "Polymarket", "ETF flows", "Telegram", "géopolitique", "GDELT", "World Bank"]
     missing = [labels[i] for i, src in enumerate(sources) if not src.get("available")]
     base = "Arkham non actif · Bloomberg/Reuters non accessibles"
     return base + (" · indisponibles : " + ", ".join(missing) if missing else "")
