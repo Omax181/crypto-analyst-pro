@@ -73,6 +73,7 @@
   <div style="background:{{c.card}};border-left:3px solid {% if t.action in ['RENFORCER','ALLEGER'] %}{{c.warning}}{% else %}{{c.info}}{% endif %};border-radius:6px;padding:12px 14px;margin-bottom:12px;">
     <div style="font-weight:700;font-size:15px;">{{t.asset}} · {{t.action}}{% if t.confidence %} <span style="font-weight:400;color:{{c.muted}};font-size:13px;">· confiance {{t.confidence}}% · {{t.action_size}}</span>{% endif %}</div>
     {% if t.observation %}<p style="margin:6px 0;font-size:14px;">{{t.observation}}</p>{% endif %}
+    {% if charts and charts[t.asset] %}<div style="margin:8px 0;text-align:center;"><img src="data:image/png;base64,{{charts[t.asset]}}" alt="{{t.asset}} chart" style="max-width:100%;border:1px solid {{c.border}};border-radius:4px;"></div>{% endif %}
     {% if t.reasoning_signals %}<ul style="margin:4px 0;padding-left:18px;font-size:13px;">{% for s in t.reasoning_signals %}<li style="margin:2px 0;">{{s}}</li>{% endfor %}</ul>{% endif %}
     {% if t.historical_pattern and t.historical_pattern.verified %}<div style="font-size:12px;color:{{c.muted}};">📊 Pattern {{t.historical_pattern.win_rate}} · move moyen {{t.historical_pattern.avg_move_pct}}% · {{t.historical_pattern.data_source}}</div>{% endif %}
     {% if t.self_critique %}<div style="font-size:12px;color:{{c.muted}};font-style:italic;margin:6px 0;">🔍 {{t.self_critique}}</div>{% endif %}

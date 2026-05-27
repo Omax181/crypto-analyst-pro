@@ -113,3 +113,89 @@ def get_global() -> dict[str, Any]:
         "eth_dominance_pct": d.get("market_cap_percentage", {}).get("eth"),
         "market_cap_change_24h_pct": d.get("market_cap_change_percentage_24h_usd"),
     }
+
+
+def get_ohlc(symbol: str, days: int = 90) -> Optional[list[dict[str, float]]]:
+    """Récupère les bougies OHLC via CoinGecko (remplace Binance, non géo-bloqué).
+
+    Args:
+        symbol: ticker du portfolio (ex. ``"BTC"``).
+        days: profondeur d'historique (1/7/14/30/90/180/365).
+
+    Returns:
+        Liste de dicts ``{open, high, low, close}`` (granularité ~4j pour
+        days>=31, ~4h pour 3-30j) ou ``None`` si indisponible.
+    """
+    cg_id = _CG_IDS.get(symbol)
+    if not cg_id:
+        return None
+    base, headers = _base_and_headers()
+
+    def _fetch() -> Optional[list[Any]]:
+        return get_json(
+            f"{base}/coins/{cg_id}/ohlc",
+            params={"vs_currency": "usd", "days": days},
+            headers=headers,
+        )
+
+    raw = CACHE.get_or_compute(f"cg:ohlc:{cg_id}:{days}", 1800, _fetch)
+    if not isinstance(raw, list) or not raw:
+        return None
+    return [
+        {"open": float(c[1]), "high": float(c[2]), "low": float(c[3]), "close": float(c[4])}
+        for c in raw
+        if len(c) >= 5
+    ]
+
+
+def get_price_volume_series(symbol: str, days: int = 30) -> Optional[dict[str, list[float]]]:
+    """Récupère les séries prix et volume journalières (pour anomalies de volume).
+
+    Args:
+        symbol: ticker.
+        days: nombre de jours.
+
+    Returns:
+        Dict ``{closes: [...], volumes: [...]}`` ou ``None``.
+    """
+    cg_id = _CG_IDS.get(symbol)
+    if not cg_id:
+        return None
+    base, headers = _base_and_headers()
+
+    def _fetch() -> Optional[dict[str, Any]]:
+        return get_json(
+            f"{base}/coins/{cg_id}/market_chart",
+            params={"vs_currency": "usd", "days": days, "interval": "daily"},
+            headers=headers,
+        )
+
+    raw = CACHE.get_or_compute(f"cg:chart:{cg_id}:{days}", 1800, _fetch)
+    if not isinstance(raw, dict):
+        return None
+    prices = [p[1] for p in raw.get("prices", []) if len(p) >= 2]
+    volumes = [v[1] for v in raw.get("total_volumes", []) if len(v) >= 2]
+    if not prices:
+        return None
+    return {"closes": prices, "volumes": volumes}
+
+
+def short_window_change_cg(symbol: str, hours: int = 1) -> Optional[float]:
+    """Variation de prix (%) sur une courte fenêtre via CoinGecko (pour panic mode).
+
+    Args:
+        symbol: ticker.
+        hours: fenêtre en heures (approximée sur données journalières si besoin).
+
+    Returns:
+        Variation en pourcentage, ou ``None``.
+    """
+    series = get_price_volume_series(symbol, days=1)
+    if not series or len(series["closes"]) < 2:
+        return None
+    closes = series["closes"]
+    n = max(2, min(len(closes), hours + 1))
+    start, end = closes[-n], closes[-1]
+    if start == 0:
+        return None
+    return (end - start) / start * 100

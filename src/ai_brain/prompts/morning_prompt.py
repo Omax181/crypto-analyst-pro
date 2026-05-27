@@ -73,16 +73,27 @@ PORTFOLIO :
 {portfolio_yaml}
 
 INSTRUCTIONS :
+0. SOURCES ACTIVES ce matin = data.active_sources. INTERDICTION ABSOLUE de citer
+   une news, une donnée macro/on-chain ou une statistique provenant d'une source
+   ABSENTE de cette liste. Si "News" n'est pas dans active_sources : écrire
+   "pas de news majeure vérifiée · marché en silence", ne JAMAIS inventer de
+   titre, de source (ex. "geopolitics") ni d'heure. Toute donnée non présente
+   dans le JSON fourni est INVENTÉE et donc interdite.
 1. Construis "l'histoire du jour" : 3 fils narratifs croisés (macro/on-chain/
-   individuel).
+   individuel) UNIQUEMENT à partir des données fournies.
 2. Pour chaque actif de data.eligible_theses UNIQUEMENT, produis une thèse
    complète respectant la RÈGLE 10. N'invente aucune thèse hors de cette liste
-   (le seuil de signaux adaptatif a déjà filtré).
+   (le seuil de signaux adaptatif a déjà filtré). Chaque thèse DOIT exploiter,
+   si présents, les champs fibonacci, bollinger, support_resistance, tvl,
+   social, signals_detail de l'actif : cite les niveaux chiffrés (support,
+   résistance, bande de Bollinger, niveaux de Fibonacci) dans l'observation et
+   le plan d'action. C'est ce qui rend l'analyse technique crédible.
 3. Reprends le tracking des recos actives (data.active_recommendations).
-4. Indicateurs on-chain, rotation sectorielle (8 secteurs), news <24h taggées.
+4. Indicateurs on-chain, rotation sectorielle (secteurs réels de data), news
+   <24h taggées (si la source News est active uniquement).
 5. Récapitule les positions (all_positions_summary) avec statut fondé, sans
    copier-coller le même paragraphe.
-6. Termine par les angles morts (sources inactives).
+6. Termine par les angles morts (data.blind_spots) — recopie-les fidèlement.
 
 {OUTPUT_CONTRACT}
 Disclaimer à placer dans footer : "{DISCLAIMER}"

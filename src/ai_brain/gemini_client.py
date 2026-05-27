@@ -1,4 +1,4 @@
-"""Client Gemini V2 : utilise google.genai (nouvelle API, remplace google.generativeai)."""
+"""Client Gemini V2 : utilise google.genai (nouvelle API)."""
 from __future__ import annotations
 import json, os
 from typing import Any, Optional
@@ -6,8 +6,10 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 _DEFAULT_MODEL = "gemini-2.5-flash"
 
+
 class GeminiQuotaError(RuntimeError):
     pass
+
 
 class GeminiClient:
     def __init__(self, model: Optional[str] = None) -> None:
@@ -24,8 +26,7 @@ class GeminiClient:
         try:
             resp = self._client.models.generate_content(
                 model=self.model_name, contents=prompt,
-                config=types.GenerateContentConfig(temperature=temperature)
-            )
+                config=types.GenerateContentConfig(temperature=temperature))
             return resp.text or ""
         except Exception as exc:
             self._raise_if_quota(exc); raise
@@ -36,14 +37,11 @@ class GeminiClient:
             resp = self._client.models.generate_content(
                 model=self.model_name, contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=temperature,
-                    response_mime_type="application/json"
-                )
-            )
+                    temperature=temperature, response_mime_type="application/json"))
             return self._parse_json(resp.text or "{}")
         except Exception as exc:
             self._raise_if_quota(exc)
-            logger.warning("generate_json fallback texte: %s", exc)
+            logger.warning("generate_json fallback texte : %s", exc)
             return self._parse_json(self.generate(prompt, temperature=temperature))
 
     def generate_with_search(self, prompt: str) -> tuple[str, list[str]]:
@@ -52,9 +50,7 @@ class GeminiClient:
             resp = self._client.models.generate_content(
                 model=self.model_name, contents=prompt,
                 config=types.GenerateContentConfig(
-                    tools=[types.Tool(google_search=types.GoogleSearch())]
-                )
-            )
+                    tools=[types.Tool(google_search=types.GoogleSearch())]))
             return resp.text or "", []
         except Exception as exc:
             self._raise_if_quota(exc)
@@ -71,9 +67,12 @@ class GeminiClient:
         except json.JSONDecodeError:
             s, e = cleaned.find("{"), cleaned.rfind("}")
             if s != -1 and e > s:
-                try: return json.loads(cleaned[s:e+1])
-                except: pass
-        logger.error("Impossible de parser le JSON Gemini."); return {}
+                try:
+                    return json.loads(cleaned[s:e + 1])
+                except json.JSONDecodeError:
+                    pass
+        logger.error("Impossible de parser le JSON Gemini.")
+        return {}
 
     @staticmethod
     def _raise_if_quota(exc: Exception) -> None:

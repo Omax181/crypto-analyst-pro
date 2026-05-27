@@ -47,12 +47,13 @@ _TEMPLATE_BY_KIND = {
 }
 
 
-def render(payload: dict[str, Any], kind: str) -> str:
+def render(payload: dict[str, Any], kind: str, charts: dict[str, str] | None = None) -> str:
     """Rend le HTML d'un rapport selon son type.
 
     Args:
         payload: dict produit par Gemini (déjà validé par coherence_checker).
         kind: type de rapport (``morning``/``evening``/``weekly``/``panic``).
+        charts: dict ``{symbol: base64_png}`` pour les graphiques de thèses.
 
     Returns:
         HTML complet prêt à l'envoi.
@@ -66,6 +67,7 @@ def render(payload: dict[str, Any], kind: str) -> str:
     context: dict[str, Any] = dict(payload)
     context["c"] = _COLORS
     context["disclaimer"] = DISCLAIMER
+    context["charts"] = charts or {}
     context.setdefault("header", {})
     context.setdefault("footer", {})
 

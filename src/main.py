@@ -25,23 +25,24 @@ from src.analytics.narratives import sector_rotation
 from src.analytics.technical import evaluate_technical
 from src.analytics.tier_resolver import min_signals_for_firm_reco, resolve_tier
 from src.data_sources import (
-    binance,
     coingecko,
     coinglass,
     cryptopanic,
+    defillama,
     econ_calendar,
     etf_flows,
     fear_greed,
     fred,
     github_dev,
+    kaito,
+    lunarcrush,
     onchain_advanced,
     prediction_markets,
     reddit,
-    telegram_channels,
+    technical_advanced,
+    telegram_reader,
+    token_unlocks,
     tradingview,
-    gdelt,
-    geopolitics,
-    world_bank,
 )
 from src.reporting.email_sender import send_email
 from src.state import report_memory as mem
@@ -73,23 +74,47 @@ def _build_asset_signals(
     symbol: str, market: dict[str, Any], reddit_sentiment: float,
     news_24h_count: int, sector_change: float | None, derivatives: dict[str, Any],
 ) -> dict[str, Any]:
-    """Construit les 9 signaux d'un actif pour le score composite."""
+    """Construit les 9 signaux d'un actif (OHLCV via CoinGecko, non géo-bloqué)."""
     tech = evaluate_technical(tradingview.get_technical(symbol))
     tech_score = tech.get("score")
 
+    # Technique avancée (Fibonacci, Bollinger, support/résistance) via CoinGecko.
+    tech_adv = technical_advanced.get_technical_advanced(symbol)
+    boll = (tech_adv.get("bollinger") or {}) if tech_adv.get("available") else {}
+    # La position Bollinger module le score technique (bas de bande = signal d'achat).
+    if boll.get("available"):
+        if boll.get("position") == "lower":
+            tech_score = min(100.0, (tech_score or 50) + 12)
+        elif boll.get("position") == "upper":
+            tech_score = max(0.0, (tech_score or 50) - 12)
+
+    # Anomalie de volume via série journalière CoinGecko.
     vol_score = None
-    klines = binance.get_klines(symbol, interval="4h", limit=31)
-    if klines and len(klines) >= 10:
-        vols = [k["volume"] for k in klines]
+    series = coingecko.get_price_volume_series(symbol, days=30)
+    if series and len(series.get("volumes", [])) >= 10:
+        vols = series["volumes"]
         avg = sum(vols[:-1]) / max(len(vols) - 1, 1)
         if avg > 0:
             ratio = vols[-1] / avg
             vol_score = max(0.0, min(100.0, 50 + (ratio - 1) * 25))
 
+    # Fondamental : dev GitHub + tendance TVL DeFiLlama.
     dev = github_dev.get_dev_activity(symbol)
-    fundamental = fundamental_score_from_signals(dev_activity=dev)
+    tvl = defillama.get_protocol_tvl(symbol)
+    fundamental = fundamental_score_from_signals(
+        dev_activity=dev, tvl_trend=tvl.get("tvl_trend_7d") if tvl.get("available") else None
+    )
+
+    # Social : LunarCrush (Galaxy Score) en priorité, sinon Reddit.
+    social_data = lunarcrush.get_social_metrics(symbol)
+    if social_data.get("available") and social_data.get("galaxy_score") is not None:
+        social = max(0.0, min(100.0, float(social_data["galaxy_score"])))
+        social_active = True
+    else:
+        social = max(0.0, min(100.0, 50 + reddit_sentiment * 25))
+        social_active = bool(reddit_sentiment)
+
     news_score = max(0.0, min(100.0, 50 + news_24h_count * 8))
-    social = max(0.0, min(100.0, 50 + reddit_sentiment * 25))
     sector_score = (
         max(0.0, min(100.0, 50 + sector_change * 2)) if sector_change is not None else None
     )
@@ -105,13 +130,14 @@ def _build_asset_signals(
         "derivatives": deriv_score,
         "sector_rotation": sector_score,
         "news_24h": news_score if news_24h_count else None,
-        "social_sentiment": social if reddit_sentiment else None,
+        "social_sentiment": social if social_active else None,
         "fundamental": fundamental,
         "macro_alignment": None,
     }
     score = composite_score(signals)
     return {
         "signals": signals, "score": score, "technical": tech, "dev": dev,
+        "tech_advanced": tech_adv, "tvl": tvl, "social": social_data,
         "derivatives": derivatives, "price": market.get("price"),
         "change_24h": market.get("change_24h"),
         "ath_distance_pct": compute_ath_distance(
@@ -138,10 +164,11 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     rotation = sector_rotation(market)
 
     news_counts = {s: len(cryptopanic.get_recent_news(s, hours=24)) for s in symbols}
-    geopo = geopolitics.get_geopolitics()
-    gdelt_events = gdelt.get_gdelt_events()
-    worldbank = world_bank.get_world_bank_macro()
-    telegram = telegram_channels.get_telegram_messages()
+    telegram = telegram_reader.get_telegram_news(hours=24)
+    defi = defillama.get_defi_tvl()
+    narratives = kaito.get_trending_narratives()
+    social_trending = lunarcrush.get_trending_coins()
+    unlocks = token_unlocks.get_upcoming_unlocks(days_ahead=30)
 
     enriched: dict[str, dict[str, Any]] = {}
     eligible: list[dict[str, Any]] = []
@@ -164,12 +191,24 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         enriched[sym] = asset
         needed = min_signals_for_firm_reco(tier)
         if needed < 999 and asset["score"]["signals_count"] >= needed:
+            ta = asset.get("tech_advanced") or {}
             eligible.append({
                 "asset": sym, "tier": tier,
                 "signals_count": asset["score"]["signals_count"],
+                "bullish_count": asset["score"]["bullish_count"],
+                "bearish_count": asset["score"]["bearish_count"],
                 "composite": asset["score"]["total"],
+                "price": asset["price"],
                 "change_24h": asset["change_24h"],
+                "ath_distance_pct": asset["ath_distance_pct"],
                 "technical_signal": asset["technical"].get("dominant_signal"),
+                "signals_detail": asset["score"]["components"],
+                "fibonacci": ta.get("fibonacci") if ta.get("available") else None,
+                "bollinger": ta.get("bollinger") if ta.get("available") else None,
+                "support_resistance": ta.get("support_resistance") if ta.get("available") else None,
+                "tvl": asset.get("tvl") if asset.get("tvl", {}).get("available") else None,
+                "social": asset.get("social") if asset.get("social", {}).get("available") else None,
+                "dev_activity": asset.get("dev") if asset.get("dev", {}).get("available") else None,
             })
     eligible.sort(key=lambda e: (e["tier"], -e["signals_count"]))
 
@@ -178,29 +217,57 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     active_recos = tracker.refresh_active(price_lookup)
     win_rate = tracker.compute_win_rate(30)
 
+    active_sources = _active_sources(
+        market=market, fng=fng, macro=macro, onchain=onchain, polymarket=polymarket,
+        etf=etf, telegram=telegram, defi=defi, narratives=narratives,
+        social=social_trending, unlocks=unlocks, news=any(news_counts.values()),
+    )
+
     return {
         "market_global": glob, "fear_greed": fng, "macro": macro,
         "economic_calendar": calendar, "onchain_indicators": onchain,
         "polymarket": polymarket, "etf_flows": etf, "reddit": reddit_data,
-        "telegram": telegram, "sector_rotation": rotation, "news_counts": news_counts,
+        "telegram": telegram, "defi_tvl": defi, "kaito_narratives": narratives,
+        "social_trending": social_trending, "token_unlocks": unlocks,
+        "sector_rotation": rotation, "news_counts": news_counts,
+        "active_sources": active_sources,
         "eligible_theses": eligible[:5], "active_recommendations": active_recos,
         "win_rate": win_rate,
         "all_positions_summary": [
             {"asset": s, "tier": enriched[s]["tier"],
              "change_24h": enriched[s]["change_24h"],
              "composite": enriched[s]["score"]["total"],
+             "signals_count": enriched[s]["score"]["signals_count"],
              "ath_distance_pct": enriched[s]["ath_distance_pct"]}
             for s in enriched
         ],
-        "geopolitics": geopo, "gdelt": gdelt_events, "world_bank": worldbank,
-        "blind_spots": _blind_spots(onchain, polymarket, etf, telegram, geopo, gdelt_events, worldbank),
+        "blind_spots": _blind_spots(onchain, polymarket, etf, telegram, defi),
     }
+
+
+def _active_sources(**flags: Any) -> list[str]:
+    """Liste lisible des sources réellement actives (anti-fabrication)."""
+    out: list[str] = []
+    mapping = {
+        "market": "CoinGecko", "fng": "Fear&Greed", "macro": "FRED",
+        "onchain": "On-chain", "polymarket": "Polymarket", "etf": "ETF flows",
+        "telegram": "Telegram", "defi": "DeFiLlama", "narratives": "Kaito",
+        "social": "LunarCrush", "unlocks": "Token Unlocks", "news": "News",
+    }
+    for key, label in mapping.items():
+        val = flags.get(key)
+        ok = bool(val) if isinstance(val, bool) else bool(val and (
+            val.get("available") if isinstance(val, dict) else val))
+        if ok:
+            out.append(label)
+    return out
 
 
 def _blind_spots(*sources: dict[str, Any]) -> str:
     """Construit la phrase d'angles morts à partir des sources indisponibles."""
-    labels = ["on-chain avancé", "Polymarket", "ETF flows", "Telegram", "géopolitique", "GDELT", "World Bank"]
-    missing = [labels[i] for i, src in enumerate(sources) if not src.get("available")]
+    labels = ["on-chain avancé", "Polymarket", "ETF flows", "Telegram", "DeFiLlama"]
+    missing = [labels[i] for i, src in enumerate(sources)
+               if not (src.get("available") if isinstance(src, dict) else src)]
     base = "Arkham non actif · Bloomberg/Reuters non accessibles"
     return base + (" · indisponibles : " + ", ".join(missing) if missing else "")
 
@@ -221,9 +288,13 @@ def run_morning() -> int:
     payload = checked["sanitized_payload"]
     payload.setdefault("footer", {})["next_report_at"] = _next_report_label("morning")
     mem.save_morning_report(payload)
-    html = _render(payload, "morning")
+    # Graphiques prix+Bollinger pour les thèses retenues.
+    from src.reporting import charts
+    chart_imgs = charts.charts_for_theses(payload.get("thesis_of_the_day") or [], limit=4)
+    html = _render(payload, "morning", charts=chart_imgs)
     ok = send_email(f"\u2600\ufe0f Veille crypto \u00b7 matin \u00b7 {datetime.now(TZ):%d/%m}", html)
-    logger.info("Matin: %s (alertes cohérence: %d)", ok, len(checked["warnings"]))
+    logger.info("Matin: %s (cohérence: %d corr · %d graphiques)",
+                ok, len(checked["warnings"]), len(chart_imgs))
     return 0 if ok else 1
 
 
@@ -303,11 +374,11 @@ def run_panic_check() -> int:
     portfolio = portfolio_data["portfolio"]
     symbols = [s for s, i in portfolio.items() if i.get("role") != "cash_reserve"]
     triggers: list[dict[str, Any]] = []
-    btc_1h = binance.short_window_change("BTC", window_hours=1)
+    btc_1h = coingecko.short_window_change_cg("BTC", hours=1)
     if btc_1h is not None and abs(btc_1h) >= cfg["btc_1h_abs_pct"]:
         triggers.append({"type": "btc_move", "detail": f"BTC {btc_1h:+.1f}% en 1h"})
     for sym in symbols:
-        ch = binance.short_window_change(sym, window_hours=1)
+        ch = coingecko.short_window_change_cg(sym, hours=1)
         if ch is not None and ch <= cfg["asset_1h_drop_pct"]:
             triggers.append({"type": "asset_crash", "detail": f"{sym} {ch:.0f}% en 1h"})
     hack = cryptopanic.check_keywords_recent(cfg["hack_keywords"], hours=1, symbols=symbols)
@@ -339,10 +410,10 @@ def run_panic_check() -> int:
     return 0 if ok else 1
 
 
-def _render(payload: dict[str, Any], kind: str) -> str:
+def _render(payload: dict[str, Any], kind: str, charts: dict[str, str] | None = None) -> str:
     """Rend le HTML du rapport selon son type."""
     from src.reporting import email_html
-    return email_html.render(payload, kind)
+    return email_html.render(payload, kind, charts=charts)
 
 
 def main() -> int:
