@@ -1,29 +1,29 @@
-# =============================================================================
-# YOUTUBE CHANNELS — chaînes de référence à scanner (vidéos < 24h)
-# Logique : récupérer les transcripts récents, les passer à Gemini pour une
-# SYNTHÈSE GLOBALE. NE JAMAIS citer une chaîne individuellement dans le rapport.
-# =============================================================================
-
 youtube_channels:
-  fr_analysis:
-    - "Crypto pour tous"
+  crypto_analysis:
+    - "cryptopourtous75"
+    - "CryptoETBoursepourTous75"
     - "Hasheur"
-    - "Bourse pour tous"
-  en_analysis:
-    - "Coin Bureau"
-    - "Benjamin Cowen"
-    - "InvestAnswers"
-  fr_macro:
-    - "Heu?reka"
-    - "HugoDécrypte"
+    - "Crypto-wavetrading"
+    - "mohamedadany"
+    - "Bankless"
+  macro_geopo:
+    - "PerunAU"
+    - "charles-gave"
+    - "TheEconomist"
+    - "CaspianReport"
 
-# Optionnel : channel IDs explicites (évite une recherche par nom, plus fiable).
-# Format : "Nom affiché": "UCxxxxxxxxxxxxxxxxxxxxxx"
-# Laisser vide => résolution par recherche YouTube Data API.
-channel_ids: {}
+channel_handles:
+  cryptopourtous75: "@cryptopourtous75"
+  CryptoETBoursepourTous75: "@CryptoETBoursepourTous75"
+  Hasheur: "@Hasheur"
+  PerunAU: "@PerunAU"
+  Crypto-wavetrading: "@Crypto-wavetrading"
+  mohamedadany: "@mohamedadany"
+  charles-gave: "@charles-gave"
+  Bankless: "@Bankless"
+  TheEconomist: "@TheEconomist"
+  CaspianReport: "@CaspianReport"
 
 settings:
   max_age_hours: 24
-  max_videos_per_channel: 2
-  transcript_languages: ["fr", "en"]
-  priority_channel: "Crypto pour tous"   # scanné en premier, résumé dédié
+  max_videos_per_channel: 3
