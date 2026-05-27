@@ -1,12 +1,19 @@
 # Canaux Telegram publics à scraper via Telethon.
 # Nécessite TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_SESSION_STRING (secrets).
+
 telegram_channels:
   watcher_guru:
     handle: "WatcherGuru"
-    filter: false          # chaîne déjà spécialisée crypto -> tout remonter
+    filter: false        # chaîne déjà spécialisée crypto -> tout remonter
   brics_news:
-    handle: "BRICSinfo"     # handle à confirmer
-    filter: true            # ne remonter que si mots-clés pertinents
+    handle: "bricsnews"
+    filter: true         # ne remonter que si mots-clés pertinents
+  crypto_news:
+    handle: "news_crypto"
+    filter: false        # chaîne crypto -> tout remonter
+  etf_flows:
+    handle: "ETF_Flows"
+    filter: false        # données ETF -> tout remonter
 
 keywords_filter:
   - payment
@@ -19,6 +26,9 @@ keywords_filter:
   - sanction
   - bitcoin
   - stablecoin
+  - etf
+  - fed
+  - rate
 
 settings:
   max_messages_per_channel: 15
