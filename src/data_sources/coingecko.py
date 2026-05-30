@@ -59,7 +59,7 @@ def get_market_data(symbols: list[str]) -> dict[str, dict[str, Any]]:
                 params={
                     "vs_currency": "usd",
                     "ids": ",".join(chunk),
-                    "price_change_percentage": "24h",
+                    "price_change_percentage": "24h,7d",
                 },
                 headers=headers,
             )
@@ -80,7 +80,8 @@ def get_market_data(symbols: list[str]) -> dict[str, dict[str, Any]]:
             "price": price,
             "market_cap": coin.get("market_cap"),
             "volume_24h": coin.get("total_volume"),
-            "change_24h": coin.get("price_change_percentage_24h"),
+            "change_24h": coin.get("price_change_percentage_24h_in_currency") or coin.get("price_change_percentage_24h"),
+            "change_7d": coin.get("price_change_percentage_7d_in_currency"),
             "ath": ath,
             "atl": coin.get("atl"),
             "change_from_ath_pct": change_from_ath,

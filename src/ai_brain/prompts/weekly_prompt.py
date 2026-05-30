@@ -17,16 +17,23 @@ from src.ai_brain.prompts.analyst_persona import (
 
 _WEEKLY_SCHEMA = """
 {
-  "header": {"week","ptf_perf_week_pct"},
-  "weekly_narrative": "string (bilan court)",
-  "weekly_predictions_scoring": {"win_rate_pct","validated","invalidated","neutral","lesson"},
-  "portfolio_overview": {"perf_week_pct","drawdown_pct","sector_exposure_vs_market": [{"sector","ptf_pct","market_signal"}]},
-  "next_week_calendar": [{"date","event","impact"}],
-  "next_week_scenarios": [{"scenario": "bearish|neutral|bullish","probability_pct","description","actions": [..]}],
-  "exit_plan_dust": [{"asset","value_usd","spike_target_pct","status"}],
-  "long_term_targets_review": [{"asset","target_6_12m_low","target_6_12m_high","rationale"}],
-  "active_sources_week": ["string"],
-  "footer": {"next_report_at"}
+  "header": {"date","time_casablanca","week_number (int)","upcoming_week (ex. '2-8 juin')"},
+  "portfolio_snapshot": {"value_usd","change_7d_pct","change_7d_usd","vs_btc_7d_pct","drawdown_ath_pct","drawdown_change_pts","usdc_pct","usdc_usd"},
+  "weekly_summary": "string (PROSE 5-8 phrases : bilan complet de la semaine avec chiffres)",
+  "predictions_scoring": {
+    "issued (int)","validated (int)","invalidated (int)","win_rate_pct",
+    "detail": [{"asset","reco (RENFORCER/ALLÉGER/SURVEILLER/...)","result (1 phrase chiffrée)","score (+1, -1, 0)"}],
+    "lesson": "string (PROSE : leçon de la semaine + action correctrice)"
+  },
+  "predictions_empty_reason": "string (REQUIS si pas d'historique : ex. 'Première semaine, pas encore d historique')",
+  "sector_exposure": [{"sector","ptf_pct","market_pct","color (hex)"}],
+  "concentration_reading": "string (PROSE : lecture concentration + recommandation structurelle)",
+  "upcoming_calendar": [{"day (ex. 'Mer 18h')","day_bg (hex)","day_color (hex)","title","impact_label (Impact élevé/moyen/Catalyseur crypto)","detail (PROSE)"}],
+  "scenarios": [{"type (bearish|neutral|bullish)","label (ex. 'baissier')","probability_pct","description (PROSE)","action (PROSE : que faire)"}],
+  "exit_plan": {"subtitle","diagnosis (PROSE chiffrée)","monitoring (PROSE : comment l'agent surveille)"},
+  "long_term_positioning": [{"asset","thesis","target","status (en route/consolide/accumulation/à surveiller/stable)","status_color (hex)"}],
+  "sources_review": {"summary (PROSE bilan sources)","gaps (PROSE lacunes structurelles)"},
+  "footer": {"next_morning","next_weekly"}
 }
 """
 

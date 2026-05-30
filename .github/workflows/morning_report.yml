@@ -2,6 +2,8 @@ name: Morning Crypto Report
 
 on:
   schedule:
+    # 8h30 Casablanca (UTC+1) = 7h30 UTC. Note : pendant le Ramadan le Maroc
+    # repasse à UTC+0, l'envoi serait alors à 7h30 local (à ajuster si besoin).
     - cron: '30 7 * * *'
   workflow_dispatch:
 

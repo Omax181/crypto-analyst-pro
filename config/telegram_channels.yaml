@@ -3,10 +3,16 @@
 telegram_channels:
   watcher_guru:
     handle: "WatcherGuru"
-    filter: false          # chaîne déjà spécialisée crypto -> tout remonter
+    filter: false          # chaîne news généraliste rapide -> tout remonter
   brics_news:
-    handle: "BRICSinfo"     # handle à confirmer
-    filter: true            # ne remonter que si mots-clés pertinents
+    handle: "bricsnews"
+    filter: true           # ne remonter que si mots-clés pertinents
+  news_crypto:
+    handle: "news_crypto"
+    filter: false          # déjà spécialisée crypto
+  etf_flows:
+    handle: "ETF_Flows"
+    filter: false          # flux ETF -> directement pertinent
 
 keywords_filter:
   - payment
@@ -19,6 +25,8 @@ keywords_filter:
   - sanction
   - bitcoin
   - stablecoin
+  - etf
+  - bond
 
 settings:
   max_messages_per_channel: 15

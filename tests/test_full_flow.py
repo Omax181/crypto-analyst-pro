@@ -26,16 +26,21 @@ def test_render_morning_minimal() -> None:
         "footer": {"next_report_at": "ce soir"},
     }
     html = render(payload, "morning")
-    assert "<html" in html and "Veille crypto" in html
+    assert "Veille crypto" in html and len(html) > 1000
 
 
 def test_render_all_kinds() -> None:
     """Les 4 types de rapport rendent sans erreur."""
-    for kind in ("morning", "evening", "weekly"):
+    expected_titles = {
+        "morning": "Veille crypto · matin",
+        "evening": "Veille crypto · soir",
+        "weekly": "Rapport hebdomadaire",
+    }
+    for kind, title in expected_titles.items():
         html = render({"header": {"date": "x"}, "footer": {}}, kind)
-        assert "<html" in html
+        assert title in html, f"{kind} doit contenir '{title}'"
     panic = render({"title": "T", "body": "B", "severity": "danger"}, "panic")
-    assert "<html" in panic and "T" in panic
+    assert "T" in panic
 
 
 def test_degraded_payload_renders() -> None:
@@ -44,7 +49,7 @@ def test_degraded_payload_renders() -> None:
 
     payload = DecisionEngine._degraded("morning", {}, "Test indispo")
     html = render(payload, "morning")
-    assert "<html" in html
+    assert "Veille crypto" in html and len(html) > 1000
 
 
 def test_memory_roundtrip(monkeypatch) -> None:

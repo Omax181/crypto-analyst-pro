@@ -38,13 +38,29 @@ def send_email(subject: str, html_body: str) -> bool:
         logger.error("GMAIL_USER / GMAIL_APP_PASSWORD manquants : email non envoyé.")
         return False
 
+    # Wrapper HTML complet pour maximum de compat (Outlook desktop est strict).
+    # Si le corps contient déjà <html, on ne wrappe pas.
+    if "<html" not in html_body.lower()[:200]:
+        wrapped = (
+            "<!DOCTYPE html><html><head>"
+            '<meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            "<title>" + subject + "</title>"
+            "</head><body style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#faf9f5;margin:0;padding:24px;color:#1a1a18;\">"
+            '<div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;">'
+            + html_body +
+            "</div></body></html>"
+        )
+    else:
+        wrapped = html_body
+
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = user
     msg["To"] = recipient
     # Fallback texte minimal pour les clients sans HTML.
     msg.attach(MIMEText("Ton client mail ne supporte pas le HTML.", "plain", "utf-8"))
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    msg.attach(MIMEText(wrapped, "html", "utf-8"))
 
     try:
         with smtplib.SMTP(_SMTP_HOST, _SMTP_PORT, timeout=30) as server:

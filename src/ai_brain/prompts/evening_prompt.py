@@ -17,15 +17,24 @@ from src.ai_brain.prompts.analyst_persona import (
 
 _EVENING_SCHEMA = """
 {
-  "header": {"date","time_casablanca","ptf_value_delta_since_morning","ptf_value_pct_since_morning"},
-  "delta_of_the_day": ["string (max 3)"],
-  "morning_reco_evolution": [{"asset","morning_action","status","current_evidence","advice"}],
-  "market_evolution": [{"change_type": "improvement|mixed|new","fact"}],
-  "tonight_and_night": [{"time","event"}],
-  "tomorrow_morning_setup": ["string"],
-  "actions_tonight_optional": ["string"],
-  "blind_spots_evening": "string",
-  "footer": {"next_report_at"}
+  "header": {"date","time_casablanca","hours_since_morning (int — déjà fourni dans data, recopie-le)"},
+  "portfolio_snapshot": {"value_usd","change_since_morning_pct"},
+  "delta_highlights": [{"headline (gras court)","detail (le reste)"}],
+  "intraday_news": [{"title","source","timestamp","impact (lien sur le PTF)"}],
+  "reco_evolution": [{
+    "asset","action","status_label (ex. 'Validation en cours','Confirmation early','Inchangé','Évolution notable')",
+    "status_bg (hex)","status_color (hex)",
+    "commentary (PROSE plusieurs phrases avec chiffres)"
+  }],
+  "reco_evolution_empty_reason": "string (REQUIS si reco_evolution vide)",
+  "market_changes": [{"tag (ex. '✓ AMÉLIORATION','→ MIXTE','↑ NOUVEAU')","tag_color (hex)","text (1 phrase)"}],
+  "overnight_events": [{"time (ex. '21h GMT')","time_bg (hex)","time_color (hex)","title","detail"}],
+  "tomorrow_setup": {
+    "checks": ["string", "string", "..."],
+    "actions_tonight": "string (PROSE : actions à faire ce soir)"
+  },
+  "blind_spots": "string",
+  "footer": {"next_morning_time (ex. '08h30')"}
 }
 """
 

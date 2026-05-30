@@ -2,7 +2,8 @@ name: Weekly Crypto Report
 
 on:
   schedule:
-    - cron: '30 10 * * 0'
+    # 12h00 (midi) dimanche Casablanca (UTC+1) = 11h00 UTC dimanche.
+    - cron: '0 11 * * 0'
   workflow_dispatch:
 
 permissions:

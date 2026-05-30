@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import ChainableUndefined, Environment, FileSystemLoader, select_autoescape
 
 from src.ai_brain.prompts.analyst_persona import DISCLAIMER
 from src.utils.logger import get_logger
@@ -21,14 +21,14 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 _COLORS = {
-    "bg": "#f5f6f8",
+    "bg": "#fafaf6",
     "card": "#ffffff",
     "text": "#1a1d24",
-    "muted": "#6b7280",
-    "border": "#e5e7eb",
-    "success": "#16a34a",
-    "warning": "#d97706",
-    "danger": "#dc2626",
+    "muted": "#7a786f",
+    "border": "#e5e4dc",
+    "success": "#3B6D11",
+    "warning": "#BA7517",
+    "danger": "#A32D2D",
     "info": "#2563eb",
     "accent": "#0f172a",
 }
@@ -37,6 +37,7 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 _env = Environment(
     loader=FileSystemLoader(str(_TEMPLATES_DIR)),
     autoescape=select_autoescape(["html", "xml", "j2"]),
+    undefined=ChainableUndefined,  # tolérant aux clés absentes
 )
 
 _TEMPLATE_BY_KIND = {
@@ -68,8 +69,28 @@ def render(payload: dict[str, Any], kind: str, charts: dict[str, str] | None = N
     context["c"] = _COLORS
     context["disclaimer"] = DISCLAIMER
     context["charts"] = charts or {}
-    context.setdefault("header", {})
-    context.setdefault("footer", {})
+    # Pré-initialise les dicts top-level pour éviter UndefinedError sur les
+    # comparaisons (ChainableUndefined gère les attributs en chaîne mais pas
+    # les opérateurs de comparaison `>= 0`, `is not none`).
+    for key in (
+        "header", "footer", "portfolio_snapshot", "macro_context",
+        "story_of_the_day", "onchain_indicators", "macro_impact",
+        "tomorrow_setup", "exit_plan", "predictions_scoring", "sources_review",
+        "btc_hold_comparison",
+        "btc_network", "stablecoin_supply", "whale_inflows", "position_correlation",
+        "daily_pnl", "evening_macro", "weekly_movers",
+        "calibration", "regret", "blind_spots_weekly",
+    ):
+        context.setdefault(key, {})
+    for key in (
+        "active_recommendations_tracking", "thesis_of_the_day", "news_24h",
+        "all_positions_summary", "sector_rotation", "delta_highlights",
+        "reco_evolution", "market_changes", "overnight_events",
+        "sector_exposure", "upcoming_calendar", "scenarios",
+        "long_term_positioning", "portfolio_heatmap", "ptf_evolution",
+        "intraday_news", "tomorrow_macro_events", "reco_changes",
+    ):
+        context.setdefault(key, [])
 
     if kind == "panic":
         severity = payload.get("severity", "warning")

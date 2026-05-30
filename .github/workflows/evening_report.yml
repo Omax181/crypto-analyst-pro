@@ -2,7 +2,8 @@ name: Evening Crypto Report
 
 on:
   schedule:
-    - cron: '30 18 * * *'
+    # 20h00 Casablanca (UTC+1) = 19h00 UTC.
+    - cron: '0 19 * * *'
   workflow_dispatch:
 
 permissions:

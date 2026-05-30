@@ -12,7 +12,10 @@ rapport entier — principe de robustesse du cahier des charges.
 
 from __future__ import annotations
 
+import threading
+import time
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import requests
 from tenacity import (
@@ -27,6 +30,31 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 DEFAULT_TIMEOUT = 15  # secondes
+
+# Délai minimum (en secondes) entre 2 appels au même domaine — anti rate-limit.
+# CoinGecko free demo = 30 req/min = 1 toutes les 2s, on prend 2.5s par sécurité.
+_DOMAIN_THROTTLE = {
+    "api.coingecko.com": 2.5,
+    "pro-api.coingecko.com": 2.5,
+    "api.llama.fi": 1.0,
+    "lunarcrush.com": 6.0,  # free tier très limité
+}
+_last_call: dict[str, float] = {}
+_throttle_lock = threading.Lock()
+
+
+def _throttle(url: str) -> None:
+    """Bloque si un appel récent a été fait au même domaine."""
+    host = urlparse(url).netloc
+    delay = _DOMAIN_THROTTLE.get(host)
+    if not delay:
+        return
+    with _throttle_lock:
+        last = _last_call.get(host, 0.0)
+        elapsed = time.monotonic() - last
+        if elapsed < delay:
+            time.sleep(delay - elapsed)
+        _last_call[host] = time.monotonic()
 
 
 class TransientHTTPError(Exception):
@@ -49,6 +77,7 @@ def _request(
     timeout: int = DEFAULT_TIMEOUT,
 ) -> requests.Response:
     """Effectue une requête avec retry. Lève sur échec définitif."""
+    _throttle(url)
     resp = requests.request(
         method,
         url,

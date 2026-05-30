@@ -1,49 +1,154 @@
-<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:{{c.bg}};font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:{{c.text}};line-height:1.5;">
-<div style="max-width:660px;margin:0 auto;padding:16px;">
-  <div style="padding:8px 4px 14px;border-bottom:2px solid {{c.accent}};">
-    <h1 style="margin:0;font-size:21px;color:{{c.accent}};">🌙 Veille crypto · soir</h1>
-    <div style="font-size:13px;color:{{c.muted}};margin-top:3px;">
-      {{header.date}} · {{header.time_casablanca}}
-      {% if header.ptf_value_delta_since_morning is not none %} · delta depuis matin {{header.ptf_value_delta_since_morning}}$ ({{header.ptf_value_pct_since_morning}}%){% endif %}
+{# Rapport soir V6 — complément du matin. Fidèle au mockup. #}
+
+{# ── HEADER ── #}
+<div style="border-bottom:0.5px solid #e5e4dc;padding-bottom:1rem;margin-bottom:1.5rem;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+      <p style="font-size:12px;color:#5a5852;margin:0 0 4px 0;">{{header.time_casablanca or header.date}}</p>
+      <h1 style="margin:0;font-size:22px;font-weight:500;">Veille crypto · soir</h1>
+      <p style="font-size:12px;color:#8a8880;margin:4px 0 0 0;">Complément au rapport matin · ce qui a changé en {{header.hours_since_morning or '11'}}h</p>
+    </div>
+    <div style="text-align:right;">
+      <p style="font-size:10px;color:#8a8880;margin:0;">Portefeuille</p>
+      <p style="font-size:16px;font-weight:500;margin:2px 0 0 0;">{% if portfolio_snapshot.value_usd %}${{ '{:,.0f}'.format(portfolio_snapshot.value_usd) }}{% else %}—{% endif %}</p>
+      {% if portfolio_snapshot.change_since_morning_pct|default(none) is not none %}<p style="font-size:10px;color:{% if (portfolio_snapshot.change_since_morning_pct|default(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (portfolio_snapshot.change_since_morning_pct|default(0)) >= 0 else '' }}{{portfolio_snapshot.change_since_morning_pct}}% depuis matin</p>{% endif %}
     </div>
   </div>
-  {% if delta_of_the_day %}
-  <div style="background:{{c.card}};border-left:3px solid {{c.info}};border-radius:6px;padding:12px 14px;margin-top:12px;">
-    <h2 style="margin:0 0 6px;font-size:15px;color:{{c.accent}};">📌 Le delta du jour</h2>
-    <ul style="margin:0;padding-left:18px;font-size:14px;">{% for d in delta_of_the_day %}<li style="margin:3px 0;">{{d}}</li>{% endfor %}</ul>
-  </div>{% endif %}
-  {% if morning_reco_evolution %}
-  <h2 style="margin:16px 4px 6px;font-size:15px;color:{{c.accent}};">🎯 Évolution des recos du matin</h2>
-  {% for r in morning_reco_evolution %}
-  <div style="background:{{c.card}};border-radius:6px;padding:10px 12px;margin-bottom:8px;font-size:13px;">
-    <strong>{{r.asset}}</strong> · {{r.morning_action}} → <span style="color:{{c.muted}};">{{r.status}}</span>
-    {% if r.current_evidence %}<div style="margin-top:3px;">{{r.current_evidence}}</div>{% endif %}
-    {% if r.advice %}<div style="margin-top:3px;font-weight:600;">{{r.advice}}</div>{% endif %}
-  </div>{% endfor %}{% endif %}
-  {% if market_evolution %}
-  <h2 style="margin:16px 4px 6px;font-size:15px;color:{{c.accent}};">📈 Ce qui a évolué</h2>
-  {% for m in market_evolution %}
-  <div style="font-size:13px;padding:5px 8px;margin-bottom:4px;border-left:2px solid {% if m.change_type=='improvement' %}{{c.success}}{% elif m.change_type=='new' %}{{c.info}}{% else %}{{c.warning}}{% endif %};">{{m.fact}}</div>
-  {% endfor %}{% endif %}
-  {% if tonight_and_night %}
-  <div style="background:{{c.card}};border-radius:6px;padding:12px 14px;margin-top:12px;">
-    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.accent}};">🌃 Soirée et nuit</h2>
-    {% for e in tonight_and_night %}<div style="font-size:13px;margin:3px 0;"><strong>{{e.time}}</strong> · {{e.event}}</div>{% endfor %}
-  </div>{% endif %}
-  {% if tomorrow_morning_setup %}
-  <div style="background:#f9fafb;border-radius:6px;padding:12px 14px;margin-top:10px;">
-    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.accent}};">🔭 Setup demain matin</h2>
-    <ul style="margin:0;padding-left:18px;font-size:13px;">{% for s in tomorrow_morning_setup %}<li style="margin:2px 0;">{{s}}</li>{% endfor %}</ul>
-  </div>{% endif %}
-  {% if actions_tonight_optional %}
-  <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:10px 12px;margin-top:10px;">
-    <h2 style="margin:0 0 6px;font-size:14px;color:{{c.warning}};">✅ Actions ce soir (optionnel)</h2>
-    <ul style="margin:0;padding-left:18px;font-size:13px;">{% for a in actions_tonight_optional %}<li style="margin:2px 0;">{{a}}</li>{% endfor %}</ul>
-  </div>{% endif %}
-  {% if blind_spots_evening %}<div style="font-size:12px;color:{{c.muted}};margin:14px 4px;border-top:1px dashed {{c.border}};padding-top:8px;">🕳️ Angles morts : {{blind_spots_evening}}</div>{% endif %}
-  <div style="margin-top:18px;padding-top:10px;border-top:1px solid {{c.border}};font-size:11px;color:{{c.muted}};text-align:center;">
-    {% if footer.next_report_at %}Prochain rapport : {{footer.next_report_at}}. {% endif %}{{disclaimer}}
+</div>
+
+{# ── DELTA DU JOUR ── #}
+{% if delta_highlights %}
+<div style="background:#f5f4ee;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
+  <p style="font-size:11px;color:#5a5852;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Le delta du jour · {{delta_highlights|length}} choses à retenir</p>
+  <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7;">
+    {% for d in delta_highlights %}<li><span style="font-weight:500;">{{d.headline}}</span>{% if d.detail %} · {{d.detail}}{% endif %}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{# ── BILAN P&L DE LA JOURNÉE (S5) ── #}
+{% if daily_pnl %}
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  <p style="font-size:11px;color:#5a5852;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Bilan de la journée</p>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
+    <div><p style="font-size:10px;color:#8a8880;margin:0;">Variation jour</p><p style="font-size:16px;font-weight:500;margin:2px 0 0 0;color:{% if (daily_pnl.day_change_pct|default(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if daily_pnl.day_change_pct|default(none) is not none %}{{ '+' if (daily_pnl.day_change_pct|default(0)) >= 0 else '' }}{{daily_pnl.day_change_pct}}%{% else %}—{% endif %}</p></div>
+    <div><p style="font-size:10px;color:#8a8880;margin:0;">En $</p><p style="font-size:16px;font-weight:500;margin:2px 0 0 0;color:{% if (daily_pnl.day_change_usd|default(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if daily_pnl.day_change_usd|default(none) is not none %}{{ '+' if (daily_pnl.day_change_usd|default(0)) >= 0 else '' }}${{ '{:,.0f}'.format(daily_pnl.day_change_usd) }}{% else %}—{% endif %}</p></div>
+    <div><p style="font-size:10px;color:#8a8880;margin:0;">Valeur PTF</p><p style="font-size:16px;font-weight:500;margin:2px 0 0 0;">{% if daily_pnl.value_usd %}${{ '{:,.0f}'.format(daily_pnl.value_usd) }}{% else %}—{% endif %}</p></div>
   </div>
-</div></body></html>
+  {% if daily_pnl.top_movers %}
+  <div style="font-size:12px;line-height:1.6;color:#5a5852;">
+    {% for mv in daily_pnl.top_movers %}<span style="display:inline-block;margin-right:12px;">{{mv.symbol}} <span style="color:{% if (mv.change|default(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};font-weight:500;">{{ '+' if (mv.change|default(0)) >= 0 else '' }}{{mv.change}}%</span></span>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── MACRO CLÔTURE US (S3) ── #}
+{% if evening_macro %}
+<div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;font-size:11px;color:#5a5852;line-height:1.6;">
+  <p style="margin:0 0 4px 0;font-weight:500;color:#1a1a18;font-size:12px;">Clôture marchés US &amp; macro</p>
+  {% if evening_macro.sp500 %}<span style="display:inline-block;margin-right:14px;">S&amp;P 500 · <strong>{{ '{:,.0f}'.format(evening_macro.sp500) }}</strong>{% if evening_macro.sp500_delta|default(none) is not none %} <span style="color:{% if (evening_macro.sp500_delta|default(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">({{ '+' if (evening_macro.sp500_delta|default(0)) >= 0 else '' }}{{ '{:,.0f}'.format(evening_macro.sp500_delta) }})</span>{% endif %}</span>{% endif %}
+  {% if evening_macro.nasdaq %}<span style="display:inline-block;margin-right:14px;">Nasdaq · <strong>{{ '{:,.0f}'.format(evening_macro.nasdaq) }}</strong></span>{% endif %}
+  {% if evening_macro.dxy %}<span style="display:inline-block;margin-right:14px;">DXY · <strong>{{evening_macro.dxy}}</strong></span>{% endif %}
+  {% if evening_macro.note %}<p style="margin:4px 0 0 0;">{{evening_macro.note}}</p>{% endif %}
+</div>
+{% endif %}
+
+{# ── CE QUI A ÉVOLUÉ CÔTÉ MARCHÉ ── #}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:18px;font-weight:500;">Ce qui a évolué côté marché</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  {% if market_changes %}
+  {% for c in market_changes %}
+  <div style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:12px;line-height:1.55;">
+    <span style="color:{{c.tag_color or '#444441'}};font-weight:500;">{{c.tag or '·'}}</span> · {{c.text}}
+  </div>
+  {% endfor %}
+  {% else %}
+  <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">Pas d'évolution marché notable depuis ce matin.</p>
+  {% endif %}
+</div>
+
+{# ── NEWS TOMBÉES DEPUIS LE MATIN (S6) ── #}
+{% if intraday_news %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:18px;font-weight:500;">Ce qui est tombé depuis ce matin</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  {% for n in intraday_news %}
+  <div style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:12px;line-height:1.55;">
+    <p style="margin:0;font-weight:500;">{{n.title}}</p>
+    <p style="margin:2px 0 0 0;font-size:11px;color:#5a5852;">{% if n.source %}{{n.source}}{% endif %}{% if n.timestamp %} · {{n.timestamp}}{% endif %}{% if n.impact %} — {{n.impact}}{% endif %}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── ÉVOLUTION DES RECOS DU MATIN ── #}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:18px;font-weight:500;">Évolution des recos du matin</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  {% if reco_evolution %}
+  {% for r in reco_evolution %}
+  <div style="padding:10px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+      <p style="margin:0;font-size:14px;font-weight:500;">{{r.asset}} · {{r.action}}</p>
+      {% if r.status_label %}<span style="background:{{r.status_bg or '#F1EFE8'}};color:{{r.status_color or '#444441'}};font-size:10px;padding:2px 6px;border-radius:4px;font-weight:500;">{{r.status_label}}</span>{% endif %}
+    </div>
+    <p style="margin:4px 0 0 0;font-size:12px;line-height:1.5;color:#5a5852;">{{r.commentary}}</p>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ reco_evolution_empty_reason or "Pas de reco active à suivre aujourd'hui." }}</p>
+  {% endif %}
+</div>
+
+{# ── SOIRÉE ET NUIT ── #}
+{% if overnight_events %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:18px;font-weight:500;">Soirée et nuit · ce qui peut bouger</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  {% for e in overnight_events %}
+  <div style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}">
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="background:{{e.time_bg or '#FAEEDA'}};color:{{e.time_color or '#633806'}};font-size:10px;padding:2px 7px;border-radius:4px;font-weight:500;flex-shrink:0;margin-top:2px;">{{e.time}}</span>
+      <div style="flex:1;">
+        <p style="margin:0;font-size:13px;font-weight:500;">{{e.title}}</p>
+        <p style="margin:2px 0 0 0;font-size:11px;color:#5a5852;">{{e.detail}}</p>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── SETUP POUR DEMAIN MATIN ── #}
+{% if tomorrow_setup %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:18px;font-weight:500;">Setup pour demain matin</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  <p style="font-size:12px;line-height:1.65;margin:0 0 12px 0;">Demain matin, voici les checks prioritaires que je ferai pour le rapport 8h30 :</p>
+  {% for check in tomorrow_setup.checks %}
+  <div style="padding:6px 0;font-size:12px;line-height:1.5;"><span style="font-weight:500;">{{loop.index}}.</span> {{check}}</div>
+  {% endfor %}
+  {% if tomorrow_macro_events %}
+  <div style="background:#FAEEDA;border-radius:8px;padding:10px 12px;margin:12px 0 0 0;">
+    <p style="margin:0 0 4px 0;font-size:10px;color:#633806;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Événements macro demain</p>
+    {% for ev in tomorrow_macro_events %}
+    <p style="margin:2px 0;font-size:12px;color:#412402;">{% if ev.time %}<span style="font-weight:500;">{{ev.time}}</span> · {% endif %}{% if ev.country %}{{ev.country}} · {% endif %}{{ev.event}}{% if ev.forecast %} (prév. {{ev.forecast}}){% endif %}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if tomorrow_setup.actions_tonight %}
+  <div style="background:#f5f4ee;border-radius:8px;padding:10px 12px;margin:12px 0 0 0;font-size:12px;line-height:1.55;"><span style="font-weight:500;">Actions à faire ce soir si tu veux :</span> {{tomorrow_setup.actions_tonight}}</div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── ANGLES MORTS SOIR ── #}
+{% if blind_spots %}
+<div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:11px;color:#5a5852;line-height:1.6;">
+  <p style="margin:0 0 4px 0;font-weight:500;color:#1a1a18;font-size:12px;">Angles morts soir</p>
+  {{blind_spots}}
+</div>
+{% endif %}
+
+{# ── FOOTER ── #}
+<div style="border-top:0.5px solid #e5e4dc;padding-top:1rem;text-align:center;">
+  <p style="font-size:10px;color:#8a8880;margin:0;">Prochain rapport · demain matin {{footer.next_morning_time or '08h30'}} · format complet</p>
+  <p style="font-size:10px;color:#8a8880;margin:4px 0 0 0;">Bonne soirée · alerte flash mail si mouvement critique cette nuit</p>
+</div>

@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 _SOURCES = load_config("sources")
 _SUBREDDITS: list[str] = _SOURCES["reddit_subreddits"]
-_HEADERS = {"User-Agent": "crypto-analyst-pro/1.0 (personal research bot)"}
+_HEADERS = {"User-Agent": "crypto-analyst-pro:v2.0 (by /u/Omax181)"}
 
 _BULLISH = ("moon", "bull", "pump", "buy", "rally", "ath", "breakout", "surge")
 _BEARISH = ("crash", "dump", "bear", "sell", "rug", "scam", "fud", "collapse")

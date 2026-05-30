@@ -170,3 +170,128 @@ class PredictionTracker:
             f"Reco {action} sur {asset} invalidée : revoir le poids des signaux "
             f"ayant motivé l'entrée et durcir le critère d'invalidation."
         )
+
+    def compute_calibration(self, period_days: int = 30) -> dict[str, Any]:
+        """Compare la confiance annoncée aux recos au taux de réussite réel.
+
+        Regroupe les recos clôturées par palier de confiance (70-75%, 80%+, etc.)
+        et calcule le taux de validation réel de chaque palier. Permet de savoir
+        si l'agent est sur-confiant, sous-confiant ou bien calibré.
+
+        Returns:
+            Dict ``{available, buckets: [{range, realized_pct, label, n}], reading}``.
+        """
+        history = mem.load_prediction_history()
+        cutoff = datetime.now(timezone.utc) - timedelta(days=period_days)
+        # Paliers de confiance.
+        bucket_defs = [
+            ("50-69%", 50, 70),
+            ("70-79%", 70, 80),
+            ("80%+", 80, 101),
+        ]
+        buckets_data = []
+        total_over = 0  # sur-confiance cumulée
+        total_buckets = 0
+        for label, lo, hi in bucket_defs:
+            validated = invalidated = 0
+            for p in history:
+                created = _parse(p.get("created_at"))
+                if created is None or created < cutoff:
+                    continue
+                conf = p.get("confidence")
+                if conf is None or not (lo <= conf < hi):
+                    continue
+                if p.get("status") == "validated":
+                    validated += 1
+                elif p.get("status") == "invalidated":
+                    invalidated += 1
+            n = validated + invalidated
+            if n == 0:
+                continue
+            realized = round(validated / n * 100)
+            # Centre du palier annoncé pour comparer.
+            announced_mid = (lo + min(hi, 100)) / 2
+            gap = realized - announced_mid
+            if gap < -10:
+                cal_label = "sur-confiance"
+                total_over += 1
+            elif gap > 10:
+                cal_label = "sous-confiance"
+            else:
+                cal_label = "calibré"
+            total_buckets += 1
+            buckets_data.append(
+                {"range": label, "realized_pct": realized, "label": cal_label, "n": n}
+            )
+
+        if not buckets_data:
+            return {"available": False}
+
+        # Lecture globale.
+        if total_over >= max(1, total_buckets // 2):
+            reading = (
+                "Tendance à la sur-confiance : les % annoncés dépassent le taux "
+                "réalisé. Réduire le sizing sur les convictions moyennes."
+            )
+        else:
+            reading = (
+                "Calibration globalement correcte : les % de confiance annoncés "
+                "sont cohérents avec les résultats observés."
+            )
+        return {"available": True, "buckets": buckets_data, "reading": reading}
+
+    def compute_regret(self, period_days: int = 7) -> dict[str, Any]:
+        """Chiffre le coût des erreurs / occasions ratées de la période.
+
+        Pour chaque reco invalidée, estime le manque à gagner ou la perte en %
+        (via le mouvement de prix depuis l'entrée si disponible). Quantifie
+        l'écart entre une grosse occasion ratée et une petite erreur.
+
+        Returns:
+            Dict ``{available, items: [{asset, description, cost_pct, cost_label,
+            cost_usd}], total_note}``.
+        """
+        history = mem.load_prediction_history()
+        cutoff = datetime.now(timezone.utc) - timedelta(days=period_days)
+        items = []
+        total_cost_pct = 0.0
+        for p in history:
+            created = _parse(p.get("created_at"))
+            if created is None or created < cutoff:
+                continue
+            if p.get("status") != "invalidated":
+                continue
+            asset = p.get("asset", "?")
+            action = p.get("action", "?")
+            # Mouvement de prix depuis l'entrée (si dispo).
+            move = p.get("price_change_pct")
+            cost_pct = None
+            cost_label = "manqués"
+            if move is not None:
+                # Pour une reco RENFORCER invalidée, le coût = mouvement négatif subi.
+                # Pour une SURVEILLER ratée, le coût = hausse non capturée.
+                cost_pct = round(abs(move), 1)
+                cost_label = "non capturés" if (action or "").upper() in ("SURVEILLER", "MAINTENIR") else "de perte"
+                total_cost_pct += cost_pct
+            desc = f"{action} → résultat défavorable"
+            items.append(
+                {
+                    "asset": asset,
+                    "description": desc,
+                    "cost_pct": cost_pct,
+                    "cost_label": cost_label,
+                    "cost_usd": p.get("cost_usd"),
+                }
+            )
+        if not items:
+            return {
+                "available": True,
+                "entries": [],
+                "total_note": "Aucune erreur coûteuse cette semaine. Discipline maintenue.",
+            }
+        items.sort(key=lambda x: x.get("cost_pct") or 0, reverse=True)
+        total_note = (
+            f"Coût cumulé estimé des erreurs : ~{round(total_cost_pct, 1)}% sur les "
+            f"positions concernées. La plus coûteuse : {items[0]['asset']}."
+        )
+        return {"available": True, "entries": items[:5], "total_note": total_note}

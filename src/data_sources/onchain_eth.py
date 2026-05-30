@@ -17,7 +17,10 @@ from src.utils.portfolio_loader import load_config
 logger = get_logger(__name__)
 
 _SOURCES = load_config("sources")
-_BASE = _SOURCES["endpoints"]["etherscan"]
+# V2 API — l'ancien endpoint V1 (api.etherscan.io/api) est déprécié depuis 2025.
+# V2 nécessite le paramètre chainid=1 pour Ethereum mainnet.
+_BASE = "https://api.etherscan.io/v2/api"
+_CHAIN_ID = "1"  # Ethereum mainnet
 
 
 def _key() -> str:
@@ -39,7 +42,7 @@ def get_eth_onchain() -> dict[str, Any]:
     def _fetch_gas() -> Any:
         return get_json(
             _BASE,
-            params={"module": "gastracker", "action": "gasoracle", "apikey": key},
+            params={"chainid": _CHAIN_ID, "module": "gastracker", "action": "gasoracle", "apikey": key},
         )
 
     gas = CACHE.get_or_compute("eth:gas", 600, _fetch_gas)
@@ -58,7 +61,7 @@ def get_eth_onchain() -> dict[str, Any]:
     def _fetch_price() -> Any:
         return get_json(
             _BASE,
-            params={"module": "stats", "action": "ethprice", "apikey": key},
+            params={"chainid": _CHAIN_ID, "module": "stats", "action": "ethprice", "apikey": key},
         )
 
     price = CACHE.get_or_compute("eth:price", 300, _fetch_price)

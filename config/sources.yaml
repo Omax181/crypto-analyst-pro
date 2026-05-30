@@ -122,6 +122,14 @@ fred_series:
   core_pce: PCEPILFE
   m2: M2SL
   unemployment: UNRATE
+  # --- V6 : actifs macro hors-crypto (corrélations marché) ---
+  sp500: SP500          # S&P 500 (clôture quotidienne)
+  nasdaq: NASDAQCOM     # NASDAQ Composite
+  gold: GOLDAMGBD228NLBM # Or, fixing AM Londres (USD/once)
+  wti: DCOILWTICO       # Pétrole WTI (USD/baril)
+  brent: DCOILBRENTEU   # Pétrole Brent (USD/baril)
+  eur_usd: DEXUSEU      # EUR/USD
+  usd_jpy: DEXJPUS      # USD/JPY (yen, carry trade)
 
 # --- Subreddits sentiment social ---
 reddit_subreddits:
@@ -136,6 +144,7 @@ endpoints:
   coingecko_pro: "https://pro-api.coingecko.com/api/v3"
   coinmarketcap: "https://pro-api.coinmarketcap.com/v1"
   binance: "https://api.binance.com/api/v3"
+  binance_futures: "https://fapi.binance.com/fapi/v1"
   fear_greed: "https://api.alternative.me/fng/"
   cryptopanic: "https://cryptopanic.com/api/v1/posts/"
   blockchain_info: "https://api.blockchain.info"

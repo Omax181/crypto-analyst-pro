@@ -40,24 +40,45 @@ def _all_channel_names() -> list[str]:
 
 
 def _resolve_channel_id(name: str, key: str) -> str | None:
-    """Résout l'ID d'une chaîne par recherche, ou via le mapping explicite."""
+    """Résout l'ID d'une chaîne, avec cache pour économiser le quota.
+
+    Ordre : (1) mapping explicite channel_ids, (2) résolution par handle
+    (forHandle = 1 unité de quota), (3) recherche par nom (100 unités, dernier
+    recours). Les IDs résolus sont mis en cache 7 jours.
+    """
     explicit = (_YT_CONF.get("channel_ids") or {}).get(name)
     if explicit:
         return explicit
-    data = get_json(
-        f"{_BASE}/search",
-        params={
-            "part": "snippet",
-            "q": name,
-            "type": "channel",
-            "maxResults": 1,
-            "key": key,
-        },
-    )
-    items = (data or {}).get("items", [])
-    if items:
-        return items[0]["snippet"]["channelId"]
-    return None
+
+    def _do_resolve() -> str | None:
+        # 2) Tentative par handle : "Crypto pour tous" -> "@cryptopourtous"
+        #    forHandle ne coûte que 1 unité de quota (vs 100 pour search).
+        handle = name.lstrip("@").replace(" ", "").lower()
+        data = get_json(
+            f"{_BASE}/channels",
+            params={"part": "id", "forHandle": f"@{handle}", "key": key},
+        )
+        items = (data or {}).get("items", [])
+        if items:
+            return items[0]["id"]
+        # 3) Fallback : recherche par nom (coûteux mais robuste).
+        data = get_json(
+            f"{_BASE}/search",
+            params={
+                "part": "snippet",
+                "q": name,
+                "type": "channel",
+                "maxResults": 1,
+                "key": key,
+            },
+        )
+        items = (data or {}).get("items", [])
+        if items:
+            return items[0]["snippet"]["channelId"]
+        return None
+
+    # Cache 7 jours : les channel IDs ne changent jamais.
+    return CACHE.get_or_compute(f"yt:chanid:{name}", 604800, _do_resolve)
 
 
 def _recent_video_ids(channel_id: str, key: str, max_age_hours: int, n: int) -> list[str]:
