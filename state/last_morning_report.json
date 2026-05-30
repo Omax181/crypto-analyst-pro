@@ -1,0 +1,960 @@
+{
+  "header": {
+    "date": "2026-05-30",
+    "time_casablanca": "11:09",
+    "active_sources_count": 10,
+    "win_rate_30d": 0,
+    "win_rate_total": "0/0"
+  },
+  "portfolio_snapshot": {
+    "value_usd": 3156.29,
+    "change_24h_pct": 0.02,
+    "change_7d_pct": 0.78,
+    "vs_btc_7d_pct": 2.24,
+    "drawdown_ath_pct": -71.0,
+    "usdc_pct": 32.6,
+    "usdc_usd": 1029.45
+  },
+  "executive_summary": "Aujourd'hui : 1 renforcement tactique sur HBAR. Le marché crypto navigue entre une peur extrême et des signaux macroéconomiques divergents, avec des sorties d'ETF BTC/ETH mais des sommets historiques pour les marchés actions US. La prudence reste de mise, mais des opportunités tactiques émergent sur des actifs à fondamentaux solides.",
+  "story_of_the_day": {
+    "narrative": "Le marché crypto débute la journée sous le signe d'une 'Peur Extrême' (Fear & Greed Index à 23), malgré un Bitcoin qui a temporairement touché les 74 000 $ hier suite à la levée du blocus dans le détroit d'Ormuz, un événement qui semble désormais intégré dans les prix. Les flux d'ETF crypto sont majoritairement négatifs, avec des sorties nettes de -120 M$ pour le BTC et -18 M$ pour l'ETH sur les dernières 24h, signalant une prudence institutionnelle. Cependant, le marché boursier américain a enregistré des sommets historiques, créant une divergence notable avec le sentiment crypto. Sur le plan on-chain, le réseau Bitcoin reste robuste avec un hashrate élevé et une faible congestion, tandis que l'activité sur Ethereum est modérée et la supply de stablecoins stable. Dans ce contexte, HBAR se distingue par des signaux techniques et fondamentaux haussiers, suggérant une opportunité de renforcement tactique.",
+    "threads": [
+      "macro",
+      "onchain",
+      "individual"
+    ]
+  },
+  "self_critique_global": "L'analyse de ce matin est limitée par l'absence de données en temps réel sur les flux Arkham, Bloomberg/Reuters, ainsi que les marchés Polymarket et les flux ETF détaillés qui pourraient affiner la lecture du sentiment et des mouvements de capitaux. L'incertitude macroéconomique est forte, avec une divergence entre la peur crypto et les sommets des actions US, rendant difficile une lecture univoque du régime de risque. Un retour des tensions géopolitiques ou une réaction négative des marchés actions aux avertissements sur la surévaluation (indicateur de Warren Buffett) pourrait rapidement invalider un scénario haussier sur les actifs risqués.",
+  "invalidation_watch": "1. Une cassure confirmée du Bitcoin sous 72 000 $ (support psychologique). 2. Une inversion du DXY au-dessus de 120, signalant une fuite vers le dollar. 3. Une augmentation significative du VIX au-delà de 20, indiquant un regain de volatilité et de peur sur les marchés traditionnels.",
+  "active_recommendations_tracking": [],
+  "tracking_footnote": "Aucune recommandation active n'est en cours de suivi pour le moment. Le processus d'apprentissage est en phase initiale, se concentrant sur la détection de signaux clairs et la formulation de plans d'action robustes.",
+  "macro_context": {
+    "btc_price": 73508,
+    "btc_note": "Le BTC a réagi positivement à la désescalade géopolitique hier, mais reste dans un range volatil.",
+    "fear_greed": 23,
+    "fear_greed_label": "Peur Extrême",
+    "dxy": 119.2868,
+    "dxy_note": "Le DXY reste à un niveau élevé, bien qu'en légère baisse (-0.08%) sur les dernières 24h, ce qui indique une force persistante du dollar et un environnement potentiellement défavorable aux actifs risqués.",
+    "polymarket_fed_cut_pct": null,
+    "fed_cut_note": "données polymarket indisponibles",
+    "regime_synthesis": "Le régime macroéconomique est complexe et divergent : une 'Peur Extrême' domine le sentiment crypto, tandis que les indices S&P 500 et Nasdaq atteignent des sommets historiques, signalant une appétit pour le risque dans le TradFi. Le DXY élevé et les prix du pétrole soutenus (Brent à 102.75 $) suggèrent des pressions inflationnistes et un environnement de 'risk-off' latent, mais le VIX calme à 15.74 ne reflète pas une panique immédiate. La courbe des taux 10Y-2Y est positive à 0.46, mais en légère baisse, indiquant des anticipations de croissance modérées.",
+    "dxy_delta": -0.0822,
+    "vix": 15.74,
+    "us_10y": 4.45,
+    "us_2y": 3.99,
+    "yield_curve_10y_2y": 0.46,
+    "sp500": 7563.63,
+    "sp500_delta": 43.27,
+    "nasdaq": 26917.47,
+    "nasdaq_delta": 242.74,
+    "brent_usd": 102.75,
+    "wti_usd": 97.63,
+    "eur_usd": 1.1603,
+    "usd_jpy": 159.2
+  },
+  "onchain_indicators": {
+    "metrics": [
+      {
+        "label": "Taux de Hachage BTC (EH/s)",
+        "value": 1008.5,
+        "color": "#22C55E",
+        "interpretation": "Le hashrate du réseau Bitcoin reste à un niveau très élevé, confirmant la robustesse et la sécurité du réseau."
+      },
+      {
+        "label": "Transactions BTC 24h",
+        "value": 650157,
+        "color": "#22C55E",
+        "interpretation": "Le nombre de transactions sur le réseau Bitcoin est significatif, indiquant une activité d'utilisation saine."
+      },
+      {
+        "label": "Taille de la Mempool BTC",
+        "value": 1396,
+        "color": "#22C55E",
+        "interpretation": "La mempool Bitcoin est peu chargée, suggérant une faible congestion du réseau et des frais de transaction bas."
+      },
+      {
+        "label": "Gaz ETH (Gwei)",
+        "value": 0.188,
+        "color": "#FBBF24",
+        "interpretation": "Les frais de gaz sur Ethereum sont extrêmement bas, ce qui peut indiquer une demande d'utilisation faible ou une efficacité accrue du réseau."
+      },
+      {
+        "label": "Capitalisation des Stablecoins",
+        "value": 268504166654.0,
+        "color": "#FBBF24",
+        "interpretation": "La capitalisation totale des stablecoins est stable sur 7 jours (-0.012%), ne signalant pas d'afflux ou de sortie majeur de 'dry powder'."
+      },
+      {
+        "label": "Inflows Whales ETH",
+        "value": 0.0,
+        "color": "#22C55E",
+        "interpretation": "Aucun dépôt significatif d'ETH par des whales n'a été détecté vers les exchanges sur les dernières 24h, réduisant la pression vendeuse potentielle."
+      }
+    ],
+    "combined_reading": "Les indicateurs on-chain présentent un tableau mitigé mais globalement sain pour Bitcoin, avec un réseau robuste et actif. L'activité sur Ethereum est plus calme, comme en témoignent les faibles frais de gaz. La stabilité de la supply des stablecoins et l'absence de mouvements de whales ETH importants suggèrent une période de consolidation ou d'attente plutôt qu'une pression directionnelle forte.",
+    "source": "fallback",
+    "btc_network": {
+      "n_tx_24h": 650157,
+      "hash_rate_ehs": 1008.5,
+      "mempool_size": 1396
+    },
+    "eth_gas_fast_gwei": 0.188386908
+  },
+  "onchain_empty_reason": null,
+  "sector_rotation": [
+    {
+      "sector": "Interop",
+      "change_24h": 5.95,
+      "your_holdings": [
+        "AXL"
+      ]
+    },
+    {
+      "sector": "DeFi",
+      "change_24h": 3.77,
+      "your_holdings": [
+        "INJ",
+        "RSR",
+        "YFI"
+      ]
+    },
+    {
+      "sector": "Infra",
+      "change_24h": 3.39,
+      "your_holdings": [
+        "ANKR"
+      ]
+    },
+    {
+      "sector": "L2",
+      "change_24h": 2.94,
+      "your_holdings": [
+        "ARB",
+        "CFX",
+        "ZK",
+        "IMX"
+      ]
+    },
+    {
+      "sector": "Ordinals",
+      "change_24h": 2.19,
+      "your_holdings": [
+        "SATS"
+      ]
+    },
+    {
+      "sector": "Storage/DePIN",
+      "change_24h": 1.65,
+      "your_holdings": [
+        "FIL"
+      ]
+    },
+    {
+      "sector": "L1",
+      "change_24h": 1.4,
+      "your_holdings": [
+        "BTC",
+        "ETH",
+        "ADA",
+        "HBAR",
+        "ATOM",
+        "STX",
+        "AR",
+        "CKB",
+        "CELO"
+      ]
+    },
+    {
+      "sector": "Payments",
+      "change_24h": 1.21,
+      "your_holdings": [
+        "XRP",
+        "ACH"
+      ]
+    },
+    {
+      "sector": "Meme/Gaming",
+      "change_24h": 0.36,
+      "your_holdings": [
+        "NOT",
+        "HMSTR"
+      ]
+    },
+    {
+      "sector": "Oracle/Infra",
+      "change_24h": 0.35,
+      "your_holdings": [
+        "LINK",
+        "QNT",
+        "TRB"
+      ]
+    },
+    {
+      "sector": "AI",
+      "change_24h": -0.07,
+      "your_holdings": [
+        "TAO",
+        "RENDER",
+        "WLD",
+        "FET",
+        "W",
+        "NMR"
+      ]
+    },
+    {
+      "sector": "IoT/Data",
+      "change_24h": -0.37,
+      "your_holdings": [
+        "JASMY"
+      ]
+    },
+    {
+      "sector": "Indexing/Infra",
+      "change_24h": -3.12,
+      "your_holdings": [
+        "GRT"
+      ]
+    },
+    {
+      "sector": "Data",
+      "change_24h": -4.32,
+      "your_holdings": [
+        "SXT"
+      ]
+    },
+    {
+      "sector": "Privacy/L1",
+      "change_24h": -4.42,
+      "your_holdings": [
+        "ZEN"
+      ]
+    }
+  ],
+  "sector_rotation_ptf_note": "La rotation sectorielle montre une dominance des secteurs Interop, DeFi et Infra sur les dernières 24h, avec des gains notables pour AXL et INJ. Le secteur L1, où HBAR est positionné, affiche une performance positive de +1.4%. En revanche, les narratifs AI et Data sont en légère sous-performance. Cela indique une préférence pour les infrastructures et la finance décentralisée, ce qui est favorable à certaines de nos positions clés.",
+  "news_24h": [
+    {
+      "category": "Macro",
+      "tag_bg": "#FBBF24",
+      "tag_color": "#000000",
+      "title": "Les marchés boursiers américains atteignent des sommets historiques",
+      "source": "Telegram WatcherGuru 20:15:13",
+      "timestamp": "2026-05-29T20:15:13+00:00",
+      "confidence": "Haute",
+      "impact_on_ptf": "Impact indirect. Bien que les actions US soient en hausse, l'indicateur de Warren Buffett à 236% suggère une surévaluation, posant un risque de correction future qui pourrait entraîner les actifs risqués, y compris le portefeuille crypto."
+    },
+    {
+      "category": "Géopolitique",
+      "tag_bg": "#EF4444",
+      "tag_color": "#FFFFFF",
+      "title": "Les États-Unis saisissent 1 milliard de dollars de crypto à l'Iran",
+      "source": "Telegram WatcherGuru 19:24:27",
+      "timestamp": "2026-05-29T19:24:27+00:00",
+      "confidence": "Haute",
+      "impact_on_ptf": "Impact indirect. Cette action réglementaire souligne les risques de saisie et de surveillance des actifs numériques, pouvant affecter le sentiment général et la perception de la sécurité des investissements crypto."
+    },
+    {
+      "category": "Risque",
+      "tag_bg": "#EF4444",
+      "tag_color": "#FFFFFF",
+      "title": "Jamie Dimon (JPMorgan) critique le Crypto Clarity Act et Brian Armstrong (Coinbase)",
+      "source": "Telegram WatcherGuru 18:13:58",
+      "timestamp": "2026-05-29T18:13:58+00:00",
+      "confidence": "Moyenne",
+      "impact_on_ptf": "Impact indirect. Les commentaires négatifs d'une figure influente de la finance traditionnelle peuvent peser sur le sentiment des investisseurs institutionnels et freiner l'adoption, créant une incertitude réglementaire."
+    },
+    {
+      "category": "Catalyseur",
+      "tag_bg": "#22C55E",
+      "tag_color": "#FFFFFF",
+      "title": "Le président Trump signera une législation sur la structure du marché crypto, selon le président de la SEC",
+      "source": "Telegram WatcherGuru 17:36:29",
+      "timestamp": "2026-05-29T17:36:29+00:00",
+      "confidence": "Haute",
+      "impact_on_ptf": "Impact direct. Cette déclaration est un catalyseur positif majeur pour la clarté réglementaire aux États-Unis, potentiellement favorable à l'adoption institutionnelle et à la réduction de l'incertitude pour les actifs du portefeuille. Potentiellement encore actionnable si le marché n'a pas pleinement intégré cette perspective."
+    },
+    {
+      "category": "Géopolitique",
+      "tag_bg": "#FBBF24",
+      "tag_color": "#000000",
+      "title": "Le blocus naval dans le détroit d'Ormuz est levé, Bitcoin réagit positivement",
+      "source": "Telegram WatcherGuru 15:39:23, news_crypto 15:34:09",
+      "timestamp": "2026-05-29T15:39:23+00:00",
+      "confidence": "Haute",
+      "impact_on_ptf": "Impact direct. La désescalade géopolitique a déjà entraîné un rebond du Bitcoin au-dessus de 74 000 $. Cette information est probablement déjà intégrée dans le prix et n'est plus directement actionnable pour un arbitrage tactique immédiat."
+    },
+    {
+      "category": "Catalyseur",
+      "tag_bg": "#22C55E",
+      "tag_color": "#FFFFFF",
+      "title": "La CFTC approuve les contrats perpétuels pour les utilisateurs américains",
+      "source": "Telegram news_crypto 15:13:18, Géopolitique",
+      "timestamp": "2026-05-29T15:13:18+00:00",
+      "confidence": "Haute",
+      "impact_on_ptf": "Impact direct. L'approbation par la CFTC de contrats perpétuels réglementés est un pas significatif vers la légitimité des produits dérivés crypto aux États-Unis, augmentant la liquidité et l'intérêt institutionnel. Potentiellement encore actionnable."
+    },
+    {
+      "category": "Risque",
+      "tag_bg": "#EF4444",
+      "tag_color": "#FFFFFF",
+      "title": "Une 'stratégie' dépose 411.48 BTC (30.3 M$) sur Coinbase Prime, spéculation de vente",
+      "source": "Telegram news_crypto 14:46:05",
+      "timestamp": "2026-05-29T14:46:05+00:00",
+      "confidence": "Moyenne",
+      "impact_on_ptf": "Impact direct. Un dépôt important de BTC sur un exchange centralisé est souvent interprété comme un signal de pression vendeuse potentielle, pouvant affecter le prix du Bitcoin et, par corrélation, le reste du portefeuille."
+    },
+    {
+      "category": "Macro",
+      "tag_bg": "#FBBF24",
+      "tag_color": "#000000",
+      "title": "Le Canada entre en récession technique",
+      "source": "Telegram WatcherGuru 14:36:13",
+      "timestamp": "2026-05-29T14:36:13+00:00",
+      "confidence": "Haute",
+      "impact_on_ptf": "Impact indirect. La récession d'une économie majeure comme le Canada peut signaler un ralentissement économique mondial plus large, ce qui est généralement négatif pour les actifs risqués comme les cryptos."
+    },
+    {
+      "category": "Risque",
+      "tag_bg": "#EF4444",
+      "tag_color": "#FFFFFF",
+      "title": "L'indicateur de Warren Buffett atteint un record de 236%, signalant une surévaluation des actions américaines",
+      "source": "Telegram news_crypto 13:32:27",
+      "timestamp": "2026-05-29T13:32:27+00:00",
+      "confidence": "Haute",
+      "impact_on_ptf": "Impact indirect. Une surévaluation historique des marchés actions US augmente le risque d'une correction majeure, ce qui aurait un impact négatif sur l'ensemble des actifs risqués, y compris le portefeuille crypto."
+    },
+    {
+      "category": "Filtré",
+      "tag_bg": "#6B7280",
+      "tag_color": "#FFFFFF",
+      "title": "Le gouvernement américain a déplacé 800K$ de fonds saisis d'Alameda",
+      "source": "Telegram news_crypto 13:46:16",
+      "timestamp": "2026-05-29T13:46:16+00:00",
+      "confidence": "Faible",
+      "impact_on_ptf": "Impact indirect et mineur. Le montant est faible et l'événement est probablement déjà intégré dans le prix, avec un impact négligeable sur le portefeuille."
+    },
+    {
+      "category": "Risque",
+      "tag_bg": "#EF4444",
+      "tag_color": "#FFFFFF",
+      "title": "L'AMF en France avertit 50 PSAN de cesser leurs activités si non conformes à MiCA d'ici le 1er juillet",
+      "source": "Géopolitique",
+      "timestamp": "2026-05-28T00:00:00+00:00",
+      "confidence": "Haute",
+      "impact_on_ptf": "Impact indirect. Cette réglementation européenne peut entraîner une consolidation du marché, réduisant la liquidité pour certaines plateformes et augmentant les barrières à l'entrée, ce qui pourrait affecter l'accès et la diversité des opportunités pour les investisseurs européens."
+    },
+    {
+      "category": "Macro",
+      "tag_bg": "#FBBF24",
+      "tag_color": "#000000",
+      "title": "La BCE envisage une hausse de taux en juin en raison de l'inflation persistante",
+      "source": "Géopolitique",
+      "timestamp": "2026-05-28T00:00:00+00:00",
+      "confidence": "Haute",
+      "impact_on_ptf": "Impact indirect. La perspective de hausses de taux par la BCE et l'inflation persistante aux États-Unis (PCE d'avril en rebond) exercent une pression négative sur les actifs risqués, rendant les actifs traditionnels plus attractifs et pouvant freiner l'appétit pour le risque crypto."
+    },
+    {
+      "category": "Risque",
+      "tag_bg": "#EF4444",
+      "tag_color": "#FFFFFF",
+      "title": "Sorties nettes de 115.3 M$ des ETF crypto (BTC -$120M, ETH -$18M)",
+      "source": "Telegram ETF_Flows 09:55:02, news_crypto 09:51:50",
+      "timestamp": "2026-05-30T09:55:02+00:00",
+      "confidence": "Haute",
+      "impact_on_ptf": "Impact direct. Les sorties importantes des ETF Bitcoin et Ethereum signalent une réduction de l'exposition institutionnelle aux deux plus grandes cryptomonnaies, ce qui peut exercer une pression vendeuse sur le marché et affecter négativement la valeur du portefeuille."
+    }
+  ],
+  "news_24h_empty_reason": null,
+  "today_watch": "Aujourd'hui, il sera crucial de surveiller l'évolution des flux d'ETF crypto, qui ont montré des sorties nettes importantes hier, pour évaluer la persistance de la pression vendeuse institutionnelle. Les déclarations concernant la législation crypto américaine par le président Trump et la CFTC sont des catalyseurs potentiels à suivre, car ils pourraient apporter de la clarté réglementaire et stimuler le sentiment. Enfin, la situation géopolitique autour du détroit d'Ormuz, malgré la levée du blocus, reste un point de tension avec les déclarations iraniennes, pouvant réintroduire de la volatilité sur les marchés mondiaux et crypto.",
+  "thesis_of_the_day": [
+    {
+      "asset": "HBAR",
+      "name": "Hedera",
+      "price_line": "$0.097716 · position $29.29 · +5.39% / 24h",
+      "action": "Renforcer",
+      "action_type": "bullish",
+      "confidence": 70,
+      "size_note": "taille standard",
+      "reliability": "complète",
+      "signals_summary": "3 signaux convergents (seuil Tier 2 atteint) avec une forte activité de développement et un volume d'achat significatif.",
+      "observation": "HBAR, l'actif natif du réseau Hedera, affiche une performance notable de +5.39% sur les dernières 24 heures, se négociant à 0.097716 $. Le prix se situe légèrement au-dessus de la bande supérieure de Bollinger (0.097 $), indiquant une forte dynamique haussière. Malgré une distance de -82.83% par rapport à son ATH, le jeton montre des signes de reprise. Le secteur L1, auquel appartient HBAR, est également en légère surperformance avec une moyenne de +1.4% sur 24h. Le prix se rapproche de la résistance clé à 0.103717 $.",
+      "sources_timestamps": "CoinGecko 11h00 · TradingView 11h05 · DeFiLlama 11h02 · BTC Network 11h03",
+      "reasoning_signals": [
+        "1. **Volume Anormalement Élevé (Bullish)**: Le signal de volume anomaly à 100.0 indique un afflux significatif de capitaux et un intérêt d'achat fort pour HBAR, ce qui soutient la dynamique haussière actuelle. Source · signals_detail 11h00.",
+        "2. **Activité de Développement Robuste (Bullish)**: Hedera montre une activité de développement très saine avec 100 commits sur les 30 derniers jours, le dernier commit datant d'aujourd'hui, et 28 contributeurs récents. Cela témoigne d'un projet actif et en constante évolution, renforçant les fondamentaux. Source · dev_activity 11h00.",
+        "3. **Positionnement au-dessus de la Bande Supérieure de Bollinger (Bullish)**: Le prix de HBAR (0.097716 $) se situe au-dessus de la bande supérieure de Bollinger (0.097 $), signalant une forte impulsion haussière et une potentielle cassure de résistance, même si cela peut aussi indiquer une surchauffe à court terme. Source · bollinger 11h00.",
+        "4. **Rotation Sectorielle Favorable (Slightly Bullish)**: Le secteur des L1, dont HBAR fait partie, est en légère surperformance avec une moyenne de +1.4% sur 24h, ce qui fournit un vent arrière au mouvement de HBAR. Source · sector_rotation 11h00."
+      ],
+      "historical_pattern": {
+        "verified": false,
+        "narrative": "Une configuration similaire, où un actif montre une forte activité de développement et un volume d'achat significatif tout en cassant la bande supérieure de Bollinger, a été observée par le passé, mais les données disponibles sont insuffisantes pour quantifier précisément le nombre d'occurrences, le mouvement moyen, le drawdown ou le win rate.",
+        "occurrences_count": null,
+        "avg_move_pct": null,
+        "max_drawdown_pct": null,
+        "win_rate": null,
+        "data_source": "données insuffisantes pour quantifier"
+      },
+      "self_critique": "Ma thèse repose fortement sur l'activité de développement et le volume, qui sont des signaux solides, mais le prix est déjà légèrement au-dessus de la bande supérieure de Bollinger, ce qui pourrait indiquer une surchauffe à très court terme et un risque de retracement avant une continuation. De plus, la divergence macroéconomique entre la peur crypto et les sommets des actions US pourrait créer une volatilité inattendue. L'absence de données sur les dérivés (funding rate spécifique à HBAR) limite l'évaluation du sentiment des traders à terme. Un retournement du sentiment général du marché crypto ou une forte correction des marchés actions pourrait invalider ce scénario haussier.",
+      "macro_coherence": "La thèse de renforcement de HBAR s'inscrit dans un contexte macroéconomique divergent. Bien que le sentiment général du marché crypto soit à la 'Peur Extrême' et que les flux d'ETF soient négatifs, les fondamentaux solides de HBAR (développement actif) et sa performance au sein du secteur L1 résistent à cette pression. La désescalade géopolitique récente, bien que déjà price-in pour BTC, pourrait créer un environnement légèrement plus stable pour les actifs risqués. Cependant, la surévaluation des actions US et les perspectives de hausses de taux par la BCE restent des vents contraires pour l'ensemble du marché.",
+      "targets": {
+        "short_term_label": "Tactique court terme · 30j",
+        "short_term_30d": "0.103 $ (+5.4%)",
+        "short_term_note": "Cible la résistance immédiate et le niveau Fibonacci 23.6% d'une correction précédente.",
+        "long_term_6_12m_low": 0.115,
+        "long_term_6_12m_high": 0.13,
+        "long_term_note": "Si le sentiment global s'améliore et que le secteur L1 continue de performer, avec une adoption croissante de Hedera."
+      },
+      "action_plan": {
+        "entry": "Renforcer la position HBAR à un prix limite de 0.096 $ (retest de la bande supérieure de Bollinger).",
+        "limit_orders": "Entrée échelonnée si le prix baisse : 50% à 0.096 $, 50% à 0.093 $ (proche du milieu de Bollinger).",
+        "take_profit": {
+          "30pct": "Vendre 30% de la position à 0.103 $.",
+          "30pct_b": "Vendre 30% de la position à 0.115 $.",
+          "40pct": "Vendre 40% de la position à 0.130 $."
+        },
+        "stop_loss": "Placer un stop loss à 0.089 $ (sous la bande médiane de Bollinger et un support clé).",
+        "invalidation_conditions": "La thèse est invalidée si HBAR clôture une journée en dessous de 0.089 $, ou si le secteur L1 passe en forte sous-performance (-2% sur 24h) de manière persistante."
+      },
+      "priority": "action"
+    }
+  ],
+  "thesis_empty_reason": null,
+  "macro_impact": {
+    "intro": "Le contexte macroéconomique actuel est caractérisé par une divergence notable entre un sentiment de 'Peur Extrême' sur le marché crypto et des records historiques atteints par les indices boursiers américains. Le DXY reste élevé, signalant une préférence pour le dollar, tandis que les prix du pétrole sont soutenus, alimentant les craintes inflationnistes et la perspective de hausses de taux par les banques centrales (BCE). Les sorties d'ETF crypto confirment une prudence institutionnelle. Cette configuration crée un environnement de 'risk-off' latent pour les actifs numériques, malgré les signaux positifs de certains secteurs traditionnels.",
+    "exposed_positions": [
+      {
+        "asset": "BTC",
+        "beta_dxy": "élevé",
+        "expected_impact_pct": -2.0
+      },
+      {
+        "asset": "ETH",
+        "beta_dxy": "élevé",
+        "expected_impact_pct": -1.5
+      },
+      {
+        "asset": "TAO",
+        "beta_dxy": "modéré",
+        "expected_impact_pct": -1.0
+      },
+      {
+        "asset": "RENDER",
+        "beta_dxy": "modéré",
+        "expected_impact_pct": -1.0
+      },
+      {
+        "asset": "INJ",
+        "beta_dxy": "modéré",
+        "expected_impact_pct": -0.8
+      }
+    ],
+    "implication": "Dans ce contexte, il est impératif de maintenir une part importante de la réserve en USDC pour préserver le capital. Les positions sur les actifs à forte corrélation avec le DXY ou les marchés traditionnels (comme BTC, ETH) sont exposées à une pression baissière. Il est judicieux de privilégier les actifs présentant des fondamentaux solides et des catalyseurs spécifiques, comme HBAR, tout en restant vigilant aux signaux d'invalidation macroéconomiques. La prudence est de mise, avec une approche tactique pour les renforcements et une gestion stricte des stop-loss.",
+    "self_critique": "L'estimation des bêtas au DXY et des impacts attendus est basée sur des corrélations empiriques et n'est pas une science exacte. Les marchés crypto peuvent parfois se découpler des marchés traditionnels ou du DXY en cas de catalyseurs spécifiques. De plus, la liquidité variable des altcoins peut amplifier ou réduire ces impacts par rapport aux grandes capitalisations. Les chiffres sont indicatifs et doivent être interprétés avec flexibilité."
+  },
+  "all_positions_summary": [
+    {
+      "asset": "ETH",
+      "tier": 0,
+      "change_24h": 0.1555553949103227,
+      "comment": "2 signaux, neutre (1↑/1↓)",
+      "action_active": null
+    },
+    {
+      "asset": "BTC",
+      "tier": 0,
+      "change_24h": -0.1381880843213637,
+      "comment": "2 signaux, neutre (1↑/1↓)",
+      "action_active": null
+    },
+    {
+      "asset": "INJ",
+      "tier": 1,
+      "change_24h": 8.999079194384871,
+      "comment": "2 signaux, neutre (1↑/1↓) · -88% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "RENDER",
+      "tier": 1,
+      "change_24h": -4.223980791323314,
+      "comment": "2 signaux, neutre (1↑/1↓) · -85% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "CKB",
+      "tier": 1,
+      "change_24h": 3.5164581547164087,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -97% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "ANKR",
+      "tier": 1,
+      "change_24h": 3.387603932282636,
+      "comment": "RAS · pas de signal notable · -98% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "TAO",
+      "tier": 1,
+      "change_24h": -2.96257254941326,
+      "comment": "2 signaux, neutre (1↑/1↓)",
+      "action_active": null
+    },
+    {
+      "asset": "LINK",
+      "tier": 1,
+      "change_24h": 1.482337372452996,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -83% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "STX",
+      "tier": 1,
+      "change_24h": 0.6008234012205603,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -94% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "JASMY",
+      "tier": 1,
+      "change_24h": -0.37229408004970577,
+      "comment": "1 signaux, biais baissier (0↑/1↓) · -100% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "RSR",
+      "tier": 1,
+      "change_24h": 0.227913849606559,
+      "comment": "1 signaux, biais baissier (0↑/1↓) · -99% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "QNT",
+      "tier": 1,
+      "change_24h": -0.03721132216629285,
+      "comment": "RAS · pas de signal notable · -83% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "FET",
+      "tier": 2,
+      "change_24h": 5.814681304192747,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -93% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "HBAR",
+      "tier": 2,
+      "change_24h": 5.390864958855535,
+      "comment": "2 signaux, biais haussier (2↑/0↓) · -83% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "IMX",
+      "tier": 2,
+      "change_24h": 3.324565998182908,
+      "comment": "RAS · pas de signal notable · -98% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "GRT",
+      "tier": 2,
+      "change_24h": -3.1158707135036576,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -99% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "CFX",
+      "tier": 2,
+      "change_24h": 1.907661223382678,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -97% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "XRP",
+      "tier": 2,
+      "change_24h": 1.6478345782019916,
+      "comment": "1 signaux, biais haussier (1↑/0↓)",
+      "action_active": null
+    },
+    {
+      "asset": "ACH",
+      "tier": 2,
+      "change_24h": 0.7698333466566146,
+      "comment": "RAS · pas de signal notable · -97% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "ARB",
+      "tier": 2,
+      "change_24h": -0.5732024959907882,
+      "comment": "RAS · pas de signal notable · -96% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "ATOM",
+      "tier": 2,
+      "change_24h": 0.4911072780331686,
+      "comment": "RAS · pas de signal notable · -95% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "ADA",
+      "tier": 2,
+      "change_24h": -0.07085454752768698,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -92% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "ZK",
+      "tier": 3,
+      "change_24h": 7.096882081332659,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -95% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "AXL",
+      "tier": 3,
+      "change_24h": 5.954863078690014,
+      "comment": "RAS · pas de signal notable · -98% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "AR",
+      "tier": 3,
+      "change_24h": -2.8037029257594672,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -97% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "W",
+      "tier": 3,
+      "change_24h": 1.189778309012778,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -99% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "NOT",
+      "tier": 3,
+      "change_24h": -0.5066438707829789,
+      "comment": "RAS · pas de signal notable · -98% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "CELO",
+      "tier": 4,
+      "change_24h": 5.481504100461984,
+      "comment": "RAS · pas de signal notable · -99% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "ZEN",
+      "tier": 4,
+      "change_24h": -4.41664194584065,
+      "comment": "RAS · pas de signal notable · -84% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "SXT",
+      "tier": 4,
+      "change_24h": -4.319912793210701,
+      "comment": "RAS · pas de signal notable · -92% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "SATS",
+      "tier": 4,
+      "change_24h": 2.191320279564888,
+      "comment": "RAS · pas de signal notable · -99% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "WLD",
+      "tier": 4,
+      "change_24h": -2.1305421380136957,
+      "comment": "RAS · pas de signal notable · -97% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "YFI",
+      "tier": 4,
+      "change_24h": 2.073036712925496,
+      "comment": "RAS · pas de signal notable · -97% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "NMR",
+      "tier": 4,
+      "change_24h": 1.8803299807238092,
+      "comment": "RAS · pas de signal notable · -91% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "FIL",
+      "tier": 4,
+      "change_24h": 1.6470784436920252,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -100% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "HMSTR",
+      "tier": 4,
+      "change_24h": 1.2365500094095678,
+      "comment": "RAS · pas de signal notable · -98% sous ATH",
+      "action_active": null
+    },
+    {
+      "asset": "TRB",
+      "tier": 4,
+      "change_24h": -0.38383872392076535,
+      "comment": "RAS · pas de signal notable · -97% sous ATH",
+      "action_active": null
+    }
+  ],
+  "blind_spots": "Arkham non actif · Bloomberg/Reuters non accessibles · indisponibles : Polymarket, ETF flows",
+  "footer": {
+    "active_sources": [
+      "Fear&Greed",
+      "FRED",
+      "On-chain",
+      "Telegram",
+      "DeFiLlama",
+      "Géopolitique",
+      "BTC Network",
+      "Stablecoins",
+      "Whale Tracking",
+      "Calendrier macro"
+    ],
+    "next_report_at": "ce soir 20h00",
+    "disclaimer": "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision."
+  },
+  "portfolio_heatmap": [
+    {
+      "symbol": "TAO",
+      "value_usd": 446.18,
+      "change_24h": -2.96257254941326
+    },
+    {
+      "symbol": "BTC",
+      "value_usd": 404.31,
+      "change_24h": -0.1381880843213637
+    },
+    {
+      "symbol": "ETH",
+      "value_usd": 370.9,
+      "change_24h": 0.1555553949103227
+    },
+    {
+      "symbol": "RENDER",
+      "value_usd": 82.66,
+      "change_24h": -4.223980791323314
+    },
+    {
+      "symbol": "JASMY",
+      "value_usd": 78.52,
+      "change_24h": -0.37229408004970577
+    },
+    {
+      "symbol": "LINK",
+      "value_usd": 76.58,
+      "change_24h": 1.482337372452996
+    },
+    {
+      "symbol": "RSR",
+      "value_usd": 71.17,
+      "change_24h": 0.227913849606559
+    },
+    {
+      "symbol": "CKB",
+      "value_usd": 70.63,
+      "change_24h": 3.5164581547164087
+    },
+    {
+      "symbol": "ANKR",
+      "value_usd": 62.55,
+      "change_24h": 3.387603932282636
+    },
+    {
+      "symbol": "STX",
+      "value_usd": 57.92,
+      "change_24h": 0.6008234012205603
+    },
+    {
+      "symbol": "INJ",
+      "value_usd": 54.66,
+      "change_24h": 8.999079194384871
+    },
+    {
+      "symbol": "QNT",
+      "value_usd": 53.56,
+      "change_24h": -0.03721132216629285
+    },
+    {
+      "symbol": "XRP",
+      "value_usd": 48.01,
+      "change_24h": 1.6478345782019916
+    },
+    {
+      "symbol": "FET",
+      "value_usd": 39.73,
+      "change_24h": 5.814681304192747
+    },
+    {
+      "symbol": "CFX",
+      "value_usd": 36.78,
+      "change_24h": 1.907661223382678
+    },
+    {
+      "symbol": "ATOM",
+      "value_usd": 33.6,
+      "change_24h": 0.4911072780331686
+    },
+    {
+      "symbol": "HBAR",
+      "value_usd": 29.29,
+      "change_24h": 5.390864958855535
+    },
+    {
+      "symbol": "ACH",
+      "value_usd": 23.6,
+      "change_24h": 0.7698333466566146
+    },
+    {
+      "symbol": "IMX",
+      "value_usd": 19.76,
+      "change_24h": 3.324565998182908
+    },
+    {
+      "symbol": "ADA",
+      "value_usd": 12.32,
+      "change_24h": -0.07085454752768698
+    },
+    {
+      "symbol": "GRT",
+      "value_usd": 11.49,
+      "change_24h": -3.1158707135036576
+    },
+    {
+      "symbol": "ARB",
+      "value_usd": 11.03,
+      "change_24h": -0.5732024959907882
+    },
+    {
+      "symbol": "AR",
+      "value_usd": 8.59,
+      "change_24h": -2.8037029257594672
+    },
+    {
+      "symbol": "NOT",
+      "value_usd": 7.58,
+      "change_24h": -0.5066438707829789
+    },
+    {
+      "symbol": "AXL",
+      "value_usd": 7.56,
+      "change_24h": 5.954863078690014
+    },
+    {
+      "symbol": "ZK",
+      "value_usd": 4.58,
+      "change_24h": 7.096882081332659
+    },
+    {
+      "symbol": "W",
+      "value_usd": 2.85,
+      "change_24h": 1.189778309012778
+    },
+    {
+      "symbol": "SXT",
+      "value_usd": 0.2,
+      "change_24h": -4.319912793210701
+    },
+    {
+      "symbol": "HMSTR",
+      "value_usd": 0.11,
+      "change_24h": 1.2365500094095678
+    },
+    {
+      "symbol": "NMR",
+      "value_usd": 0.03,
+      "change_24h": 1.8803299807238092
+    },
+    {
+      "symbol": "ZEN",
+      "value_usd": 0.03,
+      "change_24h": -4.41664194584065
+    },
+    {
+      "symbol": "WLD",
+      "value_usd": 0.02,
+      "change_24h": -2.1305421380136957
+    },
+    {
+      "symbol": "YFI",
+      "value_usd": 0.01,
+      "change_24h": 2.073036712925496
+    },
+    {
+      "symbol": "SATS",
+      "value_usd": 0.01,
+      "change_24h": 2.191320279564888
+    },
+    {
+      "symbol": "FIL",
+      "value_usd": 0.01,
+      "change_24h": 1.6470784436920252
+    },
+    {
+      "symbol": "TRB",
+      "value_usd": 0.01,
+      "change_24h": -0.38383872392076535
+    },
+    {
+      "symbol": "CELO",
+      "value_usd": 0.0,
+      "change_24h": 5.481504100461984
+    }
+  ],
+  "btc_network": {
+    "available": true,
+    "hash_rate_ehs": 1008.5,
+    "n_tx_24h": 650157,
+    "miners_revenue_usd": 0.0,
+    "difficulty": 138955357012247,
+    "market_price_usd": 73510.22,
+    "mempool_size": 1396
+  },
+  "stablecoin_supply": {
+    "available": true,
+    "total_mcap_usd": 268504166654.0,
+    "total_change_7d_pct": -0.012,
+    "components": [
+      {
+        "symbol": "USDT",
+        "market_cap_usd": 188224050495,
+        "change_7d_pct": -0.01
+      },
+      {
+        "symbol": "USDC",
+        "market_cap_usd": 75924430552,
+        "change_7d_pct": -0.01
+      },
+      {
+        "symbol": "DAI",
+        "market_cap_usd": 4355685607,
+        "change_7d_pct": 0.01
+      }
+    ],
+    "interpretation": "supply stablecoins stable · pas de signal directionnel"
+  },
+  "whale_inflows": {
+    "available": true,
+    "large_inflows_count": 0,
+    "total_eth_in": 0.0,
+    "top_transfers": [],
+    "threshold_eth": 200.0,
+    "lookback_hours": 24,
+    "interpretation": "aucun gros dépôt ETH détecté vers les exchanges surveillés sur 24h · pas de signal vendeur whale particulier"
+  },
+  "_saved_at": "2026-05-30T10:10:17.150850+00:00"
+}
