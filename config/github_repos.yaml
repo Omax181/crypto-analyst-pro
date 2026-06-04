@@ -1,0 +1,60 @@
+# Mapping symbole -> repos GitHub publics (signal de santé dev).
+#
+# Règle d'usage (RÈGLE 3 du persona) : les commits ne pèsent QUE 10% max du
+# raisonnement. `null` = memecoin / pas de repo public connu (ce n'est PAS un
+# signal négatif en soi, juste une absence de donnée dev).
+#
+# Vérifié manuellement. Si un repo renvoie 404 à l'exécution, github_dev.py
+# dégrade proprement (available=False) sans inventer "projet mort".
+
+github_repos:
+  # --- Tier 0 / L1 majeurs ---
+  BTC: ["bitcoin/bitcoin"]
+  ETH: ["ethereum/go-ethereum", "ethereum/solidity"]
+  ADA: ["IntersectMBO/cardano-node"]
+  ATOM: ["cosmos/cosmos-sdk"]
+  HBAR: ["hashgraph/hedera-services"]
+  XRP: ["XRPLF/rippled"]
+  STX: ["stacks-network/stacks-core"]
+  CKB: ["nervosnetwork/ckb"]
+  CELO: ["celo-org/celo-monorepo"]
+  AR: ["ArweaveTeam/arweave"]
+  FIL: ["filecoin-project/lotus"]
+  ZEN: ["HorizenOfficial/zen"]
+
+  # --- AI / DePIN ---
+  TAO: ["opentensor/bittensor"]
+  RENDER: ["RNDR-Inc/rndr-py"]
+  FET: ["fetchai/fetchd"]
+  WLD: ["worldcoin/world-id-protocol"]
+  NMR: ["numerai/numerai-cli"]
+
+  # --- L2 / scaling ---
+  ARB: ["OffchainLabs/nitro"]
+  IMX: ["immutable/imx-core-sdk"]
+  ZK: ["matter-labs/zksync-era"]
+  CFX: ["Conflux-Chain/conflux-rust"]
+
+  # --- DeFi ---
+  INJ: ["InjectiveLabs/injective-core"]
+  RSR: ["reserve-protocol/protocol"]
+  YFI: ["yearn/yearn-vaults"]
+  ACH: []   # AlchemyPay : pas de repo public principal fiable -> traité comme null
+
+  # --- Infra / oracle / interop ---
+  LINK: ["smartcontractkit/chainlink"]
+  QNT: []   # Quant : pas de repo public principal connu
+  GRT: ["graphprotocol/graph-node"]
+  AXL: ["axelarnetwork/axelar-core"]
+  ANKR: ["ankr/ankr.js"]
+  TRB: ["tellor-io/tellor"]
+  W: ["wormhole-foundation/wormhole"]
+  SXT: []   # Space and Time : SDK public instable -> null pour l'instant
+
+  # --- Payments / data / IoT ---
+  JASMY: []        # pas de repo public principal connu
+
+  # --- Memecoins / Ordinals (pas de repo, null assumé) ---
+  NOT: null
+  HMSTR: null
+  SATS: null

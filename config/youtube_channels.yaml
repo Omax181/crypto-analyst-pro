@@ -1,0 +1,29 @@
+# =============================================================================
+# YOUTUBE CHANNELS — chaînes de référence à scanner (vidéos < 24h)
+# Logique : récupérer les transcripts récents, les passer à Gemini pour une
+# SYNTHÈSE GLOBALE. NE JAMAIS citer une chaîne individuellement dans le rapport.
+# =============================================================================
+
+youtube_channels:
+  fr_analysis:
+    - "Crypto pour tous"
+    - "Hasheur"
+    - "Bourse pour tous"
+  en_analysis:
+    - "Coin Bureau"
+    - "Benjamin Cowen"
+    - "InvestAnswers"
+  fr_macro:
+    - "Heu?reka"
+    - "HugoDécrypte"
+
+# Optionnel : channel IDs explicites (évite une recherche par nom, plus fiable).
+# Format : "Nom affiché": "UCxxxxxxxxxxxxxxxxxxxxxx"
+# Laisser vide => résolution par recherche YouTube Data API.
+channel_ids: {}
+
+settings:
+  max_age_hours: 24
+  max_videos_per_channel: 2
+  transcript_languages: ["fr", "en"]
+  priority_channel: "Crypto pour tous"   # scanné en premier, résumé dédié

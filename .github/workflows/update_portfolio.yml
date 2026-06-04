@@ -1,0 +1,98 @@
+name: "💼 Mettre à jour le portfolio"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Workflow manuel pour mettre à jour config/portfolio.yaml après un trade.
+#
+# Comment l'utiliser :
+#   1. Allez dans l'onglet Actions de votre repo GitHub
+#   2. Cliquez sur "💼 Mettre à jour le portfolio" dans la sidebar gauche
+#   3. Cliquez "Run workflow"
+#   4. Remplissez les champs (actif, action, quantité)
+#   5. Cliquez "Run workflow" (bouton vert)
+#
+# Le portfolio sera mis à jour et commité automatiquement. Le prochain rapport
+# prendra en compte les nouvelles quantités.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      asset:
+        description: "Symbole de l'actif (ex: BTC, ETH, SOL)"
+        required: true
+        type: string
+      action:
+        description: "Action à effectuer"
+        required: true
+        type: choice
+        options:
+          - buy   # Ajouter des unités à la position existante
+          - sell  # Retirer des unités de la position existante
+          - set   # Fixer la quantité à une valeur exacte
+          - add   # Ajouter un NOUVEL actif au portfolio
+      quantity:
+        description: "Quantité (ex: 0.01 pour BTC, 1000 pour JASMY)"
+        required: true
+        type: string
+      tier:
+        description: "Tier (uniquement pour 'add' — nouvel actif)"
+        required: false
+        type: choice
+        default: "3"
+        options:
+          - "1"  # Analyse deep
+          - "2"  # Analyse condensée
+          - "3"  # Silence sauf >10%
+          - "4"  # Poussière
+      coingecko_id:
+        description: "ID CoinGecko (uniquement pour 'add' — ex: solana)"
+        required: false
+        type: string
+      notes:
+        description: "Note libre (optionnel)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Mettre à jour le portfolio
+        run: |
+          ARGS="--asset '${{ inputs.asset }}' --action '${{ inputs.action }}' --quantity '${{ inputs.quantity }}'"
+          if [ "${{ inputs.action }}" = "add" ]; then
+            ARGS="$ARGS --tier ${{ inputs.tier }}"
+            if [ -n "${{ inputs.coingecko_id }}" ]; then
+              ARGS="$ARGS --coingecko-id '${{ inputs.coingecko_id }}'"
+            fi
+          fi
+          if [ -n "${{ inputs.notes }}" ]; then
+            ARGS="$ARGS --notes '${{ inputs.notes }}'"
+          fi
+          eval python scripts/update_portfolio.py $ARGS
+
+      - name: Commit et push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add config/
+          if git diff --cached --quiet; then
+            echo "Aucun changement détecté."
+            exit 0
+          fi
+          ASSET=$(echo "${{ inputs.asset }}" | tr '[:lower:]' '[:upper:]')
+          ACTION="${{ inputs.action }}"
+          QTY="${{ inputs.quantity }}"
+          git commit -m "portfolio: ${ACTION} ${QTY} ${ASSET} [skip ci]"
+          git push
+          echo "✅ Commit poussé : ${ACTION} ${QTY} ${ASSET}"

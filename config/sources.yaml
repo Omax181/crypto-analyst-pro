@@ -1,0 +1,140 @@
+# =============================================================================
+# SOURCES — configuration des 14 sources de données
+# Les CLÉS API ne sont PAS ici : elles viennent des variables d'environnement
+# (GitHub Secrets). Ce fichier ne contient que des mappings / endpoints publics.
+# =============================================================================
+
+# --- Mapping ticker PTF -> id CoinGecko (indispensable pour /simple/price) ---
+coingecko_ids:
+  BTC: bitcoin
+  ETH: ethereum
+  TAO: bittensor
+  RENDER: render-token
+  JASMY: jasmycoin
+  LINK: chainlink
+  RSR: reserve-rights-token
+  CKB: nervos-network
+  ANKR: ankr
+  STX: blockstack
+  INJ: injective-protocol
+  QNT: quant-network
+  XRP: ripple
+  FET: fetch-ai
+  CFX: conflux-token
+  ATOM: cosmos
+  HBAR: hedera-hashgraph
+  ACH: alchemy-pay
+  IMX: immutable-x
+  ADA: cardano
+  GRT: the-graph
+  ARB: arbitrum
+  AR: arweave
+  NOT: notcoin
+  AXL: axelar
+  ZK: zksync
+  SATS: sats-ordinals
+  FIL: filecoin
+
+# --- Ticker exchange pour TradingView / Binance (paire USDT par défaut) ---
+# Si un symbole n'a pas de paire USDT liquide sur Binance, le retirer ici
+# (le code dégrade gracieusement : pas de signal technique pour ce coin).
+binance_symbols:
+  BTC: BTCUSDT
+  ETH: ETHUSDT
+  TAO: TAOUSDT
+  RENDER: RENDERUSDT
+  JASMY: JASMYUSDT
+  LINK: LINKUSDT
+  RSR: RSRUSDT
+  CKB: CKBUSDT
+  ANKR: ANKRUSDT
+  STX: STXUSDT
+  INJ: INJUSDT
+  QNT: QNTUSDT
+  XRP: XRPUSDT
+  FET: FETUSDT
+  CFX: CFXUSDT
+  ATOM: ATOMUSDT
+  HBAR: HBARUSDT
+  ACH: ACHUSDT
+  IMX: IMXUSDT
+  ADA: ADAUSDT
+  GRT: GRTUSDT
+  ARB: ARBUSDT
+  AR: ARUSDT
+  NOT: NOTUSDT
+  AXL: AXLUSDT
+  ZK: ZKUSDT
+  FIL: FILUSDT
+
+# --- Repos GitHub par crypto (dev activity = signal santé) ---
+github_repos:
+  BTC: ["bitcoin/bitcoin"]
+  ETH: ["ethereum/go-ethereum", "ethereum/solidity"]
+  TAO: ["opentensor/bittensor"]
+  RENDER: []
+  LINK: ["smartcontractkit/chainlink"]
+  INJ: ["InjectiveFoundation/injective-core"]
+  STX: ["stacks-network/stacks-core"]
+  QNT: []                       # repo privé / pas de repo public connu
+  XRP: ["XRPLF/rippled"]
+  FET: ["fetchai/fetchd"]
+  CFX: ["Conflux-Chain/conflux-rust"]
+  RSR: ["reserve-protocol/protocol"]
+  CKB: ["nervosnetwork/ckb"]
+  ANKR: ["Ankr-network/ankr.js"]
+  JASMY: []
+  ATOM: ["cosmos/gaia"]
+  HBAR: ["hashgraph/hedera-services"]
+  IMX: ["immutable/imx-core-sdk"]
+  ADA: ["IntersectMBO/cardano-node"]
+  GRT: ["graphprotocol/graph-node"]
+  ARB: ["OffchainLabs/nitro"]
+  AR: ["ArweaveTeam/arweave"]
+  AXL: ["axelarnetwork/axelar-core"]
+  ZK: ["matter-labs/zksync-era"]
+  FIL: ["filecoin-project/lotus"]
+
+# --- FRED series IDs (macro USA) ---
+fred_series:
+  fed_funds: DFF
+  us_10y: DGS10
+  us_2y: DGS2
+  yield_curve: T10Y2Y
+  dxy: DTWEXBGS
+  vix: VIXCLS
+  cpi: CPIAUCSL
+  core_pce: PCEPILFE
+  m2: M2SL
+  unemployment: UNRATE
+  # --- V6 : actifs macro hors-crypto (corrélations marché) ---
+  sp500: SP500          # S&P 500 (clôture quotidienne)
+  nasdaq: NASDAQCOM     # NASDAQ Composite
+  gold: GOLDPMGBD228NLBM # Or LBMA PM fix USD/once (fallback ; prix live = Yahoo GC=F)
+  wti: DCOILWTICO       # Pétrole WTI (USD/baril)
+  brent: DCOILBRENTEU   # Pétrole Brent (USD/baril)
+  eur_usd: DEXUSEU      # EUR/USD
+  usd_jpy: DEXJPUS      # USD/JPY (yen, carry trade)
+
+# --- Subreddits sentiment social ---
+reddit_subreddits:
+  - cryptocurrency
+  - bitcoin
+  - ethereum
+  - CryptoMarkets
+
+# --- Endpoints (publics, pas de secret) ---
+endpoints:
+  coingecko: "https://api.coingecko.com/api/v3"
+  coingecko_pro: "https://pro-api.coingecko.com/api/v3"
+  coinmarketcap: "https://pro-api.coinmarketcap.com/v1"
+  binance: "https://api.binance.com/api/v3"
+  binance_futures: "https://fapi.binance.com/fapi/v1"
+  fear_greed: "https://api.alternative.me/fng/"
+  cryptopanic: "https://cryptopanic.com/api/v1/posts/"
+  blockchain_info: "https://api.blockchain.info"
+  blockchain_stats: "https://api.blockchain.info/stats"
+  etherscan: "https://api.etherscan.io/api"
+  fred: "https://api.stlouisfed.org/fred"
+  trading_economics: "https://api.tradingeconomics.com/calendar"
+  youtube: "https://www.googleapis.com/youtube/v3"
