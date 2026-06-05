@@ -75,7 +75,12 @@ class DecisionEngine:
             timestamp=timestamp, data=data, portfolio_yaml=portfolio_yaml,
             evening_state=evening_state, macro_regime=macro_regime or None,
         )
-        return self._safe_json(prompt, data, kind="morning")
+        payload = self._safe_json(prompt, data, kind="morning")
+        # B6 — expose le verdict de la PASSE 1 dans le payload pour que le rendu
+        # puisse l'afficher même si la passe 2 ne l'a pas recopié fidèlement.
+        if isinstance(payload, dict) and macro_regime:
+            payload["macro_regime_pass1"] = macro_regime
+        return payload
 
     def _macro_regime_pass(
         self, timestamp: str, data: dict[str, Any]

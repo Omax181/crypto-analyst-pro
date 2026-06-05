@@ -342,7 +342,7 @@ def test_polymarket():
 def test_coinmetrics():
     """On-chain avancé (Coin Metrics Community — sans clé). Améliorations V10."""
     r = http_get(
-        "https://api.coinmetrics.io/v4/timeseries/asset-metrics",
+        "https://community-api.coinmetrics.io/v4/timeseries/asset-metrics",
         params={
             "assets": "btc",
             "metrics": "PriceUSD,CapMVRVCur,NVTAdj",

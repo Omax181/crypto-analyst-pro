@@ -76,7 +76,17 @@ INSTRUCTIONS :
    Si calendrier vide : "données calendrier indisponibles".
 5. 3 scénarios (baissier/neutre/haussier) avec probabilités et actions.
 6. Exit plan poussières (<$5) : attendre spike +30%, statut par actif.
-7. Cibles long terme révisées par actif Tier 0/1.
+7. Cibles long terme révisées par actif Tier 0/1. Donne des cibles CONCRÈTES
+   (niveau de prix, fourchette, ou multiple ancré sur un repère : ATH, ratio
+   MVRV, cycle) — si tu n'as pas de base réelle pour chiffrer une cible, écris
+   « cible à préciser » plutôt qu'une formule vide du type « à définir via
+   analyse dédiée ». Pas de remplissage creux.
+8. SOURCES — n'invente PAS un nombre de sources. Le compte réel est
+   data.active_sources_count (sur total_sources_count) : utilise-le tel quel dans
+   sources_review. Ne dis jamais « 15 sources » si le compte fourni est différent.
+9. EXPOSITION SECTORIELLE — déjà calculée côté Python (data.sector_exposure_computed,
+   poids PTF réels par secteur). Recopie-la, ne mets JAMAIS « n/d% » : si elle est
+   absente, omets la section.
 
 {OUTPUT_CONTRACT}
 Disclaimer footer : "{DISCLAIMER}"

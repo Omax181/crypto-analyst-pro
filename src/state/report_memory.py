@@ -330,6 +330,22 @@ def compute_blind_spots_weekly() -> dict[str, Any]:
     this_week = _count_down(week1_start, now)
     prev_week = _count_down(week2_start, week1_start)
 
+    # B10 — fiabilité statistique : ne rien conclure tant qu'on n'a pas observé
+    # une semaine COMPLÈTE de runs. Avec 1-2 jours de logs, « 2 j/7 » est du
+    # bruit trompeur. On exige >= 7 jours distincts d'observation sur la fenêtre.
+    observed_days = set()
+    for entry in logs:
+        try:
+            when = _dt.datetime.fromisoformat(entry.get("date", ""))
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=_dt.timezone.utc)
+        except (ValueError, TypeError):
+            continue
+        if week1_start <= when < now:
+            observed_days.add(when.strftime("%Y-%m-%d"))
+    if len(observed_days) < 7:
+        return {"available": False, "observed_days": len(observed_days)}
+
     if not this_week:
         return {"available": False}
 

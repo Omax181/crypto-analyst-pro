@@ -98,3 +98,97 @@ def relevant_patterns(context: dict[str, Any]) -> list[dict[str, Any]]:
         elif fng is not None and "fear & greed > 75" in trig and fng > 75:
             selected.append(p)
     return selected or HISTORICAL_PATTERNS
+
+
+# --- A11 : analyse historique chartiste RÉELLE (calculée sur OHLC) -----------
+
+def compute_setup_stats(
+    closes: list[float],
+    change_24h: float | None = None,
+    forward_days: int = 7,
+) -> dict[str, Any]:
+    """Statistiques chartistes RÉELLES d'un actif à partir de ses clôtures.
+
+    Au lieu d'affirmations vagues, on quantifie le comportement passé du
+    « même type de configuration » : on repère dans l'historique les jours où
+    l'actif était au moins aussi survendu qu'aujourd'hui (écart sous sa moyenne
+    mobile 20j comparable, ou repli journalier comparable), puis on mesure le
+    rendement moyen sur ``forward_days`` jours et la proportion de cas positifs.
+
+    Args:
+        closes: clôtures quotidiennes croissantes (la dernière = aujourd'hui).
+        change_24h: variation 24h actuelle (%) pour calibrer « repli comparable ».
+        forward_days: horizon de mesure du rendement forward (jours).
+
+    Returns:
+        Dict ``{available, occurrences, avg_forward_pct, win_rate_pct,
+        forward_days, lookback_days, summary}``. ``available=False`` si
+        l'historique est trop court (< ~35 points).
+    """
+    if not closes or len(closes) < 35:
+        return {"available": False}
+
+    n = len(closes)
+    ma_window = 20
+
+    # Écart actuel sous la moyenne mobile 20j (mesure de survente positionnelle).
+    def _ma_gap(idx: int) -> float | None:
+        if idx < ma_window:
+            return None
+        window = closes[idx - ma_window:idx]
+        ma = sum(window) / ma_window
+        if ma <= 0:
+            return None
+        return (closes[idx] - ma) / ma * 100.0
+
+    current_gap = _ma_gap(n - 1)
+    # Seuil de « configuration comparable » : aussi bas (ou plus) que maintenant.
+    # Si l'écart actuel n'est pas calculable, on retombe sur le repli 24h.
+    drop_threshold = None
+    if change_24h is not None:
+        drop_threshold = min(float(change_24h), -2.0)  # au moins -2%
+
+    occurrences = 0
+    forward_returns: list[float] = []
+    # On s'arrête forward_days avant la fin pour avoir un rendement forward complet.
+    for i in range(ma_window, n - forward_days):
+        gap = _ma_gap(i)
+        is_similar = False
+        if current_gap is not None and gap is not None and current_gap < 0:
+            # configuration au moins aussi survendue que maintenant
+            is_similar = gap <= current_gap
+        elif drop_threshold is not None and i >= 1 and closes[i - 1] > 0:
+            day_ret = (closes[i] - closes[i - 1]) / closes[i - 1] * 100.0
+            is_similar = day_ret <= drop_threshold
+        if not is_similar:
+            continue
+        entry = closes[i]
+        future = closes[i + forward_days]
+        if entry > 0:
+            occurrences += 1
+            forward_returns.append((future - entry) / entry * 100.0)
+
+    if occurrences < 3 or not forward_returns:
+        return {
+            "available": False,
+            "lookback_days": n,
+            "reason": "pas assez d'occurrences comparables sur l'historique",
+        }
+
+    avg_fwd = sum(forward_returns) / len(forward_returns)
+    wins = sum(1 for r in forward_returns if r > 0)
+    win_rate = wins / len(forward_returns) * 100.0
+    summary = (
+        f"Sur ~{n}j d'historique, une configuration aussi survendue s'est "
+        f"présentée {occurrences} fois ; rendement moyen {avg_fwd:+.1f}% sur "
+        f"{forward_days}j, positif dans {win_rate:.0f}% des cas."
+    )
+    return {
+        "available": True,
+        "occurrences": occurrences,
+        "avg_forward_pct": round(avg_fwd, 1),
+        "win_rate_pct": round(win_rate, 0),
+        "forward_days": forward_days,
+        "lookback_days": n,
+        "summary": summary,
+    }

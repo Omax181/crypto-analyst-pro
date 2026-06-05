@@ -35,6 +35,7 @@ _EVENING_SCHEMA = """
     "checks": ["string — DÉRIVÉ des événements du jour (gros mouvements >5%, signaux émergents, recos à un seuil critique). Génériques SEULEMENT si rien de spécifique."],
     "actions_tonight": "string (PROSE : actions ANCRÉES dans tes positions actives, leurs niveaux clés du jour, et les recos du matin — ordres limite à poser, allègements en cours)"
   },
+  "tomorrow_macro_events": [{"label","date","when (demain/aujourd'hui)","source"}],
   "blind_spots": "string",
   "footer": {"next_morning_time (ex. '08h30')"}
 }
@@ -96,6 +97,11 @@ INSTRUCTIONS :
      niveaux clés du jour, et les recos du matin (ordres limite à poser,
      allègements en cours). PAS d'actions génériques déconnectées du jour.
 5. Angles morts : sources manquantes / incertitudes du jour.
+5bis. ÉVÉNEMENTS MACRO DEMAIN — recopie EXCLUSIVEMENT data.tomorrow_macro_events
+   (dates RÉELLES issues de FRED). N'INVENTE AUCUN événement, aucune heure, aucun
+   consensus : si la liste est vide, ne mets rien (pas d'ISM/PMI improvisés). Le
+   P&L par position en $ (24h) est déjà calculé dans data.daily_pnl.top_movers
+   (champ pnl_usd) — ne le recalcule pas, le rendu l'affiche tel quel.
 6. NOMS DE SOURCES — utilise TOUJOURS le libellé public :
    "CoinGecko" (pas "prices_now"), "Fear & Greed Index" (pas "fear_greed"),
    "Yahoo Finance" (pas "evening_macro"), "Farside Investors" (pas "etf_flows"),

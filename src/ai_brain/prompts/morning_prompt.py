@@ -20,6 +20,7 @@ _MORNING_SCHEMA = """
   "header": {"date","time_casablanca","active_sources_count","win_rate_30d","win_rate_total"},
   "portfolio_snapshot": {"value_usd","change_24h_pct","change_7d_pct","vs_btc_7d_pct","drawdown_ath_pct"},
   "executive_summary": "string (TL;DR en 1-2 phrases pour scan 5 secondes : actions clés du jour + régime macro. Ex. 'Aujourd'hui : 1 renforcement GRT, 1 allègement INJ. Régime macro prudent (DXY haut, courbe inversée). 2 actions à poser.')",
+  "macro_regime_readout": {"regime (risk-on/risk-off/neutre — repris de la PASSE 1 data.macro_regime)","confidence_pct","drivers (string : 2-3 moteurs clés)","crypto_bias (ce que ça implique pour le crypto)"},
   "story_of_the_day": {"narrative (PROSE 4-6 phrases avec 3 fils nommés Macro/On-chain/Setup)","threads": ["macro","onchain","individual"]},
   "self_critique_global": "string (PLUSIEURS phrases : sources manquantes, incertitudes, ce qui invaliderait)",
   "invalidation_watch": "string (2-3 triggers chiffrés que tu surveilles aujourd'hui pour invalider ton scénario)",
@@ -46,7 +47,7 @@ _MORNING_SCHEMA = """
      "historical_pattern": {"verified","narrative (PROSE détaillée si verified)","occurrences_count","avg_move_pct","max_drawdown_pct","win_rate","data_source"},
      "self_critique (PROSE plusieurs arguments)","macro_coherence (PROSE)",
      "targets": {"short_term_label (ex. 'Tactique court terme · 30j')","short_term_30d","short_term_note (ex. '+46% · cible technique')","long_term_6_12m_low","long_term_6_12m_high","long_term_note (ex. 'si bull alts confirmé')"},
-     "action_plan": {"entry","limit_orders","take_profit": {"30pct","30pct_b","40pct"},"stop_loss","invalidation_conditions"}
+     "action_plan": {"entry","limit_orders","take_profit": {"30pct","30pct_b","40pct"},"stop_loss","stop_loss_basis (à quel niveau technique le SL correspond)","rr (ratio risque/récompense ex. '3.2:1' — UNIQUEMENT si fondé et lisible, sinon OMETTRE)","invalidation_conditions"}
   }],
   "thesis_empty_reason": "string (REQUIS si thesis_of_the_day vide)",
   "macro_impact": {
@@ -172,6 +173,24 @@ INSTRUCTIONS :
    - data.reco_changes : tes changements d'avis récents — si tu changes une reco
      par rapport à avant, explique POURQUOI (quels signaux ont changé, RÈGLE 13... 
      en pratique : sois transparent sur le revirement).
+6bis. CHAMPS À RENSEIGNER À PARTIR DE DONNÉES PRÉ-CALCULÉES (ne pas inventer) :
+   - macro_regime_readout : recopie le verdict de la PASSE 1 (data.macro_regime :
+     regime, confidence_pct, drivers, crypto_bias). Si la passe 1 est absente,
+     déduis-le brièvement du contexte macro mais dis-le.
+   - macro_impact.exposed_positions[].beta_dxy : utilise data.per_asset_beta
+     (by_asset[ACTIF].dxy.beta). Si un bêta n'est pas disponible pour un actif,
+     n'invente pas — écris « n/d » et explique en auto-critique. expected_impact_pct
+     se déduit du bêta (β × variation DXY plausible), à présenter comme ordre de grandeur.
+   - thesis_of_the_day[].historical_pattern : remplis depuis
+     data.eligible_theses[].historical_stats (verified = historical_stats.available ;
+     occurrences_count, avg_move_pct = avg_forward_pct, win_rate, data_source = "OHLC 90j").
+     Si available=false : verified=false et narrative explique l'historique insuffisant.
+   - CALENDRIER À VENIR : data.upcoming_calendar.events liste les prochaines
+     publications macro (dates réelles). Intègre les plus proches dans today_watch
+     et le raisonnement (ex. « NFP demain → prudence avant le chiffre »). N'invente
+     AUCUN événement absent de cette liste.
+   - R:R : pour chaque plan d'action, calcule action_plan.rr depuis tes entry/TP1/
+     stop_loss et ne l'affiche que s'il est fondé (cf. RÈGLE 6).
 7. Termine par les angles morts (data.blind_spots) — recopie-les fidèlement.
 
 {OUTPUT_CONTRACT}

@@ -256,3 +256,78 @@ def compute_macro_crypto_correlation(
         "correlations": correlations,
         "regime_hint": regime_hint,
     }
+
+
+def _beta(asset_returns: list[float], macro_returns: list[float]) -> Optional[float]:
+    """Bêta (pente de régression) des rendements actif sur rendements macro.
+
+    beta = cov(actif, macro) / var(macro). Interprétation : variation attendue
+    (%) de l'actif pour +1% du facteur macro. None si données insuffisantes.
+    """
+    n = min(len(asset_returns), len(macro_returns))
+    if n < _MIN_POINTS:
+        return None
+    a, m = asset_returns[-n:], macro_returns[-n:]
+    mean_a = sum(a) / n
+    mean_m = sum(m) / n
+    cov = sum((x - mean_a) * (y - mean_m) for x, y in zip(a, m))
+    var_m = sum((y - mean_m) ** 2 for y in m)
+    if var_m <= 0:
+        return None
+    return cov / var_m
+
+
+def compute_per_asset_macro_beta(
+    asset_dated: dict[str, dict[str, float]],
+    macro_series: dict[str, dict[str, float]],
+    window: int = 30,
+    factors: tuple[str, ...] = ("dxy", "sp500", "vix"),
+) -> dict[str, Any]:
+    """Bêtas et corrélations par actif vs facteurs macro (DXY/S&P/VIX).
+
+    Pour chaque actif (clôtures datées) et chaque facteur macro, calcule le bêta
+    (sensibilité) et la corrélation des rendements quotidiens alignés par date.
+    Sert à remplir le champ ``beta_dxy`` des thèses et à chiffrer le lien
+    macro → crypto par position (recommandation A9).
+
+    Args:
+        asset_dated: ``{symbol: {date: close}}`` (clôtures datées par actif).
+        macro_series: ``{factor: {date: value}}``.
+        window: fenêtre cible (jours).
+        factors: facteurs macro à traiter (clés de ``macro_series``).
+
+    Returns:
+        Dict ``{available, window, by_asset: {sym: {factor: {beta, corr}}}}``.
+    """
+    if not asset_dated or not macro_series:
+        return {"available": False, "by_asset": {}}
+
+    by_asset: dict[str, dict[str, Any]] = {}
+    for sym, dated in asset_dated.items():
+        if not dated:
+            continue
+        per_factor: dict[str, Any] = {}
+        for fac in factors:
+            macro_dated = macro_series.get(fac)
+            if not macro_dated:
+                continue
+            ra, rm = _align_returns(dated, macro_dated)
+            if not ra or not rm:
+                continue
+            n = min(len(ra), len(rm), window)
+            corr = _pearson(ra[-n:], rm[-n:])
+            beta = _beta(ra[-n:], rm[-n:])
+            if corr is None and beta is None:
+                continue
+            per_factor[fac] = {
+                "beta": round(beta, 2) if beta is not None else None,
+                "corr": round(corr, 2) if corr is not None else None,
+            }
+        if per_factor:
+            by_asset[sym] = per_factor
+
+    return {
+        "available": bool(by_asset),
+        "window": window,
+        "by_asset": by_asset,
+    }

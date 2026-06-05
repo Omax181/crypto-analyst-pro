@@ -52,7 +52,7 @@
       <td style="width:20%;vertical-align:top;padding-right:6px;">
         <p style="margin:0;color:#8a8880;font-size:10px;">P&amp;L nuit</p>
         <p style="margin:2px 0 0 0;font-weight:500;font-size:15px;color:{% if (portfolio_snapshot.overnight_pnl_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if portfolio_snapshot.overnight_pnl_pct is not none %}{{ portfolio_snapshot.overnight_pnl_pct|fmt_pct }}{% else %}—{% endif %}</p>
-        {% if portfolio_snapshot.overnight_pnl_usd is not none %}<p style="margin:0;font-size:10px;color:#5a5852;">{% if (portfolio_snapshot.overnight_pnl_usd|num(0)) >= 0 %}+${{ '{:,.0f}'.format((portfolio_snapshot.overnight_pnl_usd)|num(0)) }}{% else %}\u2212${{ '{:,.0f}'.format(((portfolio_snapshot.overnight_pnl_usd)|num(0))|abs) }}{% endif %}</p>{% endif %}
+        {% if portfolio_snapshot.overnight_pnl_usd is not none %}<p style="margin:0;font-size:10px;color:#5a5852;">{% if (portfolio_snapshot.overnight_pnl_usd|num(0)) >= 0 %}+${{ '{:,.0f}'.format((portfolio_snapshot.overnight_pnl_usd)|num(0)) }}{% else %}−${{ '{:,.0f}'.format(((portfolio_snapshot.overnight_pnl_usd)|num(0))|abs) }}{% endif %}</p>{% endif %}
       </td>
       <td style="width:20%;vertical-align:top;padding-right:6px;">
         <p style="margin:0;color:#8a8880;font-size:10px;">24h</p>
@@ -93,6 +93,11 @@
   {% if macro_context.regime_synthesis %}
   <div style="background:#f5f4ee;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;line-height:1.5;"><span style="font-weight:500;">Régime :</span> {{macro_context.regime_synthesis}}</div>
   {% endif %}
+  {% if macro_regime_readout and macro_regime_readout.regime %}
+  <div style="background:#eef2f7;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;line-height:1.5;">
+    <span style="font-weight:500;">Lecture macro (passe 1) :</span> {{macro_regime_readout.regime}}{% if macro_regime_readout.confidence_pct is not none %} · confiance {{macro_regime_readout.confidence_pct}}%{% endif %}{% if macro_regime_readout.drivers %} · moteurs : {{macro_regime_readout.drivers}}{% endif %}{% if macro_regime_readout.crypto_bias %}<br><span style="color:#5a5852;">Biais crypto : {{macro_regime_readout.crypto_bias}}</span>{% endif %}
+  </div>
+  {% endif %}
 
   {# Groupe 1 — Crypto & sentiment #}
   {% set _g1_has = macro_context.btc_price or ((macro_context.fear_greed|default(none)) is not none) or ((macro_context.polymarket_fed_cut_pct|default(none)) is not none) or macro_context.dxy_ice or macro_context.dxy %}
@@ -121,11 +126,11 @@
         {% if macro_context.fed_cut_note %}<p style="font-size:10px;color:#A32D2D;margin:0;">{{macro_context.fed_cut_note}}</p>{% endif %}
       </td>
       {% endif %}
-      {% if macro_context.dxy_ice or macro_context.dxy %}
+      {% if (macro_context.dxy|num(none)) is not none %}
       <td style="width:25%;vertical-align:top;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">{% if macro_context.dxy_ice %}DXY{% else %}USD (large){% endif %}</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{% if macro_context.dxy_ice %}{{ '%.2f'|format(macro_context.dxy_ice) }}{{ _mss.get('dxy_ice') | pastille }}{% else %}{{macro_context.dxy}}{{ _mss.get('dxy') | pastille }}{% endif %}</p>
-        <p style="font-size:10px;color:#8a8880;margin:0;">{% if macro_context.dxy_ice and macro_context.dxy %}large {{macro_context.dxy}}{% else %}{{macro_context.dxy_note or ''}}{% endif %}</p>
+        <p style="font-size:10px;color:#8a8880;margin:0;">DXY</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.2f'|format(macro_context.dxy|num(0)) }}{{ _mss.get('dxy_ice') | pastille }}{% if data_contradictions and data_contradictions.has_any %}<sup style="font-size:9px;color:#8a8880;">²</sup>{% endif %}</p>
+        <p style="font-size:10px;color:#8a8880;margin:0;">{% if (macro_context.dxy_broad|num(none)) is not none %}large {{ '%.2f'|format(macro_context.dxy_broad|num(0)) }}{% elif macro_context.dxy_note %}{{macro_context.dxy_note}}{% endif %}</p>
       </td>
       {% endif %}
     </tr>
@@ -142,14 +147,14 @@
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">S&amp;P 500</p>
         <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format((macro_context.sp500)|num(0)) }}{{ _mss.get('sp500') | pastille }}</p>
-        {% if (macro_context.sp500_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (macro_context.sp500_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (macro_context.sp500_delta|num(0)) >= 0 else '\u2212' }}{{ '{:,.0f}'.format(((macro_context.sp500_delta)|num(0))|abs) }}</p>{% endif %}
+        {% if (macro_context.sp500_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (macro_context.sp500_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (macro_context.sp500_delta|num(0)) >= 0 else '−' }}{{ '{:,.0f}'.format(((macro_context.sp500_delta)|num(0))|abs) }}</p>{% endif %}
       </td>
       {% endif %}
       {% if macro_context.nasdaq %}
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Nasdaq</p>
         <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format((macro_context.nasdaq)|num(0)) }}{{ _mss.get('nasdaq') | pastille }}</p>
-        {% if (macro_context.nasdaq_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (macro_context.nasdaq_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (macro_context.nasdaq_delta|num(0)) >= 0 else '\u2212' }}{{ '{:,.0f}'.format(((macro_context.nasdaq_delta)|num(0))|abs) }}</p>{% endif %}
+        {% if (macro_context.nasdaq_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (macro_context.nasdaq_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (macro_context.nasdaq_delta|num(0)) >= 0 else '−' }}{{ '{:,.0f}'.format(((macro_context.nasdaq_delta)|num(0))|abs) }}</p>{% endif %}
       </td>
       {% endif %}
       {% if macro_context.vix %}
@@ -213,14 +218,25 @@
     {% for p in macro_impact.exposed_positions %}
     <div style="background:#f5f4ee;padding:10px;border-radius:6px;">
       <p style="font-size:11px;color:#8a8880;margin:0;">{{p.asset}}</p>
-      <p style="font-size:14px;font-weight:500;margin:2px 0;">β {{p.beta_dxy}}</p>
-      <p style="font-size:10px;color:#5a5852;margin:0;">impact attendu {{p.expected_impact_pct}}%</p>
+      <p style="font-size:14px;font-weight:500;margin:2px 0;">β {% if (p.beta_dxy|num(none)) is not none %}{{ ('%+.2f'|format(p.beta_dxy|num(0)))|replace('-','−') }}{% else %}{{p.beta_dxy}}{% endif %}</p>
+      <p style="font-size:10px;color:#5a5852;margin:0;">impact attendu {% if (p.expected_impact_pct|num(none)) is not none %}{{ p.expected_impact_pct|fmt_pct }}{% else %}{{p.expected_impact_pct}}%{% endif %}</p>
     </div>
     {% endfor %}
   </div>
   {% endif %}
   {% if macro_impact.implication %}<p style="margin:0;font-size:13px;line-height:1.65;"><span style="font-weight:500;">Donc :</span> {{macro_impact.implication}}</p>{% endif %}
   {% if macro_impact.self_critique %}<p style="margin:10px 0 0 0;font-size:11px;color:#8a8880;font-style:italic;">Auto-critique · {{macro_impact.self_critique}}</p>{% endif %}
+</div>
+{% endif %}
+
+{# ── DONNÉES QUANTITATIVES (B7) : MVRV/options/corrélations/bêtas — référence chiffrée garantie ── #}
+{% if quant_reference %}
+<div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:11px;color:#5a5852;line-height:1.7;">
+  <p style="margin:0 0 4px 0;font-weight:500;color:#1a1a18;font-size:12px;">Données quantitatives · référence</p>
+  {% if quant_reference.onchain %}<p style="margin:0;">🔗 On-chain · {{quant_reference.onchain}}</p>{% endif %}
+  {% if quant_reference.options %}<p style="margin:0;">🎯 Options · {{quant_reference.options}}</p>{% endif %}
+  {% if quant_reference.correlations %}<p style="margin:0;">📈 {{quant_reference.correlations}}</p>{% endif %}
+  {% if quant_reference.per_asset_beta %}<p style="margin:0;">β Macro · {{quant_reference.per_asset_beta}}</p>{% endif %}
 </div>
 {% endif %}
 
@@ -483,7 +499,8 @@
     <p style="margin:0;color:{% if t.action_type == 'bearish' %}#501313{% else %}#173404{% endif %};">
       {% if t.action_plan.entry %}<span style="font-weight:700;">Entrée :</span> {{t.action_plan.entry|md}}<br>{% endif %}
       {% if t.action_plan.take_profit %}<span style="font-weight:700;">Take profit :</span> {{t.action_plan.take_profit['30pct']}} / {{t.action_plan.take_profit['30pct_b']}} / {{t.action_plan.take_profit['40pct']}}<br>{% endif %}
-      {% if t.action_plan.stop_loss %}<span style="font-weight:700;">Stop loss :</span> {{t.action_plan.stop_loss|md}}<br>{% endif %}
+      {% if t.action_plan.stop_loss %}<span style="font-weight:700;">Stop loss :</span> {{t.action_plan.stop_loss|md}}{% if t.action_plan.stop_loss_basis %} <span style="color:#5a5852;">({{t.action_plan.stop_loss_basis}})</span>{% endif %}<br>{% endif %}
+      {% if t.action_plan.rr %}<span style="font-weight:700;">Risque/récompense :</span> {{t.action_plan.rr}}<br>{% endif %}
       {% if t.action_plan.invalidation_conditions %}<span style="font-weight:700;">Invalidation :</span> {{t.action_plan.invalidation_conditions|md}}{% endif %}
     </p>
   </div>
@@ -619,6 +636,13 @@
 <div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-top:1rem;margin-bottom:1rem;font-size:11px;color:#5a5852;line-height:1.6;">
   <p style="margin:0 0 4px 0;font-weight:500;color:#1a1a18;font-size:12px;">Angles morts du jour</p>
   {{blind_spots}}
+</div>
+{% endif %}
+
+{# ── NOTE DE BAS DE PAGE (C1) : contradictions de données détectées, discret ── #}
+{% if data_contradictions and data_contradictions.has_any %}
+<div style="margin:0 0 0.75rem 0;font-size:10px;color:#8a8880;line-height:1.5;">
+  {% for n in data_contradictions.notes %}<p style="margin:0;"><sup>²</sup> {{n}}</p>{% endfor %}
 </div>
 {% endif %}
 

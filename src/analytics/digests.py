@@ -143,9 +143,30 @@ def macro_correlation_line(corr: dict[str, Any]) -> str:
     return f"Corrélations 30j BTC ↔ {items} · régime: {corr.get('regime_hint', '')}"
 
 
-def calendar_line(prints: dict[str, Any], polymarket: dict[str, Any]) -> str:
-    """Ligne compacte calendrier : derniers chiffres macro + consensus marché."""
+def calendar_line(
+    prints: dict[str, Any],
+    polymarket: dict[str, Any],
+    upcoming: dict[str, Any] | None = None,
+) -> str:
+    """Ligne compacte calendrier : à venir + derniers chiffres + consensus.
+
+    A10/C6 : les publications À VENIR (dates réelles FRED) passent en premier —
+    c'est l'information la plus actionnable (« NFP demain → attendre »). Aucune
+    invention possible : si ``upcoming`` est vide, rien n'est affiché.
+    """
     parts: list[str] = []
+    if upcoming and upcoming.get("available"):
+        seg = []
+        for e in upcoming.get("events", [])[:4]:
+            da = e.get("days_ahead")
+            when = (
+                "aujourd'hui" if da == 0
+                else "demain" if da == 1
+                else f"dans {da}j"
+            )
+            seg.append(f"{e['label']} {when} ({e['date']})")
+        if seg:
+            parts.append("À venir: " + " · ".join(seg))
     if prints.get("available"):
         seg = []
         for p in prints.get("prints", []):
@@ -160,6 +181,32 @@ def calendar_line(prints: dict[str, Any], polymarket: dict[str, Any]) -> str:
         if seg:
             parts.append("Consensus marché (Polymarket): " + " · ".join(seg))
     return " | ".join(parts)
+
+
+_BETA_FACTOR_LABEL = {"dxy": "DXY", "sp500": "S&P500", "vix": "VIX", "gold": "Or"}
+
+
+def per_asset_beta_line(beta_data: dict[str, Any]) -> str:
+    """Ligne compacte bêtas par actif vs macro (DXY/S&P/VIX) — recommandation A9.
+
+    Ex. ``TAO: β-DXY −0.42 (corr −0.55) · β-S&P500 +0.68`` — chiffre le lien
+    macro → crypto position par position. Vide si non disponible.
+    """
+    if not beta_data.get("available"):
+        return ""
+    bits: list[str] = []
+    for sym, factors in (beta_data.get("by_asset") or {}).items():
+        seg = []
+        for fac, d in factors.items():
+            beta = d.get("beta")
+            if beta is None:
+                continue
+            corr = d.get("corr")
+            ctxt = f" (corr {corr:+})" if isinstance(corr, (int, float)) else ""
+            seg.append(f"β-{_BETA_FACTOR_LABEL.get(fac, fac)} {beta:+}{ctxt}")
+        if seg:
+            bits.append(f"{sym}: " + " · ".join(seg))
+    return " | ".join(bits)
 
 
 def feedback_line(perf: dict[str, Any]) -> str:

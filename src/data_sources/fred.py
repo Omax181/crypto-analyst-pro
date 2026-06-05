@@ -82,12 +82,25 @@ def get_macro() -> dict[str, Any]:
 
 # Séries macro retenues pour les corrélations glissantes BTC ↔ macro.
 # (clé logique -> id FRED ; ids déjà présents dans sources.yaml fred_series)
+# A8 : la série or LBMA (GOLDPMGBD228NLBM) renvoie 400 (gelée côté FRED) et est
+# retirée des corrélations — le prix or live reste fourni par Yahoo pour le
+# dashboard. On ne garde ici que des séries quotidiennes fiables.
 _CORR_SERIES = {
-    "gold": "GOLDPMGBD228NLBM",
     "dxy": "DTWEXBGS",
     "sp500": "SP500",
     "vix": "VIXCLS",
     "us_10y": "DGS10",
+}
+
+# A7/A10/C6 — Calendrier macro À VENIR : prochaines publications officielles via
+# l'endpoint FRED /release/dates (dates réelles, jamais inventées). Mapping
+# release_id -> libellé pour les publications les plus suivies par le marché.
+_UPCOMING_RELEASES = {
+    10: "Inflation CPI",
+    50: "Emploi US (NFP + chômage)",
+    21: "Revenus & dépenses (PCE)",
+    53: "PIB US (1re estimation)",
+    9: "Ventes au détail US",
 }
 
 # Indicateurs « calendrier » : dernière publication + delta (raisonnement causal).
@@ -189,3 +202,71 @@ def get_calendar_prints() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         logger.warning("FRED calendar prints indisponible : %s", exc)
         return {"available": False, "prints": []}
+
+
+def get_upcoming_releases(horizon_days: int = 10) -> dict[str, Any]:
+    """Prochaines publications macro officielles (dates RÉELLES, via FRED).
+
+    Interroge l'endpoint ``/release/dates`` de FRED pour chaque publication
+    suivie (CPI, emploi, PCE, PIB, ventes au détail) et retient la prochaine
+    date >= aujourd'hui dans la fenêtre ``horizon_days``. Cela élimine toute
+    hallucination de calendrier : si FRED ne renvoie rien, la liste est vide.
+
+    Returns:
+        Dict ``{available, events: [{key, label, date, days_ahead}]}`` trié par
+        date croissante. ``available=False`` si pas de clé ou aucune date.
+    """
+    key = os.environ.get("FRED_API_KEY", "").strip()
+    if not key:
+        return {"available": False, "events": []}
+
+    from datetime import date, datetime
+
+    def _fetch() -> dict[str, Any]:
+        today = date.today()
+        events: list[dict[str, Any]] = []
+        for rid, label in _UPCOMING_RELEASES.items():
+            data = get_json(
+                f"{_BASE}/release/dates",
+                params={
+                    "release_id": rid,
+                    "api_key": key,
+                    "file_type": "json",
+                    "include_release_dates_with_no_data": "true",
+                    "sort_order": "asc",
+                    "limit": 60,
+                },
+            )
+            if not data or "release_dates" not in data:
+                continue
+            for rd in data["release_dates"]:
+                ds = rd.get("date")
+                if not ds:
+                    continue
+                try:
+                    d = datetime.strptime(ds, "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    continue
+                if d < today:
+                    continue
+                days_ahead = (d - today).days
+                if days_ahead <= horizon_days:
+                    events.append(
+                        {
+                            "key": str(rid),
+                            "label": label,
+                            "date": ds,
+                            "days_ahead": days_ahead,
+                        }
+                    )
+                break  # première date future suffit pour cette publication
+        events.sort(key=lambda e: e["date"])
+        return {"available": bool(events), "events": events}
+
+    try:
+        return CACHE.get_or_compute(
+            f"fred:upcoming:{horizon_days}", 3600, _fetch
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("FRED upcoming releases indisponible : %s", exc)
+        return {"available": False, "events": []}
