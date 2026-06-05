@@ -7,7 +7,7 @@ basiques (blockchain.info / Etherscan) :
   - Realized Price       : CapRealUSD / SplyCur (prix de revient moyen du marché)
   - Active addresses     : AdrActCnt (adoption réseau)
 
-Endpoint communautaire : ``https://api.coinmetrics.io/v4/timeseries/asset-metrics``.
+Endpoint communautaire : ``https://community-api.coinmetrics.io/v4/timeseries/asset-metrics``.
 Aucune authentification requise (cf. doc « Coin Metrics Community Data »).
 Rate limit communautaire : 10 req / 6 s par IP — on fait 1 seule requête (batch
 BTC+ETH) par run, donc large marge.
@@ -27,7 +27,7 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_BASE = "https://api.coinmetrics.io/v4/timeseries/asset-metrics"
+_BASE = "https://community-api.coinmetrics.io/v4/timeseries/asset-metrics"
 
 # Métriques community (IDs validés, stables pour BTC/ETH).
 _METRICS = ["PriceUSD", "CapMVRVCur", "NVTAdj", "CapRealUSD", "SplyCur", "AdrActCnt"]
