@@ -30,6 +30,10 @@ _WEEKLY_SCHEMA = """
   "concentration_reading": "string (PROSE : lecture concentration + recommandation structurelle)",
   "upcoming_calendar": [{"day (ex. 'Mer 18h')","day_bg (hex)","day_color (hex)","title","impact_label (Impact élevé/moyen/Catalyseur crypto)","detail (PROSE)"}],
   "scenarios": [{"type (bearish|neutral|bullish)","label (ex. 'baissier')","probability_pct","description (PROSE)","action (PROSE : que faire)"}],
+  "weekly_action_plan": [{"priority (1-3)","action (concret ex. 'Si BTC < 60k → alléger TAO de 30%')","rationale (1 phrase)"}],
+  "losses_vs_recos": "string — 1-3 phrases : relie les plus fortes baisses de la semaine aux recos qu'on avait émises (ex. 'ZK était en SURVEILLER lundi, -21% depuis : sortie au-dessus de 0.005 aurait évité -X%'). Honnête sur les erreurs.",
+  "watchlist": [{"asset","direction (entrée/sortie)","trigger (niveau/condition précis)","rationale (1 phrase fondée)"}],
+  "macro_panorama": "string — 2-3 phrases : panorama macro de la semaine à venir (Fed/CPI/NFP du calendrier réel + Polymarket + ETF flows) et son implication pour le PTF. Le fil rouge macro.",
   "exit_plan": {"subtitle","diagnosis (PROSE chiffrée)","monitoring (PROSE : comment l'agent surveille)"},
   "long_term_positioning": [{"asset","thesis","target","status (en route/consolide/accumulation/à surveiller/stable)","status_color (hex)"}],
   "sources_review": {"summary (PROSE bilan sources)","gaps (PROSE lacunes structurelles)"},
@@ -87,6 +91,28 @@ INSTRUCTIONS :
 9. EXPOSITION SECTORIELLE — déjà calculée côté Python (data.sector_exposure_computed,
    poids PTF réels par secteur). Recopie-la, ne mets JAMAIS « n/d% » : si elle est
    absente, omets la section.
+10. SOURCES CLÉS À EXPLOITER (P3-A5) — données factuelles fournies, à UTILISER
+   dans l'analyse, pas seulement à afficher :
+   - data.upcoming_calendar.events : prochaines publications macro (dates réelles).
+     Alimente macro_panorama + upcoming_calendar + watchlist (ex. « CPI jeudi → ne
+     pas se positionner avant »).
+   - data.polymarket.markets : probas Fed implicites du marché → biais taux.
+   - data.etf_flows : flux ETF BTC/ETH → sentiment institutionnel. Intègre-les
+     dans le panorama et les scénarios.
+11. LIEN PERTES ↔ RECOS (losses_vs_recos) : relie HONNÊTEMENT les plus fortes
+   baisses de la semaine aux recos émises. Si une position en SURVEILLER/RENFORCER
+   a chuté, dis-le et tire la leçon chiffrée.
+12. SCÉNARIOS COHÉRENTS AVEC LE PTF (scenarios) : chaque scénario doit dire ce
+   qu'il implique CONCRÈTEMENT pour CE portefeuille (positions exposées nommées),
+   pas des généralités. Et l'action proposée doit être cohérente avec la
+   composition réelle (concentration L1/AI, absence de cash).
+13. ALLÉGEMENTS SPÉCIFIQUES (A9) : ne dis jamais « alléger les positions exposées »
+   en vague. NOMME les positions (ex. « alléger TAO : 25% du PTF, secteur AI -9%/j,
+   β-DXY défavorable »), avec un argument ET un contre-argument.
+14. PLAN D'ACTION SEMAINE (weekly_action_plan) : 2-4 actions concrètes,
+   conditionnelles et chiffrées pour la semaine (« si X → fais Y »).
+15. WATCHLIST (watchlist) : actifs à entrer/sortir avec trigger précis et raison
+   FONDÉE (analysée), pas une liste au hasard.
 
 {OUTPUT_CONTRACT}
 Disclaimer footer : "{DISCLAIMER}"

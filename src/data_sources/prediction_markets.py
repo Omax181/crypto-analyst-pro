@@ -26,7 +26,31 @@ def get_fed_cut_probabilities() -> dict[str, Any]:
     """
 
     def _fetch() -> Any:
-        return get_json(_GAMMA, params={"active": "true", "closed": "false", "limit": 100})
+        # v12 — on trie par volume décroissant et on élargit la fenêtre : les
+        # marchés Fed/taux sont à fort volume mais noyés parmi des milliers de
+        # marchés ; sans tri par volume, ils n'apparaissaient pas (cause du
+        # « Polymarket indisponible »). On agrège deux tris pour fiabiliser.
+        out: list[Any] = []
+        for order in ("volume24hr", "volumeNum"):
+            data = get_json(
+                _GAMMA,
+                params={
+                    "active": "true", "closed": "false", "limit": 250,
+                    "order": order, "ascending": "false",
+                },
+            )
+            if isinstance(data, list):
+                out.extend(data)
+        # Dédup par id en préservant l'ordre.
+        seen: set = set()
+        uniq: list[Any] = []
+        for m in out:
+            mid = m.get("id") if isinstance(m, dict) else None
+            if mid in seen:
+                continue
+            seen.add(mid)
+            uniq.append(m)
+        return uniq or None
 
     raw = CACHE.get_or_compute("polymarket:fed", 3600, _fetch)
     if not isinstance(raw, list):

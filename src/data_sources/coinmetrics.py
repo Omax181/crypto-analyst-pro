@@ -31,6 +31,8 @@ _BASE = "https://community-api.coinmetrics.io/v4/timeseries/asset-metrics"
 
 # Métriques community (IDs validés, stables pour BTC/ETH).
 _METRICS = ["PriceUSD", "CapMVRVCur", "NVTAdj", "CapRealUSD", "SplyCur", "AdrActCnt"]
+# Sous-ensemble cœur garanti sur le tier community (utilisé en repli).
+_CORE_METRICS = ["PriceUSD", "CapMVRVCur", "CapRealUSD", "SplyCur"]
 
 # Mapping ticker PTF -> id Coin Metrics (minuscule).
 _CM_IDS = {"BTC": "btc", "ETH": "eth"}
@@ -72,17 +74,27 @@ def get_onchain_metrics() -> dict[str, Any]:
         start = (datetime.now(timezone.utc) - timedelta(days=12)).strftime(
             "%Y-%m-%dT00:00:00Z"
         )
-        raw = get_json(
-            _BASE,
-            params={
-                "assets": ",".join(_CM_IDS.values()),
-                "metrics": ",".join(_METRICS),
-                "frequency": "1d",
-                "start_time": start,
-                "page_size": 1000,
-                "pretty": "false",
-            },
-        )
+
+        def _query(metrics: list[str]) -> Any:
+            return get_json(
+                _BASE,
+                params={
+                    "assets": ",".join(_CM_IDS.values()),
+                    "metrics": ",".join(metrics),
+                    "frequency": "1d",
+                    "start_time": start,
+                    "page_size": 1000,
+                    "pretty": "false",
+                },
+            )
+
+        raw = _query(_METRICS)
+        # Résilience v12 : l'API community refuse parfois un lot complet si UNE
+        # métrique n'est pas servie sur le tier gratuit → tout échoue. On réessaie
+        # alors avec le sous-ensemble cœur GARANTI (prix + MVRV) pour ne jamais
+        # perdre le MVRV, signal de valorisation clé.
+        if not isinstance(raw, dict) or not isinstance(raw.get("data"), list) or not raw.get("data"):
+            raw = _query(_CORE_METRICS)
         if not isinstance(raw, dict) or not isinstance(raw.get("data"), list):
             return {"available": False, "source": "coinmetrics"}
 

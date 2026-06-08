@@ -170,9 +170,16 @@ def calendar_line(
     if prints.get("available"):
         seg = []
         for p in prints.get("prints", []):
-            delta = p.get("delta")
-            dtxt = f" (Δ{delta:+})" if isinstance(delta, (int, float)) else ""
-            seg.append(f"{p['label']} {p['value']}{dtxt}")
+            disp = p.get("display")
+            if disp:
+                # Valeur lisible (YoY %, niveau %, emplois) — pas l'indice brut.
+                dd = p.get("display_delta")
+                dtxt = f" (Δ{dd:+})" if isinstance(dd, (int, float)) else ""
+                seg.append(f"{p['label']} {disp}{dtxt}")
+            else:
+                delta = p.get("delta")
+                dtxt = f" (Δ{delta:+})" if isinstance(delta, (int, float)) else ""
+                seg.append(f"{p['label']} {p['value']}{dtxt}")
         if seg:
             parts.append("Derniers chiffres: " + " · ".join(seg))
     if polymarket.get("available"):

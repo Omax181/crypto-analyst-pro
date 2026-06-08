@@ -73,9 +73,27 @@
 
 {# ── TL;DR EXÉCUTIF (scan 5 secondes) ── #}
 {% if executive_summary %}
-<div style="background:#1a1a18;border-radius:10px;padding:12px 16px;margin-bottom:1.5rem;">
+<div style="background:#1a1a18;border-radius:10px;padding:12px 16px;margin-bottom:0.75rem;">
   <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">En bref</p>
   <p style="margin:0;font-size:13px;line-height:1.6;color:#f5f4ee;">{{executive_summary}}</p>
+</div>
+{% endif %}
+
+{# ── SCORE DE RISQUE PTF (B5) — scannable, code couleur ── #}
+{% if risk_score and (risk_score.score is not none) %}
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-left:3px solid {{risk_score.level_color or '#8a8880'}};border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+    <tr>
+      <td style="vertical-align:middle;white-space:nowrap;padding-right:14px;">
+        <span style="font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;">Risque PTF</span><br>
+        <span style="font-size:22px;font-weight:700;color:{{risk_score.level_color or '#1a1a18'}};">{{risk_score.score}}</span><span style="font-size:12px;color:#8a8880;">/10</span>
+        <span style="font-size:11px;font-weight:600;color:{{risk_score.level_color or '#1a1a18'}};margin-left:4px;">{{risk_score.level}}</span>
+      </td>
+      <td style="vertical-align:middle;font-size:11px;color:#5a5852;line-height:1.5;">
+        {% if risk_score.factors %}{{ risk_score.factors|join(' · ') }}{% endif %}
+      </td>
+    </tr>
+  </table>
 </div>
 {% endif %}
 
@@ -212,31 +230,22 @@
 <h2 style="margin:2rem 0 0.75rem 0;font-size:17px;font-weight:500;">Macro · liens chiffrés sur ton PTF</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
   {% if macro_impact.intro %}<p style="margin:0 0 10px 0;font-size:13px;line-height:1.65;">{{macro_impact.intro}}</p>{% endif %}
-  {% if macro_impact.exposed_positions %}
-  <p style="margin:0 0 10px 0;font-size:13px;line-height:1.65;">Beta DXY calculé pour tes positions les plus exposées :</p>
-  <div style="display:grid;grid-template-columns:repeat({{macro_impact.exposed_positions|length}},1fr);gap:8px;margin:12px 0;">
-    {% for p in macro_impact.exposed_positions %}
-    <div style="background:#f5f4ee;padding:10px;border-radius:6px;">
-      <p style="font-size:11px;color:#8a8880;margin:0;">{{p.asset}}</p>
-      <p style="font-size:14px;font-weight:500;margin:2px 0;">β {% if (p.beta_dxy|num(none)) is not none %}{{ ('%+.2f'|format(p.beta_dxy|num(0)))|replace('-','−') }}{% else %}{{p.beta_dxy}}{% endif %}</p>
-      <p style="font-size:10px;color:#5a5852;margin:0;">impact attendu {% if (p.expected_impact_pct|num(none)) is not none %}{{ p.expected_impact_pct|fmt_pct }}{% else %}{{p.expected_impact_pct}}%{% endif %}</p>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
+  {# A3 — plus de grille de bêtas de toutes les positions (illisible et souvent
+     aberrante). Les bêtas pertinents sont désormais cités directement dans
+     l'analyse macro ci-dessus par l'IA, seulement quand la corrélation est
+     significative. On garde uniquement la conclusion (implication). #}
   {% if macro_impact.implication %}<p style="margin:0;font-size:13px;line-height:1.65;"><span style="font-weight:500;">Donc :</span> {{macro_impact.implication}}</p>{% endif %}
   {% if macro_impact.self_critique %}<p style="margin:10px 0 0 0;font-size:11px;color:#8a8880;font-style:italic;">Auto-critique · {{macro_impact.self_critique}}</p>{% endif %}
 </div>
 {% endif %}
 
-{# ── DONNÉES QUANTITATIVES (B7) : MVRV/options/corrélations/bêtas — référence chiffrée garantie ── #}
-{% if quant_reference %}
+{# ── DONNÉES QUANTITATIVES (B7) : MVRV/options/corrélations — référence chiffrée ── #}
+{% if quant_reference and (quant_reference.onchain or quant_reference.options or quant_reference.correlations) %}
 <div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:11px;color:#5a5852;line-height:1.7;">
   <p style="margin:0 0 4px 0;font-weight:500;color:#1a1a18;font-size:12px;">Données quantitatives · référence</p>
   {% if quant_reference.onchain %}<p style="margin:0;">🔗 On-chain · {{quant_reference.onchain}}</p>{% endif %}
   {% if quant_reference.options %}<p style="margin:0;">🎯 Options · {{quant_reference.options}}</p>{% endif %}
   {% if quant_reference.correlations %}<p style="margin:0;">📈 {{quant_reference.correlations}}</p>{% endif %}
-  {% if quant_reference.per_asset_beta %}<p style="margin:0;">β Macro · {{quant_reference.per_asset_beta}}</p>{% endif %}
 </div>
 {% endif %}
 
@@ -425,6 +434,7 @@
     <tr>
       <td style="vertical-align:top;">
         <p style="margin:0;font-size:16px;font-weight:600;color:#1a1a18;">{{t.asset}}{% if t.name %} · {{t.name}}{% endif %}</p>
+        {% if t.tier_label %}<p style="margin:2px 0 0 0;font-size:10px;color:#8a8880;">{{t.tier_label}}</p>{% endif %}
         {% if t.price_line %}<p style="margin:2px 0 0 0;font-size:12px;color:#5a5852;">{{t.price_line}}</p>{% endif %}
       </td>
       <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:10px;">
@@ -493,17 +503,22 @@
   </div>
   {% endif %}
 
-  {% if t.action_plan %}
+  {# A7 — n'affiche le plan QUE pour une action ferme (RENFORCER/ALLÉGER) ET
+     seulement si entrée/TP réels existent. Jamais de « None / None / None ». #}
+  {% set _has_tp = t.action_plan and t.action_plan.take_profit and (t.action_plan.take_profit['30pct'] not in [none,'None','',0]) %}
+  {% if t.action_plan and (t.action in ['RENFORCER','ALLÉGER','ALLEGER']) and (t.action_plan.entry or _has_tp) %}
   <div style="background:{% if t.action_type == 'bearish' %}#FCEBEB{% else %}#EAF3DE{% endif %};border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px;line-height:1.55;">
-    <p style="margin:0 0 4px 0;font-size:11px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Donc · plan d'action complet</p>
+    <p style="margin:0 0 4px 0;font-size:11px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Donc · plan d'action</p>
     <p style="margin:0;color:{% if t.action_type == 'bearish' %}#501313{% else %}#173404{% endif %};">
       {% if t.action_plan.entry %}<span style="font-weight:700;">Entrée :</span> {{t.action_plan.entry|md}}<br>{% endif %}
-      {% if t.action_plan.take_profit %}<span style="font-weight:700;">Take profit :</span> {{t.action_plan.take_profit['30pct']}} / {{t.action_plan.take_profit['30pct_b']}} / {{t.action_plan.take_profit['40pct']}}<br>{% endif %}
+      {% if _has_tp %}<span style="font-weight:700;">Take profit :</span> {{t.action_plan.take_profit['30pct']}} / {{t.action_plan.take_profit['30pct_b']}} / {{t.action_plan.take_profit['40pct']}}<br>{% endif %}
       {% if t.action_plan.stop_loss %}<span style="font-weight:700;">Stop loss :</span> {{t.action_plan.stop_loss|md}}{% if t.action_plan.stop_loss_basis %} <span style="color:#5a5852;">({{t.action_plan.stop_loss_basis}})</span>{% endif %}<br>{% endif %}
-      {% if t.action_plan.rr %}<span style="font-weight:700;">Risque/récompense :</span> {{t.action_plan.rr}}<br>{% endif %}
+      {% if t.action_plan.rr %}{% set _rrnum = (t.action_plan.rr|string|replace(':1','')|replace(',','.')|float(0)) %}<span style="font-weight:700;">Risque/récompense :</span> <span style="background:{% if _rrnum >= 2 %}#EAF3DE{% elif _rrnum >= 1.5 %}#FBF0DA{% else %}#FCEBEB{% endif %};color:{% if _rrnum >= 2 %}#27500A{% elif _rrnum >= 1.5 %}#7A4E12{% else %}#791F1F{% endif %};padding:1px 7px;border-radius:6px;font-weight:700;">{{t.action_plan.rr}}{% if _rrnum and _rrnum < 1.5 %} · faible{% elif _rrnum >= 2 %} · favorable{% endif %}</span><br>{% endif %}
       {% if t.action_plan.invalidation_conditions %}<span style="font-weight:700;">Invalidation :</span> {{t.action_plan.invalidation_conditions|md}}{% endif %}
     </p>
   </div>
+  {% elif t.action in ['SURVEILLER','MAINTENIR'] and t.watch_trigger %}
+  <div style="background:#E6F1FB;border-radius:8px;padding:8px 12px;margin:12px 0;font-size:12px;line-height:1.5;color:#0C447C;"><span style="font-weight:700;">Déclencheur à surveiller :</span> {{t.watch_trigger|md}}</div>
   {% endif %}
 </div>
 {% endfor %}
@@ -652,6 +667,7 @@
   <p style="font-size:10px;color:#5a5852;margin:0 0 2px 0;font-weight:500;">Sources actives ce matin · {{header.active_sources_count or 0}}{% if header.total_sources_count %} / {{header.total_sources_count}}{% endif %}</p>
   <p style="font-size:10px;color:#8a8880;margin:0;line-height:1.5;">{{ footer.active_sources|join(' · ') if footer.active_sources is iterable and footer.active_sources is not string else footer.active_sources }}</p>
   {% endif %}
-  <p style="font-size:10px;color:#8a8880;margin:6px 0 0 0;">Prochain rapport · {{footer.next_report_at or 'ce soir 20h00'}} · format complémentaire</p>
+  <p style="font-size:10px;color:#8a8880;margin:6px 0 0 0;">Prochain rapport · {{footer.next_report_at or 'ce soir 20h00'}}</p>
+  <p style="font-size:9px;color:#b5b3ab;margin:4px 0 0 0;">Crypto Analyst Pro · v13</p>
   <p style="font-size:9px;color:#8a8880;margin:8px 0 0 0;font-style:italic;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
 </div>

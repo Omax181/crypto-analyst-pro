@@ -95,7 +95,13 @@
     </tr>
   </table>
   {% if evening_macro.note %}<p style="margin:8px 0 0 0;font-size:11px;color:#5a5852;line-height:1.5;">{{evening_macro.note}}</p>{% endif %}
+  {% if us_session %}<p style="margin:8px 0 0 0;font-size:12px;color:#412402;line-height:1.55;">{{us_session|md}}</p>{% endif %}
 </div>
+{% endif %}
+
+{# ── RÉGIME MACRO · check du soir (B5) — 1 ligne discrète ── #}
+{% if regime_check %}
+<div style="background:#eef2f7;border-radius:8px;padding:8px 12px;margin-bottom:1.25rem;font-size:12px;color:#28415c;line-height:1.5;"><span style="font-weight:600;">Régime ·</span> {{regime_check|md}}</div>
 {% endif %}
 
 {# ── CE QUI A ÉVOLUÉ CÔTÉ MARCHÉ (limit 5 + <details>, verdict signaux) ──
@@ -201,6 +207,46 @@
   {% endif %}
 </div>
 
+{# ── SCÉNARIOS · mise à jour vs matin (B2) ── #}
+{% if scenarios_update %}
+{% set _scen_valid = [] %}
+{% for sc in scenarios_update %}{% if sc.scenario %}{% set _ = _scen_valid.append(sc) %}{% endif %}{% endfor %}
+{% if _scen_valid %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Scénarios · ce qui a bougé</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.75rem 1rem;margin-bottom:1.25rem;">
+  {% for sc in _scen_valid %}
+  <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;">
+    <span style="font-weight:600;text-transform:capitalize;">{{sc.scenario}}</span>
+    {% if sc.verdict %}
+    {% set _v = (sc.verdict)|lower %}
+    <span style="font-size:11px;padding:1px 7px;border-radius:6px;margin-left:6px;background:{% if 'renforc' in _v %}#FCEBEB{% elif 'atténu' in _v or 'attenue' in _v %}#EAF3DE{% else %}#EFEDE6{% endif %};color:{% if 'renforc' in _v %}#791F1F{% elif 'atténu' in _v or 'attenue' in _v %}#27500A{% else %}#5a5852{% endif %};">{{sc.verdict}}</span>
+    {% endif %}
+    {% if sc.why %}<span style="color:#5a5852;"> · {{sc.why}}</span>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
+{# ── NIVEAUX À SURVEILLER CETTE NUIT (B3) — le bloc le plus actionnable ── #}
+{% if levels_tonight %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Niveaux à surveiller cette nuit</h2>
+<div style="background:#FAEEDA;border-radius:12px;padding:0.75rem 1rem;margin-bottom:1.25rem;">
+  {% for lv in levels_tonight %}
+  <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #ecdcc0;{% endif %}font-size:12px;line-height:1.5;color:#412402;">
+    <span style="font-weight:700;">{{lv.asset}}</span> · <span style="font-weight:600;">{{lv.level}}</span>{% if lv.trigger %} — {{lv.trigger}}{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if tomorrow_outlook %}
+<div style="background:#1a1a18;border-radius:10px;padding:12px 16px;margin-bottom:1.5rem;">
+  <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Demain matin · à quoi s'attendre</p>
+  <p style="margin:0;font-size:13px;line-height:1.6;color:#f5f4ee;">{{tomorrow_outlook|md}}</p>
+</div>
+{% endif %}
+
 {# ── À SURVEILLER / DEMAIN MATIN (C1 : fusion des 3 blocs prospectifs) ──
    Ordre : Cette nuit → Demain matin · checks → Événements macro demain →
    Actions à faire ce soir (point 14 : ordre confirmé).
@@ -305,5 +351,6 @@
   {% endif %}
   <p style="font-size:10px;color:#8a8880;margin:0;">Prochain rapport · {{footer.next_report_at or footer.next_morning_time or 'demain 08h30'}} · format complet</p>
   <p style="font-size:10px;color:#8a8880;margin:4px 0 0 0;">Bonne soirée.</p>
+  <p style="font-size:9px;color:#b5b3ab;margin:4px 0 0 0;">Crypto Analyst Pro · v13</p>
   <p style="font-size:9px;color:#8a8880;margin:8px 0 0 0;font-style:italic;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
 </div>

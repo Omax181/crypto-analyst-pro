@@ -35,6 +35,11 @@ _EVENING_SCHEMA = """
     "checks": ["string — DÉRIVÉ des événements du jour (gros mouvements >5%, signaux émergents, recos à un seuil critique). Génériques SEULEMENT si rien de spécifique."],
     "actions_tonight": "string (PROSE : actions ANCRÉES dans tes positions actives, leurs niveaux clés du jour, et les recos du matin — ordres limite à poser, allègements en cours)"
   },
+  "us_session": "string — 1-2 phrases sur la DYNAMIQUE de la séance US en cours (mi-séance) : S&P/Nasdaq (avec leur delta), DXY, ce que ça implique pour BTC/le PTF. Discret, factuel.",
+  "regime_check": "string — 1 phrase : le régime macro annoncé le matin (champ macro_regime_readout du RAPPORT DU MATIN ci-dessus) s'est-il confirmé/atténué ce soir ? (cite le vrai mouvement DXY/BTC). Omettre si aucun changement.",
+  "scenarios_update": [{"scenario (baissier/neutre/haussier — repris du matin)","verdict (se renforce / s'atténue / inchangé)","why (1 phrase chiffrée : quel signal du jour fait bouger la proba)"}],
+  "levels_tonight": [{"asset (ex. BTC)","level (niveau précis ex. '60 000 $')","trigger (ce qui se passe si cassé : ex. 'sous 60k → capitulation, alléger')"}],
+  "tomorrow_outlook": "string — 1-2 phrases : à quoi s'attendre demain matin (catalyseur clé du calendrier, scénario le plus probable, ce qui ferait basculer). Concret, actionnable.",
   "tomorrow_macro_events": [{"label","date","when (demain/aujourd'hui)","source"}],
   "blind_spots": "string",
   "footer": {"next_morning_time (ex. '08h30')"}
@@ -97,6 +102,22 @@ INSTRUCTIONS :
      niveaux clés du jour, et les recos du matin (ordres limite à poser,
      allègements en cours). PAS d'actions génériques déconnectées du jour.
 5. Angles morts : sources manquantes / incertitudes du jour.
+5ter. NOUVEAUX BLOCS (concis, scannables, jamais inventés) :
+   - us_session : dynamique de la séance US en cours. Cite S&P ET Nasdaq AVEC
+     leurs deltas (data.evening_macro.sp500_delta / nasdaq_delta) et le DXY, puis
+     l'implication crypto. UTILISE le delta Nasdaq dans le raisonnement (tech-heavy
+     → corrélé aux L1/AI). 1-2 phrases, discret.
+   - regime_check : compare au régime macro annoncé le matin (macro_regime_readout
+     du RAPPORT DU MATIN ci-dessus) : confirmé / atténué ? 1 phrase chiffrée. Omettre si rien.
+   - scenarios_update : reprends la lecture directionnelle du matin (story_of_the_day
+     / macro_regime_readout du RAPPORT DU MATIN) et dis si le biais baissier/neutre/
+     haussier se renforce ou s'atténue ce soir, avec le signal du jour qui le justifie.
+     N'invente pas de scénarios chiffrés qui n'étaient pas dans le rapport du matin.
+   - levels_tonight : 2-4 niveaux PRÉCIS à surveiller cette nuit (prix exact +
+     ce qui se passe si cassé). C'est le bloc le plus actionnable du soir.
+   - tomorrow_outlook : à quoi s'attendre demain matin (catalyseur du calendrier
+     réel, scénario probable). Concret.
+   - POUSSIÈRES (<10 $) : aucune analyse (déjà exclues des movers).
 5bis. ÉVÉNEMENTS MACRO DEMAIN — recopie EXCLUSIVEMENT data.tomorrow_macro_events
    (dates RÉELLES issues de FRED). N'INVENTE AUCUN événement, aucune heure, aucun
    consensus : si la liste est vide, ne mets rien (pas d'ISM/PMI improvisés). Le

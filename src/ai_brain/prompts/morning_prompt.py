@@ -38,7 +38,7 @@ _MORNING_SCHEMA = """
   "news_24h_empty_reason": "string (REQUIS si news_24h vide — RARE, voir RÈGLE 8)",
   "today_watch": "string (PROSE : 2-3 catalyseurs/risques précis à surveiller dans la journée)",
   "thesis_of_the_day": [{
-     "asset","name (nom complet ex. 'The Graph')","price_line (ex. '$0.026 · position $11.49 · +8% / 24h')",
+     "asset","name (nom complet ex. 'The Graph')","tier_label (recopie data.eligible_theses[].tier_label, ex. 'Tier 2 · mid cap')","price_line (ex. '$0.026 · position $11.49 · +8% / 24h')",
      "action","action_type (bullish|bearish|neutral)","confidence","size_note (ex. 'taille standard')",
      "reliability (complète|partielle)",
      "signals_summary (ex. '4 signaux convergents (seuil Tier 1 atteint)')",
@@ -47,7 +47,8 @@ _MORNING_SCHEMA = """
      "historical_pattern": {"verified","narrative (PROSE détaillée si verified)","occurrences_count","avg_move_pct","max_drawdown_pct","win_rate","data_source"},
      "self_critique (PROSE plusieurs arguments)","macro_coherence (PROSE)",
      "targets": {"short_term_label (ex. 'Tactique court terme · 30j')","short_term_30d","short_term_note (ex. '+46% · cible technique')","long_term_6_12m_low","long_term_6_12m_high","long_term_note (ex. 'si bull alts confirmé')"},
-     "action_plan": {"entry","limit_orders","take_profit": {"30pct","30pct_b","40pct"},"stop_loss","stop_loss_basis (à quel niveau technique le SL correspond)","rr (ratio risque/récompense ex. '3.2:1' — UNIQUEMENT si fondé et lisible, sinon OMETTRE)","invalidation_conditions"}
+     "watch_trigger (UNIQUEMENT si action SURVEILLER/MAINTENIR : 1 phrase, le déclencheur chiffré qui ferait passer à l'action)",
+     "action_plan": "OBJET UNIQUEMENT si action = RENFORCER ou ALLÉGER. Pour SURVEILLER/MAINTENIR : OMETTRE complètement action_plan (ne pas mettre de champs 'None'). Forme: {entry, limit_orders, take_profit:{30pct,30pct_b,40pct}, stop_loss, stop_loss_basis, rr (ex '3.2:1' si fondé sinon omettre), invalidation_conditions}"
   }],
   "thesis_empty_reason": "string (REQUIS si thesis_of_the_day vide)",
   "macro_impact": {
@@ -191,6 +192,19 @@ INSTRUCTIONS :
      AUCUN événement absent de cette liste.
    - R:R : pour chaque plan d'action, calcule action_plan.rr depuis tes entry/TP1/
      stop_loss et ne l'affiche que s'il est fondé (cf. RÈGLE 6).
+6ter. RÈGLES DE RENDU SUPPLÉMENTAIRES (v12) :
+   - SURVEILLER / MAINTENIR : N'ÉMETS AUCUN action_plan (pas de "Take profit:
+     None / None / None", pas d'entrée). Une position surveillée n'a pas de plan
+     d'entrée — explique juste en 1 phrase ce que tu attends pour agir.
+   - Le score de risque PTF est déjà calculé (data.risk_score : score/10, level,
+     factors). Ne le recalcule pas ; le rendu l'affiche. Tu peux y faire référence
+     en 1 phrase dans "en bref" si pertinent.
+   - VS HIER : si data.reco_evolution_30d ou l'état du soir révèlent un vrai
+     changement (nouveau régime, reco retournée, nouvelle thèse), dis-le en 1
+     phrase. Sinon, n'invente pas de comparaison.
+   - POUSSIÈRES (<10 $) : pas de thèse ni d'analyse (RÈGLE 2bis).
+   - RÉFÉRENCE VALORISATION : utilise market_cap autant que la distance à l'ATH
+     quand c'est pertinent (RÈGLE 9bis).
 7. Termine par les angles morts (data.blind_spots) — recopie-les fidèlement.
 
 {OUTPUT_CONTRACT}

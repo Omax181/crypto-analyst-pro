@@ -282,6 +282,8 @@ def compute_per_asset_macro_beta(
     macro_series: dict[str, dict[str, float]],
     window: int = 30,
     factors: tuple[str, ...] = ("dxy", "sp500", "vix"),
+    min_abs_corr: float = 0.25,
+    beta_cap: float = 3.0,
 ) -> dict[str, Any]:
     """Bêtas et corrélations par actif vs facteurs macro (DXY/S&P/VIX).
 
@@ -290,11 +292,19 @@ def compute_per_asset_macro_beta(
     Sert à remplir le champ ``beta_dxy`` des thèses et à chiffrer le lien
     macro → crypto par position (recommandation A9).
 
+    Robustesse (v12) : un bêta n'est conservé QUE si la corrélation est
+    statistiquement significative (``|corr| >= min_abs_corr``) ET dans une plage
+    plausible (``|beta| <= beta_cap``). Sinon il est écarté (None) : sur 30
+    jours, un crypto très volatil régressé sur un DXY quasi plat produit des
+    pentes aberrantes (β = cov/var, var_macro ~0) qui ne veulent rien dire.
+
     Args:
         asset_dated: ``{symbol: {date: close}}`` (clôtures datées par actif).
         macro_series: ``{factor: {date: value}}``.
         window: fenêtre cible (jours).
         factors: facteurs macro à traiter (clés de ``macro_series``).
+        min_abs_corr: corrélation minimale pour juger le bêta exploitable.
+        beta_cap: borne absolue de plausibilité du bêta.
 
     Returns:
         Dict ``{available, window, by_asset: {sym: {factor: {beta, corr}}}}``.
@@ -317,12 +327,12 @@ def compute_per_asset_macro_beta(
             n = min(len(ra), len(rm), window)
             corr = _pearson(ra[-n:], rm[-n:])
             beta = _beta(ra[-n:], rm[-n:])
-            if corr is None and beta is None:
+            # Garde-fous v12 : corrélation significative + bêta plausible.
+            if corr is None or abs(corr) < min_abs_corr:
                 continue
-            per_factor[fac] = {
-                "beta": round(beta, 2) if beta is not None else None,
-                "corr": round(corr, 2) if corr is not None else None,
-            }
+            if beta is None or abs(beta) > beta_cap:
+                continue
+            per_factor[fac] = {"beta": round(beta, 2), "corr": round(corr, 2)}
         if per_factor:
             by_asset[sym] = per_factor
 

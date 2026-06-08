@@ -178,23 +178,46 @@ def get_calendar_prints() -> dict[str, Any]:
         return {"available": False, "prints": []}
 
     def _fetch() -> dict[str, Any]:
+        # A5 — les séries CPI/PCE/NFP sont des INDICES (CPI ~332, base 1982),
+        # pas des taux. Les afficher bruts (« CPI 332 ») est trompeur. On calcule
+        # donc une variation lisible : YoY % pour l'inflation (CPI, core PCE), et
+        # on garde le niveau pour le chômage / Fed funds (déjà des %). NFP : on
+        # affiche la variation mensuelle d'emplois (en milliers).
+        yoy_series = {"cpi", "core_pce"}
         prints: list[dict[str, Any]] = []
         for name, (sid, label) in _CALENDAR_SERIES.items():
-            obs = _series_observations(sid, key, limit=3)
+            obs = _series_observations(sid, key, limit=14)  # 13 mois pour le YoY
             if not obs:
                 continue
             last = obs[-1]
             prev = obs[-2] if len(obs) > 1 else None
-            prints.append(
-                {
-                    "key": name,
-                    "label": label,
-                    "value": round(last["value"], 2),
-                    "date": last["date"],
-                    "previous": round(prev["value"], 2) if prev else None,
-                    "delta": round(last["value"] - prev["value"], 2) if prev else None,
-                }
-            )
+            entry: dict[str, Any] = {
+                "key": name,
+                "label": label,
+                "value": round(last["value"], 2),
+                "date": last["date"],
+                "previous": round(prev["value"], 2) if prev else None,
+                "delta": round(last["value"] - prev["value"], 2) if prev else None,
+            }
+            if name in yoy_series and len(obs) >= 13:
+                yago = obs[-13]["value"]
+                if yago:
+                    yoy = (last["value"] - yago) / yago * 100
+                    prev_yoy = None
+                    if len(obs) >= 14 and obs[-14]["value"]:
+                        prev_yoy = (prev["value"] - obs[-14]["value"]) / obs[-14]["value"] * 100
+                    entry["display"] = f"{yoy:+.1f}% sur 1 an"
+                    entry["display_value"] = round(yoy, 1)
+                    if prev_yoy is not None:
+                        entry["display_delta"] = round(yoy - prev_yoy, 1)
+            elif name == "nonfarm" and prev:
+                # NFP : variation mensuelle de l'emploi, en milliers de postes.
+                jobs_k = (last["value"] - prev["value"]) * 1000  # série en milliers
+                entry["display"] = f"{jobs_k:+,.0f}k emplois (mois)"
+            elif name in ("unemployment", "fed_funds"):
+                # Déjà en % : on affiche le niveau tel quel.
+                entry["display"] = f"{last['value']:.2f}%"
+            prints.append(entry)
         return {"available": bool(prints), "prints": prints}
 
     try:

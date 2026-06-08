@@ -20,17 +20,32 @@ from datetime import datetime, timedelta, timezone
 def test_per_asset_macro_beta_basic() -> None:
     from src.analytics.correlation import compute_per_asset_macro_beta
 
-    # Série actif = 2 × série DXY (rendements) → bêta attendu ≈ +2, corr ≈ +1.
+    # Actif fortement corrélé au DXY mais avec une sensibilité plausible
+    # (bêta dans la plage admise) → doit être conservé.
     dates = [f"2026-05-{d:02d}" for d in range(1, 21)]
-    dxy = {d: 100.0 + i for i, d in enumerate(dates)}            # +1 / jour
-    asset = {d: 50.0 + 2 * i for i, d in enumerate(dates)}        # +2 / jour
+    dxy = {d: 100.0 + i for i, d in enumerate(dates)}     # +1 / jour
+    asset = {d: 200.0 + i for i, d in enumerate(dates)}   # +1 / jour, base 2x → β~0.5
     out = compute_per_asset_macro_beta(
         {"TAO": asset}, {"dxy": dxy}, window=30, factors=("dxy",)
     )
     assert out["available"] is True
     b = out["by_asset"]["TAO"]["dxy"]
     assert b["corr"] is not None and b["corr"] > 0.9
-    assert b["beta"] is not None and b["beta"] > 0  # pente positive
+    assert b["beta"] is not None and 0 < b["beta"] <= 3.0  # borné, plausible
+
+def test_per_asset_macro_beta_rejects_aberrant() -> None:
+    """Un bêta aberrant (faible corrélation) est écarté, pas affiché."""
+    from src.analytics.correlation import compute_per_asset_macro_beta
+
+    dates = [f"2026-05-{d:02d}" for d in range(1, 21)]
+    # DXY quasi plat + actif très volatil non corrélé → bêta explose / corr ~0.
+    dxy = {d: 100.0 + (0.01 if i % 2 else -0.01) for i, d in enumerate(dates)}
+    asset = {d: 50.0 + (5 if i % 3 else -7) * (i % 4) for i, d in enumerate(dates)}
+    out = compute_per_asset_macro_beta(
+        {"X": asset}, {"dxy": dxy}, window=30, factors=("dxy",)
+    )
+    # Soit indisponible, soit X absent : aucun bêta aberrant ne doit passer.
+    assert ("X" not in out.get("by_asset", {})) or (out["available"] is False)
 
 def test_per_asset_macro_beta_degrades_when_empty() -> None:
     from src.analytics.correlation import compute_per_asset_macro_beta

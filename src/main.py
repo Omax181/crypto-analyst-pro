@@ -239,6 +239,8 @@ def _build_asset_signals(
         "change_7d": market.get("change_7d"),
         "change_30d": market.get("change_30d"),
         "volume_24h": market.get("volume_24h"),
+        "market_cap": market.get("market_cap"),
+        "ath": market.get("ath"),
         "price_series_30d": price_series_30d,
         "ath_distance_pct": compute_ath_distance(
             market.get("price") or 0, market.get("ath") or 0
@@ -292,7 +294,6 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         logger.info("Cross-check CMC (compat) ignoré : %s", exc)
     fng = fear_greed.get_fear_greed()
     macro = fred.get_macro()
-    calendar = econ_calendar.get_economic_calendar()
     onchain = onchain_advanced.get_onchain_indicators()
     polymarket = prediction_markets.get_fed_cut_probabilities()
     # V10 — sources analytiques avancées (gratuites, sans clé, dégradation
@@ -469,6 +470,8 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
                 "price": asset["price"],
                 "change_24h": asset["change_24h"],
                 "ath_distance_pct": asset["ath_distance_pct"],
+                "market_cap": asset.get("market_cap"),
+                "ath": asset.get("ath"),
                 "technical_signal": asset["technical"].get("dominant_signal"),
                 "technical_detail": technical_detail,
                 "historical_stats": historical_stats,
@@ -597,6 +600,11 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         "feedback": digests.feedback_line(per_asset_perf),
     }
 
+    # B5 — score de risque PTF synthétique (scannable en tête de rapport).
+    risk_score = _compute_portfolio_risk_score(
+        snapshot, sector_exposure, macro_context, enriched, portfolio
+    )
+
     return {
         "header_meta": {
             "active_sources_count": len(active_sources),
@@ -618,6 +626,7 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         "onchain_advanced": onchain_cm,          # B7/A4 — MVRV/NVT (CoinMetrics)
         "options_deribit": options_deribit,      # B7/A3 — put/call · max pain · DVOL
         "sector_exposure": sector_exposure,      # A6 — exposition sectorielle PTF
+        "risk_score": risk_score,                # B5 — score de risque PTF (0-10)
         "upcoming_calendar": upcoming_calendar,  # A10/C6 — prochaines publications
         "data_contradictions": data_contradictions,  # C1 — incohérences détectées
         "historical_context": relevant_patterns({
@@ -626,7 +635,7 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         }),                                      # A11 — patterns macro indicatifs
         "reco_evolution_30d": tracker.compute_per_asset_performance(30),  # C3
         "market_global": glob, "fear_greed": fng, "macro": _sanitize_macro_for_prompt(macro),
-        "economic_calendar": calendar, "onchain_indicators": onchain,
+        "economic_calendar": upcoming_calendar, "onchain_indicators": onchain,
         "polymarket": polymarket, "etf_flows": etf, "reddit": reddit_data,
         "telegram": telegram, "defi_tvl": defi, "kaito_narratives": narratives,
         "social_trending": social_trending, "token_unlocks": unlocks,
@@ -855,7 +864,8 @@ def _evening_report_is_fresh(report: dict[str, Any], max_age_hours: float = 18.0
     if not report:
         return False
     ts = (
-        report.get("generated_at")
+        report.get("_saved_at")
+        or report.get("generated_at")
         or report.get("timestamp")
         or (report.get("header") or {}).get("generated_at")
         or (report.get("meta") or {}).get("generated_at")
@@ -960,6 +970,88 @@ def _detect_data_contradictions(macro_context: dict[str, Any]) -> dict[str, Any]
             "large de la Fed (échelle différente, à interpréter avec prudence)."
         )
     return {"has_any": bool(notes), "notes": notes}
+
+
+def _compute_portfolio_risk_score(
+    snapshot: dict[str, Any],
+    sector_exposure: dict[str, Any],
+    macro_context: dict[str, Any],
+    enriched: dict[str, dict[str, Any]],
+    portfolio: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """B5 — score de risque PTF synthétique (0-10) + facteurs explicites.
+
+    Combine, de façon déterministe et transparente, les vrais signaux de risque
+    du portefeuille : drawdown 7j, concentration sectorielle, volatilité 24h
+    moyenne des positions, absence de cash, et régime macro (peur extrême /
+    biais risk-off). Chaque composante est plafonnée ; le total est ramené sur
+    10. Objectif : un chiffre scannable en haut de rapport, pas un modèle.
+
+    Returns:
+        Dict ``{score, level, level_color, factors: [str]}``.
+    """
+    score = 0.0
+    factors: list[str] = []
+
+    # 1) Drawdown 7j (perf hebdo négative) — jusqu'à 3 pts.
+    ch7 = snapshot.get("change_7d_pct")
+    if isinstance(ch7, (int, float)) and ch7 < 0:
+        pts = min(3.0, abs(ch7) / 5.0)  # -15%/7j → 3 pts
+        score += pts
+        if pts >= 1:
+            factors.append(f"drawdown 7j {ch7:+.1f}%")
+
+    # 2) Concentration sectorielle (poids du 1er secteur) — jusqu'à 2.5 pts.
+    sectors = (sector_exposure or {}).get("sectors") or []
+    if sectors:
+        top = max(sectors, key=lambda s: s.get("ptf_pct") or 0)
+        top_pct = top.get("ptf_pct") or 0
+        if top_pct >= 30:
+            pts = min(2.5, (top_pct - 20) / 20)  # 70% → 2.5 pts
+            score += pts
+            factors.append(f"concentration {top.get('sector')} {top_pct:.0f}%")
+
+    # 3) Volatilité 24h moyenne des positions significatives — jusqu'à 2 pts.
+    vols = [abs(e.get("change_24h")) for e in enriched.values()
+            if isinstance(e.get("change_24h"), (int, float)) and (e.get("value_usd") or 0) >= 10]
+    if vols:
+        avg_vol = sum(vols) / len(vols)
+        pts = min(2.0, avg_vol / 6.0)  # 12%/24h moyen → 2 pts
+        score += pts
+        if pts >= 1:
+            factors.append(f"volatilité 24h {avg_vol:.1f}% en moyenne")
+
+    # 4) Absence de réserve cash — 1.5 pt (vulnérabilité en cas de baisse).
+    cash = 0.0
+    total_ptf = 0.0
+    for sym, info in (portfolio or {}).items():
+        v = info.get("value_usd") or 0
+        total_ptf += v
+        if info.get("role") == "cash_reserve":
+            cash += v
+    cash_pct = (cash / total_ptf * 100) if total_ptf else 0
+    if cash_pct < 3:
+        score += 1.5
+        factors.append("aucune réserve cash (USDC ~0%)")
+
+    # 5) Régime macro défavorable (peur extrême / VIX tendu) — jusqu'à 1.5 pt.
+    fng = macro_context.get("fear_greed")
+    if isinstance(fng, (int, float)) and fng <= 25:
+        score += 1.0
+        factors.append(f"sentiment Peur Extrême (F&G {int(fng)})")
+    vix = macro_context.get("vix")
+    if isinstance(vix, (int, float)) and vix >= 25:
+        score += 0.5
+        factors.append(f"VIX tendu ({vix:.0f})")
+
+    score = round(min(10.0, score), 1)
+    if score >= 7:
+        level, color = "élevé", "#A32D2D"
+    elif score >= 4:
+        level, color = "modéré", "#BA7517"
+    else:
+        level, color = "maîtrisé", "#3B6D11"
+    return {"score": score, "level": level, "level_color": color, "factors": factors}
 
 
 def _fred_value(macro: dict[str, Any], *keys: str) -> dict[str, Any]:
@@ -1394,28 +1486,11 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
             return (imp_score, conf_score)
         payload["news_24h"] = sorted(news, key=_news_score, reverse=True)
 
-    # ── V11 — injections factuelles supplémentaires (priorité au calcul Python) ──
-    # A5/C8 — bêtas par actif : on remplit macro_impact.exposed_positions avec les
-    # VRAIS bêtas DXY calculés (β + impact attendu), pour ne jamais afficher
-    # « β n/d ». Gemini garde la narration (intro/implication), Python fournit les
-    # chiffres. On sélectionne les positions les plus exposées (|β-DXY| décroissant).
-    beta = data.get("per_asset_beta") or {}
-    if beta.get("available"):
-        exposed: list[dict[str, Any]] = []
-        for sym, facs in (beta.get("by_asset") or {}).items():
-            bdxy = (facs.get("dxy") or {}).get("beta")
-            if bdxy is None:
-                continue
-            # Impact attendu = β × mouvement DXY de référence (+1% conventionnel).
-            exposed.append({
-                "asset": sym,
-                "beta_dxy": bdxy,
-                "expected_impact_pct": round(bdxy * 1.0, 2),
-            })
-        exposed.sort(key=lambda e: abs(e["beta_dxy"]), reverse=True)
-        if exposed:
-            mi = payload.setdefault("macro_impact", {})
-            mi["exposed_positions"] = exposed[:6]
+    # ── V11/V12 — injections factuelles supplémentaires (priorité au calcul Python) ──
+    # A3 (v12) : on n'injecte PLUS de grille de bêtas (macro_impact.exposed_positions)
+    # — elle était illisible et souvent aberrante. Les bêtas restent calculés et
+    # passés à l'IA via le digest (analytics_digest.per_asset_beta) pour nourrir
+    # son ANALYSE, mais ne sont plus déversés tels quels dans le mail.
     # B6 — readout du régime macro (passe 1) : injecté si Gemini ne l'a pas rempli.
     regime = payload.get("macro_regime_pass1") or {}
     if regime and not payload.get("macro_regime_readout"):
@@ -1428,15 +1503,14 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
             ),
             "crypto_bias": regime.get("crypto_bias"),
         }
-    # B7 — bloc quantitatif compact (MVRV/options/corrélations/bêtas) GARANTI à
+    # B7 — bloc quantitatif compact (MVRV/options/corrélations) GARANTI à
     # l'affichage : les lignes du digest sont injectées pour rendu direct, en plus
-    # de l'usage que Gemini en fait dans sa prose.
+    # de l'usage que Gemini en fait dans sa prose. (Bêtas exclus du rendu — A3.)
     dg = data.get("analytics_digest") or {}
     quant = {k: v for k, v in {
         "onchain": dg.get("onchain_advanced"),
         "options": dg.get("options"),
         "correlations": dg.get("macro_correlations"),
-        "per_asset_beta": dg.get("per_asset_beta"),
     }.items() if v}
     if quant:
         payload["quant_reference"] = quant
@@ -1444,6 +1518,20 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
     contra = data.get("data_contradictions") or {}
     if contra.get("has_any"):
         payload["data_contradictions"] = contra
+    # B5 — score de risque PTF (toujours injecté : c'est un fait calculé Python).
+    if data.get("risk_score"):
+        payload["risk_score"] = data["risk_score"]
+    # B2 — libellé de tier garanti dans chaque thèse (depuis les données éligibles),
+    # au cas où l'IA ne l'aurait pas recopié.
+    _tier_by_asset = {
+        e.get("asset"): e.get("tier_label")
+        for e in (data.get("eligible_theses") or []) if e.get("tier_label")
+    }
+    for _t in (payload.get("thesis_of_the_day") or []):
+        if isinstance(_t, dict) and not _t.get("tier_label"):
+            tl = _tier_by_asset.get(_t.get("asset"))
+            if tl:
+                _t["tier_label"] = tl
 
     return payload
 
@@ -1638,6 +1726,10 @@ def run_evening() -> int:
         if ch is None:
             continue
         pos_val = _position_value(portfolio[s], market.get(s))
+        # P2-A5 — on ignore les poussières (< 10 $) : pas d'analyse ni d'affichage,
+        # leur P&L en $ est négligeable et pollue la lecture.
+        if pos_val < 10:
+            continue
         movers.append(
             {
                 "symbol": s,
@@ -1663,6 +1755,7 @@ def run_evening() -> int:
         "sp500": ev_macro_ctx.get("sp500"),
         "sp500_delta": ev_macro_ctx.get("sp500_delta"),
         "nasdaq": ev_macro_ctx.get("nasdaq"),
+        "nasdaq_delta": ev_macro_ctx.get("nasdaq_delta"),
         "dxy": ev_macro_ctx.get("dxy"),
         "dxy_broad": ev_macro_ctx.get("dxy_broad"),
         "dxy_ice": ev_macro_ctx.get("dxy_ice"),
@@ -1673,26 +1766,30 @@ def run_evening() -> int:
         ev_macro_ctx, ev_yahoo_quotes, (macro or {}).get("series"), tolerance_pct=10.0
     )
 
-    # S4 : événements macro de demain. A10 — source ROBUSTE en priorité : FRED
-    # /release/dates (dates RÉELLES des prochaines publications officielles, zéro
-    # hallucination). Boursorama en complément best-effort. On ne retient que les
-    # publications dans les ~2 jours pour la fenêtre « demain ».
+    # S4 — ÉVÉNEMENTS MACRO À VENIR. P2-A1 : source UNIQUE = FRED /release/dates
+    # (dates RÉELLES). On ÉLARGIT la fenêtre à 7 jours (un soir donné, il n'y a
+    # souvent aucune publication dans les 48h → la fenêtre courte renvoyait vide
+    # et l'ancien fallback Boursorama HALLUCINAIT des ISM/PMI). Plus AUCUN
+    # fallback : si FRED ne renvoie rien, la liste reste vide et le rendu
+    # affiche « aucun événement majeur ». Zéro invention possible.
     tomorrow_macro_events: list[dict[str, Any]] = []
-    ev_upcoming = fred.get_upcoming_releases(horizon_days=2)
+    ev_upcoming = fred.get_upcoming_releases(horizon_days=7)
     if ev_upcoming.get("available"):
         for e in ev_upcoming.get("events", []):
             da = e.get("days_ahead")
-            when = "demain" if da == 1 else "aujourd'hui" if da == 0 else f"dans {da}j"
+            when = (
+                "aujourd'hui" if da == 0 else "demain" if da == 1
+                else f"dans {da}j"
+            )
             tomorrow_macro_events.append(
                 {
                     "label": e.get("label"),
                     "date": e.get("date"),
                     "when": when,
+                    "days_ahead": da,
                     "source": "FRED",
                 }
             )
-    if not tomorrow_macro_events and boursorama_cal.get("available"):
-        tomorrow_macro_events = boursorama_cal.get("events", [])[:5]
 
     data = {
         "prices_now": price_lookup,
@@ -1756,8 +1853,13 @@ def run_weekly() -> int:
     portfolio = portfolio_data["portfolio"]
     symbols = [s for s, i in portfolio.items() if i.get("role") != "cash_reserve"]
     market = coingecko.get_market_data(symbols)
-    calendar = econ_calendar.get_economic_calendar(days_ahead=7)
+    # P3-A5 — CALENDRIER : l'ancien econ_calendar (Trading Economics) renvoie 410.
+    # On passe sur FRED /release/dates (dates RÉELLES, fiable) avec un horizon
+    # hebdo (8 jours). + Polymarket (signaux taux Fed) + ETF flows : ces trois
+    # sources sont désormais TOUJOURS récupérées et surfacées dans le hebdo.
+    calendar = fred.get_upcoming_releases(horizon_days=8)
     polymarket = prediction_markets.get_fed_cut_probabilities()
+    etf = etf_flows.get_etf_flows()
     tracker = PredictionTracker()
     price_lookup = {s: market.get(s, {}).get("price") for s in symbols}
     tracker.refresh_active(price_lookup)
@@ -1879,7 +1981,8 @@ def run_weekly() -> int:
                   "last_evening": mem.load_evening_report()}
     last_snap = (week_state["last_morning"] or {}).get("portfolio_snapshot") or {}
     data = {"win_rate": win_rate, "lesson": lesson, "economic_calendar": calendar,
-            "polymarket": polymarket, "dust_positions": dust, "prices_now": price_lookup,
+            "upcoming_calendar": calendar, "polymarket": polymarket,
+            "etf_flows": etf, "dust_positions": dust, "prices_now": price_lookup,
             "active_sources_count": None, "total_sources_count": len(_ALL_SOURCES_LIST),
             "sector_exposure_computed": None}
     # A4/A6 — pré-calculs injectés dans le prompt (le rendu utilise aussi les
@@ -1897,7 +2000,7 @@ def run_weekly() -> int:
     _wk_active_pre = sum([
         bool(market), bool(_cmc_quotes_w), bool(polymarket.get("available")),
         bool(calendar.get("available")), bool(correlation.get("available")),
-        len(snapshots) >= 2,
+        bool(etf.get("available")), len(snapshots) >= 2,
     ])
     data["active_sources_count"] = _wk_active_pre
     engine = DecisionEngine()
@@ -1915,20 +2018,49 @@ def run_weekly() -> int:
     snap_w: dict[str, Any] = {}
     snap_w["value_usd"] = round(current_value, 2)
 
-    # P&L semaine : référence = snapshot de la semaine précédente (snapshots[-2]
-    # car -1 est celui qu'on vient d'enregistrer à la ligne `record_weekly_snapshot`).
-    if len(snapshots) >= 2:
+    # P3-A2 — P&L SEMAINE FIABILISÉ. L'ancienne méthode dépendait d'un snapshot
+    # de la semaine précédente (snapshots[-2]) qui n'existe pas tant que le hebdo
+    # n'a pas tourné plusieurs dimanches → « — » en permanence. On calcule donc
+    # le P&L 7j DIRECTEMENT depuis les variations 7j par position (CoinGecko),
+    # exactement comme le snapshot du matin : value_7j = Σ valeur_i / (1+chg7j_i),
+    # ce qui donne une perf réelle dès le 1er run. Le snapshot reste un repli.
+    val_7d_ago = 0.0
+    has_7d = False
+    for s in symbols:
+        v = _position_value(portfolio[s], market.get(s))
+        ch7 = market.get(s, {}).get("change_7d")
+        if v > 0 and isinstance(ch7, (int, float)) and (1 + ch7 / 100) > 0:
+            val_7d_ago += v / (1 + ch7 / 100)
+            has_7d = True
+        else:
+            val_7d_ago += v  # neutre si pas de variation 7j connue
+    if has_7d and val_7d_ago > 0:
+        weekly_pnl_usd = current_value - val_7d_ago
+        snap_w["weekly_pnl_usd"] = round(weekly_pnl_usd, 2)
+        snap_w["weekly_pnl_pct"] = round(weekly_pnl_usd / val_7d_ago * 100, 2)
+        snap_w["change_7d_pct"] = snap_w["weekly_pnl_pct"]
+        snap_w["change_7d_usd"] = snap_w["weekly_pnl_usd"]
+    elif len(snapshots) >= 2:  # repli : snapshot semaine précédente
         prev_val = snapshots[-2].get("value_usd")
         if prev_val and prev_val > 0:
             weekly_pnl_usd = current_value - prev_val
             snap_w["weekly_pnl_usd"] = round(weekly_pnl_usd, 2)
             snap_w["weekly_pnl_pct"] = round((weekly_pnl_usd / prev_val) * 100, 2)
-            # change_7d_pct/usd : alias compat template (utilisé par l'ancien rendu).
             snap_w["change_7d_pct"] = snap_w["weekly_pnl_pct"]
             snap_w["change_7d_usd"] = snap_w["weekly_pnl_usd"]
 
-    # vs BTC 7j : performance PTF vs performance BTC sur la même fenêtre.
-    if len(snapshots) >= 2 and btc_price_now:
+    # vs BTC 7j : perf PTF 7j − perf BTC 7j (même fenêtre). BTC change_7d direct.
+    _btc_7d = (market.get("BTC") or {}).get("change_7d")
+    if snap_w.get("weekly_pnl_pct") is not None and isinstance(_btc_7d, (int, float)):
+        snap_w["vs_btc_7d_pct"] = round(snap_w["weekly_pnl_pct"] - _btc_7d, 2)
+    # B2 — benchmark supplémentaire vs ETH (perf 7j). Donne une vue au-delà du BTC.
+    _eth_7d = (market.get("ETH") or {}).get("change_7d")
+    if snap_w.get("weekly_pnl_pct") is not None and isinstance(_eth_7d, (int, float)):
+        snap_w["vs_eth_7d_pct"] = round(snap_w["weekly_pnl_pct"] - _eth_7d, 2)
+        snap_w["ptf_7d_pct"] = snap_w["weekly_pnl_pct"]
+        snap_w["btc_7d_pct"] = round(_btc_7d, 2) if isinstance(_btc_7d, (int, float)) else None
+        snap_w["eth_7d_pct"] = round(_eth_7d, 2)
+    elif len(snapshots) >= 2 and btc_price_now:  # repli snapshot
         prev_snap = snapshots[-2]
         prev_btc = prev_snap.get("btc_price")
         prev_val = prev_snap.get("value_usd")
@@ -1981,6 +2113,23 @@ def run_weekly() -> int:
     # V6 : matrice de corrélation chiffrée des positions (clusters de risque)
     if correlation.get("available"):
         payload["position_correlation"] = correlation
+    # P3-A5 — CALENDRIER / POLYMARKET / ETF FLOWS surfacés comme FAITS Python
+    # (jamais hallucinés). Le rendu et l'analyse s'appuient dessus. Le calendrier
+    # passe en structure {events:[{label,date,when,days_ahead}]} lisible.
+    if calendar.get("available"):
+        _wk_cal_events = []
+        for e in calendar.get("events", []):
+            da = e.get("days_ahead")
+            _wk_cal_events.append({
+                "label": e.get("label"), "date": e.get("date"),
+                "when": ("aujourd'hui" if da == 0 else "demain" if da == 1 else f"dans {da}j"),
+                "days_ahead": da,
+            })
+        payload["upcoming_calendar_facts"] = {"available": True, "events": _wk_cal_events}
+    if polymarket.get("available"):
+        payload["polymarket_facts"] = polymarket
+    if etf.get("available"):
+        payload["etf_flows_facts"] = etf
     # H3 : tendance du win rate
     if win_rate_trend:
         sc = payload.setdefault("predictions_scoring", {})
