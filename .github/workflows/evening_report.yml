@@ -1,9 +1,6 @@
 name: Evening Crypto Report
 
 on:
-  schedule:
-    # 20h00 Casablanca (UTC+1) = 19h00 UTC.
-    - cron: '0 19 * * *'
   # Déclenchement externe fiable via cron-job.org (POST repository_dispatch).
   # Le schedule GitHub natif est gardé en filet de sécurité (souvent en retard).
   # Variantes underscore acceptées (un type non listé = 202 silencieux sans run).

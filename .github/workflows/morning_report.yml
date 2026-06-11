@@ -1,10 +1,6 @@
 name: Morning Crypto Report
 
 on:
-  schedule:
-    # 8h30 Casablanca (UTC+1) = 7h30 UTC. Note : pendant le Ramadan le Maroc
-    # repasse à UTC+0, l'envoi serait alors à 7h30 local (à ajuster si besoin).
-    - cron: '30 7 * * *'
   # Déclenchement externe fiable via cron-job.org (POST repository_dispatch).
   # Le schedule GitHub natif est gardé en filet de sécurité (souvent en retard).
   # cron-job.org doit POSTer un event_type parmi les types ci-dessous :
