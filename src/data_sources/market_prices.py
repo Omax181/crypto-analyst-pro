@@ -54,6 +54,28 @@ _MACRO_TICKERS: dict[str, str] = {
     "us_10y": "^TNX",
     "eur_usd": "EURUSD=X",
     "usd_jpy": "JPY=X",
+    # --- International (demande v14.1 : « pas que les USA ») ---
+    #   ^N225 = Nikkei 225 (Japon) · ^STOXX50E = Euro Stoxx 50 (zone euro)
+    #   ^GDAXI = DAX (Allemagne). Les TAUX BCE/BoJ viennent de FRED
+    #   (ecb_deposit_rate / boj_call_rate, voir sources.yaml) — pas de ticker.
+    "nikkei": "^N225",
+    "stoxx50": "^STOXX50E",
+    "dax": "^GDAXI",
+}
+
+# Actions cotées US structurellement liées au crypto / à la demande de calcul
+# IA-GPU. Servent à deux choses :
+#   1. affichage (NVDA dans le bloc « Actions US » du mail matin) ;
+#   2. corrélations actions ↔ crypto (NVDA↔RENDER/TAO/FET, COIN/MSTR↔BTC…)
+#      calculées dans analytics/correlation.compute_equity_crypto_links.
+# Mapping {ticker: symbole Yahoo}. Tous sans clé, via le même endpoint chart.
+_EQUITY_TICKERS: dict[str, str] = {
+    "NVDA": "NVDA",   # Nvidia — proxy demande GPU/IA (lien RENDER/TAO/FET)
+    "AMD": "AMD",     # AMD — semi-conducteurs IA (lien secondaire)
+    "TSM": "TSM",     # TSMC — fonderie amont des GPU (lien secondaire)
+    "COIN": "COIN",   # Coinbase — bêta crypto/volumes exchange (lien BTC/ETH)
+    "MSTR": "MSTR",   # Strategy (MicroStrategy) — proxy BTC à effet de levier
+    "MARA": "MARA",   # Marathon — mineur BTC (lien hashprice/BTC)
 }
 
 # Cryptos cross-checkées via Yahoo (paires -USD). On se limite aux grosses
@@ -71,6 +93,74 @@ _CRYPTO_TICKERS: dict[str, str] = {
     "RENDER": "RENDER-USD",
     "TAO": "TAO22974-USD",
 }
+
+
+def _extract_detailed(payload: Any) -> Optional[dict[str, float]]:
+    """Extrait ``{price, previous_close, delta}`` d'une réponse chart v8.
+
+    ``previous_close`` vient de ``regularMarketPreviousClose`` (séance précédente)
+    avec repli sur ``chartPreviousClose``. ``delta`` = price − previous_close,
+    DANS L'UNITÉ DE LA VALEUR (cohérent avec la macro ``arrow24`` des templates,
+    qui compare |delta| à 0,5 % de la valeur). None si le prix est absent ;
+    ``previous_close``/``delta`` sont omis si non disponibles.
+    """
+    if not isinstance(payload, dict):
+        return None
+    chart = payload.get("chart")
+    if not isinstance(chart, dict) or chart.get("error"):
+        return None
+    result = chart.get("result")
+    if not isinstance(result, list) or not result:
+        return None
+    meta = result[0].get("meta") if isinstance(result[0], dict) else None
+    if not isinstance(meta, dict):
+        return None
+    price = meta.get("regularMarketPrice")
+    if not isinstance(price, (int, float)):
+        return None
+    out: dict[str, float] = {"price": float(price)}
+    prev = meta.get("regularMarketPreviousClose")
+    if not isinstance(prev, (int, float)):
+        prev = meta.get("chartPreviousClose")
+    if isinstance(prev, (int, float)) and float(prev) != 0:
+        out["previous_close"] = float(prev)
+        out["delta"] = float(price) - float(prev)
+        out["change_pct"] = round((float(price) - float(prev)) / float(prev) * 100, 2)
+    return out
+
+
+def _extract_dated_closes(payload: Any) -> dict[str, float]:
+    """Extrait ``{date_ISO: close}`` d'une réponse chart v8 (range multi-jours).
+
+    Aligne ``timestamp[]`` avec ``indicators.quote[0].close[]`` en ignorant les
+    points None (jours fériés/à trous). Dict vide si structure inattendue.
+    """
+    if not isinstance(payload, dict):
+        return {}
+    chart = payload.get("chart")
+    if not isinstance(chart, dict) or chart.get("error"):
+        return {}
+    result = chart.get("result")
+    if not isinstance(result, list) or not result or not isinstance(result[0], dict):
+        return {}
+    ts = result[0].get("timestamp")
+    ind = result[0].get("indicators") or {}
+    quotes = ind.get("quote") if isinstance(ind, dict) else None
+    closes = (quotes[0].get("close") if isinstance(quotes, list) and quotes
+              and isinstance(quotes[0], dict) else None)
+    if not isinstance(ts, list) or not isinstance(closes, list):
+        return {}
+    from datetime import datetime, timezone as _tz
+    out: dict[str, float] = {}
+    for t, c in zip(ts, closes):
+        if not isinstance(t, (int, float)) or not isinstance(c, (int, float)):
+            continue
+        try:
+            d = datetime.fromtimestamp(int(t), tz=_tz.utc).strftime("%Y-%m-%d")
+        except (OverflowError, OSError, ValueError):
+            continue
+        out[d] = float(c)
+    return out
 
 
 def _extract_price(payload: Any) -> Optional[float]:
@@ -106,6 +196,41 @@ def _fetch_one(yahoo_symbol: str) -> Optional[float]:
     return _extract_price(data)
 
 
+def get_macro_quotes_detailed() -> dict[str, dict[str, float]]:
+    """Quotes macro détaillées Yahoo : ``{nom: {price, previous_close, delta,
+    change_pct}}``.
+
+    v14.1 — fournit aussi le DELTA LIVE (vs clôture précédente, même unité que
+    la valeur) pour les flèches 24h. Avant, la valeur venait de Yahoo (live)
+    mais la flèche d'un delta FRED potentiellement périmé : valeur et tendance
+    pouvaient se contredire. ``us_10y`` est converti (÷10) sur tous les champs.
+
+    Vide si Yahoo est totalement injoignable (dégradation → FRED).
+    """
+
+    def _fetch() -> dict[str, dict[str, float]]:
+        out: dict[str, dict[str, float]] = {}
+        for name, ysym in _MACRO_TICKERS.items():
+            url = _CHART.format(symbol=ysym)
+            data = get_json(url, headers=_HEADERS, params={"interval": "1d", "range": "1d"})
+            detail = _extract_detailed(data)
+            if not detail:
+                continue
+            if name == "us_10y":
+                # Yahoo cote ^TNX en pourcentage ×10 (ex. 44.5 = 4.45 %).
+                for k in ("price", "previous_close", "delta"):
+                    if k in detail:
+                        detail[k] = round(detail[k] / 10.0, 4)
+            out[name] = detail
+        return out
+
+    try:
+        return CACHE.get_or_compute("yahoo_macro_quotes_detailed", _TTL, _fetch) or {}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Yahoo macro quotes (détaillées) indisponible : %s", exc)
+        return {}
+
+
 def get_macro_quotes() -> dict[str, float]:
     """Prix macro temps réel depuis Yahoo. Dict {nom_interne: prix}.
 
@@ -114,24 +239,76 @@ def get_macro_quotes() -> dict[str, float]:
     Yahoo (pourcentage ×10) vers le pourcentage réel.
 
     Vide si Yahoo est totalement injoignable (dégradation → FRED).
+    Dérivé du fetch détaillé (même cache, zéro appel supplémentaire).
+    """
+    detailed = get_macro_quotes_detailed()
+    return {name: d["price"] for name, d in detailed.items() if "price" in d}
+
+
+def get_macro_deltas() -> dict[str, float]:
+    """Deltas macro LIVE (valeur − clôture précédente, unité de la valeur).
+
+    Dict {nom_interne: delta}. Sert de source prioritaire pour les flèches 24h
+    (cohérent avec la valeur Yahoo affichée) ; FRED reste le fallback. Vide si
+    Yahoo indisponible. Dérivé du même fetch caché que ``get_macro_quotes``.
+    """
+    detailed = get_macro_quotes_detailed()
+    return {name: d["delta"] for name, d in detailed.items() if "delta" in d}
+
+
+def get_equity_quotes() -> dict[str, dict[str, float]]:
+    """Actions liées crypto (NVDA, COIN, MSTR, AMD, TSM, MARA) — quotes live.
+
+    Returns:
+        Dict ``{TICKER: {price, previous_close, delta, change_pct}}``. Vide si
+        Yahoo est injoignable (la source est alors simplement absente : aucune
+        section ne casse, conformément au principe de dégradation gracieuse).
     """
 
-    def _fetch() -> dict[str, float]:
-        out: dict[str, float] = {}
-        for name, ysym in _MACRO_TICKERS.items():
-            price = _fetch_one(ysym)
-            if price is None:
-                continue
-            if name == "us_10y":
-                # Yahoo cote ^TNX en pourcentage ×10 (ex. 44.5 = 4.45 %).
-                price = round(price / 10.0, 4)
-            out[name] = price
+    def _fetch() -> dict[str, dict[str, float]]:
+        out: dict[str, dict[str, float]] = {}
+        for ticker, ysym in _EQUITY_TICKERS.items():
+            url = _CHART.format(symbol=ysym)
+            data = get_json(url, headers=_HEADERS, params={"interval": "1d", "range": "1d"})
+            detail = _extract_detailed(data)
+            if detail:
+                out[ticker] = detail
         return out
 
     try:
-        return CACHE.get_or_compute("yahoo_macro_quotes", _TTL, _fetch) or {}
+        return CACHE.get_or_compute("yahoo_equity_quotes", _TTL, _fetch) or {}
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Yahoo macro quotes indisponible : %s", exc)
+        logger.warning("Yahoo equity quotes indisponible : %s", exc)
+        return {}
+
+
+def get_equity_dated_closes(days: int = 95) -> dict[str, dict[str, float]]:
+    """Clôtures datées des actions liées crypto, pour corrélations actions↔crypto.
+
+    Args:
+        days: profondeur d'historique demandée (90j ≈ ``range=3mo``).
+
+    Returns:
+        Dict ``{TICKER: {date_ISO: close}}``. Tickers sans données omis ; vide
+        si Yahoo est injoignable. Caché 1h (les corrélations 30j n'ont pas
+        besoin de plus frais).
+    """
+    rng = "3mo" if days <= 95 else "6mo"
+
+    def _fetch() -> dict[str, dict[str, float]]:
+        out: dict[str, dict[str, float]] = {}
+        for ticker, ysym in _EQUITY_TICKERS.items():
+            url = _CHART.format(symbol=ysym)
+            data = get_json(url, headers=_HEADERS, params={"interval": "1d", "range": rng})
+            dated = _extract_dated_closes(data)
+            if dated:
+                out[ticker] = dated
+        return out
+
+    try:
+        return CACHE.get_or_compute(f"yahoo_equity_closes:{rng}", 3600, _fetch) or {}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Yahoo equity closes indisponible : %s", exc)
         return {}
 
 
@@ -313,6 +490,13 @@ def compute_macro_source_status(
         "dxy": ("", "dxy"),             # FRED seul (indice large)
         "eur_usd": ("eur_usd", "eur_usd"),
         "usd_jpy": ("usd_jpy", "usd_jpy"),
+        # International (v14.1) : Nikkei recoupé Yahoo×FRED (NIKKEI225) ;
+        # Stoxx 50 / DAX = Yahoo seul ; taux BCE/BoJ = FRED seul.
+        "nikkei": ("nikkei", "nikkei"),
+        "stoxx50": ("stoxx50", ""),
+        "dax": ("dax", ""),
+        "ecb_deposit_rate": ("", "ecb_deposit_rate"),
+        "boj_rate": ("", "boj_call_rate"),
     }
 
     def _fred_val(key: str) -> Optional[float]:

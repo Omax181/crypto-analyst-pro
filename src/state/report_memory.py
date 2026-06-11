@@ -114,21 +114,40 @@ def save_active_recommendations(recos: list[dict[str, Any]]) -> None:
 
 
 def add_recommendation(reco: dict[str, Any]) -> None:
-    """Ajoute une nouvelle reco à la liste active (dédupliquée par id).
+    """Ajoute une nouvelle reco à la liste active, dédupliquée par actif+action.
 
-    V6 — versioning : si une reco active existe déjà pour le même asset mais avec
-    une action DIFFÉRENTE, on enregistre la transition dans ``reco_changes`` (qui
-    garde l'historique des changements d'avis avec leur raisonnement) avant de
-    remplacer l'ancienne reco.
+    V14 — correctif anti-doublons : l'id est ``{asset}-{date}-{action}`` donc un
+    même actif recommandé plusieurs jours d'affilée créait autant d'entrées
+    (BTC-05, BTC-06, BTC-08…), gonflant artificiellement le tracker (le soir les
+    listait toutes, l'hebdo en scorait 11 en 3 jours). Désormais :
+      - si une reco OUVERTE existe déjà pour le même actif ET la même action,
+        on NE crée PAS de doublon — on conserve la PREMIÈRE (avec son prix
+        d'entrée d'origine, ce qui est la référence correcte pour le scoring) ;
+      - si l'action DIFFÈRE (RENFORCER -> ALLÉGER), on archive la transition
+        dans ``reco_changes`` puis on remplace l'ancienne reco.
     """
     recos = load_active_recommendations()
+    asset = reco.get("asset")
+    new_action = (reco.get("action") or "").upper()
+
+    # Doublon exact (même actif + même action, déjà ouvert) -> on garde l'original.
+    for r in recos:
+        if (
+            r.get("asset") == asset
+            and (r.get("action") or "").upper() == new_action
+            and (r.get("status") or "in_progress") == "in_progress"
+        ):
+            logger.info(
+                "Reco %s %s déjà ouverte (entrée d'origine conservée), doublon ignoré.",
+                asset, new_action,
+            )
+            return
+
     existing_ids = {r.get("id") for r in recos}
     if reco.get("id") in existing_ids:
         logger.info("Reco %s déjà active, ignorée.", reco.get("id"))
         return
 
-    asset = reco.get("asset")
-    new_action = (reco.get("action") or "").upper()
     kept: list[dict[str, Any]] = []
     for r in recos:
         if r.get("asset") == asset and (r.get("action") or "").upper() != new_action:

@@ -47,6 +47,12 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          # v14 fix : clés lues par le code mais jamais transmises par les
+          # workflows (secret defini cote repo = ignore sinon). Un secret
+          # absent s'evalue en chaine vide -> sans effet tant qu'il n'existe pas.
+          COINMETRICS_API_KEY: ${{ secrets.COINMETRICS_API_KEY }}
+          COINGLASS_PAID: ${{ secrets.COINGLASS_PAID }}
+          KAITO_API_KEY: ${{ secrets.KAITO_API_KEY }}
         run: python -m src.main weekly
       - name: Commit state files
         if: always()

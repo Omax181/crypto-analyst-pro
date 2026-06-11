@@ -15,10 +15,14 @@ logger = get_logger(__name__)
 
 _QUERY = (
     "Quels sont les événements géopolitiques et macroéconomiques majeurs des "
-    "dernières 24 heures susceptibles d'affecter les marchés crypto et risk-on "
-    "(décisions de banques centrales, tensions géopolitiques, régulation crypto, "
-    "mouvements sur le dollar/obligations) ? Réponds en 4-6 puces factuelles et "
-    "datées, en français, avec une courte lecture d'impact crypto pour chacune."
+    "dernières 24 heures susceptibles d'affecter les marchés crypto et risk-on ? "
+    "Couvre TOUTES les grandes zones, pas seulement les USA : décisions et "
+    "discours des banques centrales (Fed, BCE — Banque centrale européenne, "
+    "BoJ — Banque du Japon, PBoC — Chine), tensions géopolitiques, régulation "
+    "crypto (US, UE/MiCA, Asie), mouvements sur le dollar/euro/yen et les "
+    "obligations, actions liées au crypto et à l'IA (Nvidia, Coinbase, "
+    "MicroStrategy, mineurs). Réponds en 4-6 puces factuelles et datées, en "
+    "français, avec une courte lecture d'impact crypto pour chacune."
 )
 
 

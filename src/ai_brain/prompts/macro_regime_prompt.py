@@ -58,7 +58,10 @@ DONNÉES MACRO (chiffres à copier verbatim, n'invente aucune valeur absente) :
 
 MÉTHODE :
 1. Lis le dollar (DXY), les actions US (S&P/Nasdaq), l'or, le VIX, la courbe des
-   taux (10Y-2Y) et les corrélations 30j BTC↔macro fournies.
+   taux (10Y-2Y) et les corrélations 30j BTC↔macro fournies. v14.1 — intègre
+   AUSSI l'international quand fourni : Nikkei/Stoxx 50/DAX (appétit risque
+   Asie/Europe), taux de dépôt BCE (liquidité euro), taux BoJ (carry trade yen :
+   un RELÈVEMENT BoJ = vent contraire majeur sur tous les actifs risqués).
 2. Raisonnement causal sur les taux : à partir des derniers chiffres macro
    (inflation, chômage) et du consensus Polymarket, déduis la trajectoire Fed
    probable et son implication crypto (ex. chômage ↑ → biais baisse de taux →

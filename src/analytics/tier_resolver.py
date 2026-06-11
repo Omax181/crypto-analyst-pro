@@ -11,7 +11,6 @@ tiers par ``value_usd`` plutôt que par le champ statique du portfolio :
 
 from __future__ import annotations
 
-from typing import Any
 
 from src.utils.logger import get_logger
 from src.utils.portfolio_loader import load_config

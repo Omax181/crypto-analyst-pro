@@ -163,7 +163,10 @@ def get_price_volume_series(
             automatiquement le pas le plus fin disponible.
 
     Returns:
-        Dict ``{closes: [...], volumes: [...]}`` ou ``None``.
+        Dict ``{closes: [...], volumes: [...], prices: [...]}`` ou ``None``.
+        ``prices`` est un ALIAS de ``closes`` (bug v14 : main.py lisait
+        ``series["prices"]`` qui n'existait pas -> corrélation des positions
+        jamais calculée ; l'alias rend les deux clés équivalentes).
     """
     cg_id = _CG_IDS.get(symbol)
     if not cg_id:
@@ -189,7 +192,7 @@ def get_price_volume_series(
     volumes = [v[1] for v in raw.get("total_volumes", []) if len(v) >= 2]
     if not prices:
         return None
-    return {"closes": prices, "volumes": volumes}
+    return {"closes": prices, "volumes": volumes, "prices": prices}
 
 
 def get_dated_closes(symbol: str, days: int = 35) -> dict[str, float]:

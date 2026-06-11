@@ -89,6 +89,8 @@ def _fmt_price(value: Any) -> str:
         return "—"
     if v <= 0:
         return "—"
+    if not math.isfinite(v):
+        return "—"
     if v >= 1000:
         return f"${v:,.0f}"
     if v >= 1:
@@ -99,6 +101,72 @@ def _fmt_price(value: Any) -> str:
     exp = math.floor(math.log10(v))          # ex. 0.000168 -> -4 ; 1e-8 -> -8
     decimals = min(-exp + 5, 18)             # 6 sig figs, borné pour la sûreté
     return f"${v:.{decimals}f}".rstrip("0").rstrip(".")
+
+
+def _fmt_money(value: Any) -> str:
+    """Formate un montant à la française avec suffixe ``$`` : ``69.637,63 $``.
+
+    V14 (point 1B) : les prix dans les plans d'action étaient collés et sans
+    devise (``69637,63``). On rend désormais ``69.637,63 $`` : séparateur de
+    milliers ``.``, décimale ``,``, devise en suffixe. Décimales adaptatives :
+      - >= 1000 : 2 décimales (ex. 69.637,63 $)
+      - >= 1    : 2 décimales (ex. 7,94 $)
+      - >= 0.01 : 4 décimales (ex. 0,0526 $)
+      - < 0.01  : 6 chiffres significatifs, zéros de fin retirés
+    Accepte un nombre OU une string déjà partiellement formatée (on tente de
+    parser ; si échec, on renvoie la valeur telle quelle). Valeur absente → ``—``.
+    """
+    import math
+    from jinja2 import Undefined
+
+    if value is None or isinstance(value, Undefined):
+        return "—"
+    # Tolérance : string type "63180" / "63,180" / "63 180 $" / "0.0014" /
+    # "69.637,63 $" (v14.1 : la SORTIE de ce filtre redevient parsable — avant,
+    # re-filtrer un montant déjà formaté donnait 69.637 au lieu de 69637,63).
+    if isinstance(value, str):
+        cleaned = (
+            value.replace("$", "").replace("€", "").replace("\u202f", "")
+            .replace("\xa0", "").replace(" ", "").strip()
+        )
+        has_dot, has_comma = "." in cleaned, "," in cleaned
+        if has_dot and has_comma:
+            if cleaned.rfind(",") > cleaned.rfind("."):
+                cleaned = cleaned.replace(".", "").replace(",", ".")
+            else:
+                cleaned = cleaned.replace(",", "")
+        elif has_comma:
+            head, _, tail = cleaned.rpartition(",")
+            if tail.isdigit() and len(tail) == 3 and head and "," not in head:
+                cleaned = cleaned.replace(",", "")   # « 63,180 » : milliers US
+            else:
+                cleaned = cleaned.replace(",", ".")  # « 69637,63 » : décimale FR
+        try:
+            v = float(cleaned)
+        except (ValueError, TypeError):
+            return value  # non parsable : on laisse tel quel (ex. "marché")
+    else:
+        try:
+            v = float(value)
+        except (ValueError, TypeError):
+            return "—"
+    if v == 0:
+        return "0 $"
+    if not math.isfinite(v):
+        return "—"
+    neg = v < 0
+    v = abs(v)
+    if v >= 1:
+        s = f"{v:,.2f}"
+    elif v >= 0.01:
+        s = f"{v:,.4f}"
+    else:
+        exp = math.floor(math.log10(v))
+        decimals = min(-exp + 5, 18)
+        s = f"{v:,.{decimals}f}".rstrip("0").rstrip(".")
+    # Conversion format US (','=milliers, '.'=décimale) -> FR ('.'=milliers, ','=déc.)
+    s = s.replace(",", "\u0000").replace(".", ",").replace("\u0000", ".")
+    return f"{'−' if neg else ''}{s} $"
 
 
 def _fmt_vol(value: Any) -> str:
@@ -113,6 +181,9 @@ def _fmt_vol(value: Any) -> str:
         return "—"
     if v <= 0:
         return "—"
+    import math as _m
+    if not _m.isfinite(v):
+        return "—"
     if v >= 1e9:
         return f"${v / 1e9:.1f}B"
     if v >= 1e6:
@@ -123,6 +194,7 @@ def _fmt_vol(value: Any) -> str:
 
 
 _env.filters["fmt_price"] = _fmt_price
+_env.filters["fmt_money"] = _fmt_money
 _env.filters["fmt_vol"] = _fmt_vol
 
 
@@ -134,12 +206,15 @@ def _fmt_pct(value: Any) -> str:
     négatifs ; ``—`` (U+2014) reste réservé aux valeurs non disponibles (H32).
     """
     from jinja2 import Undefined
+    import math
 
     if value is None or isinstance(value, Undefined):
         return "—"
     try:
         v = float(value)
     except (ValueError, TypeError):
+        return "—"
+    if not math.isfinite(v):
         return "—"
     if round(v, 1) == 0:
         v = 0.0  # évite l'affichage "−0.0%" pour les micro-négatifs
@@ -252,7 +327,8 @@ def _num(value: Any, default: Any = None) -> Any:
     if isinstance(value, bool):
         return default
     if isinstance(value, (int, float)):
-        return float(value)
+        import math as _m
+        return float(value) if _m.isfinite(float(value)) else default
     if isinstance(value, str):
         import re as _re
         s = (value.strip().replace("%", "").replace("$", "")
@@ -312,7 +388,7 @@ def render(payload: dict[str, Any], kind: str, charts: dict[str, str] | None = N
         "btc_network", "stablecoin_supply", "whale_inflows", "position_correlation",
         "daily_pnl", "evening_macro", "weekly_movers",
         "calibration", "regret", "blind_spots_weekly", "portfolio_heatmap",
-        "market_movers",
+        "market_movers", "tomorrow_checklist", "risk_score",
     ):
         context.setdefault(key, {})
     for key in (
@@ -322,6 +398,7 @@ def render(payload: dict[str, Any], kind: str, charts: dict[str, str] | None = N
         "sector_exposure", "upcoming_calendar", "scenarios",
         "long_term_positioning", "ptf_evolution",
         "intraday_news", "tomorrow_macro_events", "reco_changes",
+        "delta_summary", "news_today", "levels_tonight", "reco_bilan",
     ):
         context.setdefault(key, [])
 

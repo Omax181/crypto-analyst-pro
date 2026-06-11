@@ -33,7 +33,7 @@ _WEEKLY_SCHEMA = """
   "weekly_action_plan": [{"priority (1-3)","action (concret ex. 'Si BTC < 60k → alléger TAO de 30%')","rationale (1 phrase)"}],
   "losses_vs_recos": "string — 1-3 phrases : relie les plus fortes baisses de la semaine aux recos qu'on avait émises (ex. 'ZK était en SURVEILLER lundi, -21% depuis : sortie au-dessus de 0.005 aurait évité -X%'). Honnête sur les erreurs.",
   "watchlist": [{"asset","direction (entrée/sortie)","trigger (niveau/condition précis)","rationale (1 phrase fondée)"}],
-  "macro_panorama": "string — 2-3 phrases : panorama macro de la semaine à venir (Fed/CPI/NFP du calendrier réel + Polymarket + ETF flows) et son implication pour le PTF. Le fil rouge macro.",
+  "macro_panorama": "string — 2-3 phrases : panorama macro de la semaine à venir (Fed/CPI/NFP du calendrier réel + Polymarket + ETF flows, ET la dimension internationale si fournie : BCE, BoJ/carry trade yen, Nikkei/Stoxx — le crypto ne vit pas qu'aux USA) et son implication pour le PTF. Le fil rouge macro.",
   "exit_plan": {"subtitle","diagnosis (PROSE chiffrée)","monitoring (PROSE : comment l'agent surveille)"},
   "long_term_positioning": [{"asset","thesis","target","status (en route/consolide/accumulation/à surveiller/stable)","status_color (hex)"}],
   "sources_review": {"summary (PROSE bilan sources)","gaps (PROSE lacunes structurelles)"},

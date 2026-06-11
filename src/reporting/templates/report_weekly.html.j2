@@ -26,7 +26,7 @@
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
     <tr>
       <td style="vertical-align:top;">
-        <p style="font-size:12px;color:#5a5852;margin:0 0 4px 0;">{{header.time_casablanca or header.date}}{% if header.week_number %} · semaine {{header.week_number}}/2026{% endif %}</p>
+        <p style="font-size:12px;color:#5a5852;margin:0 0 4px 0;">{{header.time_casablanca or header.date}}{% if header.week_number %} · semaine {{header.week_number}}/{{header.year or 2026}}{% endif %}</p>
         <h1 style="margin:0;font-size:25px;font-weight:500;line-height:1.2;">Rapport hebdomadaire</h1>
         <p style="font-size:12px;color:#8a8880;margin:6px 0 0 0;">Bilan semaine passée · focus semaine à venir</p>
       </td>
@@ -187,8 +187,9 @@
       </td>
       <td style="width:25%;vertical-align:top;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Cash USDC</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;color:#1a1a18;">{% if (portfolio_snapshot.usdc_pct|default(none)) is not none %}{{portfolio_snapshot.usdc_pct}}%{% else %}—{% endif %}</p>
-        {% if portfolio_snapshot.usdc_usd %}<p style="font-size:10px;color:#8a8880;margin:0;">{{ portfolio_snapshot.usdc_usd|fmt_price }}</p>{% endif %}
+        {% set _ucp = portfolio_snapshot.usdc_pct|num(none) %}
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;color:#1a1a18;">{% if _ucp is not none %}{{ _ucp|round|int }}%{% else %}—{% endif %}</p>
+        {% if _ucp is not none and _ucp < 1 %}<p style="font-size:10px;color:#8a8880;margin:0;">100% investi</p>{% elif portfolio_snapshot.usdc_usd %}<p style="font-size:10px;color:#8a8880;margin:0;">{{ portfolio_snapshot.usdc_usd|fmt_price }}</p>{% endif %}
       </td>
     </tr>
   </table>
@@ -515,8 +516,11 @@
 {# ── FOOTER (heures Casablanca HH:MM, points 29-30-39) ── #}
 <div style="border-top:0.5px solid #e5e4dc;padding-top:1rem;text-align:center;">
   {# Point 30 : matin = 08:30 (cron 30 7 * * *) ; point 29 : hebdo = dimanche 12:00. #}
+  {% if _degraded or footer.note %}
+  <p style="font-size:11px;color:#BA7517;margin:0 0 6px 0;font-weight:600;">⚠️ {{ footer.note or "Rapport généré en mode dégradé." }}</p>
+  {% endif %}
   <p style="font-size:10px;color:#8a8880;margin:0;">Prochain rapport · {{footer.next_morning or footer.next_report_at or 'demain 08h30'}}</p>
   <p style="font-size:10px;color:#8a8880;margin:4px 0 0 0;">Prochain rapport hebdo · {{footer.next_weekly or 'dimanche prochain 12:00'}}</p>
-  <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · v13</p>
+  <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · v14</p>
   <p style="font-size:9px;color:#8a8880;margin:8px 0 0 0;font-style:italic;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
 </div>

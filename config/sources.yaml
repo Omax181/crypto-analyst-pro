@@ -110,11 +110,20 @@ fred_series:
   # --- V6 : actifs macro hors-crypto (corrélations marché) ---
   sp500: SP500          # S&P 500 (clôture quotidienne)
   nasdaq: NASDAQCOM     # NASDAQ Composite
-  gold: GOLDPMGBD228NLBM # Or LBMA PM fix USD/once (fallback ; prix live = Yahoo GC=F)
+  # NB : l'or n'est PAS pris via FRED — la série LBMA GOLDPMGBD228NLBM est gelée
+  # (400 Bad Request). Le prix or live vient de Yahoo Finance (GC=F), fiable et
+  # à jour. Voir market_prices.py (_YF_SYMBOLS["gold"]).
   wti: DCOILWTICO       # Pétrole WTI (USD/baril)
   brent: DCOILBRENTEU   # Pétrole Brent (USD/baril)
   eur_usd: DEXUSEU      # EUR/USD
   usd_jpy: DEXJPUS      # USD/JPY (yen, carry trade)
+  # --- v14.1 : international (« pas que les USA ») ---
+  # Une série FRED inconnue/gelée renvoie une erreur HTTP → simplement omise
+  # par _latest_observation (dégradation gracieuse, aucune valeur inventée).
+  ecb_deposit_rate: ECBDFR        # Taux de dépôt BCE (quotidien, source BCE)
+  boj_call_rate: IRSTCI01JPM156N  # Taux au jour le jour Japon (mensuel, OCDE —
+                                  # proxy du taux directeur BoJ ; best-effort)
+  nikkei: NIKKEI225               # Nikkei 225 (quotidien) — recoupe Yahoo ^N225
 
 # --- Subreddits sentiment social ---
 reddit_subreddits:

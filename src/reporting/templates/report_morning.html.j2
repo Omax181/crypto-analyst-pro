@@ -1,6 +1,23 @@
 {# Rapport matin V6 — fidèle au mockup, couleurs hex (compat mail).
    Sections fixes ; contenu adaptatif piloté par le payload. #}
 
+{# ── MACRO FLÈCHE 24h (v14 point 16) — verte hausse / rouge baisse / grise stable.
+   Seuil adaptatif : un mouvement < 0,5% de la valeur de l'item est jugé stable
+   (gris). delta = variation absolue (même unité que value). Pour une variation
+   déjà en %, passer value=100 et delta=variation%. Rend "" si delta/valeur
+   manquant (aucune flèche parasite). #}
+{% macro arrow24(value, delta) -%}
+{%- set v = value|num(0) -%}
+{%- set d = delta|num(none) -%}
+{%- if d is not none and v and v != 0 -%}
+  {%- set pct = (d if d >= 0 else -d) / (v if v >= 0 else -v) * 100 -%}
+  {%- if pct < 0.5 -%}<span style="color:#8a8880;font-size:12px;"> ▬</span>
+  {%- elif d > 0 -%}<span style="color:#3B6D11;font-size:12px;"> ▲</span>
+  {%- else -%}<span style="color:#A32D2D;font-size:12px;"> ▼</span>
+  {%- endif -%}
+{%- endif -%}
+{%- endmacro %}
+
 {# ── HEADER ── #}
 <div style="border-bottom:0.5px solid #e5e4dc;padding-bottom:1rem;margin-bottom:1.5rem;">
   {# Header en table pour rendu mail-safe (flex non supporté sur Gmail/Outlook
@@ -71,11 +88,19 @@
   {% if portfolio_snapshot.usdc_usd %}<p style="margin:8px 0 0 0;font-size:11px;color:#5a5852;">💰 Cash disponible · <strong>{{ portfolio_snapshot.usdc_usd|fmt_price }}</strong>{% if portfolio_snapshot.usdc_pct is not none %} ({{portfolio_snapshot.usdc_pct}}% du PTF){% endif %} pour saisir des opportunités</p>{% endif %}
 </div>
 
+{# ── HISTOIRE DU JOUR (v14 point 15 : remontée entre Portefeuille et En bref) ── #}
+{% if story_of_the_day and story_of_the_day.narrative %}
+<div style="background:#f5f4ee;border-radius:12px;padding:14px 16px;margin-bottom:1.25rem;">
+  <p style="font-size:11px;color:#5a5852;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">L'histoire du jour</p>
+  <p style="margin:0;font-size:13px;line-height:1.65;">{{ story_of_the_day.narrative|md }}</p>
+</div>
+{% endif %}
+
 {# ── TL;DR EXÉCUTIF (scan 5 secondes) ── #}
 {% if executive_summary %}
 <div style="background:#1a1a18;border-radius:10px;padding:12px 16px;margin-bottom:0.75rem;">
   <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">En bref</p>
-  <p style="margin:0;font-size:13px;line-height:1.6;color:#f5f4ee;">{{executive_summary}}</p>
+  <p style="margin:0;font-size:13px;line-height:1.6;color:#f5f4ee;">{{executive_summary|md}}</p>
 </div>
 {% endif %}
 
@@ -126,7 +151,7 @@
       {% if macro_context.btc_price %}
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">BTC</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ macro_context.btc_price|fmt_price }}{{ _cps.get('BTC', {}).get('status') | pastille }}</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ macro_context.btc_price|fmt_price }}{{ _cps.get('BTC', {}).get('status') | pastille }}{{ arrow24(100, macro_context.btc_change_24h) }}</p>
         {% if macro_context.btc_note %}<p style="font-size:10px;color:#5a5852;margin:0;">{{macro_context.btc_note}}</p>{% endif %}
       </td>
       {% endif %}
@@ -139,15 +164,16 @@
       {% endif %}
       {% if (macro_context.polymarket_fed_cut_pct|default(none)) is not none %}
       <td style="width:25%;vertical-align:top;padding-right:6px;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">Polymarket Fed cut</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{macro_context.polymarket_fed_cut_pct}}%</p>
-        {% if macro_context.fed_cut_note %}<p style="font-size:10px;color:#A32D2D;margin:0;">{{macro_context.fed_cut_note}}</p>{% endif %}
+        <p style="font-size:10px;color:#8a8880;margin:0;">Polymarket · taux Fed</p>
+        {% set _cut = macro_context.polymarket_fed_cut_pct|num(0) %}
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.1f'|format(100 - _cut) }}% <span style="font-size:10px;color:#5a5852;font-weight:400;">maintien</span></p>
+        <p style="font-size:10px;color:#5a5852;margin:0;">baisse {{ '%.1f'|format(_cut) }}%{% if macro_context.fed_cut_note %} · {{macro_context.fed_cut_note}}{% endif %}</p>
       </td>
       {% endif %}
       {% if (macro_context.dxy|num(none)) is not none %}
       <td style="width:25%;vertical-align:top;">
         <p style="font-size:10px;color:#8a8880;margin:0;">DXY</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.2f'|format(macro_context.dxy|num(0)) }}{{ _mss.get('dxy_ice') | pastille }}{% if data_contradictions and data_contradictions.has_any %}<sup style="font-size:9px;color:#8a8880;">²</sup>{% endif %}</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.2f'|format(macro_context.dxy|num(0)) }}{{ _mss.get('dxy_ice') | pastille }}{% if data_contradictions and data_contradictions.has_any %}<sup style="font-size:9px;color:#8a8880;">²</sup>{% endif %}{{ arrow24(macro_context.dxy, macro_context.dxy_delta) }}</p>
         <p style="font-size:10px;color:#8a8880;margin:0;">{% if (macro_context.dxy_broad|num(none)) is not none %}large {{ '%.2f'|format(macro_context.dxy_broad|num(0)) }}{% elif macro_context.dxy_note %}{{macro_context.dxy_note}}{% endif %}</p>
       </td>
       {% endif %}
@@ -164,25 +190,34 @@
       {% if macro_context.sp500 %}
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">S&amp;P 500</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format((macro_context.sp500)|num(0)) }}{{ _mss.get('sp500') | pastille }}</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format((macro_context.sp500)|num(0)) }}{{ _mss.get('sp500') | pastille }}{{ arrow24(macro_context.sp500, macro_context.sp500_delta) }}</p>
         {% if (macro_context.sp500_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (macro_context.sp500_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (macro_context.sp500_delta|num(0)) >= 0 else '−' }}{{ '{:,.0f}'.format(((macro_context.sp500_delta)|num(0))|abs) }}</p>{% endif %}
       </td>
       {% endif %}
       {% if macro_context.nasdaq %}
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Nasdaq</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format((macro_context.nasdaq)|num(0)) }}{{ _mss.get('nasdaq') | pastille }}</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format((macro_context.nasdaq)|num(0)) }}{{ _mss.get('nasdaq') | pastille }}{{ arrow24(macro_context.nasdaq, macro_context.nasdaq_delta) }}</p>
         {% if (macro_context.nasdaq_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (macro_context.nasdaq_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (macro_context.nasdaq_delta|num(0)) >= 0 else '−' }}{{ '{:,.0f}'.format(((macro_context.nasdaq_delta)|num(0))|abs) }}</p>{% endif %}
       </td>
       {% endif %}
       {% if macro_context.vix %}
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">VIX</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{macro_context.vix}}{{ _mss.get('vix') | pastille }}</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.1f'|format(macro_context.vix|num(0)) }}{{ _mss.get('vix') | pastille }}{{ arrow24(macro_context.vix, macro_context.vix_delta) }}</p>
         <p style="font-size:10px;color:{% if (macro_context.vix|num(0)) >= 25 %}#A32D2D{% else %}#5a5852{% endif %};margin:0;">{% if (macro_context.vix|num(0)) >= 25 %}stress{% else %}calme{% endif %}</p>
       </td>
       {% endif %}
+      {% set _nvda = (equity_quotes or {}).get('NVDA') %}
+      {% if _nvda and _nvda.price %}
+      <td style="width:25%;vertical-align:top;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">NVDA · IA/GPU</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ _nvda.price|fmt_price }}{{ arrow24(_nvda.price, _nvda.delta) }}</p>
+        {% if (_nvda.change_pct|default(none)) is not none %}<p style="font-size:10px;color:{% if (_nvda.change_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ _nvda.change_pct|fmt_pct }} · lien RENDER/TAO</p>{% endif %}
+      </td>
+      {% else %}
       <td style="width:25%;"></td>
+      {% endif %}
     </tr>
   </table>
   {% endif %}
@@ -196,32 +231,77 @@
       {% if macro_context.us_10y %}
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">US 10Y</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{macro_context.us_10y}}%{{ _mss.get('us_10y') | pastille }}</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{macro_context.us_10y}}%{{ _mss.get('us_10y') | pastille }}{{ arrow24(macro_context.us_10y, macro_context.us_10y_delta) }}</p>
         {% if (macro_context.yield_curve_10y_2y|default(none)) is not none %}<p style="font-size:10px;color:{% if (macro_context.yield_curve_10y_2y|num(0)) < 0 %}#A32D2D{% else %}#5a5852{% endif %};margin:0;">courbe {{macro_context.yield_curve_10y_2y}}{% if (macro_context.yield_curve_10y_2y|num(0)) < 0 %} ⚠{% endif %}</p>{% endif %}
       </td>
       {% endif %}
       {% if macro_context.gold_usd %}
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Gold</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ macro_context.gold_usd|fmt_price }}{{ _mss.get('gold_usd') | pastille }}</p>
-        {% if (macro_context.gold_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (macro_context.gold_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ macro_context.gold_delta|fmt_pct }}</p>{% endif %}
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ macro_context.gold_usd|fmt_price }}{{ _mss.get('gold_usd') | pastille }}{{ arrow24(macro_context.gold_usd, macro_context.gold_delta) }}</p>
+        {% if (macro_context.gold_delta|default(none)) is not none and (macro_context.gold_usd|num(0)) > 0 %}<p style="font-size:10px;color:{% if (macro_context.gold_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ (((macro_context.gold_delta|num(0)) / (macro_context.gold_usd|num(1)) * 100))|fmt_pct }}</p>{% endif %}
       </td>
       {% endif %}
       {% if macro_context.brent_usd %}
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Brent</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ macro_context.brent_usd|fmt_price }}{{ _mss.get('brent_usd') | pastille }}</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ macro_context.brent_usd|fmt_price }}{{ _mss.get('brent_usd') | pastille }}{{ arrow24(macro_context.brent_usd, macro_context.brent_delta) }}</p>
       </td>
       {% endif %}
       {% if macro_context.usd_jpy %}
       <td style="width:25%;vertical-align:top;">
         <p style="font-size:10px;color:#8a8880;margin:0;">USD/JPY</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{macro_context.usd_jpy}}{{ _mss.get('usd_jpy') | pastille }}</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{macro_context.usd_jpy}}{{ _mss.get('usd_jpy') | pastille }}{{ arrow24(macro_context.usd_jpy, macro_context.usd_jpy_delta) }}</p>
         {% if macro_context.eur_usd %}<p style="font-size:10px;color:#5a5852;margin:0;">EUR/USD {{macro_context.eur_usd}}</p>{% endif %}
       </td>
       {% endif %}
     </tr>
   </table>
+  {% endif %}
+
+  {# Groupe 4 — International (v14.1 : zone euro · Japon — pas que les USA) #}
+  {% set _g4_has = macro_context.stoxx50 or macro_context.nikkei or (macro_context.ecb_deposit_rate|default(none)) is not none or (macro_context.boj_rate|default(none)) is not none %}
+  {% if _g4_has %}
+  <p style="font-size:9px;color:#8a8880;margin:12px 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;border-top:0.5px solid #f0efe8;padding-top:10px;">International · Europe &amp; Asie</p>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
+    <tr>
+      {% if macro_context.stoxx50 %}
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Euro Stoxx 50</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format((macro_context.stoxx50)|num(0)) }}{{ _mss.get('stoxx50') | pastille }}{{ arrow24(macro_context.stoxx50, macro_context.stoxx50_delta) }}</p>
+        {% if macro_context.dax %}<p style="font-size:10px;color:#5a5852;margin:0;">DAX {{ '{:,.0f}'.format((macro_context.dax)|num(0)) }}{{ arrow24(macro_context.dax, macro_context.dax_delta) }}</p>{% endif %}
+      </td>
+      {% endif %}
+      {% if macro_context.nikkei %}
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Nikkei 225</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format((macro_context.nikkei)|num(0)) }}{{ _mss.get('nikkei') | pastille }}{{ arrow24(macro_context.nikkei, macro_context.nikkei_delta) }}</p>
+        <p style="font-size:10px;color:#5a5852;margin:0;">appétit risque Asie</p>
+      </td>
+      {% endif %}
+      {% if (macro_context.ecb_deposit_rate|default(none)) is not none %}
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">BCE · dépôt</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.2f'|format(macro_context.ecb_deposit_rate|num(0)) }}%{{ _mss.get('ecb_deposit_rate') | pastille }}</p>
+        <p style="font-size:10px;color:#5a5852;margin:0;">liquidité zone euro</p>
+      </td>
+      {% endif %}
+      {% if (macro_context.boj_rate|default(none)) is not none %}
+      <td style="width:25%;vertical-align:top;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">BoJ · taux</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.2f'|format(macro_context.boj_rate|num(0)) }}%{{ _mss.get('boj_rate') | pastille }}</p>
+        <p style="font-size:10px;color:#5a5852;margin:0;">carry trade yen</p>
+      </td>
+      {% else %}
+      <td style="width:25%;"></td>
+      {% endif %}
+    </tr>
+  </table>
+  {% endif %}
+
+  {# v14.1 — lien actions ↔ crypto chiffré (corr/β 30j calculés Python) #}
+  {% if equity_crypto_links and equity_crypto_links.available and equity_crypto_links.summary_line %}
+  <p style="font-size:11px;color:#5a5852;margin:12px 0 0 0;border-top:0.5px solid #f0efe8;padding-top:8px;"><span style="font-weight:500;color:#1a1a18;">Actions ↔ crypto&nbsp;:</span> {{ equity_crypto_links.summary_line }}</p>
   {% endif %}
 </div>
 
@@ -229,13 +309,13 @@
 {% if macro_impact %}
 <h2 style="margin:2rem 0 0.75rem 0;font-size:17px;font-weight:500;">Macro · liens chiffrés sur ton PTF</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  {% if macro_impact.intro %}<p style="margin:0 0 10px 0;font-size:13px;line-height:1.65;">{{macro_impact.intro}}</p>{% endif %}
+  {% if macro_impact.intro %}<p style="margin:0 0 10px 0;font-size:13px;line-height:1.65;">{{macro_impact.intro|md}}</p>{% endif %}
   {# A3 — plus de grille de bêtas de toutes les positions (illisible et souvent
      aberrante). Les bêtas pertinents sont désormais cités directement dans
      l'analyse macro ci-dessus par l'IA, seulement quand la corrélation est
      significative. On garde uniquement la conclusion (implication). #}
-  {% if macro_impact.implication %}<p style="margin:0;font-size:13px;line-height:1.65;"><span style="font-weight:500;">Donc :</span> {{macro_impact.implication}}</p>{% endif %}
-  {% if macro_impact.self_critique %}<p style="margin:10px 0 0 0;font-size:11px;color:#8a8880;font-style:italic;">Auto-critique · {{macro_impact.self_critique}}</p>{% endif %}
+  {% if macro_impact.implication %}<p style="margin:0;font-size:13px;line-height:1.65;"><span style="font-weight:500;">Donc :</span> {{macro_impact.implication|md}}</p>{% endif %}
+  {% if macro_impact.self_critique %}<p style="margin:10px 0 0 0;font-size:11px;color:#8a8880;font-style:italic;">Auto-critique · {{macro_impact.self_critique|md}}</p>{% endif %}
 </div>
 {% endif %}
 
@@ -259,21 +339,16 @@
 </div>
 {% endif %}
 
-{# ── ON-CHAIN (2x2 + lecture combinée) ── #}
+{# ── ON-CHAIN (compact v14 point 1A : flux inline pour gagner de la place,
+   l'analyse passe par la lecture combinée) ── #}
 <h2 style="margin:1.25rem 0 0.5rem 0;font-size:17px;font-weight:500;">Indicateurs on-chain · ce qu'ils disent</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.85rem 1.1rem;margin-bottom:1rem;">
   {% if onchain_indicators and onchain_indicators.metrics %}
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
-    {% for m in onchain_indicators.metrics %}
-    <div>
-      <p style="font-size:10px;color:#8a8880;margin:0;">{{m.label}}</p>
-      <p style="font-size:14px;font-weight:500;margin:2px 0 0 0;color:{{m.color or '#5a5852'}};">{{m.value}}</p>
-      <p style="font-size:10px;color:#5a5852;margin:2px 0 0 0;">{{m.interpretation}}</p>
-    </div>
-    {% endfor %}
-  </div>
+  <p style="margin:0;font-size:12px;line-height:1.9;color:#1a1a18;">
+    {% for m in onchain_indicators.metrics %}<span style="display:inline-block;margin-right:16px;white-space:nowrap;"><span style="color:#8a8880;">{{m.label}}</span> · <strong style="color:{{m.color or '#1a1a18'}};">{{m.value}}</strong></span>{% endfor %}
+  </p>
   {% if onchain_indicators.combined_reading %}
-  <div style="background:#f5f4ee;border-radius:8px;padding:10px 12px;margin:12px 0 0 0;font-size:12px;line-height:1.55;"><span style="font-weight:500;">Lecture combinée :</span> {{onchain_indicators.combined_reading}}</div>
+  <div style="background:#f5f4ee;border-radius:8px;padding:10px 12px;margin:10px 0 0 0;font-size:12px;line-height:1.55;"><span style="font-weight:500;">Lecture combinée :</span> {{onchain_indicators.combined_reading}}</div>
   {% endif %}
   {# Flux de capitaux : stablecoins (dry powder) + whale tracking (pression vendeuse) #}
   {% if (stablecoin_supply and stablecoin_supply.available) or (whale_inflows and whale_inflows.available) %}
@@ -323,13 +398,19 @@
       <td style="width:50%;vertical-align:top;padding-right:8px;">
         <p style="font-size:10px;color:#3B6D11;margin:0 0 4px 0;font-weight:700;">▲ Gagnants</p>
         {% for g in market_movers.gainers[:5] %}
-        <div style="font-size:12px;line-height:1.5;color:#1a1a18;">{{g.symbol}} <span style="color:#3B6D11;font-weight:600;float:right;">+{{ '%.1f'|format((g.change_24h|num(0))|abs) }}%</span></div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr>
+          <td style="font-size:12px;line-height:1.5;color:#1a1a18;">{{g.symbol}}</td>
+          <td style="font-size:12px;line-height:1.5;color:#3B6D11;font-weight:600;text-align:right;">+{{ '%.1f'|format((g.change_24h|num(0))|abs) }}%</td>
+        </tr></table>
         {% endfor %}
       </td>
       <td style="width:50%;vertical-align:top;padding-left:8px;border-left:0.5px solid #e5e4dc;">
         <p style="font-size:10px;color:#A32D2D;margin:0 0 4px 0;font-weight:700;">▼ Perdants</p>
         {% for l in market_movers.losers[:5] %}
-        <div style="font-size:12px;line-height:1.5;color:#1a1a18;">{{l.symbol}} <span style="color:#A32D2D;font-weight:600;float:right;">−{{ '%.1f'|format((l.change_24h|num(0))|abs) }}%</span></div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr>
+          <td style="font-size:12px;line-height:1.5;color:#1a1a18;">{{l.symbol}}</td>
+          <td style="font-size:12px;line-height:1.5;color:#A32D2D;font-weight:600;text-align:right;">−{{ '%.1f'|format((l.change_24h|num(0))|abs) }}%</td>
+        </tr></table>
         {% endfor %}
       </td>
     </tr>
@@ -397,21 +478,15 @@
 {% if today_watch %}
 <div style="background:#E6F1FB;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;border-left:2px solid #378ADD;border-top-left-radius:0;border-bottom-left-radius:0;">
   <p style="font-size:11px;color:#0C447C;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">À surveiller aujourd'hui</p>
-  <p style="margin:0;font-size:12px;line-height:1.6;color:#042C53;">{{today_watch}}</p>
+  <p style="margin:0;font-size:12px;line-height:1.6;color:#042C53;">{{today_watch|md}}</p>
 </div>
 {% endif %}
-
-{# ── HISTOIRE DU JOUR ── #}
-<div style="background:#f5f4ee;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
-  <p style="font-size:11px;color:#5a5852;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">L'histoire du jour</p>
-  <p style="margin:0;font-size:13px;line-height:1.65;">{{ story_of_the_day.narrative or "Données de marché en cours de consolidation ce matin." }}</p>
-</div>
 
 {# ── AUTO-CRITIQUE GLOBALE ── #}
 {% if self_critique_global %}
 <div style="background:#FAEEDA;border-radius:8px;padding:10px 14px;margin-bottom:1rem;border-left:2px solid #BA7517;border-top-left-radius:0;border-bottom-left-radius:0;">
   <p style="font-size:11px;color:#633806;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Auto-critique de l'analyse globale</p>
-  <p style="margin:0;font-size:12px;line-height:1.6;color:#412402;">{{self_critique_global}}</p>
+  <p style="margin:0;font-size:12px;line-height:1.6;color:#412402;">{{self_critique_global|md}}</p>
 </div>
 {% endif %}
 
@@ -419,7 +494,7 @@
 {% if invalidation_watch %}
 <div style="background:#E6F1FB;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;border-left:2px solid #378ADD;border-top-left-radius:0;border-bottom-left-radius:0;">
   <p style="font-size:11px;color:#0C447C;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Ce que je surveille pour invalider mon scénario</p>
-  <p style="margin:0;font-size:12px;line-height:1.6;color:#042C53;">{{invalidation_watch}}</p>
+  <p style="margin:0;font-size:12px;line-height:1.6;color:#042C53;">{{invalidation_watch|md}}</p>
 </div>
 {% endif %}
 
@@ -441,7 +516,7 @@
         {% if t.priority == 'action' %}<span style="display:inline-block;background:#E24B4A;color:#fff;font-size:9px;padding:2px 7px;border-radius:4px;font-weight:700;margin-bottom:4px;">ACTION</span>{% elif t.priority == 'watch' %}<span style="display:inline-block;background:#E6F1FB;color:#0C447C;font-size:9px;padding:2px 7px;border-radius:4px;font-weight:700;margin-bottom:4px;">SUIVI</span>{% endif %}
         <span style="background:{% if t.action_type == 'bullish' %}#EAF3DE{% elif t.action_type == 'bearish' %}#FCEBEB{% else %}#E6F1FB{% endif %};color:{% if t.action_type == 'bullish' %}#27500A{% elif t.action_type == 'bearish' %}#791F1F{% else %}#0C447C{% endif %};padding:4px 10px;border-radius:8px;font-size:11px;font-weight:600;display:inline-block;">{{t.action}}</span>
         <p style="margin:4px 0 0 0;font-size:10px;color:#8a8880;">{% if t.confidence %}Confiance · {{t.confidence}}%{% if t.size_note %} → {{t.size_note}}{% endif %}{% endif %}</p>
-        {% if t.reliability %}<p style="margin:3px 0 0 0;font-size:9px;color:{% if t.reliability == 'complète' %}#27500A{% else %}#BA7517{% endif %};">données {{t.reliability}}</p>{% endif %}
+        {% if t.reliability %}<p style="margin:3px 0 0 0;font-size:9px;color:{% if t.reliability == 'complète' %}#27500A{% else %}#BA7517{% endif %};">données {{ 'complètes' if t.reliability == 'complète' else 'partielles' }}</p>{% endif %}
       </td>
     </tr>
   </table>
@@ -489,18 +564,24 @@
   {% endif %}
 
   {% if t.targets %}
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0;">
-    <div style="background:{% if t.action_type == 'bearish' %}#FCEBEB{% else %}#EAF3DE{% endif %};border-radius:8px;padding:10px 12px;">
-      <p style="margin:0 0 4px 0;font-size:10px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">{{t.targets.short_term_label or 'Tactique court terme'}}</p>
-      <p style="margin:0;font-size:16px;font-weight:500;color:{% if t.action_type == 'bearish' %}#501313{% else %}#173404{% endif %};">{{t.targets.short_term_30d}}</p>
-      {% if t.targets.short_term_note %}<p style="margin:2px 0 0 0;font-size:11px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};">{{t.targets.short_term_note|md}}</p>{% endif %}
-    </div>
-    <div style="background:#E1F5EE;border-radius:8px;padding:10px 12px;">
-      <p style="margin:0 0 4px 0;font-size:10px;color:#085041;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Positionnement LT · 6-12 mois</p>
-      <p style="margin:0;font-size:16px;font-weight:500;color:#04342C;">{% if t.targets.long_term_6_12m_low %}{{t.targets.long_term_6_12m_low}}{% if t.targets.long_term_6_12m_high %} — {{t.targets.long_term_6_12m_high}}{% endif %}{% endif %}</p>
-      {% if t.targets.long_term_note %}<p style="margin:2px 0 0 0;font-size:11px;color:#085041;">{{t.targets.long_term_note|md}}</p>{% endif %}
-    </div>
-  </div>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;margin:12px 0;">
+    <tr>
+      <td style="width:50%;vertical-align:top;padding-right:4px;">
+        <div style="background:{% if t.action_type == 'bearish' %}#FCEBEB{% else %}#EAF3DE{% endif %};border-radius:8px;padding:10px 12px;">
+          <p style="margin:0 0 4px 0;font-size:10px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">{{t.targets.short_term_label or 'Tactique court terme'}}</p>
+          <p style="margin:0;font-size:16px;font-weight:500;color:{% if t.action_type == 'bearish' %}#501313{% else %}#173404{% endif %};">{{t.targets.short_term_30d|fmt_money}}</p>
+          {% if t.targets.short_term_note %}<p style="margin:2px 0 0 0;font-size:11px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};">{{t.targets.short_term_note|md}}</p>{% endif %}
+        </div>
+      </td>
+      <td style="width:50%;vertical-align:top;padding-left:4px;">
+        <div style="background:#E1F5EE;border-radius:8px;padding:10px 12px;">
+          <p style="margin:0 0 4px 0;font-size:10px;color:#085041;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Positionnement LT · 6-12 mois</p>
+          <p style="margin:0;font-size:16px;font-weight:500;color:#04342C;">{% if t.targets.long_term_6_12m_low %}{{t.targets.long_term_6_12m_low|fmt_money}}{% if t.targets.long_term_6_12m_high %} — {{t.targets.long_term_6_12m_high|fmt_money}}{% endif %}{% endif %}</p>
+          {% if t.targets.long_term_note %}<p style="margin:2px 0 0 0;font-size:11px;color:#085041;">{{t.targets.long_term_note|md}}</p>{% endif %}
+        </div>
+      </td>
+    </tr>
+  </table>
   {% endif %}
 
   {# A7 — n'affiche le plan QUE pour une action ferme (RENFORCER/ALLÉGER) ET
@@ -510,9 +591,9 @@
   <div style="background:{% if t.action_type == 'bearish' %}#FCEBEB{% else %}#EAF3DE{% endif %};border-radius:8px;padding:10px 12px;margin:12px 0;font-size:13px;line-height:1.55;">
     <p style="margin:0 0 4px 0;font-size:11px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Donc · plan d'action</p>
     <p style="margin:0;color:{% if t.action_type == 'bearish' %}#501313{% else %}#173404{% endif %};">
-      {% if t.action_plan.entry %}<span style="font-weight:700;">Entrée :</span> {{t.action_plan.entry|md}}<br>{% endif %}
-      {% if _has_tp %}<span style="font-weight:700;">Take profit :</span> {{t.action_plan.take_profit['30pct']}} / {{t.action_plan.take_profit['30pct_b']}} / {{t.action_plan.take_profit['40pct']}}<br>{% endif %}
-      {% if t.action_plan.stop_loss %}<span style="font-weight:700;">Stop loss :</span> {{t.action_plan.stop_loss|md}}{% if t.action_plan.stop_loss_basis %} <span style="color:#5a5852;">({{t.action_plan.stop_loss_basis}})</span>{% endif %}<br>{% endif %}
+      {% if t.action_plan.entry %}<span style="font-weight:700;">Entrée :</span> {{t.action_plan.entry|fmt_money}}<br>{% endif %}
+      {% if _has_tp %}<span style="font-weight:700;">Take profit :</span> {{t.action_plan.take_profit['30pct']|fmt_money}} · {{t.action_plan.take_profit['30pct_b']|fmt_money}} · {{t.action_plan.take_profit['40pct']|fmt_money}}<br>{% endif %}
+      {% if t.action_plan.stop_loss %}<span style="font-weight:700;">Stop loss :</span> {{t.action_plan.stop_loss|fmt_money}}{% if t.action_plan.stop_loss_basis %} <span style="color:#5a5852;">({{t.action_plan.stop_loss_basis}})</span>{% endif %}<br>{% endif %}
       {% if t.action_plan.rr %}{% set _rrnum = (t.action_plan.rr|string|replace(':1','')|replace(',','.')|float(0)) %}<span style="font-weight:700;">Risque/récompense :</span> <span style="background:{% if _rrnum >= 2 %}#EAF3DE{% elif _rrnum >= 1.5 %}#FBF0DA{% else %}#FCEBEB{% endif %};color:{% if _rrnum >= 2 %}#27500A{% elif _rrnum >= 1.5 %}#7A4E12{% else %}#791F1F{% endif %};padding:1px 7px;border-radius:6px;font-weight:700;">{{t.action_plan.rr}}{% if _rrnum and _rrnum < 1.5 %} · faible{% elif _rrnum >= 2 %} · favorable{% endif %}</span><br>{% endif %}
       {% if t.action_plan.invalidation_conditions %}<span style="font-weight:700;">Invalidation :</span> {{t.action_plan.invalidation_conditions|md}}{% endif %}
     </p>
@@ -667,7 +748,10 @@
   <p style="font-size:10px;color:#5a5852;margin:0 0 2px 0;font-weight:500;">Sources actives ce matin · {{header.active_sources_count or 0}}{% if header.total_sources_count %} / {{header.total_sources_count}}{% endif %}</p>
   <p style="font-size:10px;color:#8a8880;margin:0;line-height:1.5;">{{ footer.active_sources|join(' · ') if footer.active_sources is iterable and footer.active_sources is not string else footer.active_sources }}</p>
   {% endif %}
+  {% if _degraded or footer.note %}
+  <p style="font-size:11px;color:#BA7517;margin:0 0 6px 0;font-weight:600;">⚠️ {{ footer.note or "Rapport généré en mode dégradé." }}</p>
+  {% endif %}
   <p style="font-size:10px;color:#8a8880;margin:6px 0 0 0;">Prochain rapport · {{footer.next_report_at or 'ce soir 20h00'}}</p>
-  <p style="font-size:9px;color:#b5b3ab;margin:4px 0 0 0;">Crypto Analyst Pro · v13</p>
+  <p style="font-size:9px;color:#b5b3ab;margin:4px 0 0 0;">Crypto Analyst Pro · v14</p>
   <p style="font-size:9px;color:#8a8880;margin:8px 0 0 0;font-style:italic;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
 </div>

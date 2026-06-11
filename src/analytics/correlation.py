@@ -341,3 +341,114 @@ def compute_per_asset_macro_beta(
         "window": window,
         "by_asset": by_asset,
     }
+
+
+# --- Corrélations actions ↔ crypto (v14.1 : NVDA/COIN/MSTR… ↔ positions) -----
+
+# Paires (action, crypto, mécanisme) suivies. Le mécanisme est le LIEN CAUSAL
+# que l'IA doit expliciter (« si Nvidia monte, RENDER monte car... ») — jamais
+# une corrélation nue sans explication. Paires choisies pour le PTF d'Omar :
+# bloc IA/GPU (RENDER, TAO, FET ~ NVDA/AMD/TSM) + proxys BTC (COIN, MSTR, MARA).
+EQUITY_CRYPTO_MAP: list[tuple[str, str, str]] = [
+    ("NVDA", "RENDER", "demande GPU / calcul IA"),
+    ("NVDA", "TAO", "cycle d'investissement IA"),
+    ("NVDA", "FET", "narratif agents IA"),
+    ("AMD", "RENDER", "chaîne semi-conducteurs IA"),
+    ("TSM", "TAO", "amont fonderie des puces IA"),
+    ("COIN", "BTC", "volumes exchange / bêta crypto coté"),
+    ("COIN", "ETH", "volumes exchange / bêta crypto coté"),
+    ("MSTR", "BTC", "proxy BTC à effet de levier"),
+    ("MARA", "BTC", "économie des mineurs (hashprice)"),
+]
+
+_EQ_BETA_CAP = 4.0  # un β crypto/action > 4 sur 30j est du bruit, pas un signal
+
+
+def compute_equity_crypto_links(
+    equity_dated: dict[str, dict[str, float]],
+    crypto_dated: dict[str, dict[str, float]],
+    window: int = 30,
+    pairs: list[tuple[str, str, str]] | None = None,
+    min_abs_corr: float = 0.2,
+) -> dict[str, Any]:
+    """Corrélations/bêtas 30j entre actions liées crypto et positions du PTF.
+
+    Args:
+        equity_dated: ``{TICKER_ACTION: {date: close}}`` (Yahoo).
+        crypto_dated: ``{TICKER_CRYPTO: {date: close}}`` (CoinGecko).
+        window: fenêtre de rendements quotidiens (jours).
+        pairs: paires suivies (défaut : ``EQUITY_CRYPTO_MAP``).
+        min_abs_corr: sous ce seuil, la paire est listée mais marquée non
+            significative (et son β est écarté — pente sans corrélation = bruit).
+
+    Returns:
+        Dict ``{available, window, links: [{equity, crypto, corr, beta,
+        mechanism, significant, reading}], summary_line}``. Les actions/cryptos
+        sans données alignées sont simplement omises (dégradation gracieuse).
+        ``summary_line`` = 1 phrase prête pour l'email (meilleure paire).
+    """
+    if not equity_dated or not crypto_dated:
+        return {"available": False, "reason": "séries actions ou crypto absentes"}
+
+    links: list[dict[str, Any]] = []
+    for equity, crypto, mechanism in (pairs or EQUITY_CRYPTO_MAP):
+        eq = equity_dated.get(equity)
+        cr = crypto_dated.get(crypto)
+        if not eq or not cr:
+            continue
+        # Rendements crypto régressés sur rendements action (β = sensibilité
+        # de la crypto à +1% de l'action — le sens causal recherché).
+        r_eq, r_cr = _align_returns(eq, cr)
+        if not r_eq or not r_cr:
+            continue
+        n = min(len(r_eq), len(r_cr), window)
+        corr = _pearson(r_cr[-n:], r_eq[-n:])
+        if corr is None:
+            continue
+        beta = _beta(r_cr[-n:], r_eq[-n:])
+        significant = abs(corr) >= min_abs_corr
+        entry: dict[str, Any] = {
+            "equity": equity,
+            "crypto": crypto,
+            "corr": round(corr, 2),
+            "mechanism": mechanism,
+            "significant": significant,
+        }
+        if significant and beta is not None and abs(beta) <= _EQ_BETA_CAP:
+            entry["beta"] = round(beta, 2)
+            entry["reading"] = (
+                f"corr 30j {corr:+.2f} ({_corr_label(crypto, corr).split()[0]}) · "
+                f"β {beta:.2f} : +1% {equity} ≈ {beta:+.1f}% {crypto} "
+                f"({mechanism})"
+            )
+        else:
+            entry["reading"] = (
+                f"corr 30j {corr:+.2f} — lien {mechanism} non significatif "
+                f"sur la fenêtre"
+            )
+        links.append(entry)
+
+    if not links:
+        return {"available": False, "reason": "alignement actions/crypto insuffisant"}
+
+    links.sort(key=lambda l: abs(l["corr"]), reverse=True)
+    sig = [l for l in links if l.get("significant")]
+    if sig:
+        top = sig[0]
+        summary_line = (
+            f"{top['equity']}↔{top['crypto']} corr 30j {top['corr']:+.2f}"
+            + (f" · β {top['beta']:.2f}" if top.get("beta") is not None else "")
+            + f" — {top['mechanism']}"
+        )
+    else:
+        summary_line = (
+            "aucun lien actions↔crypto significatif sur 30j (corrélations < "
+            f"{min_abs_corr:.2f})"
+        )
+
+    return {
+        "available": True,
+        "window": window,
+        "links": links,
+        "summary_line": summary_line,
+    }

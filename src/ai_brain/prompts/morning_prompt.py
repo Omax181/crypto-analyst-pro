@@ -160,6 +160,17 @@ INSTRUCTIONS :
    - data.macro_context contient maintenant Gold, S&P 500, Nasdaq, Brent, WTI,
      EUR/USD, USD/JPY, VIX, US 10Y/2Y, courbe des taux. Croise-les avec le crypto
      quand c'est pertinent (RÈGLE 12). Cite les chiffres exacts reçus.
+   - INTERNATIONAL (v14.1) : data.macro_context contient aussi nikkei, stoxx50,
+     dax, ecb_deposit_rate (taux de dépôt BCE), boj_rate (taux BoJ). Intègre la
+     dimension MONDIALE de ton analyse : liquidité BCE, carry trade yen (BoJ),
+     appétit risque Asie/Europe (Nikkei/Stoxx avant l'ouverture US). RÈGLE 12.
+   - ACTIONS ↔ CRYPTO (v14.1) : data.equity_quotes (NVDA/AMD/TSM/COIN/MSTR/MARA,
+     prix + % séance) et data.equity_crypto_links.links (corr/β 30j Python entre
+     ces actions et tes positions, avec mécanisme). La ligne condensée est dans
+     analytics_digest.equity_crypto. Raisonne en transmission (« si NVDA monte,
+     RENDER monte car demande GPU/IA — corr +0,62, β 1,4 ») en citant UNIQUEMENT
+     les chiffres reçus. Pertinent en priorité pour RENDER, TAO, FET (bloc IA
+     du PTF) et pour BTC via COIN/MSTR/MARA.
    - data.market_movers (Crypto Bubbles) : top gainers/losers du marché sur 24h
      + data.market_movers.portfolio_movers (tes positions vs le marché). Sert à
      repérer si un token du PTF surperforme/sous-performe le marché global, et la
@@ -193,6 +204,11 @@ INSTRUCTIONS :
    - R:R : pour chaque plan d'action, calcule action_plan.rr depuis tes entry/TP1/
      stop_loss et ne l'affiche que s'il est fondé (cf. RÈGLE 6).
 6ter. RÈGLES DE RENDU SUPPLÉMENTAIRES (v12) :
+   - SEUIL DE CONFIANCE ≥ 60% (v14) : n'émets une thèse dans thesis_of_the_day
+     QUE si sa confidence est >= 60. En dessous de 60, l'incertitude est trop
+     forte pour mériter une thèse dédiée — ne l'inclus PAS (ni en SURVEILLER, ni
+     autrement). Mieux vaut 2 thèses solides (≥60) que 5 thèses tièdes. Si aucun
+     actif n'atteint 60, renvoie thesis_of_the_day vide + thesis_empty_reason.
    - SURVEILLER / MAINTENIR : N'ÉMETS AUCUN action_plan (pas de "Take profit:
      None / None / None", pas d'entrée). Une position surveillée n'a pas de plan
      d'entrée — explique juste en 1 phrase ce que tu attends pour agir.
@@ -205,7 +221,16 @@ INSTRUCTIONS :
    - POUSSIÈRES (<10 $) : pas de thèse ni d'analyse (RÈGLE 2bis).
    - RÉFÉRENCE VALORISATION : utilise market_cap autant que la distance à l'ATH
      quand c'est pertinent (RÈGLE 9bis).
+   - POLYMARKET (v14) : data.polymarket fournit des probabilités de marché. Au-delà
+     de la décision Fed, exploite TOUTES les probabilités importantes disponibles
+     (récession, plafond de la dette, élections/votes macro, prix BTC cible, etc.)
+     quand elles éclairent le contexte. Présente-les clairement : indique TOUJOURS
+     la probabilité de l'ÉVÉNEMENT formulé positivement (ex. « maintien des taux
+     99,8% » et non « cut 0,2% » qui prête à confusion). Polymarket = un edge sur
+     le probable ; mets-le en valeur sans le déformer.
 7. Termine par les angles morts (data.blind_spots) — recopie-les fidèlement.
+   Si MVRV/on-chain CoinMetrics est indisponible, NE le répète PAS dans plusieurs
+   sections (1 mention max en angle mort) et NE bloque pas l'analyse pour autant.
 
 {OUTPUT_CONTRACT}
 Disclaimer à placer dans footer : "{DISCLAIMER}"

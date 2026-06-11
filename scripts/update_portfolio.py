@@ -146,7 +146,7 @@ def action_add(text: str, asset: str, qty: float, tier: int,
     # Construit le nouveau bloc YAML.
     lines = [f"  {asset}:"]
     lines.append(f"    quantity: {_format_qty(qty)}")
-    lines.append(f"    value_usd: 0")
+    lines.append("    value_usd: 0")
     lines.append(f"    tier: {tier}")
     if notes:
         lines.append(f'    notes: "{notes}"')
@@ -174,8 +174,8 @@ def action_add(text: str, asset: str, qty: float, tier: int,
     if coingecko_id:
         print(f"   CoinGecko ID '{coingecko_id}' ajouté dans sources.yaml.")
     else:
-        print(f"   ⚠️  Pensez à ajouter le coingecko_id dans config/sources.yaml"
-              f" (sinon le prix ne sera jamais récupéré).")
+        print("   ⚠️  Pensez à ajouter le coingecko_id dans config/sources.yaml"
+              " (sinon le prix ne sera jamais récupéré).")
     return result
 
 

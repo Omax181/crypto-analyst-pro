@@ -89,7 +89,12 @@ def build_asset_technical(tv_daily: dict[str, Any], tech_adv: dict[str, Any]) ->
 
 
 def onchain_line(cm: dict[str, Any]) -> str:
-    """Ligne compacte on-chain avancé (Coin Metrics) BTC/ETH."""
+    """Ligne compacte on-chain avancé (Coin Metrics) BTC/ETH.
+
+    v14.1 : quand la donnée vient du miroir GitHub et accuse du retard
+    (``stale``), la date ``as_of`` est affichée (« au 23/05 ») — donnée datée
+    plutôt qu'absente, et JAMAIS présentée comme du temps réel (Règle 1).
+    """
     if not cm.get("available"):
         return ""
     bits: list[str] = []
@@ -104,9 +109,43 @@ def onchain_line(cm: dict[str, Any]) -> str:
             seg.append(f"prix/realized {rr} ({'profit' if rr >= 1 else 'perte'} latent)")
         if d.get("active_addresses_trend_pct") is not None:
             seg.append(f"adresses actives {d['active_addresses_trend_pct']:+}% / 7j")
+        if seg and d.get("stale") and d.get("as_of"):
+            ymd = str(d["as_of"]).split("-")
+            if len(ymd) == 3:
+                seg.append(f"données au {ymd[2]}/{ymd[1]} (miroir, pas temps réel)")
         if seg:
             bits.append(f"{sym}: " + ", ".join(seg))
     return " | ".join(bits)
+
+
+def equity_crypto_line(links: dict[str, Any], equity_quotes: dict[str, Any]) -> str:
+    """Ligne compacte liens actions ↔ crypto (v14.1).
+
+    Combine les corrélations 30j significatives (NVDA↔RENDER…) et la variation
+    du jour des actions concernées, pour que l'IA raisonne en transmission
+    (« NVDA +2,1% aujourd'hui, corr 30j NVDA↔RENDER +0,62 → vent porteur sur le
+    bloc IA/GPU du PTF »). Vide si rien de significatif (jamais de bruit).
+    """
+    if not links.get("available"):
+        return ""
+    sig = [l for l in (links.get("links") or []) if l.get("significant")]
+    if not sig:
+        return ""
+    pair_bits = []
+    for l in sig[:5]:
+        b = f"{l['equity']}↔{l['crypto']} {l['corr']:+.2f}"
+        if l.get("beta") is not None:
+            b += f" (β {l['beta']:.1f})"
+        pair_bits.append(b)
+    line = f"Actions↔crypto 30j : {' · '.join(pair_bits)}"
+    moves = []
+    for tkr in dict.fromkeys(l["equity"] for l in sig[:5]):
+        q = (equity_quotes or {}).get(tkr) or {}
+        if q.get("change_pct") is not None:
+            moves.append(f"{tkr} {q['change_pct']:+.1f}%")
+    if moves:
+        line += f" — séance : {', '.join(moves)}"
+    return line
 
 
 def options_line(opt: dict[str, Any]) -> str:

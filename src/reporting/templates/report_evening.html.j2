@@ -1,13 +1,31 @@
-{# Rapport soir V6 — complément du matin. Fidèle au mockup. #}
+{# Rapport SOIR v14 — dashboard de fin de journée, 8 blocs scannables.
+   Tables mail-safe (flex/grid non supportés Gmail/Outlook), styles inline,
+   codes couleur systématiques. Aucune dépendance JS. #}
 
-{# ── HEADER (table mail-safe, h1 25px) ── #}
+{# ── MACRO FLÈCHE 24h (v14) — verte hausse / rouge baisse / grise stable.
+   Seuil adaptatif : < 0,5% de la valeur de l'item = stable. Pour une variation
+   déjà en %, passer value=100 et delta=variation%. Rend "" si delta/valeur
+   manquant. #}
+{% macro arrow24(value, delta) -%}
+{%- set v = value|num(0) -%}
+{%- set d = delta|num(none) -%}
+{%- if d is not none and v and v != 0 -%}
+  {%- set pct = (d if d >= 0 else -d) / (v if v >= 0 else -v) * 100 -%}
+  {%- if pct < 0.5 -%}<span style="color:#8a8880;font-size:11px;"> ▬</span>
+  {%- elif d > 0 -%}<span style="color:#3B6D11;font-size:11px;"> ▲</span>
+  {%- else -%}<span style="color:#A32D2D;font-size:11px;"> ▼</span>
+  {%- endif -%}
+{%- endif -%}
+{%- endmacro %}
+
+{# ════════ BLOC 1 · HEADER ════════ #}
 <div style="border-bottom:0.5px solid #e5e4dc;padding-bottom:1rem;margin-bottom:1.5rem;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
     <tr>
       <td style="vertical-align:top;">
         <p style="font-size:12px;color:#5a5852;margin:0 0 4px 0;">{{header.time_casablanca or header.date}}</p>
         <h1 style="margin:0;font-size:25px;font-weight:500;line-height:1.2;">Veille crypto · soir</h1>
-        <p style="font-size:12px;color:#8a8880;margin:6px 0 0 0;">Complément au rapport matin · ce qui a changé en {{header.hours_since_morning or '11'}}h</p>
+        <p style="font-size:12px;color:#8a8880;margin:6px 0 0 0;">Complément au rapport matin{% if header.morning_time_label %} ({{header.morning_time_label}}){% endif %}{% if header.since_morning_label %} · {{header.since_morning_label}}{% endif %}</p>
       </td>
       <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Portefeuille</p>
@@ -18,339 +36,233 @@
   </table>
 </div>
 
-{# ── DELTA DU JOUR (point 28 : titre 13px bold #1a1a18 sans uppercase) ── #}
-{% if delta_highlights %}
-<div style="background:#f5f4ee;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
-  <p style="font-size:13px;font-weight:700;color:#1a1a18;margin:0 0 10px 0;">Le delta du jour · {{delta_highlights|length}} choses à retenir</p>
-  <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.6;list-style-position:outside;">
-    {% for d in delta_highlights %}<li style="margin-bottom:8px;padding-left:4px;"><span style="font-weight:600;color:#1a1a18;">{{d.headline}}</span>{% if d.detail %}<br><span style="color:#5a5852;font-size:12px;">{{d.detail}}</span>{% endif %}</li>{% endfor %}
-  </ul>
-</div>
-{% endif %}
-
-{# ── BILAN P&L DE LA JOURNÉE (table 3-col mail-safe + séparation top movers) ──
-   Points 10 (table 3 td 33%), 25 (négatif USD = "−$X" pas "$-X"),
-   29 (ligne séparation entre KPI macro et top movers PTF),
-   31 (sous-titre 12px #1a1a18). #}
+{# ════════ BLOC 2 · BILAN DU JOUR (4 KPIs + movers + mini-barre) ════════ #}
 {% if daily_pnl %}
+{% set _pnl_pct = daily_pnl.day_change_pct %}
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  <p style="font-size:12px;font-weight:500;color:#1a1a18;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;">Bilan de la journée</p>
+  <p style="font-size:12px;font-weight:500;color:#1a1a18;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;">Bilan du jour</p>
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
     <tr>
-      <td style="width:33.33%;vertical-align:top;padding-right:6px;">
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">P&amp;L jour</p>
-        <p style="font-size:16px;font-weight:500;margin:2px 0 0 0;color:{% if (daily_pnl.day_change_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if (daily_pnl.day_change_pct|default(none)) is not none %}{{ daily_pnl.day_change_pct|fmt_pct }}{% else %}—{% endif %}</p>
+        <p style="font-size:18px;font-weight:700;margin:2px 0 0 0;color:{% if (_pnl_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if _pnl_pct is not none %}{{ _pnl_pct|fmt_pct }}{% else %}—{% endif %}</p>
       </td>
-      <td style="width:33.33%;vertical-align:top;padding-right:6px;">
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">En $</p>
-        <p style="font-size:16px;font-weight:500;margin:2px 0 0 0;color:{% if (daily_pnl.day_change_usd|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if (daily_pnl.day_change_usd|default(none)) is not none %}{% if (daily_pnl.day_change_usd|num(0)) >= 0 %}+${{ '{:,.0f}'.format((daily_pnl.day_change_usd)|num(0)) }}{% else %}−${{ '{:,.0f}'.format(((daily_pnl.day_change_usd)|num(0))|abs) }}{% endif %}{% else %}—{% endif %}</p>
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if (daily_pnl.day_change_usd|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% set _d = daily_pnl.day_change_usd|num(none) %}{% if _d is not none %}{{ '+' if _d >= 0 else '−' }}${{ '{:,.0f}'.format(_d|abs) }}{% else %}—{% endif %}</p>
       </td>
-      <td style="width:33.33%;vertical-align:top;">
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Valeur PTF</p>
-        <p style="font-size:16px;font-weight:500;margin:2px 0 0 0;">{% if daily_pnl.value_usd %}{{ daily_pnl.value_usd|fmt_price }}{% else %}—{% endif %}</p>
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;">{% if daily_pnl.value_usd %}{{ daily_pnl.value_usd|fmt_price }}{% else %}—{% endif %}</p>
+      </td>
+      <td style="width:25%;vertical-align:top;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Risque PTF</p>
+        {% if risk_score and (risk_score.score is not none) %}
+        <p style="font-size:18px;font-weight:700;margin:2px 0 0 0;color:{{risk_score.level_color or '#1a1a18'}};">{{risk_score.score}}<span style="font-size:11px;color:#8a8880;font-weight:400;">/10</span></p>
+        <p style="font-size:9px;color:{{risk_score.level_color or '#8a8880'}};margin:0;">{{risk_score.level}}</p>
+        {% else %}<p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:#8a8880;">—</p>{% endif %}
       </td>
     </tr>
   </table>
-  {% if daily_pnl.top_movers %}
-  <div style="margin-top:12px;padding-top:8px;border-top:0.5px solid #e5e4dc;">
-    <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.3px;">Top mouvements PTF</p>
-    <div style="font-size:12px;line-height:1.6;color:#5a5852;">
-      {% for mv in daily_pnl.top_movers %}<span style="display:inline-block;margin-right:12px;">{{mv.symbol}} · <span style="color:{% if (mv.change|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};font-weight:500;">{{ mv.change|fmt_pct }}</span>{% if (mv.pnl_usd|default(none)) is not none %} <span style="color:#8a8880;">({% if (mv.pnl_usd|num(0)) >= 0 %}+${{ '{:,.0f}'.format((mv.pnl_usd)|num(0)) }}{% else %}−${{ '{:,.0f}'.format(((mv.pnl_usd)|num(0))|abs) }}{% endif %})</span>{% endif %}</span>{% endfor %}
-    </div>
+  {# Mini-barre P&L : largeur ∝ |P&L%| (plafond visuel ±10%). #}
+  {% if _pnl_pct is not none %}
+  {% set _w = ((_pnl_pct|num(0))|abs * 10) %}{% set _w = 100 if _w > 100 else _w %}
+  <div style="background:#e5e4dc;border-radius:4px;height:6px;width:100%;margin-top:10px;">
+    <div style="background:{% if (_pnl_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};border-radius:4px;height:6px;width:{{ '%.0f'|format(_w) }}%;"></div>
   </div>
+  {% endif %}
+  {# Top mouvements (poussières <10$ déjà exclues côté Python). #}
+  {% if daily_pnl.top_movers %}
+  <p style="font-size:9px;color:#8a8880;margin:12px 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;border-top:0.5px solid #f0efe8;padding-top:10px;">Top mouvements</p>
+  <p style="margin:0;font-size:12px;line-height:1.7;">
+    {% for m in daily_pnl.top_movers %}<span style="display:inline-block;margin-right:14px;white-space:nowrap;"><strong>{{m.symbol}}</strong> <span style="color:{% if (m.change|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (m.change|num(0)) >= 0 else '' }}{{m.change}}%</span> <span style="color:#8a8880;font-size:11px;">({% set _pu = m.pnl_usd|num(0) %}{{ '+' if _pu >= 0 else '−' }}${{ '{:,.0f}'.format(_pu|abs) }})</span></span>{% endfor %}
+  </p>
   {% endif %}
 </div>
 {% endif %}
 
-{# ── MACRO CLÔTURE US (table 3-col 33%, séparateur "·", parenthèses retirées) ──
-   Points 11 (table 3 col égales), 37 (% sans parenthèses), 38 (séparateur ·),
-   31 (sous-titre 12px #1a1a18), 5 (pastilles ²). #}
-{% if evening_macro %}
+{# ════════ BLOC 2bis · LES 3 CHOSES À RETENIR (delta_summary) ════════ #}
+{% if delta_summary %}
+<div style="background:#1a1a18;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
+  <p style="font-size:10px;color:#8a8880;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">À retenir aujourd'hui</p>
+  {% for d in delta_summary %}
+  <p style="margin:0 0 {{ '7px' if not loop.last else '0' }} 0;font-size:13px;line-height:1.5;color:#f5f4ee;">→ {{ d|md }}</p>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ════════ BLOC 3 · MARCHÉS GLOBAUX (crypto + tradfi unifiés, 2 lignes) ════════ #}
+{% set _em = evening_macro or {} %}
 {% set _mss_e = macro_source_status or {} %}
-<div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;">
-  <p style="margin:0 0 8px 0;font-weight:500;color:#1a1a18;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Marchés US · mi-séance</p>
+{% if _em.btc_price or _em.sp500 or _em.dxy %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Marchés · mi-séance</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  {# Ligne 1 — Crypto & sentiment #}
+  <p style="font-size:9px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Crypto &amp; sentiment</p>
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
     <tr>
-      {% if evening_macro.sp500 %}
-      <td style="width:33.33%;vertical-align:top;padding-right:6px;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">S&amp;P 500</p>
-        <p style="font-size:13px;font-weight:700;margin:2px 0 0 0;color:#1a1a18;">{{ '{:,.0f}'.format((evening_macro.sp500)|num(0)) }}{{ _mss_e.get('sp500') | pastille }}</p>
-        {% if (evening_macro.sp500_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (evening_macro.sp500_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (evening_macro.sp500_delta|num(0)) >= 0 else '−' }}{{ '{:,.0f}'.format(((evening_macro.sp500_delta)|num(0))|abs) }}</p>{% endif %}
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">BTC</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{% if _em.btc_price %}{{ _em.btc_price|fmt_price }}{% else %}—{% endif %}{{ arrow24(100, _em.btc_change_24h) }}</p>
+        {% if (_em.btc_change_24h|default(none)) is not none %}<p style="font-size:10px;color:{% if (_em.btc_change_24h|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ _em.btc_change_24h|fmt_pct }}</p>{% endif %}
       </td>
-      {% endif %}
-      {% if evening_macro.nasdaq %}
-      <td style="width:33.33%;vertical-align:top;padding-right:6px;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">Nasdaq</p>
-        <p style="font-size:13px;font-weight:700;margin:2px 0 0 0;color:#1a1a18;">{{ '{:,.0f}'.format((evening_macro.nasdaq)|num(0)) }}{{ _mss_e.get('nasdaq') | pastille }}</p>
-        {% if (evening_macro.nasdaq_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (evening_macro.nasdaq_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (evening_macro.nasdaq_delta|num(0)) >= 0 else '−' }}{{ '{:,.0f}'.format(((evening_macro.nasdaq_delta)|num(0))|abs) }}</p>{% endif %}
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">F&amp;G</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{% if (_em.fear_greed|default(none)) is not none %}{{_em.fear_greed}}{% else %}—{% endif %}{{ arrow24(_em.fear_greed, _em.fear_greed_delta) }}</p>
+        {% if _em.fear_greed_label %}<p style="font-size:10px;color:#BA7517;margin:0;">{{_em.fear_greed_label}}</p>{% endif %}
       </td>
-      {% endif %}
-      {% if (evening_macro.dxy|num(none)) is not none %}
-      <td style="width:33.33%;vertical-align:top;">
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">DXY</p>
-        <p style="font-size:13px;font-weight:700;margin:2px 0 0 0;color:#1a1a18;">{{ '%.2f'|format(evening_macro.dxy|num(0)) }}{{ _mss_e.get('dxy_ice') | pastille }}</p>
-        {% if (evening_macro.dxy_broad|num(none)) is not none %}<p style="font-size:10px;color:#8a8880;margin:0;">large {{ '%.2f'|format(evening_macro.dxy_broad|num(0)) }}</p>{% endif %}
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{% if (_em.dxy|num(none)) is not none %}{{ '%.2f'|format(_em.dxy|num(0)) }}{% else %}—{% endif %}{{ _mss_e.get('dxy_ice') | pastille }}{{ arrow24(_em.dxy, _em.dxy_delta) }}</p>
+        {% if (_em.dxy_broad|num(none)) is not none %}<p style="font-size:10px;color:#8a8880;margin:0;">large {{ '%.2f'|format(_em.dxy_broad|num(0)) }}</p>{% endif %}
       </td>
-      {% endif %}
+      <td style="width:25%;vertical-align:top;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Or</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{% if _em.gold_usd %}{{ _em.gold_usd|fmt_price }}{% else %}—{% endif %}{{ arrow24(_em.gold_usd, _em.gold_delta) }}</p>
+      </td>
     </tr>
   </table>
-  {% if evening_macro.note %}<p style="margin:8px 0 0 0;font-size:11px;color:#5a5852;line-height:1.5;">{{evening_macro.note}}</p>{% endif %}
-  {% if us_session %}<p style="margin:8px 0 0 0;font-size:12px;color:#412402;line-height:1.55;">{{us_session|md}}</p>{% endif %}
+  {# Ligne 2 — Actions & taux #}
+  {% if _em.sp500 or _em.nasdaq or _em.vix or _em.brent_usd %}
+  <p style="font-size:9px;color:#8a8880;margin:12px 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;border-top:0.5px solid #f0efe8;padding-top:10px;">Actions &amp; taux</p>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
+    <tr>
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">S&amp;P 500</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{% if _em.sp500 %}{{ '{:,.0f}'.format(_em.sp500|num(0)) }}{% else %}—{% endif %}{{ _mss_e.get('sp500') | pastille }}{{ arrow24(_em.sp500, _em.sp500_delta) }}</p>
+        {% if (_em.sp500_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (_em.sp500_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (_em.sp500_delta|num(0)) >= 0 else '−' }}{{ '{:,.0f}'.format((_em.sp500_delta|num(0))|abs) }}</p>{% endif %}
+      </td>
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Nasdaq</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{% if _em.nasdaq %}{{ '{:,.0f}'.format(_em.nasdaq|num(0)) }}{% else %}—{% endif %}{{ _mss_e.get('nasdaq') | pastille }}{{ arrow24(_em.nasdaq, _em.nasdaq_delta) }}</p>
+        {% if (_em.nasdaq_delta|default(none)) is not none %}<p style="font-size:10px;color:{% if (_em.nasdaq_delta|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if (_em.nasdaq_delta|num(0)) >= 0 else '−' }}{{ '{:,.0f}'.format((_em.nasdaq_delta|num(0))|abs) }}</p>{% endif %}
+      </td>
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">VIX</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{% if (_em.vix|num(none)) is not none %}{{ '%.1f'|format(_em.vix|num(0)) }}{% else %}—{% endif %}{{ _mss_e.get('vix') | pastille }}{{ arrow24(_em.vix, _em.vix_delta) }}</p>
+        {% if (_em.vix|num(none)) is not none %}<p style="font-size:10px;color:{% if (_em.vix|num(0)) >= 25 %}#A32D2D{% else %}#5a5852{% endif %};margin:0;">{% if (_em.vix|num(0)) >= 25 %}stress{% else %}calme{% endif %}</p>{% endif %}
+      </td>
+      <td style="width:25%;vertical-align:top;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Brent</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{% if _em.brent_usd %}{{ _em.brent_usd|fmt_price }}{% else %}—{% endif %}{{ arrow24(_em.brent_usd, _em.brent_delta) }}</p>
+      </td>
+    </tr>
+  </table>
+  {% endif %}
 </div>
 {% endif %}
 
-{# ── RÉGIME MACRO · check du soir (B5) — 1 ligne discrète ── #}
-{% if regime_check %}
-<div style="background:#eef2f7;border-radius:8px;padding:8px 12px;margin-bottom:1.25rem;font-size:12px;color:#28415c;line-height:1.5;"><span style="font-weight:600;">Régime ·</span> {{regime_check|md}}</div>
+{# ════════ BLOC 4 · CE QUI A ÉVOLUÉ (✗ ✓ → ↑) ════════ #}
+{% if market_changes %}
+{% set _ico = {'invalidated':['✗','#A32D2D','INVALIDÉ'],'confirmed':['✓','#3B6D11','CONFIRMÉ'],'unchanged':['→','#8a8880','INCHANGÉ'],'new':['↑','#0C447C','NOUVEAU']} %}
+<h2 style="margin:1.5rem 0 0.5rem 0;font-size:17px;font-weight:500;">Ce qui a évolué côté marché</h2>
+<div style="background:#f5f4ee;border-radius:12px;padding:12px 16px;margin-bottom:1.5rem;">
+  {% for c in market_changes %}
+  {% set _m = _ico.get(c.status, ['•','#5a5852','']) %}
+  <p style="margin:0 0 {{ '10px' if not loop.last else '0' }} 0;font-size:13px;line-height:1.55;">
+    <span style="color:{{_m[1]}};font-weight:700;">{{_m[0]}} {{_m[2]}}</span> · {{c.description|md}}{% if c.source %} <span style="color:#8a8880;font-size:11px;">· {{c.source}}</span>{% endif %}
+  </p>
+  {% endfor %}
+</div>
 {% endif %}
 
-{# ── CE QUI A ÉVOLUÉ CÔTÉ MARCHÉ (limit 5 + <details>, verdict signaux) ──
-   Points 16 (5 lignes max + repli), 22 (verdict ✓/→/✗ sur signaux matin),
-   30 (h2 17px). #}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Ce qui a évolué côté marché</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  {% if market_changes %}
-  {% set primary = market_changes[:5] %}
-  {% set overflow = market_changes[5:] %}
-  {% for c in primary %}
-  <div style="padding:8px 0;{% if not loop.last or overflow %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:12px;line-height:1.55;">
-    {% if c.verdict %}{# Point 22 : verdict ✓/→/✗ sur les signaux du matin. #}
-    <span style="display:inline-block;color:{% if c.verdict == '✓' %}#3B6D11{% elif c.verdict == '✗' %}#A32D2D{% else %}#BA7517{% endif %};font-weight:700;margin-right:6px;">{{c.verdict}}</span>
-    {% endif %}<span style="color:{{c.tag_color or '#444441'}};font-weight:500;">{{c.tag or '·'}}</span> · {{c.text}}
+{# ════════ BLOC 5 · CE QUI EST TOMBÉ DEPUIS CE MATIN (news) ════════ #}
+{% if news_today %}
+<h2 style="margin:1.5rem 0 0.5rem 0;font-size:17px;font-weight:500;">Ce qui est tombé depuis ce matin</h2>
+<div style="margin-bottom:1.5rem;">
+  {% for n in news_today %}
+  <div style="border-left:2px solid #e5e4dc;padding:0 0 0 12px;margin-bottom:{{ '12px' if not loop.last else '0' }};">
+    <p style="margin:0;font-size:13px;font-weight:500;line-height:1.4;">{{n.title}}</p>
+    <p style="margin:3px 0 0 0;font-size:11px;color:#5a5852;line-height:1.5;">{% if n.source %}{{n.source}}{% endif %}{% if n.time %} · {{n.time}}{% endif %} — {{n.impact|md}}{% if n.status %} <span style="color:{% if n.status == 'actionnable' %}#BA7517{% else %}#8a8880{% endif %};">({{n.status}})</span>{% endif %}</p>
   </div>
   {% endfor %}
-  {% if overflow %}
-  <details style="margin-top:8px;">
-    <summary style="font-size:11px;color:#5a5852;cursor:pointer;padding:4px 0;list-style:none;">▸ Voir {{overflow|length}} évolution{{'s' if overflow|length > 1 else ''}} supplémentaire{{'s' if overflow|length > 1 else ''}}</summary>
-    {% for c in overflow %}
-    <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;">
-      {% if c.verdict %}<span style="display:inline-block;color:{% if c.verdict == '✓' %}#3B6D11{% elif c.verdict == '✗' %}#A32D2D{% else %}#BA7517{% endif %};font-weight:700;margin-right:6px;">{{c.verdict}}</span>{% endif %}<span style="color:{{c.tag_color or '#444441'}};font-weight:500;">{{c.tag or '·'}}</span> · {{c.text}}
-    </div>
+</div>
+{% elif intraday_news %}
+<h2 style="margin:1.5rem 0 0.5rem 0;font-size:17px;font-weight:500;">Ce qui est tombé depuis ce matin</h2>
+<div style="margin-bottom:1.5rem;">
+  {% for n in intraday_news %}
+  <div style="border-left:2px solid #e5e4dc;padding:0 0 0 12px;margin-bottom:{{ '12px' if not loop.last else '0' }};">
+    <p style="margin:0;font-size:13px;font-weight:500;line-height:1.4;">{{n.title}}</p>
+    <p style="margin:3px 0 0 0;font-size:11px;color:#5a5852;">{% if n.source %}{{n.source}}{% endif %}{% if n.timestamp %} · {{n.timestamp}}{% endif %}{% if n.impact %} — {{n.impact|md}}{% endif %}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ════════ BLOC 6 · RECOS DU MATIN · BILAN SOIR (Python, 1 ligne/actif) ════════ #}
+{% if reco_bilan %}
+{% set _st = {'on_track':['✓ on track','#EAF3DE','#27500A'],'under_pressure':['⚠ sous pression','#FAEEDA','#412402'],'invalidated':['✗ invalidé','#FCEBEB','#791F1F'],'no_trigger':['→ pas de trigger','#f5f4ee','#8a8880']} %}
+<h2 style="margin:1.5rem 0 0.5rem 0;font-size:17px;font-weight:500;">Recos du matin · bilan soir</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 0.75rem;margin-bottom:1.5rem;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-size:12px;">
+    <tr style="color:#8a8880;font-size:9px;text-transform:uppercase;letter-spacing:0.5px;">
+      <td style="padding:6px 4px;">Actif</td>
+      <td style="padding:6px 4px;">Reco</td>
+      <td style="padding:6px 4px;">Matin → soir</td>
+      <td style="padding:6px 4px;text-align:right;">Δ</td>
+      <td style="padding:6px 4px;text-align:right;">Statut</td>
+    </tr>
+    {% for r in reco_bilan %}
+    {% set _s = _st.get(r.status, ['—','#f5f4ee','#8a8880']) %}
+    <tr style="border-top:0.5px solid #f0efe8;">
+      <td style="padding:7px 4px;font-weight:700;">{{r.asset}}</td>
+      <td style="padding:7px 4px;color:#5a5852;">{{r.action}}</td>
+      <td style="padding:7px 4px;color:#5a5852;line-height:1.4;">
+        {%- if r.entry is not none and r.current is not none -%}
+          {{ r.entry|fmt_money }} → {{ r.current|fmt_money }}
+        {%- else -%}—{%- endif -%}
+      </td>
+      <td style="padding:7px 4px;text-align:right;{% if r.delta_pct is not none %}color:{% if (r.delta_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};font-weight:600;{% else %}color:#8a8880;{% endif %}">{% if r.delta_pct is not none %}{{ r.delta_pct|fmt_pct }}{% else %}—{% endif %}</td>
+      <td style="padding:7px 4px;text-align:right;white-space:nowrap;"><span style="background:{{_s[1]}};color:{{_s[2]}};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">{{_s[0]}}</span></td>
+    </tr>
     {% endfor %}
-  </details>
-  {% endif %}
-  {% else %}
-  <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ market_changes_empty_reason or "Aucune évolution significative depuis ce matin." }}</p>
-  {% endif %}
-</div>
-
-{# ── NEWS TOMBÉES (tri desc + limit 5 + <details>, heures HH:MM Casablanca) ──
-   Points 17 (tri descendant + repli au-delà de 5), 35 (heures format HH:MM
-   normalisées en amont par _normalize_time côté code Python si possible),
-   30 (h2 17px). #}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Ce qui est tombé depuis ce matin</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  {% if intraday_news %}
-  {# Tri descendant par timestamp si présent. attribute='timestamp' avec reverse=true. #}
-  {% set sorted_news = intraday_news|sort(attribute='timestamp', reverse=true) %}
-  {% set primary_news = sorted_news[:5] %}
-  {% set overflow_news = sorted_news[5:] %}
-  {% for n in primary_news %}
-  <div style="padding:8px 0;{% if not loop.last or overflow_news %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:12px;line-height:1.55;">
-    <p style="margin:0;font-size:13px;font-weight:600;line-height:1.4;color:#1a1a18;">{{n.title}}</p>
-    <p style="margin:5px 0 0 0;font-size:11px;color:#5a5852;line-height:1.5;">{% if n.source %}{{n.source|humanize_source}}{% endif %}{% if n.timestamp %} · {{n.timestamp}}{% endif %}{% if n.impact %} — {{n.impact}}{% endif %}</p>
-  </div>
-  {% endfor %}
-  {% if overflow_news %}
-  <details style="margin-top:8px;">
-    <summary style="font-size:11px;color:#5a5852;cursor:pointer;padding:4px 0;list-style:none;">▸ Voir {{overflow_news|length}} news supplémentaire{{'s' if overflow_news|length > 1 else ''}}</summary>
-    {% for n in overflow_news %}
-    <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;">
-      <p style="margin:0;font-size:12px;font-weight:600;line-height:1.4;color:#1a1a18;">{{n.title}}</p>
-      <p style="margin:4px 0 0 0;font-size:10px;color:#5a5852;line-height:1.5;">{% if n.source %}{{n.source|humanize_source}}{% endif %}{% if n.timestamp %} · {{n.timestamp}}{% endif %}{% if n.impact %} — {{n.impact}}{% endif %}</p>
-    </div>
-    {% endfor %}
-  </details>
-  {% endif %}
-  {% else %}
-  <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ intraday_news_empty_reason or "Aucune news significative depuis le rapport matin." }}</p>
-  {% endif %}
-</div>
-
-{# ── ÉVOLUTION DES RECOS DU MATIN (mail-safe + statuts standardisés) ──
-   Points 20 (chaque reco avec asset/action/statut/mouvement/justif),
-   21 (INVALIDÉE rouge / CIBLE TOUCHÉE vert), 33 (fond blanc + bordure),
-   30 (h2 17px). #}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Évolution des recos du matin</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  {% if reco_evolution %}
-  {% for r in reco_evolution %}
-  {# Normalisation des couleurs de statut : INVALIDÉE rouge, CIBLE TOUCHÉE vert,
-     CONFIRMATION vert pâle, INVALIDATION early rouge pâle, INCHANGÉ neutre. #}
-  {% set _st = (r.status_label or '')|upper %}
-  {% if 'INVALIDÉE' in _st or 'INVALIDEE' in _st %}{% set _st_bg = '#FCEBEB' %}{% set _st_fg = '#A32D2D' %}
-  {% elif 'CIBLE' in _st %}{% set _st_bg = '#EAF3DE' %}{% set _st_fg = '#27500A' %}
-  {% elif 'CONFIRMATION' in _st %}{% set _st_bg = '#EAF3DE' %}{% set _st_fg = '#27500A' %}
-  {% elif 'INVALIDATION' in _st %}{% set _st_bg = '#FCEBEB' %}{% set _st_fg = '#A32D2D' %}
-  {% elif 'INCHANG' in _st %}{% set _st_bg = '#F1EFE8' %}{% set _st_fg = '#5a5852' %}
-  {% else %}{% set _st_bg = r.status_bg or '#F1EFE8' %}{% set _st_fg = r.status_color or '#444441' %}
-  {% endif %}
-  <div style="padding:10px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
-      <tr>
-        <td style="vertical-align:top;">
-          <p style="margin:0;font-size:14px;font-weight:600;color:#1a1a18;">{{r.asset}} · {{r.action}}</p>
-        </td>
-        {% if r.status_label %}
-        <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:8px;">
-          <span style="background:{{_st_bg}};color:{{_st_fg}};font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;">{{r.status_label}}</span>
-        </td>
-        {% endif %}
-      </tr>
-    </table>
-    {% if r.move_since_morning %}<p style="margin:4px 0 0 0;font-size:12px;font-weight:600;color:{% if (r.move_since_morning|string)[0] == '-' or '−' in (r.move_since_morning|string) %}#A32D2D{% else %}#3B6D11{% endif %};">{{r.move_since_morning}} depuis ce matin</p>{% endif %}
-    {% if r.commentary %}<p style="margin:4px 0 0 0;font-size:12px;line-height:1.5;color:#5a5852;">{{r.commentary}}</p>{% endif %}
-  </div>
-  {% endfor %}
-  {% else %}
-  <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ reco_evolution_empty_reason or "Pas de reco active à suivre aujourd'hui." }}</p>
-  {% endif %}
-</div>
-
-{# ── SCÉNARIOS · mise à jour vs matin (B2) ── #}
-{% if scenarios_update %}
-{% set _scen_valid = [] %}
-{% for sc in scenarios_update %}{% if sc.scenario %}{% set _ = _scen_valid.append(sc) %}{% endif %}{% endfor %}
-{% if _scen_valid %}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Scénarios · ce qui a bougé</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.75rem 1rem;margin-bottom:1.25rem;">
-  {% for sc in _scen_valid %}
-  <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;">
-    <span style="font-weight:600;text-transform:capitalize;">{{sc.scenario}}</span>
-    {% if sc.verdict %}
-    {% set _v = (sc.verdict)|lower %}
-    <span style="font-size:11px;padding:1px 7px;border-radius:6px;margin-left:6px;background:{% if 'renforc' in _v %}#FCEBEB{% elif 'atténu' in _v or 'attenue' in _v %}#EAF3DE{% else %}#EFEDE6{% endif %};color:{% if 'renforc' in _v %}#791F1F{% elif 'atténu' in _v or 'attenue' in _v %}#27500A{% else %}#5a5852{% endif %};">{{sc.verdict}}</span>
-    {% endif %}
-    {% if sc.why %}<span style="color:#5a5852;"> · {{sc.why}}</span>{% endif %}
-  </div>
-  {% endfor %}
+  </table>
 </div>
 {% endif %}
-{% endif %}
 
-{# ── NIVEAUX À SURVEILLER CETTE NUIT (B3) — le bloc le plus actionnable ── #}
+{# ════════ BLOC 7 · NIVEAUX À SURVEILLER CETTE NUIT ════════ #}
 {% if levels_tonight %}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Niveaux à surveiller cette nuit</h2>
-<div style="background:#FAEEDA;border-radius:12px;padding:0.75rem 1rem;margin-bottom:1.25rem;">
-  {% for lv in levels_tonight %}
-  <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #ecdcc0;{% endif %}font-size:12px;line-height:1.5;color:#412402;">
-    <span style="font-weight:700;">{{lv.asset}}</span> · <span style="font-weight:600;">{{lv.level}}</span>{% if lv.trigger %} — {{lv.trigger}}{% endif %}
-  </div>
-  {% endfor %}
+{% set _lt = {'support':['support','#FAEEDA','#412402'],'resistance':['résistance','#EAF3DE','#27500A'],'critical':['critique','#FCEBEB','#791F1F'],'threshold':['seuil','#E6F1FB','#0C447C']} %}
+<h2 style="margin:1.5rem 0 0.5rem 0;font-size:17px;font-weight:500;">Niveaux à surveiller cette nuit</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 0.75rem;margin-bottom:1.5rem;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-size:12px;">
+    {% for lv in levels_tonight %}
+    {% set _t = _lt.get(lv.type, ['niveau','#f5f4ee','#5a5852']) %}
+    <tr style="{% if not loop.first %}border-top:0.5px solid #f0efe8;{% endif %}">
+      <td style="padding:7px 4px;font-weight:700;white-space:nowrap;width:48px;">{{lv.asset}}</td>
+      <td style="padding:7px 4px;font-weight:600;white-space:nowrap;">{{lv.level}}</td>
+      <td style="padding:7px 4px;white-space:nowrap;width:78px;"><span style="background:{{_t[1]}};color:{{_t[2]}};padding:1px 7px;border-radius:6px;font-size:10px;font-weight:600;">{{_t[0]}}</span></td>
+      <td style="padding:7px 4px;color:#5a5852;line-height:1.4;">{{lv.trigger|md}}</td>
+    </tr>
+    {% endfor %}
+  </table>
 </div>
 {% endif %}
 
-{% if tomorrow_outlook %}
-<div style="background:#1a1a18;border-radius:10px;padding:12px 16px;margin-bottom:1.5rem;">
-  <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Demain matin · à quoi s'attendre</p>
-  <p style="margin:0;font-size:13px;line-height:1.6;color:#f5f4ee;">{{tomorrow_outlook|md}}</p>
+{# ════════ BLOC 8 · DEMAIN MATIN · CHECK LIST ════════ #}
+{% set _tc = tomorrow_checklist or {} %}
+{% if _tc.calendar or _tc.checks or _tc.scenario or _tc.invalidation or tomorrow_macro_events %}
+<div style="background:#1a1a18;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
+  <p style="font-size:11px;color:#8a8880;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Demain matin · check list</p>
+  <p style="margin:0 0 7px 0;font-size:12px;line-height:1.55;color:#f5f4ee;">📅 <span style="color:#8a8880;">Calendrier :</span> {% if tomorrow_macro_events %}{% for e in tomorrow_macro_events %}{{e.label}}{% if e.date %} ({{e.date}}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}{% elif _tc.calendar %}{{_tc.calendar}}{% else %}Pas d'événement macro majeur dans les 48h.{% endif %}</p>
+  {% if _tc.checks %}<p style="margin:0 0 7px 0;font-size:12px;line-height:1.55;color:#f5f4ee;">📊 <span style="color:#8a8880;">À vérifier :</span> {{_tc.checks}}</p>{% endif %}
+  {% if _tc.scenario %}<p style="margin:0 0 7px 0;font-size:12px;line-height:1.55;color:#f5f4ee;">🎯 <span style="color:#8a8880;">Scénario probable :</span> {{_tc.scenario}}</p>{% endif %}
+  {% if _tc.invalidation %}<p style="margin:0;font-size:12px;line-height:1.55;color:#f5f4ee;">⚠ <span style="color:#8a8880;">Invalidation :</span> {{_tc.invalidation}}</p>{% endif %}
 </div>
 {% endif %}
 
-{# ── À SURVEILLER / DEMAIN MATIN (C1 : fusion des 3 blocs prospectifs) ──
-   Ordre : Cette nuit → Demain matin · checks → Événements macro demain →
-   Actions à faire ce soir (point 14 : ordre confirmé).
-   Points 12 (events triés chrono asc), 13 (filtrage placeholders),
-   15 (filtre Cette nuit générique), 23 (actions <ul> ou phrase 1 ligne),
-   24 (checks dérivés), 39 (<ol> padding-left:18px),
-   31 (sous-titres 12px #1a1a18), 32 (badges horaires neutres),
-   33 (fonds différenciés : actions=#FAEEDA, blanc+bordure pour bloc parent),
-   30 (h2 17px). #}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">À surveiller / demain matin</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  {# A10 — événements macro RÉELS (FRED : label/date/when) ou fallback Boursorama.
-     On filtre les placeholders vides ; aucune invention possible côté données. #}
-  {% set valid_events = [] %}
-  {% for ev in (tomorrow_macro_events or []) %}{% set _lbl = (ev.label or ev.event or '')|string %}{% if _lbl and _lbl|lower not in ['évènement','evenement','event','none',''] %}{% set _ = valid_events.append(ev) %}{% endif %}{% endfor %}
-  {% set sorted_events = valid_events %}
-
-  {# Filtre "Cette nuit" : ne garder que les items concrets (point 15).
-     Un item est concret si title contient un nom propre, ou detail mentionne
-     une heure/niveau précis. Le filtrage fin est mieux côté code Python,
-     mais on filtre déjà les detail purement génériques ici. #}
-  {% set valid_overnight = [] %}
-  {% for e in (overnight_events or []) %}{% set _gen = (e.title or '')|lower %}{% if e.title and 'rester attentif' not in _gen and 'attentif à toute annonce' not in _gen and 'actualités géopolitiques/macro asiatiques' not in _gen %}{% set _ = valid_overnight.append(e) %}{% endif %}{% endfor %}
-
-  {# Sous-bloc : Cette nuit (masqué si rien de concret) #}
-  {% if valid_overnight %}
-  <p style="font-size:12px;color:#1a1a18;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Cette nuit</p>
-  {% for e in valid_overnight %}
-  <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
-      <tr>
-        <td style="width:80px;vertical-align:top;padding-top:2px;">
-          <span style="background:#F1EFE8;color:#5a5852;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;">{{e.time}}</span>
-        </td>
-        <td style="vertical-align:top;">
-          <p style="margin:0;font-size:13px;font-weight:500;">{{e.title}}</p>
-          {% if e.detail %}<p style="margin:2px 0 0 0;font-size:11px;color:#5a5852;">{{e.detail}}</p>{% endif %}
-        </td>
-      </tr>
-    </table>
-  </div>
-  {% endfor %}
-  {% endif %}
-
-  {# Sous-bloc : Demain matin · checks (point 24 + 39 : <ol> avec retrait) #}
-  {% if tomorrow_setup and tomorrow_setup.checks %}
-  <p style="font-size:12px;color:#1a1a18;margin:{% if valid_overnight %}16px{% else %}0{% endif %} 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Demain matin · checks prioritaires</p>
-  <ol style="margin:0;padding-left:18px;font-size:12px;line-height:1.6;">
-    {% for check in tomorrow_setup.checks %}
-    <li style="margin-bottom:4px;">{{check}}</li>
-    {% endfor %}
-  </ol>
-  {% endif %}
-
-  {# Sous-bloc : Événements macro demain (filtré + trié, masqué si vide). #}
-  {% if sorted_events %}
-  <div style="background:#FAEEDA;border-radius:8px;padding:10px 12px;margin:14px 0 0 0;">
-    <p style="margin:0 0 4px 0;font-size:12px;color:#1a1a18;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Événements macro demain</p>
-    {% for ev in sorted_events %}
-    <p style="margin:2px 0;font-size:12px;color:#412402;"><span style="font-weight:500;">{{ ev.when or ev.time or ev.date }}</span> · {% if ev.country %}{{ev.country}} · {% endif %}{{ ev.label or ev.event }}{% if ev.date and (ev.when or ev.time) %} ({{ev.date}}){% endif %}{% if ev.forecast %} · prév. {{ev.forecast}}{% endif %}{% if ev.source %} · <span style="color:#8a7a5a;">{{ev.source}}</span>{% endif %}</p>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  {# Sous-bloc : Actions à faire ce soir (point 23 + 33 fond beige #FAEEDA).
-     Si actions_tonight est une chaîne → 1 phrase courte (cas "rien à faire").
-     Si c'est une liste → <ul> avec puces. #}
-  {% if tomorrow_setup and tomorrow_setup.actions_tonight %}
-  {% set _actions = tomorrow_setup.actions_tonight %}
-  <div style="background:#FAEEDA;border-radius:8px;padding:10px 12px;margin:14px 0 0 0;font-size:12px;line-height:1.55;color:#412402;">
-    <p style="margin:0 0 4px 0;font-size:12px;color:#1a1a18;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Actions à faire ce soir</p>
-    {% if _actions is iterable and _actions is not string %}
-    <ul style="margin:0;padding-left:18px;">
-      {% for action in _actions %}<li style="margin-bottom:3px;">{{action}}</li>{% endfor %}
-    </ul>
-    {% else %}
-    <p style="margin:0;">{{_actions}}</p>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  {# Fallback si tout est vide (distinction "rien à dire" vs "indispo" : point 8). #}
-  {% if not valid_overnight and not (tomorrow_setup and tomorrow_setup.checks) and not sorted_events and not (tomorrow_setup and tomorrow_setup.actions_tonight) %}
-  <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ tomorrow_setup_empty_reason or "Rien de spécifique à surveiller cette nuit." }}</p>
-  {% endif %}
-</div>
-
-{# ── ANGLES MORTS SOIR (point 33 : fond gris neutre #F1EFE8 distingue
-   des actions=#FAEEDA et des recos=#fff+border) ── #}
+{# ── Angle mort (discret, 1 ligne si critique) ── #}
 {% if blind_spots %}
-<div style="background:#F1EFE8;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:11px;color:#5a5852;line-height:1.6;">
-  <p style="margin:0 0 4px 0;font-weight:500;color:#1a1a18;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Angles morts soir</p>
-  {{blind_spots}}
-</div>
+<p style="font-size:11px;color:#8a8880;font-style:italic;margin:0 0 1rem 0;">Angle mort · {{blind_spots}}</p>
 {% endif %}
 
-{# ── FOOTER (heures Casablanca HH:MM, point 39) ── #}
-<div style="border-top:0.5px solid #e5e4dc;padding-top:1rem;text-align:center;">
-  {% if footer.active_sources %}
-  <p style="font-size:10px;color:#5a5852;margin:0 0 2px 0;font-weight:500;">Sources actives ce soir · {{header.active_sources_count or 0}}{% if header.total_sources_count %} / {{header.total_sources_count}}{% endif %}</p>
-  <p style="font-size:10px;color:#8a8880;margin:0 0 6px 0;line-height:1.5;">{{ footer.active_sources|join(' · ') if footer.active_sources is iterable and footer.active_sources is not string else footer.active_sources }}</p>
+{# ════════ BLOC 9 · FOOTER ════════ #}
+<div style="border-top:0.5px solid #e5e4dc;padding-top:1rem;margin-top:0.5rem;">
+  {% if _degraded or footer.note %}
+  <p style="font-size:11px;color:#BA7517;margin:0 0 6px 0;font-weight:600;">⚠️ {{ footer.note or "Rapport généré en mode dégradé." }}</p>
   {% endif %}
-  <p style="font-size:10px;color:#8a8880;margin:0;">Prochain rapport · {{footer.next_report_at or footer.next_morning_time or 'demain 08h30'}} · format complet</p>
-  <p style="font-size:10px;color:#8a8880;margin:4px 0 0 0;">Bonne soirée.</p>
-  <p style="font-size:9px;color:#b5b3ab;margin:4px 0 0 0;">Crypto Analyst Pro · v13</p>
-  <p style="font-size:9px;color:#8a8880;margin:8px 0 0 0;font-style:italic;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
+  <p style="font-size:11px;color:#8a8880;margin:0;">Prochain rapport · {{ footer.next_report_at or ("demain " ~ (footer.next_morning_time or '08h30')) }} · format complet</p>
+  <p style="font-size:11px;color:#8a8880;margin:4px 0 0 0;">Bonne soirée.</p>
+  <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · v14</p>
+  <p style="font-size:9px;color:#b5b3ab;margin:2px 0 0 0;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
 </div>

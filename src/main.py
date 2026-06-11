@@ -13,7 +13,7 @@ win rate ; le coherence_checker valide le JSON avant envoi.
 from __future__ import annotations
 
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
@@ -35,7 +35,6 @@ from src.data_sources import (
     deribit,
     newsapi,
     defillama,
-    econ_calendar,
     etf_flows,
     fear_greed,
     fred,
@@ -59,7 +58,9 @@ from src.data_sources import (
 )
 from src.analytics import digests
 from src.analytics.correlation import (
+    EQUITY_CRYPTO_MAP,
     compute_correlation_analysis,
+    compute_equity_crypto_links,
     compute_macro_crypto_correlation,
     compute_per_asset_macro_beta,
 )
@@ -84,6 +85,9 @@ _ALL_SOURCES_LIST = [
     "Stablecoins", "Whale Tracking", "Yahoo Finance", "Calendrier macro",
     "RSS news (crypto + macro · 16 flux)",
     "On-chain avancé (Coin Metrics)", "Options (Deribit)", "Corrélations macro",
+    # v14.1 — international + transmission actions → crypto.
+    "Marchés internationaux (BCE · BoJ · Nikkei · Stoxx)",
+    "Actions ↔ crypto (NVDA · COIN · MSTR…)",
 ]
 _TIER0 = {"BTC", "ETH"}
 
@@ -522,6 +526,33 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     # perf 24h moyenne du secteur côté marché). Données factuelles pour le hebdo.
     sector_exposure = _compute_sector_exposure(enriched, rotation)
 
+    # v14.1 — INTERNATIONAL + ACTIONS ↔ CRYPTO -------------------------------
+    # Prix macro temps réel Yahoo (valeurs ET deltas vs clôture précédente,
+    # même fetch caché) — prioritaires sur FRED pour les actifs cotés en
+    # continu. Récupérés ICI (avant _active_sources) pour alimenter le flag
+    # « Marchés internationaux ».
+    yahoo_quotes = market_prices.get_macro_quotes()
+    yahoo_deltas = market_prices.get_macro_deltas()
+    # Actions liées crypto (NVDA, COIN, MSTR, AMD, TSM, MARA) : quotes live +
+    # corrélations 30j avec les positions du PTF concernées (bloc IA/GPU +
+    # proxys BTC). Les clôtures datées crypto réutilisent celles déjà chargées
+    # pour les thèses (asset_dated_closes/BTC) ; seules les paires manquantes
+    # déclenchent un appel CoinGecko (caché 30 min, ~2-4 appels max).
+    equity_quotes = market_prices.get_equity_quotes()
+    equity_dated = market_prices.get_equity_dated_closes(days=95)
+    equity_crypto_links: dict[str, Any] = {"available": False}
+    if equity_dated:
+        link_crypto_dated: dict[str, dict[str, float]] = {}
+        for _eq, _cr, _ in EQUITY_CRYPTO_MAP:
+            if _cr in link_crypto_dated:
+                continue
+            dated = _beta_inputs.get(_cr) or coingecko.get_dated_closes(_cr, 35)
+            if dated:
+                link_crypto_dated[_cr] = dated
+        equity_crypto_links = compute_equity_crypto_links(
+            equity_dated, link_crypto_dated, window=30
+        )
+
     tracker = PredictionTracker()
     price_lookup = {s: enriched[s].get("price") for s in enriched}
     active_recos = tracker.refresh_active(price_lookup)
@@ -540,6 +571,11 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         macro_news=bool(macro_news_items), macro_calendar=boursorama_cal,
         crypto_rss=rss_news.get("available"),
         onchain_adv=onchain_cm, options=options_deribit, macro_corr=macro_correlations,
+        intl_markets=bool(
+            yahoo_quotes.get("nikkei") or yahoo_quotes.get("stoxx50")
+            or yahoo_quotes.get("dax")
+        ),
+        equity_links=bool(equity_quotes) and equity_crypto_links.get("available", False),
     )
 
     # Enregistre la santé des sources (alimente le bilan hebdo des angles morts).
@@ -572,11 +608,11 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         if abs(_pct) <= 25.0:  # garde-fou de plausibilité
             snapshot["overnight_pnl_usd"] = round(_overnight, 2)
             snapshot["overnight_pnl_pct"] = round(_pct, 2)
-    # Prix macro temps réel (Yahoo) — prioritaires sur FRED pour Gold/Brent/WTI/
-    # indices/FX, qui sont en retard ou gelés côté FRED.
-    yahoo_quotes = market_prices.get_macro_quotes()
-    # Macro context : valeurs chiffrées injectées directement.
-    macro_context = _macro_context(market, fng, macro, polymarket, yahoo_quotes)
+    # Macro context : valeurs chiffrées injectées directement (yahoo_quotes /
+    # yahoo_deltas déjà récupérés plus haut — même cache, zéro appel en plus).
+    macro_context = _macro_context(
+        market, fng, macro, polymarket, yahoo_quotes, yahoo_deltas
+    )
     # Statut de fiabilité par métrique macro (pastilles : vert si Yahoo+FRED
     # concordent, orange si une seule source).
     macro_source_status = market_prices.compute_macro_source_status(
@@ -598,6 +634,8 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         "onchain_advanced": digests.onchain_line(onchain_cm),
         "options": digests.options_line(options_deribit),
         "feedback": digests.feedback_line(per_asset_perf),
+        # v14.1 — transmission actions → crypto (NVDA↔RENDER…), 1 ligne dense.
+        "equity_crypto": digests.equity_crypto_line(equity_crypto_links, equity_quotes),
     }
 
     # B5 — score de risque PTF synthétique (scannable en tête de rapport).
@@ -644,6 +682,9 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         "macro_news": macro_news_items[:12],
         "boursorama_calendar": boursorama_cal,
         "market_movers": market_movers,
+        # v14.1 — actions liées crypto : quotes live + liens chiffrés 30j.
+        "equity_quotes": equity_quotes,
+        "equity_crypto_links": equity_crypto_links,
         "youtube_corpus": youtube_corpus, "geopolitics": geopol,
         "btc_network": btc_network, "stablecoin_supply": stablecoin_supply,
         "whale_inflows": whale_inflows, "position_correlation": correlation,
@@ -1104,6 +1145,12 @@ _MACRO_RANGES: dict[str, tuple[float, float]] = {
     "eur_usd": (0.7, 1.6),
     "usd_jpy": (80.0, 260.0),
     "btc_price": (1000.0, 500000.0),
+    # v14.1 — international.
+    "nikkei": (10000.0, 80000.0),
+    "stoxx50": (2000.0, 9000.0),
+    "dax": (8000.0, 35000.0),
+    "ecb_deposit_rate": (-1.0, 8.0),
+    "boj_rate": (-1.0, 5.0),
 }
 _macro_validation_flags: list[str] = []
 
@@ -1161,9 +1208,31 @@ def _sanitize_macro_for_prompt(macro: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _fng_label_fr(value: Any) -> Optional[str]:
+    """Traduit l'index Fear & Greed (0-100) en libellé français lisible.
+
+    Bug v14 : le template du soir lisait ``fear_greed_label`` mais aucune
+    fonction ne produisait cette clé (alternative.me renvoie ``classification``
+    en anglais) -> le libellé n'apparaissait jamais. Paliers standard du
+    Crypto Fear & Greed Index.
+    """
+    if not isinstance(value, (int, float)):
+        return None
+    if value <= 25:
+        return "Peur extrême"
+    if value <= 45:
+        return "Peur"
+    if value <= 55:
+        return "Neutre"
+    if value <= 75:
+        return "Avidité"
+    return "Avidité extrême"
+
+
 def _macro_context(
     market: dict[str, Any], fng: dict[str, Any], macro: dict[str, Any],
     polymarket: dict[str, Any], yahoo_quotes: Optional[dict[str, float]] = None,
+    yahoo_deltas: Optional[dict[str, float]] = None,
 ) -> dict[str, Any]:
     """Agrège les chiffres macro pour l'en-tête et l'analyse.
 
@@ -1177,9 +1246,17 @@ def _macro_context(
     sa série or historique est gelée. FRED reste le fallback si Yahoo est
     indisponible. On expose aussi ``dxy_ice`` (le vrai DXY ICE ~99-105, distinct
     du ``dxy`` broad FRED ~115-125) pour lever toute ambiguïté de libellé.
+
+    v14.1 : (1) ``yahoo_deltas`` (variation vs clôture précédente, MÊME unité
+    que la valeur) est prioritaire sur le delta FRED pour les flèches 24h —
+    avant, une valeur Yahoo live pouvait porter la flèche d'un delta FRED
+    périmé (valeur et tendance contradictoires). (2) INTERNATIONAL : Nikkei 225,
+    Euro Stoxx 50, DAX (Yahoo, FRED en recoupement pour le Nikkei), taux de
+    dépôt BCE et taux BoJ (FRED). Le marché crypto ne vit pas qu'aux USA.
     """
     _macro_validation_flags.clear()  # réinit par run (évite l'accumulation)
     yq = yahoo_quotes or {}
+    yd = yahoo_deltas or {}
     btc_price = (market.get("BTC") or {}).get("price")
     fng_val = fng.get("value") if fng.get("available") else None
 
@@ -1195,11 +1272,20 @@ def _macro_context(
     wti = _fred_value(macro, "wti")
     eur_usd = _fred_value(macro, "eur_usd")
     usd_jpy = _fred_value(macro, "usd_jpy")
+    # v14.1 — international (FRED ; Yahoo prioritaire pour le niveau Nikkei).
+    nikkei = _fred_value(macro, "nikkei")
+    ecb_rate = _fred_value(macro, "ecb_deposit_rate")
+    boj_rate = _fred_value(macro, "boj_call_rate")
 
     # Yahoo prioritaire (live), FRED fallback. _pref(yahoo_key, fred_dict) :
     # renvoie la valeur Yahoo si présente, sinon la valeur FRED.
     def _pref(yk: str, fred_d: dict[str, Any]) -> Any:
         return yq[yk] if yk in yq else fred_d["value"]
+
+    # Delta : Yahoo live (vs clôture précédente) prioritaire, FRED fallback —
+    # la flèche 24h reste ainsi cohérente avec la valeur affichée.
+    def _delta_pref(yk: str, fred_d: dict[str, Any]) -> Any:
+        return yd[yk] if yk in yd else fred_d["delta"]
 
     fed_cut = None
     if polymarket.get("available"):
@@ -1213,6 +1299,8 @@ def _macro_context(
         # Cœur (header principal, comme V5).
         "btc_price": _vm("btc_price", round(btc_price, 2) if btc_price else None),
         "fear_greed": fng_val,
+        "fear_greed_label": _fng_label_fr(fng_val),
+        "fear_greed_delta": fng.get("delta") if fng.get("available") else None,
         # A1 — DXY DÉSAMBIGUÏSÉ. ``dxy`` = le VRAI DXY ICE (~98-105, source
         # Yahoo DX-Y.NYB), c'est celui que tout le monde appelle « le DXY » et
         # que l'IA doit citer. ``dxy_broad`` = l'indice dollar large pondéré du
@@ -1223,26 +1311,48 @@ def _macro_context(
                 else _vm("dxy", dxy["value"]),
         "dxy_is_broad_fallback": yq.get("dxy_ice") is None and dxy["value"] is not None,
         "dxy_broad": _vm("dxy", dxy["value"]),
-        "dxy_delta": dxy["delta"],
+        "dxy_delta": yd.get("dxy_ice") if yd.get("dxy_ice") is not None else dxy["delta"],
         # Conservé pour compat interne (égal à dxy quand Yahoo dispo).
         "dxy_ice": _vm("dxy_ice", yq.get("dxy_ice")),
         "polymarket_fed_cut_pct": fed_cut,
         # Taux & volatilité (Yahoo prioritaire sur VIX et 10Y).
         "vix": _vm("vix", _pref("vix", vix)),
+        "vix_delta": _delta_pref("vix", vix),
         "us_10y": _vm("us_10y", _pref("us_10y", us_10y)),
+        "us_10y_delta": _delta_pref("us_10y", us_10y),
         "us_2y": _vm("us_2y", us_2y["value"]),
         "yield_curve_10y_2y": _vm("yield_curve", yield_curve["value"]),
         # Actifs macro hors-crypto (Yahoo prioritaire — prix live).
         "gold_usd": _vm("gold", _pref("gold", gold)),
-        "gold_delta": gold["delta"],
+        "gold_delta": _delta_pref("gold", gold),
         "sp500": _vm("sp500", _pref("sp500", sp500)),
-        "sp500_delta": sp500["delta"],
+        "sp500_delta": _delta_pref("sp500", sp500),
         "nasdaq": _vm("nasdaq", _pref("nasdaq", nasdaq)),
-        "nasdaq_delta": nasdaq["delta"],
+        "nasdaq_delta": _delta_pref("nasdaq", nasdaq),
         "brent_usd": _vm("brent", _pref("brent", brent)),
+        "brent_delta": _delta_pref("brent", brent),
         "wti_usd": _vm("wti", _pref("wti", wti)),
         "eur_usd": _vm("eur_usd", _pref("eur_usd", eur_usd)),
+        "eur_usd_delta": _delta_pref("eur_usd", eur_usd),
         "usd_jpy": _vm("usd_jpy", _pref("usd_jpy", usd_jpy)),
+        "usd_jpy_delta": _delta_pref("usd_jpy", usd_jpy),
+        # v14.1 — INTERNATIONAL (zone euro · Japon). Indices via Yahoo live
+        # (FRED recoupe le Nikkei) ; taux directeurs via FRED. Une valeur
+        # absente reste None → cellule masquée, jamais inventée.
+        "nikkei": _vm("nikkei", _pref("nikkei", nikkei)),
+        "nikkei_delta": _delta_pref("nikkei", nikkei),
+        "stoxx50": _vm("stoxx50", yq.get("stoxx50")),
+        "stoxx50_delta": yd.get("stoxx50"),
+        "dax": _vm("dax", yq.get("dax")),
+        "dax_delta": yd.get("dax"),
+        "ecb_deposit_rate": _vm("ecb_deposit_rate", ecb_rate["value"]),
+        "ecb_deposit_rate_delta": ecb_rate["delta"],
+        "ecb_deposit_rate_date": ecb_rate["date"],
+        "boj_rate": _vm("boj_rate", boj_rate["value"]),
+        "boj_rate_delta": boj_rate["delta"],
+        "boj_rate_date": boj_rate["date"],
+        # Variation 24h du BTC (%) pour la flèche de tendance (v14 point 16).
+        "btc_change_24h": (market.get("BTC") or {}).get("change_24h"),
         # Provenance (pour transparence / debug ; non affiché par défaut).
         "_price_source": "yahoo+fred" if yq else "fred",
     }
@@ -1263,6 +1373,9 @@ def _active_sources(**flags: Any) -> list[str]:
         "onchain_adv": "On-chain avancé (Coin Metrics)",
         "options": "Options (Deribit)",
         "macro_corr": "Corrélations macro",
+        # v14.1 — international + transmission actions → crypto.
+        "intl_markets": "Marchés internationaux (BCE · BoJ · Nikkei · Stoxx)",
+        "equity_links": "Actions ↔ crypto (NVDA · COIN · MSTR…)",
     }
     for key, label in mapping.items():
         if _is_truly_active(flags.get(key)):
@@ -1380,6 +1493,16 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         existing.update({k: v for k, v in macro_ctx.items() if v is not None})
         payload["macro_context"] = existing
 
+    # v14.1 — liens actions ↔ crypto : chiffres Python (corr/β 30j) injectés
+    # tels quels pour le rendu (l'IA ne peut pas les altérer). Quotes actions
+    # passées aussi (cellule NVDA du bloc Actions US).
+    links = data.get("equity_crypto_links") or {}
+    if links.get("available"):
+        payload["equity_crypto_links"] = links
+    eqq = data.get("equity_quotes") or {}
+    if eqq:
+        payload["equity_quotes"] = eqq
+
     # Rotation sectorielle : on injecte directement les chiffres réels
     sec = (data.get("sector_rotation") or {}).get("sectors", {})
     if sec:
@@ -1447,6 +1570,28 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
     # afficher les thèses actionnables en premier, puis par confiance décroissante.
     theses = payload.get("thesis_of_the_day") or []
     if isinstance(theses, list):
+        # v14 (point 1C) — filet de sécurité : on n'affiche QUE les thèses de
+        # confiance >= 60% (réduit les thèses tièdes et économise de la place,
+        # ce qui aide aussi contre la troncature Gmail). Le prompt le demande
+        # déjà à Gemini ; ici on garantit le seuil même si Gemini le rate.
+        def _conf_ok(t: Any) -> bool:
+            if not isinstance(t, dict):
+                return False
+            c = _coerce_confidence(t.get("confidence"))
+            return c is not None and c >= 60
+        filtered = [t for t in theses if _conf_ok(t)]
+        # Si Gemini avait produit des thèses mais TOUTES sont sous 60%, on respecte
+        # STRICTEMENT le seuil : aucune thèse affichée (ne pas présenter une thèse
+        # tiède comme « fondée »). On renseigne thesis_empty_reason pour que le
+        # rendu affiche un message honnête plutôt qu'un vide brut.
+        if not filtered and theses:
+            if not payload.get("thesis_empty_reason"):
+                payload["thesis_empty_reason"] = (
+                    "Aucune thèse à conviction suffisante ce matin (toutes < 60% "
+                    "de confiance) — pas de convergence de signaux assez forte "
+                    "pour une recommandation ferme."
+                )
+        theses = filtered
         for t in theses:
             if not isinstance(t, dict):
                 continue
@@ -1456,7 +1601,9 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
             if not isinstance(t, dict):
                 return (2, 0)
             prio = 0 if t.get("priority") == "action" else 1
-            conf = t.get("confidence") or 0
+            # Gemini renvoie parfois la confiance en string ("72%") :
+            # sans coercition, -conf lève TypeError et fait planter le tri.
+            conf = _coerce_confidence(t.get("confidence")) or 0
             return (prio, -conf)
         payload["thesis_of_the_day"] = sorted(theses, key=_thesis_rank)
 
@@ -1672,6 +1819,104 @@ def run_morning() -> int:
     return 0 if ok else 1
 
 
+def _parse_num(value: Any) -> Optional[float]:
+    """Parse un nombre depuis un float ou une string ('63180', '1,679.33',
+    '63 180 $', '69.637,63 $', '0,0014'). Renvoie None si non parsable/non fini.
+
+    v14.1 — FIX format français. L'ancien code supprimait toutes les virgules :
+    « 69.637,63 » (le propre format ``fmt_money`` du projet !) devenait 69.637
+    au lieu de 69637,63 — bilan recos faussé si l'IA recopie un prix formaté.
+    Désormais : si '.' ET ',' coexistent, le séparateur le PLUS À DROITE est la
+    décimale (l'autre = milliers) ; une ',' seule suivie de ≤2 chiffres en fin
+    de chaîne (ou d'une longue mantisse type '0,0014') = décimale française.
+    """
+    import math as _m
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value) if _m.isfinite(float(value)) else None
+    if isinstance(value, str):
+        cleaned = (
+            value.replace("$", "").replace("€", "").replace("\u202f", "")
+            .replace("\xa0", "").replace(" ", "").strip()
+        )
+        if not cleaned:
+            return None
+        has_dot, has_comma = "." in cleaned, "," in cleaned
+        if has_dot and has_comma:
+            # Le séparateur le plus à droite est la décimale.
+            if cleaned.rfind(",") > cleaned.rfind("."):
+                cleaned = cleaned.replace(".", "").replace(",", ".")   # 69.637,63
+            else:
+                cleaned = cleaned.replace(",", "")                     # 1,679.33
+        elif has_comma:
+            head, _, tail = cleaned.rpartition(",")
+            if tail.isdigit() and len(tail) == 3 and head and "," not in head:
+                # « 63,180 » : très probablement milliers US (3 chiffres pile).
+                cleaned = cleaned.replace(",", "")
+            else:
+                # « 69637,63 » / « 0,0014 » / « 1,5 » : décimale française.
+                cleaned = cleaned.replace(",", ".")
+        try:
+            v = float(cleaned)
+            return v if _m.isfinite(v) else None
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
+def _build_evening_reco_bilan(
+    morning_state: dict[str, Any], market: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """BLOC 6 (v14) — bilan express des recos DU DERNIER MATIN, 1 ligne/actif.
+
+    100% Python (Gemini ne touche pas) : on lit morning_state.thesis_of_the_day
+    et on compare le prix d'entrée du matin au prix live. Aucun doublon possible
+    (dédup par actif). 3 statuts : on_track / under_pressure / invalidated, plus
+    no_trigger pour les SURVEILLER/MAINTENIR (pas d'entrée).
+    """
+    theses = (morning_state or {}).get("thesis_of_the_day") or []
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for t in theses:
+        if not isinstance(t, dict):
+            continue
+        asset = t.get("asset")
+        if not asset or asset in seen:
+            continue
+        seen.add(asset)
+        action = (t.get("action") or "").upper()
+        current = (market.get(asset) or {}).get("price")
+        ap = t.get("action_plan") or {}
+        is_firm = any(k in action for k in ("RENFORC", "ALLÉG", "ALLEG"))
+        entry = _parse_num(ap.get("entry")) if is_firm else None
+        sl = _parse_num(ap.get("stop_loss")) if is_firm else None
+        cur = _parse_num(current)
+
+        row: dict[str, Any] = {
+            "asset": asset,
+            "action": "RENFORCER" if "RENFORC" in action else ("ALLÉGER" if is_firm else action),
+            "entry": entry,
+            "current": cur,
+            "delta_pct": None,
+            "status": "no_trigger",
+        }
+        if is_firm and entry and cur and entry > 0:
+            delta_pct = (cur - entry) / entry * 100
+            row["delta_pct"] = round(delta_pct, 2)
+            bearish = "ALLÉG" in action or "ALLEG" in action
+            if sl and ((not bearish and cur < sl) or (bearish and cur > sl)):
+                row["status"] = "invalidated"
+            elif (not bearish and delta_pct >= 0) or (bearish and delta_pct <= 0):
+                row["status"] = "on_track"
+            else:
+                row["status"] = "under_pressure"
+        out.append(row)
+    return out
+
+
 def run_evening() -> int:
     """Génère et envoie le rapport du soir (différentiel)."""
     from src.ai_brain.decision_engine import DecisionEngine
@@ -1699,7 +1944,8 @@ def run_evening() -> int:
                 seen_ev.add(key)
     macro = fred.get_macro()
     polymarket = prediction_markets.get_fed_cut_probabilities()
-    boursorama_cal = boursorama_calendar.get_boursorama_calendar()
+    # v14.1 — scrape Boursorama RETIRÉ ici : le résultat n'était jamais lu
+    # (B8 = calendrier FRED exclusivement depuis v14). Appel réseau économisé.
     morning_state = mem.load_morning_report()
     tracker = PredictionTracker()
     price_lookup = {s: market.get(s, {}).get("price") for s in symbols}
@@ -1711,9 +1957,31 @@ def run_evening() -> int:
     current_value = sum(_position_value(portfolio[s], market.get(s)) for s in symbols)
     delta_morning = current_value - (morning_snap.get("value_usd") or current_value)
 
-    # S1 : écart horaire réel matin (08h30) -> maintenant.
+    # BLOC 1 (v14) : écart horaire RÉEL depuis l'heure d'envoi du matin
+    # (morning_state._saved_at, ISO UTC), et non un 08h30 théorique. Si le matin
+    # n'a pas tourné aujourd'hui, on retombe proprement sur l'écart vs 08h30.
     now_local = datetime.now(TZ)
+    morning_saved_at = morning_state.get("_saved_at") if isinstance(morning_state, dict) else None
+    morning_time_label = None  # ex. "08h32" — heure réelle du matin (Casablanca)
+    since_morning_label = None  # ex. "il y a 11h" / "il y a 23min"
     hours_since_morning = max(1, round(now_local.hour + now_local.minute / 60 - 8.5))
+    if morning_saved_at:
+        try:
+            _ms = datetime.fromisoformat(str(morning_saved_at).replace("Z", "+00:00"))
+            if _ms.tzinfo is None:
+                _ms = _ms.replace(tzinfo=timezone.utc)
+            _ms_local = _ms.astimezone(TZ)
+            morning_time_label = _ms_local.strftime("%Hh%M")
+            _delta_min = max(0, int((now_local - _ms_local).total_seconds() // 60))
+            if _delta_min < 60:
+                since_morning_label = f"il y a {_delta_min}min"
+                hours_since_morning = max(1, round(_delta_min / 60))
+            else:
+                _h = round(_delta_min / 60)
+                since_morning_label = f"il y a {_h}h"
+                hours_since_morning = _h
+        except (ValueError, TypeError):
+            pass
 
     # S5 : bilan P&L du jour + top movers (sur la base des variations 24h).
     # A7 — P&L PAR POSITION EN $ (24h). Le % seul masque l'impact réel : −15%
@@ -1750,16 +2018,45 @@ def run_evening() -> int:
 
     # S3 : macro de clôture US (S&P, Nasdaq, DXY) — dispo en soirée Casablanca.
     ev_yahoo_quotes = market_prices.get_macro_quotes()
-    ev_macro_ctx = _macro_context(market, fng, macro, polymarket, ev_yahoo_quotes)
+    ev_yahoo_deltas = market_prices.get_macro_deltas()
+    ev_macro_ctx = _macro_context(
+        market, fng, macro, polymarket, ev_yahoo_quotes, ev_yahoo_deltas
+    )
     evening_macro = {
+        # Crypto & sentiment (BLOC 3 ligne 1).
+        "btc_price": ev_macro_ctx.get("btc_price"),
+        "btc_change_24h": ev_macro_ctx.get("btc_change_24h"),
+        "fear_greed": ev_macro_ctx.get("fear_greed"),
+        "fear_greed_label": ev_macro_ctx.get("fear_greed_label"),
+        "fear_greed_delta": ev_macro_ctx.get("fear_greed_delta"),
+        "gold_usd": ev_macro_ctx.get("gold_usd"),
+        "gold_delta": ev_macro_ctx.get("gold_delta"),
+        # Actions & taux (BLOC 3 ligne 2).
         "sp500": ev_macro_ctx.get("sp500"),
         "sp500_delta": ev_macro_ctx.get("sp500_delta"),
         "nasdaq": ev_macro_ctx.get("nasdaq"),
         "nasdaq_delta": ev_macro_ctx.get("nasdaq_delta"),
+        "vix": ev_macro_ctx.get("vix"),
+        "vix_delta": ev_macro_ctx.get("vix_delta"),
+        "brent_usd": ev_macro_ctx.get("brent_usd"),
+        "brent_delta": ev_macro_ctx.get("brent_delta"),
         "dxy": ev_macro_ctx.get("dxy"),
         "dxy_broad": ev_macro_ctx.get("dxy_broad"),
         "dxy_ice": ev_macro_ctx.get("dxy_ice"),
+        "dxy_delta": ev_macro_ctx.get("dxy_delta"),
+        # v14.1 — international (contexte IA UNIQUEMENT : la structure 8 blocs
+        # du mail soir est figée, B3 reste 2×4 cellules — ne rien y rajouter).
+        "nikkei": ev_macro_ctx.get("nikkei"),
+        "nikkei_delta": ev_macro_ctx.get("nikkei_delta"),
+        "stoxx50": ev_macro_ctx.get("stoxx50"),
+        "stoxx50_delta": ev_macro_ctx.get("stoxx50_delta"),
+        "eur_usd": ev_macro_ctx.get("eur_usd"),
+        "usd_jpy": ev_macro_ctx.get("usd_jpy"),
+        "ecb_deposit_rate": ev_macro_ctx.get("ecb_deposit_rate"),
+        "boj_rate": ev_macro_ctx.get("boj_rate"),
     }
+    # Actions liées crypto en séance US (mi-séance à 20h Casa) — contexte IA.
+    ev_equity_quotes = market_prices.get_equity_quotes()
     # Statut de fiabilité macro (pastilles ² du rendu soir) — calculé Python,
     # alimente _mss_e dans le template. Sans ça les pastilles seraient vides.
     ev_macro_source_status = market_prices.compute_macro_source_status(
@@ -1797,6 +2094,7 @@ def run_evening() -> int:
         "fear_greed": fng, "etf_flows": etf, "news_12h": news_global[:8],
         "active_recommendations": active,
         "daily_pnl": daily_pnl, "evening_macro": evening_macro,
+        "equity_quotes": ev_equity_quotes,
         "tomorrow_macro_events": tomorrow_macro_events,
         "hours_since_morning": hours_since_morning,
     }
@@ -1810,6 +2108,8 @@ def run_evening() -> int:
     header["date"] = _now_str()
     header["time_casablanca"] = _now_str()
     header["hours_since_morning"] = hours_since_morning
+    header["morning_time_label"] = morning_time_label
+    header["since_morning_label"] = since_morning_label
     header["ptf_value_delta_since_morning"] = round(delta_morning, 2)
     if morning_snap.get("value_usd"):
         header["ptf_value_pct_since_morning"] = round(
@@ -1822,6 +2122,13 @@ def run_evening() -> int:
 
     # S5/S3/S4/S6 : injecter les blocs factuels (calculés Python, non hallucinés).
     payload["daily_pnl"] = daily_pnl
+    # BLOC 6 (v14) : bilan recos du dernier matin, calculé Python (1 ligne/actif,
+    # zéro doublon). Remplace l'ancienne section reco_evolution (buguée/dupliquée).
+    payload["reco_bilan"] = _build_evening_reco_bilan(morning_state, market)
+    # BLOC 2 (v14) : score de risque repris du matin (pas recalculé le soir).
+    _mr_risk = (morning_state or {}).get("risk_score")
+    if _mr_risk:
+        payload["risk_score"] = _mr_risk
     if any(evening_macro.values()):
         payload["evening_macro"] = evening_macro
     # Pastilles ² macro (vert = Yahoo+FRED concordent, orange = 1 source).
@@ -2089,7 +2396,15 @@ def run_weekly() -> int:
     if _drawdown_change_pts is not None:
         payload.setdefault("portfolio_snapshot", {})["drawdown_change_pts"] = _drawdown_change_pts
     header = payload.setdefault("header", {})
-    header["week"] = f"Semaine {datetime.now(TZ).strftime('%V')} · {_fr_date(datetime.now(TZ), with_time=False)}"
+    _now_h = datetime.now(TZ)
+    # Bug v14 : le template lit header.week_number / header.year /
+    # header.time_casablanca, mais Python ne remplissait que header["week"]
+    # (jamais lu) -> numéro de semaine et date absents de l'en-tête hebdo.
+    header["week"] = f"Semaine {_now_h.strftime('%V')} · {_fr_date(_now_h, with_time=False)}"
+    header["week_number"] = int(_now_h.strftime("%V"))
+    header["year"] = _now_h.year
+    header.setdefault("time_casablanca", _fr_date(_now_h))
+    header.setdefault("date", _fr_date(_now_h, with_time=False))
     if win_rate.get("total", 0) == 0:
         # 1re semaine sans historique : message clair
         payload.setdefault("predictions_scoring", {})
@@ -2215,6 +2530,19 @@ def run_weekly() -> int:
     if crypto_price_status_w:
         payload["crypto_price_status"] = crypto_price_status_w
     payload.setdefault("footer", {})["next_report_at"] = _next_report_label("weekly")
+    # v14 — date du prochain hebdo calculée en Python (le cron weekly_report.yml
+    # est dimanche 11h UTC = 12:00 Casablanca, UTC+1). Évite l'hallucination
+    # Gemini (« lundi 15 juin ») et corrige l'ancienne mention erronée 15:00.
+    _now_w = datetime.now(TZ)
+    _days_to_sun = (6 - _now_w.weekday()) % 7  # weekday(): lundi=0..dimanche=6
+    if _days_to_sun == 0:
+        _days_to_sun = 7  # le prochain hebdo, pas celui d'aujourd'hui
+    from datetime import timedelta as _td
+    _next_sun = _now_w + _td(days=_days_to_sun)
+    payload["footer"]["next_weekly"] = (
+        f"{_JOURS_FR[_next_sun.weekday()]} {_next_sun.day} "
+        f"{_MOIS_FR[_next_sun.month - 1]} {_next_sun.year}, 12:00 Casablanca"
+    )
     mem.save_weekly_report(payload)
     html = _render(payload, "weekly")
     ok = send_email(f"\U0001f4ca Bilan hebdo crypto \u00b7 {datetime.now(TZ):%d/%m}", html)

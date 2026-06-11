@@ -19,29 +19,17 @@ _EVENING_SCHEMA = """
 {
   "header": {"date","time_casablanca","hours_since_morning (int — déjà fourni dans data, recopie-le)"},
   "portfolio_snapshot": {"value_usd","change_since_morning_pct"},
-  "delta_highlights": [{"headline (GRAS, 12-18 mots : quoi + chiffre clé)","detail (1 ligne ≤20 mots, factuel)"}],
-  "intraday_news": [{"title","source","timestamp (ex. '14h32')","impact (1 ligne : lien court sur le PTF, ex. 'renforce le bear macro CT')"}],
-  "reco_evolution": [{
-    "asset","action (RENFORCER/ALLÉGER/SURVEILLER… telle qu'émise le matin)",
-    "status_label (Validation en cours / Confirmation early / Invalidation early / INVALIDÉE / CIBLE TOUCHÉE / Inchangé / Trigger touché)",
-    "status_bg (hex)","status_color (hex)",
-    "move_since_morning (ex. '+11.3% · +0.0098$')",
-    "commentary (1 phrase ≤25 mots justifiant le statut)"
-  }],
-  "reco_evolution_empty_reason": "string (REQUIS si reco_evolution vide)",
-  "market_changes": [{"tag (✓ CONFIRMÉ / → S'ESSOUFFLE / ✗ INVALIDÉ / ↑ NOUVEAU / → INCHANGÉ)","tag_color (hex)","text (1 phrase : signal d'origine du matin → évolution du jour → verdict ; OU évolution marché autonome DXY/ETF)"}],
-  "overnight_events": [{"time (ex. '21h GMT')","time_bg (hex)","time_color (hex)","title","detail"}],
-  "tomorrow_setup": {
-    "checks": ["string — DÉRIVÉ des événements du jour (gros mouvements >5%, signaux émergents, recos à un seuil critique). Génériques SEULEMENT si rien de spécifique."],
-    "actions_tonight": "string (PROSE : actions ANCRÉES dans tes positions actives, leurs niveaux clés du jour, et les recos du matin — ordres limite à poser, allègements en cours)"
+  "delta_summary": ["3 bullets MAX, denses (1-2 phrases chacun) : LES 3 choses à retenir de la journée. Factuel, chiffré, pas de blabla. Ce sont les conclusions, pas une analyse."],
+  "market_changes": [{"status (invalidated|confirmed|unchanged|new)","description (1-2 phrases, le DELTA vs ce matin uniquement — pas une reformulation du matin)","source (nom réel + heure, ex. 'Financial Times 12h48')"}],
+  "news_today": [{"title (titre court)","source (nom réel)","time (ex. '12h48')","impact (1 phrase : effet sur le PTF/marché)","status (intégré|actionnable)"}],
+  "levels_tonight": [{"asset (BTC/ETH/DXY/… )","level (niveau PRÉCIS ex. '63 000 $')","type (support|resistance|critical|threshold)","trigger (ce qui se passe si cassé/atteint, ACTIONNABLE ex. 'sous 62k → alléger, capitulation probable')"}],
+  "tomorrow_checklist": {
+    "calendar": "string — événements macro réels des 48h (RECOPIE data.tomorrow_macro_events). Si vide : 'Pas d'événement macro majeur dans les 48h.'",
+    "checks": "string — 2-3 vérifs CONCRÈTES liées aux mouvements/recos du jour (ex. 'IMX tient son +12% overnight ? · DXY reste sous 100 ?'). Pas de généralité.",
+    "scenario": "string — 1 phrase TRANCHÉE : le scénario le plus probable + sa condition (ex. 'consolidation 63k-65k si DXY < 100'). Jamais 'ça dépend'.",
+    "invalidation": "string — 1 condition CHIFFRÉE qui ferait basculer l'analyse (ex. 'BTC sous 62k + VIX > 25 = risk-off confirmé'). Cohérente avec levels_tonight."
   },
-  "us_session": "string — 1-2 phrases sur la DYNAMIQUE de la séance US en cours (mi-séance) : S&P/Nasdaq (avec leur delta), DXY, ce que ça implique pour BTC/le PTF. Discret, factuel.",
-  "regime_check": "string — 1 phrase : le régime macro annoncé le matin (champ macro_regime_readout du RAPPORT DU MATIN ci-dessus) s'est-il confirmé/atténué ce soir ? (cite le vrai mouvement DXY/BTC). Omettre si aucun changement.",
-  "scenarios_update": [{"scenario (baissier/neutre/haussier — repris du matin)","verdict (se renforce / s'atténue / inchangé)","why (1 phrase chiffrée : quel signal du jour fait bouger la proba)"}],
-  "levels_tonight": [{"asset (ex. BTC)","level (niveau précis ex. '60 000 $')","trigger (ce qui se passe si cassé : ex. 'sous 60k → capitulation, alléger')"}],
-  "tomorrow_outlook": "string — 1-2 phrases : à quoi s'attendre demain matin (catalyseur clé du calendrier, scénario le plus probable, ce qui ferait basculer). Concret, actionnable.",
-  "tomorrow_macro_events": [{"label","date","when (demain/aujourd'hui)","source"}],
-  "blind_spots": "string",
+  "blind_spots": "string — 1 phrase MAX si un angle mort est critique (ex. flux ETF indisponibles), sinon chaîne vide.",
   "footer": {"next_morning_time (ex. '08h30')"}
 }
 """
@@ -77,68 +65,58 @@ INSTRUCTIONS :
    copié VERBATIM depuis le JSON fourni — jamais calculé, extrapolé, mémorisé
    d'ailleurs, ni inventé. Donnée absente = "n/d" ou description sans chiffre. Un
    prix faux affiché en confiance est l'erreur la plus grave de ce rapport.
-1. "Le delta du jour" : EXACTEMENT 3 puces max, SCANNABLES. Chaque puce =
-   headline en gras (12-18 mots, quoi + chiffre clé) + 1 ligne d'explication
-   (≤20 mots). PAS de paragraphe de 4-5 lignes. Condense, n'développe pas.
-2. "Évolution des recos du matin" : pour CHAQUE reco émise le matin (parcours
-   thesis_of_the_day et active_recommendations du RAPPORT DU MATIN), produis UNE
-   ligne reco_evolution. AUCUNE reco du matin ne doit disparaître. Pour chacune :
-   statut d'évolution, mouvement de prix depuis le matin (move_since_morning, %
-   ET valeur), et 1 phrase ≤25 mots justifiant. Si trigger d'invalidation touché
-   → status "INVALIDÉE" (rouge). Si cible CT atteinte → "CIBLE TOUCHÉE".
-3. "Ce qui a évolué côté marché" : pour chaque signal majeur du matin (rotation
-   sectorielle, on-chain, news macro), une ligne de SUIVI : signal d'origine →
-   évolution du jour → verdict (✓ confirmé / → s'essouffle / ✗ invalidé).
-   Conserve AUSSI les évolutions marché autonomes (DXY/USD, ETF flows) non liées
-   au matin — c'est de la valeur ajoutée. Uniquement le NOUVEAU.
-4. "À surveiller / demain matin" :
-   - overnight_events : événements session asiatique, discours US tardifs,
-     niveaux techniques à surveiller cette nuit. Vide si rien.
-   - tomorrow_setup.checks : DÉRIVÉS des événements du jour (position ayant bougé
-     >5% → check persistance overnight ; signal émergent → check confirmation ;
-     reco à un seuil critique → check du seuil). Génériques SEULEMENT si rien de
-     spécifique ne ressort.
-   - tomorrow_setup.actions_tonight : ANCRÉES dans tes positions actives et leurs
-     niveaux clés du jour, et les recos du matin (ordres limite à poser,
-     allègements en cours). PAS d'actions génériques déconnectées du jour.
-5. Angles morts : sources manquantes / incertitudes du jour.
-5ter. NOUVEAUX BLOCS (concis, scannables, jamais inventés) :
-   - us_session : dynamique de la séance US en cours. Cite S&P ET Nasdaq AVEC
-     leurs deltas (data.evening_macro.sp500_delta / nasdaq_delta) et le DXY, puis
-     l'implication crypto. UTILISE le delta Nasdaq dans le raisonnement (tech-heavy
-     → corrélé aux L1/AI). 1-2 phrases, discret.
-   - regime_check : compare au régime macro annoncé le matin (macro_regime_readout
-     du RAPPORT DU MATIN ci-dessus) : confirmé / atténué ? 1 phrase chiffrée. Omettre si rien.
-   - scenarios_update : reprends la lecture directionnelle du matin (story_of_the_day
-     / macro_regime_readout du RAPPORT DU MATIN) et dis si le biais baissier/neutre/
-     haussier se renforce ou s'atténue ce soir, avec le signal du jour qui le justifie.
-     N'invente pas de scénarios chiffrés qui n'étaient pas dans le rapport du matin.
-   - levels_tonight : 2-4 niveaux PRÉCIS à surveiller cette nuit (prix exact +
-     ce qui se passe si cassé). C'est le bloc le plus actionnable du soir.
-   - tomorrow_outlook : à quoi s'attendre demain matin (catalyseur du calendrier
-     réel, scénario probable). Concret.
-   - POUSSIÈRES (<10 $) : aucune analyse (déjà exclues des movers).
-5bis. ÉVÉNEMENTS MACRO DEMAIN — recopie EXCLUSIVEMENT data.tomorrow_macro_events
-   (dates RÉELLES issues de FRED). N'INVENTE AUCUN événement, aucune heure, aucun
-   consensus : si la liste est vide, ne mets rien (pas d'ISM/PMI improvisés). Le
-   P&L par position en $ (24h) est déjà calculé dans data.daily_pnl.top_movers
-   (champ pnl_usd) — ne le recalcule pas, le rendu l'affiche tel quel.
-6. NOMS DE SOURCES — utilise TOUJOURS le libellé public :
-   "CoinGecko" (pas "prices_now"), "Fear & Greed Index" (pas "fear_greed"),
-   "Yahoo Finance" (pas "evening_macro"), "Farside Investors" (pas "etf_flows"),
-   "Rapport matin" (pas "morning_report"), "Blockchain.com" (pas "btc_network"),
-   "DeFiLlama" (pas "stablecoin_supply"). Les identifiants Python ne doivent
-   JAMAIS apparaître dans le texte rendu.
-7. PAS DE SOURCE PLACEHOLDER. N'écris une ligne "Source · X" que si tu as un
-   nom de source RÉEL et un horodatage DISTINCT du moment du rapport (pas tous
-   à 20h00). Pas de "Source · Analyse technique 20h00" générique — mieux vaut
-   PAS de source du tout que fausse source. Si tu n'as pas d'horodatage réel
-   distinct, omets entièrement la mention de source.
-8. DISTINGUER "rien à dire" vs "source indisponible". Si une liste est vide
-   parce qu'il n'y a rien de notable → écris dans *_empty_reason :
-   "Aucune évolution significative depuis ce matin." Si c'est parce qu'une
-   source est down → écris : "Source indisponible ce soir · [nom source] ·
-   signalé dans les angles morts." Ne mélange pas les deux cas.
+1. delta_summary : EXACTEMENT 3 puces max, denses et scannables (1-2 phrases
+   chacune). CE SONT LES 3 CHOSES À RETENIR de la journée — des conclusions
+   chiffrées, pas une analyse qui se développe. PAS de paragraphe.
+2. market_changes (« Ce qui a évolué côté marché ») : 4 à 6 items MAX. Chaque
+   item = un statut (invalidated ✗ / confirmed ✓ / unchanged → / new ↑) + 1-2
+   phrases décrivant UNIQUEMENT le DELTA vs ce matin (jamais une reformulation du
+   matin) + la source réelle avec son heure. Inclus aussi les évolutions marché
+   autonomes (DXY, ETF, divergence indices) qui sont de la valeur ajoutée —
+   v14.1 : dont l'INTERNATIONAL (clôtures Nikkei/Stoxx, BCE/BoJ via
+   data.evening_macro) et les actions liées crypto en séance (data.equity_quotes :
+   NVDA pour le bloc IA RENDER/TAO/FET, COIN/MSTR/MARA comme proxys BTC) quand
+   le mouvement est significatif et CHANGE la lecture du matin. Le
+   régime macro du matin (macro_regime_readout du RAPPORT DU MATIN) : s'il a
+   bougé, mets-le ICI en 1 ligne (« → INCHANGÉ · régime transition confirmé,
+   DXY stable »). Pas de bloc régime séparé.
+3. news_today (« Ce qui est tombé depuis ce matin ») : 3 à 5 news MAX, ultra
+   compactes. Chaque news = titre court + source réelle + heure + 1 phrase
+   d'impact + statut (intégré / actionnable). UNIQUEMENT les news qui CHANGENT
+   quelque chose vs le matin. Ne répète pas une news déjà couverte dans
+   market_changes. Pas de % de confiance (inutile, le matin a déjà trié).
+4. levels_tonight (« Niveaux à surveiller cette nuit ») — bloc le PLUS
+   actionnable : 4 à 8 niveaux PRÉCIS. Inclus OBLIGATOIREMENT BTC (≥1 support +
+   ≥1 résistance), ETH (idem) et DXY. AJOUTE les positions ayant bougé >8% dans
+   la journée (vois data.daily_pnl.top_movers) avec un niveau de TP/résistance.
+   Pour chaque niveau : type (support/resistance/critical/threshold) + trigger
+   ACTIONNABLE (« sous 62k → alléger »), jamais « à surveiller ». Niveaux ancrés
+   techniquement (supports testés, Fibonacci, max pain), pas de ronds arbitraires.
+5. tomorrow_checklist (« Demain matin ») — objet à 4 champs :
+   - calendar : RECOPIE EXCLUSIVEMENT data.tomorrow_macro_events (dates RÉELLES
+     FRED). N'invente AUCUN événement/heure/consensus. Liste vide → « Pas
+     d'événement macro majeur dans les 48h. »
+   - checks : 2-3 vérifs CONCRÈTES dérivées du jour (position >8% → persistance
+     overnight ; seuil macro → tient-il ?). Pas de généralité.
+   - scenario : 1 phrase TRANCHÉE (scénario probable + condition). Jamais « ça
+     dépend » ni « consolidation dans un contexte incertain ».
+   - invalidation : 1 condition CHIFFRÉE, cohérente avec levels_tonight.
+6. blind_spots : 1 phrase MAX si un angle mort est critique (ex. flux ETF
+   indisponibles), sinon chaîne vide. Si MVRV/on-chain CoinMetrics manque, NE le
+   répète pas en boucle (1 mention max).
+7. NE PRODUIS PAS de bilan des recos : il est calculé par Python (data fourni en
+   aval) et rendu automatiquement, 1 ligne par actif. N'émets donc AUCUN champ
+   reco_evolution / reco bilan dans ton JSON.
+8. RÈGLE CASH : le portefeuille est 100% crypto, ZÉRO USDC. N'écris jamais
+   « rester liquide en USDC », « renforcer USDC » ni « déployer du cash ». Pour
+   financer une entrée : alléger une position existante.
+9. NOMS DE SOURCES — libellé public TOUJOURS : « CoinGecko » (pas prices_now),
+   « Fear & Greed Index » (pas fear_greed), « Yahoo Finance » (pas evening_macro),
+   « Farside Investors » (pas etf_flows), « Rapport matin » (pas morning_report).
+   Aucun identifiant Python dans le texte rendu.
+10. PAS DE SOURCE PLACEHOLDER. Une mention « Source · X » exige un nom RÉEL et un
+   horodatage DISTINCT du moment du rapport (pas tout à 20h00). Sinon, omets la
+   source entièrement plutôt que d'en inventer une.
 NE répète PAS le contexte macro/on-chain/rotation déjà donné le matin.
 Le mail tombe à 20h Casablanca = 14h US = MI-SÉANCE américaine (pas la clôture).
 
