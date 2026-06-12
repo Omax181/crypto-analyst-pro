@@ -19,11 +19,11 @@ _MORNING_SCHEMA = """
 {
   "header": {"date","time_casablanca","active_sources_count","win_rate_30d","win_rate_total"},
   "portfolio_snapshot": {"value_usd","change_24h_pct","change_7d_pct","vs_btc_7d_pct","drawdown_ath_pct"},
-  "executive_summary": "string (TL;DR en 1-2 phrases pour scan 5 secondes : actions clés du jour + régime macro. Ex. 'Aujourd'hui : 1 renforcement GRT, 1 allègement INJ. Régime macro prudent (DXY haut, courbe inversée). 2 actions à poser.')",
+  "executive_summary": {"bullets": [{"icon ('✓'|'⚠'|'✗')","text (1 ligne dense : action/risque/contexte)"}]},
   "macro_regime_readout": {"regime (risk-on/risk-off/neutre — repris de la PASSE 1 data.macro_regime)","confidence_pct","drivers (string : 2-3 moteurs clés)","crypto_bias (ce que ça implique pour le crypto)"},
-  "story_of_the_day": {"narrative (PROSE 4-6 phrases avec 3 fils nommés Macro/On-chain/Setup)","threads": ["macro","onchain","individual"]},
-  "self_critique_global": "string (PLUSIEURS phrases : sources manquantes, incertitudes, ce qui invaliderait)",
-  "invalidation_watch": "string (2-3 triggers chiffrés que tu surveilles aujourd'hui pour invalider ton scénario)",
+  "story_of_the_day": {"narrative (PROSE 5-7 LIGNES MAX, dense : 3 fils nommés Macro/On-chain/Setup — le DÉTAIL vit dans les blocs dédiés, pas ici)","threads": ["macro","onchain","individual"]},
+  "self_critique_global": {"bullets": ["angle mort 1 (1 ligne)","angle mort 2","angle mort 3 (2-4 puces max)"]},
+  "invalidation_watch": [{"condition (ex. 'DXY > 101,0')","implication (1 ligne : ce que ça invaliderait)"}],
   "active_recommendations_tracking": [{"asset","action","issued_at","ct_target","current_price","progress_pct","progress_label","status","status_color"}],
   "tracking_footnote": "string (1 phrase : leçon récente, ce qu'a appris l'agent)",
   "macro_context": {"btc_price","btc_note (ex. 'range macro')","fear_greed","fear_greed_label (ex. 'peur extrême')","dxy","dxy_note (ex. 'cassure ↑')","polymarket_fed_cut_pct","fed_cut_note (ex. '−10pts en 2 sem.')","regime_synthesis (1 phrase qui lit le régime macro en croisant DXY/Gold/VIX/courbe/actions US — ex. 'Risk-off léger : DXY en hausse, Gold qui monte, courbe inversée, mais VIX calme')"},
@@ -34,7 +34,7 @@ _MORNING_SCHEMA = """
   "onchain_empty_reason": "string (REQUIS si onchain_indicators absent)",
   "sector_rotation": [{"sector","change_24h","leaders (string ex. 'DOGE PEPE')","your_holdings": ["ticker1","ticker2"]}],
   "sector_rotation_ptf_note": "string (1-2 phrases : ce que la rotation veut dire sur TON ptf)",
-  "news_24h": [{"category (Macro/Géopo/Catalyseur/Risque/Filtré)","tag_bg (hex)","tag_color (hex)","title","source","timestamp","confidence","impact_on_ptf (lien direct/indirect)"}],
+  "news_24h": [{"category (Macro/Géopo/Catalyseur/Risque/Filtré)","tag_bg (hex)","tag_color (hex)","title","source","timestamp","confidence (ENTIER 0-100, jamais /5)","impact_on_ptf (lien direct/indirect)"}],
   "news_24h_empty_reason": "string (REQUIS si news_24h vide — RARE, voir RÈGLE 8)",
   "today_watch": "string (PROSE : 2-3 catalyseurs/risques précis à surveiller dans la journée)",
   "thesis_of_the_day": [{
@@ -54,8 +54,7 @@ _MORNING_SCHEMA = """
   "macro_impact": {
     "intro": "string (PROSE introductive sur l'impact macro du jour)",
     "exposed_positions": [{"asset","beta_dxy","expected_impact_pct"}],
-    "implication": "string (PROSE : que faire sur ton PTF)",
-    "self_critique": "string (limites de la règle empirique)"
+    "implication": "string (PROSE : que faire sur ton PTF · termine par 1 phrase de limite méthodo — il n'y a PLUS de bloc auto-critique macro séparé, cf. RÈGLE 10bis)"
   },
   "all_positions_summary": [{"asset","tier","change_24h","comment","action_active (RENFORCER/ALLÉGER/SORTIR/SURVEILLER/MAINTENIR ou null)"}],
   "blind_spots": "string",
@@ -121,13 +120,19 @@ INSTRUCTIONS :
    possible dans ce rapport — il vaut TOUJOURS mieux ne pas donner de chiffre que
    d'en donner un non sourcé. Les prix des actifs viennent EXCLUSIVEMENT de
    data.all_positions_summary et data.macro_context ; ne les recalcule jamais.
-1. Construis "l'histoire du jour" en PROSE DÉVELOPPÉE (4 à 6 phrases minimum si
-   la matière le permet) : 3 fils narratifs croisés et NOMMÉS (Macro / On-chain /
-   Setup individuel), chacun avec ses chiffres et sources, comme un éditorial de
-   marché. Donne du contexte, pas seulement des constats secs.
-   "self_critique_global" : PLUSIEURS arguments (3-4 phrases) — quelles sources
-   manquent ce matin, quelles incertitudes pèsent sur la lecture, ce qui pourrait
-   invalider le scénario du jour. Développe, ne te contente pas d'une phrase.
+1. Construis "l'histoire du jour" en PROSE DENSE de 5 à 7 LIGNES MAXIMUM
+   (v15 — audit : 15 lignes qui répétaient les blocs = doublon ; le DÉTAIL vit
+   dans les blocs dédiés, l'histoire SYNTHÉTISE) : 3 fils narratifs croisés et
+   NOMMÉS (Macro / On-chain / Setup individuel), chacun avec 1-2 chiffres
+   marquants. Du contexte causal, zéro répétition des blocs.
+   "self_critique_global" : 2-4 PUCES (1 ligne chacune) — quelles sources
+   manquent ce matin, quelles incertitudes pèsent, ce qui invaliderait le
+   scénario. Des angles NOUVEAUX (RÈGLE 10bis), pas les redites des thèses.
+   "executive_summary.bullets" (v15) : EXACTEMENT 2 à 4 puces typées —
+   icon '✓' = action/élément positif du jour, '⚠' = vigilance, '✗' = risque
+   avéré. Chaque puce = 1 ligne scannable avec chiffre. PAS de paragraphe.
+   "invalidation_watch" (v15) : LISTE de 2-4 objets {{condition, implication}},
+   chaque condition CHIFFRÉE (« S&P 500 < 7 200 en clôture »).
 2. Pour CHAQUE actif de data.eligible_theses, produis une thèse complète suivant
    la RÈGLE 10 (7 sous-blocs, prose développée, longueur adaptative). IL N'Y A
    PAS DE NOMBRE MAXIMUM de thèses : si 8 actifs sont éligibles, produis 8 thèses
@@ -197,10 +202,24 @@ INSTRUCTIONS :
      data.eligible_theses[].historical_stats (verified = historical_stats.available ;
      occurrences_count, avg_move_pct = avg_forward_pct, win_rate, data_source = "OHLC 90j").
      Si available=false : verified=false et narrative explique l'historique insuffisant.
-   - CALENDRIER À VENIR : data.upcoming_calendar.events liste les prochaines
-     publications macro (dates réelles). Intègre les plus proches dans today_watch
-     et le raisonnement (ex. « NFP demain → prudence avant le chiffre »). N'invente
-     AUCUN événement absent de cette liste.
+   - CALENDRIER À VENIR : data.upcoming_calendar.events liste les prochains
+     événements macro CONSOLIDÉS (FRED + Boursorama + décisions FOMC/BoJ
+     officielles ; les entrées « (estimé) » sont des récurrences statistiques).
+     today_watch ne cite QUE des événements de cette liste (avec leur date) ou
+     des catalyseurs issus des news fournies. N'invente AUCUN événement ni
+     horaire absent des données (audit : « Balance commerciale 14h30 »
+     halluciné = défaut majeur).
+   - POLYMARKET ÉTENDU (v15) : data.polymarket.fed_bars donne baisse/maintien/
+     hausse + le scénario DOMINANT — cite TOUJOURS le dominant en premier
+     (« maintien à 99,2% », jamais « baisse 0,2% » seul). data.polymarket.
+     extra_markets liste d'autres probabilités de marché à fort volume
+     (récession, géopolitique, crypto) : exploite-les comme un EDGE dans le
+     panorama macro et les scénarios quand elles éclairent une thèse.
+   - MOUVEMENTS PTF > ±10% (v15, audit P1-6) : data.ptf_big_movers_24h liste
+     les positions ayant bougé de plus de 10% sur 24h. CHAQUE entrée DOIT être
+     commentée quelque part (thèse dédiée si éligible, sinon 1 ligne dans
+     sector_rotation_ptf_note ou l'histoire du jour) : un +10,8% du PTF passé
+     sous silence = défaut d'audit avéré, quel que soit le tier.
    - R:R : pour chaque plan d'action, calcule action_plan.rr depuis tes entry/TP1/
      stop_loss et ne l'affiche que s'il est fondé (cf. RÈGLE 6).
 6ter. RÈGLES DE RENDU SUPPLÉMENTAIRES (v12) :

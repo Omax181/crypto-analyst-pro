@@ -1,8 +1,9 @@
 name: Morning Crypto Report
 
 on:
-  # Déclenchement externe fiable via cron-job.org (POST repository_dispatch).
-  # Le schedule GitHub natif est gardé en filet de sécurité (souvent en retard).
+  # v15 — schedule GitHub natif RETIRÉ : cron-job.org déclenche déjà via
+  # repository_dispatch, et les deux tombaient ensemble → MAILS EN DOUBLE
+  # (constaté en prod le 10-11/06). Un seul déclencheur planifié : cron-job.org.
   # cron-job.org doit POSTer un event_type parmi les types ci-dessous :
   #   curl -X POST -H "Accept: application/vnd.github+json" \
   #        -H "Authorization: Bearer <PAT>" \

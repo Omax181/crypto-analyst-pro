@@ -209,7 +209,7 @@ def test_evening_render_8_blocs():
     html = render(_enriched_evening_payload(), "evening")
     assert not re.search(r"\{\{|\{%", html)          # pas de Jinja non rendu
     assert "rendu simplifié" not in html             # pas de fallback
-    assert "Crypto Analyst Pro · v14" in html        # versioning
+    assert "Crypto Analyst Pro · v15" in html        # versioning
     # blocs présents
     assert "Bilan du jour" in html
     assert "Marchés · mi-séance" in html
@@ -277,7 +277,7 @@ def test_morning_reorder_histoire_before_enbref():
     from src.reporting.email_html import render
     html = render(_morning_payload(), "morning")
     assert "histoire du jour" in html.lower()
-    assert html.lower().find("histoire du jour") < html.find("En bref")
+    assert html.lower().find("histoire du jour") < html.lower().find("en bref")  # v15 : libellé EN BREF
 
 
 def test_morning_plan_fmt_money():
@@ -294,7 +294,7 @@ def test_morning_arrows_and_plural_and_polymarket():
     assert "▲" in html and "▼" in html              # flèches up/down
     assert "données partielles" in html             # pluriel
     assert "maintien" in html and "99.8%" in html    # Polymarket reframé
-    assert "Crypto Analyst Pro · v14" in html
+    assert "Crypto Analyst Pro · v15" in html
 
 
 # ─────────────────── v14 AUDIT HARDENING TESTS ─────────────────── #

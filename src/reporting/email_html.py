@@ -20,6 +20,10 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# v15 — version produit UNIQUE, injectée dans les 3 footers (audit : « v13 »
+# en dur dans les templates). main.py la ré-exporte pour les logs.
+APP_VERSION = "v15"
+
 _COLORS = {
     "bg": "#fafaf6",
     "card": "#ffffff",
@@ -377,6 +381,8 @@ def render(payload: dict[str, Any], kind: str, charts: dict[str, str] | None = N
     context["c"] = _COLORS
     context["disclaimer"] = DISCLAIMER
     context["charts"] = charts or {}
+    # v15 — version produit centralisée (audit : footer « v13 » en dur).
+    context.setdefault("app_version", APP_VERSION)
     # Pré-initialise les dicts top-level pour éviter UndefinedError sur les
     # comparaisons (ChainableUndefined gère les attributs en chaîne mais pas
     # les opérateurs de comparaison `>= 0`, `is not none`).

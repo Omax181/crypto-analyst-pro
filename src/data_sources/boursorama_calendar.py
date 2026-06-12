@@ -24,7 +24,16 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_URL = "https://www.boursorama.com/bourse/actualites/calendriers/macroeconomique"
+# v15 — l'URL historique renvoie 404 (diagnostic du 11/06) : Boursorama a
+# réorganisé ses agendas. On tente plusieurs chemins candidats dans l'ordre ;
+# le premier qui répond 200 avec un tableau parsable gagne.
+_URL_CANDIDATES = (
+    "https://www.boursorama.com/bourse/actualites/calendriers/macroeconomique",
+    "https://www.boursorama.com/bourse/actualites/agenda/macroeconomique",
+    "https://www.boursorama.com/bourse/agenda/macroeconomique",
+    "https://www.boursorama.com/bourse/actualites/calendriers/",
+)
+_URL = _URL_CANDIDATES[0]  # compat héritée (diagnostic, logs)
 
 _BROWSER_HEADERS = {
     "User-Agent": (
@@ -55,15 +64,23 @@ def get_boursorama_calendar() -> dict[str, Any]:
             import requests
         except ImportError:
             return {"available": False, "reason": "requests indisponible"}
-        try:
-            resp = requests.get(_URL, headers=_BROWSER_HEADERS, timeout=15)
-        except Exception as exc:  # noqa: BLE001
-            return {"available": False, "reason": f"réseau : {exc}"}
-
-        if resp.status_code != 200:
+        resp = None
+        last_status = None
+        for url in _URL_CANDIDATES:
+            try:
+                r = requests.get(url, headers=_BROWSER_HEADERS, timeout=15)
+            except Exception as exc:  # noqa: BLE001
+                last_status = f"réseau : {exc}"
+                continue
+            last_status = f"HTTP {r.status_code}"
+            if r.status_code == 200 and "<table" in r.text.lower():
+                resp = r
+                break
+        if resp is None:
             return {
                 "available": False,
-                "reason": f"HTTP {resp.status_code} (anti-scraping probable)",
+                "reason": f"{last_status} sur toutes les URL candidates "
+                          "(anti-scraping ou réorganisation du site)",
             }
 
         html = resp.text

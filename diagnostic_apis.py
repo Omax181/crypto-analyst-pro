@@ -284,6 +284,44 @@ def test_polymarket():
         report("Polymarket", "ko", f"HTTP {r.status_code}")
 
 
+@test("Polymarket étendu (v15 · barres Fed + marchés majeurs)", None)
+def test_polymarket_extended():
+    """v15 — vérifie le module enrichi : dominant Fed + autres probabilités."""
+    from src.data_sources import prediction_markets as _pm
+    res = _pm.get_key_markets()
+    fb = res.get("fed_bars") or {}
+    extra = res.get("extra_markets") or []
+    if fb.get("dominant"):
+        report("Polymarket étendu (v15 · barres Fed + marchés majeurs)", "ok",
+               f"Dominant : {fb['dominant']} {fb.get('dominant_pct')}% · "
+               f"{len(extra)} autre(s) marché(s) majeur(s)")
+    elif res.get("available"):
+        report("Polymarket étendu (v15 · barres Fed + marchés majeurs)", "warn",
+               "Marchés Fed reçus mais agrégation barres incomplète "
+               "(probas hors patterns) — fallback % baisse actif, "
+               "AUCUNE action requise")
+    else:
+        report("Polymarket étendu (v15 · barres Fed + marchés majeurs)", "ko",
+               "Aucun marché reçu")
+
+
+@test("Calendrier macro consolidé (v15)", None)
+def test_macro_calendar_consolidated():
+    """v15 — FRED + Boursorama + FOMC/BoJ officiels : ne doit JAMAIS être vide."""
+    from src.data_sources import macro_calendar as _mc
+    res = _mc.get_consolidated_calendar(horizon_days=10)
+    evts = res.get("events") or []
+    if evts:
+        nxt = evts[0]
+        report("Calendrier macro consolidé (v15)", "ok",
+               f"{len(evts)} événement(s) sur 10j · prochain : "
+               f"{nxt.get('label')} ({nxt.get('when')}) · "
+               f"sources : {', '.join(res.get('sources_used') or []) or 'repli'}")
+    else:
+        report("Calendrier macro consolidé (v15)", "ko",
+               "Fenêtre vide malgré le repli banques centrales — anormal")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # On-chain
 # ─────────────────────────────────────────────────────────────────────────────

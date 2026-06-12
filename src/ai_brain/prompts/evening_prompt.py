@@ -23,6 +23,7 @@ _EVENING_SCHEMA = """
   "market_changes": [{"status (invalidated|confirmed|unchanged|new)","description (1-2 phrases, le DELTA vs ce matin uniquement — pas une reformulation du matin)","source (nom réel + heure, ex. 'Financial Times 12h48')"}],
   "news_today": [{"title (titre court)","source (nom réel)","time (ex. '12h48')","impact (1 phrase : effet sur le PTF/marché)","status (intégré|actionnable)"}],
   "levels_tonight": [{"asset (BTC/ETH/DXY/… )","level (niveau PRÉCIS ex. '63 000 $')","type (support|resistance|critical|threshold)","trigger (ce qui se passe si cassé/atteint, ACTIONNABLE ex. 'sous 62k → alléger, capitulation probable')"}],
+  "actions_tonight": ["v15 — 0 à 3 ACTIONS CONCRÈTES à poser CE SOIR (ordre limite à placer, alerte à régler, position à alléger), 1 ligne chacune, chiffrées. Liste VIDE si rien à faire (ne meuble pas)."],
   "tomorrow_checklist": {
     "calendar": "string — événements macro réels des 48h (RECOPIE data.tomorrow_macro_events). Si vide : 'Pas d'événement macro majeur dans les 48h.'",
     "checks": "string — 2-3 vérifs CONCRÈTES liées aux mouvements/recos du jour (ex. 'IMX tient son +12% overnight ? · DXY reste sous 100 ?'). Pas de généralité.",
@@ -87,20 +88,34 @@ INSTRUCTIONS :
    market_changes. Pas de % de confiance (inutile, le matin a déjà trié).
 4. levels_tonight (« Niveaux à surveiller cette nuit ») — bloc le PLUS
    actionnable : 4 à 8 niveaux PRÉCIS. Inclus OBLIGATOIREMENT BTC (≥1 support +
-   ≥1 résistance), ETH (idem) et DXY. AJOUTE les positions ayant bougé >8% dans
-   la journée (vois data.daily_pnl.top_movers) avec un niveau de TP/résistance.
-   Pour chaque niveau : type (support/resistance/critical/threshold) + trigger
-   ACTIONNABLE (« sous 62k → alléger »), jamais « à surveiller ». Niveaux ancrés
-   techniquement (supports testés, Fibonacci, max pain), pas de ronds arbitraires.
+   ≥1 résistance), ETH (idem) et DXY. AJOUTE chaque position de
+   data.big_movers_day (mouvement > ±8% aujourd'hui) avec un niveau de
+   TP/résistance ou de protection — un +12% du jour SANS niveau le soir =
+   défaut d'audit avéré. Pour chaque niveau : type (support/resistance/
+   critical/threshold) + trigger ACTIONNABLE (« sous 62k → alléger »), jamais
+   « à surveiller ». Niveaux ancrés techniquement (supports testés, Fibonacci,
+   max pain), pas de ronds arbitraires.
+4bis. actions_tonight (v15) : 0 à 3 actions à POSER ce soir (ordres limites,
+   alertes, allègements), chiffrées et exécutables. Ne répète pas levels_tonight
+   — une action = un geste, un niveau = une surveillance. Vide si rien à faire.
 5. tomorrow_checklist (« Demain matin ») — objet à 4 champs :
-   - calendar : RECOPIE EXCLUSIVEMENT data.tomorrow_macro_events (dates RÉELLES
-     FRED). N'invente AUCUN événement/heure/consensus. Liste vide → « Pas
+   - calendar : RECOPIE EXCLUSIVEMENT data.tomorrow_macro_events (calendrier
+     CONSOLIDÉ v15 : FRED + Boursorama + décisions FOMC/BoJ officielles ; les
+     entrées « (estimé) » sont des récurrences statistiques — garde la mention).
+     N'invente AUCUN événement/heure/consensus. Liste vide → « Pas
      d'événement macro majeur dans les 48h. »
    - checks : 2-3 vérifs CONCRÈTES dérivées du jour (position >8% → persistance
-     overnight ; seuil macro → tient-il ?). Pas de généralité.
+     overnight ; seuil macro → tient-il ?). Pas de généralité. v15 — INTERDIT
+     de répéter un niveau déjà listé dans levels_tonight : si « S&P < 7 200 »
+     est un level, le check porte sur AUTRE chose (volume, flux ETF, suivi
+     d'une reco) ; sinon supprime le check (2 suffisent).
    - scenario : 1 phrase TRANCHÉE (scénario probable + condition). Jamais « ça
      dépend » ni « consolidation dans un contexte incertain ».
    - invalidation : 1 condition CHIFFRÉE, cohérente avec levels_tonight.
+5bis. POLYMARKET (v15) : data.polymarket.fed_bars (baisse/maintien/hausse +
+   dominant). Si tu cites Polymarket, cite le DOMINANT en premier. Les
+   extra_markets (probabilités d'événements majeurs) peuvent nourrir
+   market_changes/scenario s'ils éclairent un mouvement du jour.
 6. blind_spots : 1 phrase MAX si un angle mort est critique (ex. flux ETF
    indisponibles), sinon chaîne vide. Si MVRV/on-chain CoinMetrics manque, NE le
    répète pas en boucle (1 mention max).

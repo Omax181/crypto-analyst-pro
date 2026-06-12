@@ -1,3 +1,123 @@
+# Refonte v15 — audit complet des 3 mails du 11/06 (2026-06-12)
+
+Base : v14.1. ~80 points d'audit traités (morning / evening / weekly / transverse).
+153/153 tests verts en local (130 hérités adaptés + 23 nouveaux `tests/test_v15.py`).
+Rappel important : les 3 mails audités provenaient du code **main (footer v13)** —
+les runs ont checkout `origin/main`, pas la branche v14.1 ; plusieurs points
+étaient donc déjà corrigés en v14.1 et arrivent en prod avec ce déploiement.
+
+## Fiabilité des données (anti-hallucination)
+
+1. **Calendrier macro CONSOLIDÉ** — nouveau `src/data_sources/macro_calendar.py` :
+   FRED (dates réelles) + Boursorama (4 URL candidates, l'unique 404ait) +
+   calendriers OFFICIELS FOMC/BoJ 2026 + récurrences CPI/NFP flaguées « (estimé) ».
+   Dédup par famille (une date réelle écrase une estimation). Le « Aucun événement
+   macro majeur » avec un FOMC à J+6 ne peut plus se produire ; `today_watch` et la
+   checklist du soir sont VERROUILLÉS sur cette liste (fin du « Balance commerciale
+   14h30 » inventé).
+2. **Polymarket ÉTENDU** — `get_key_markets()` : barres baisse/maintien/hausse
+   agrégées sur la prochaine échéance, scénario **dominant affiché en premier**
+   (« maintien 99,2 % », plus jamais « 0,1 % baisse » seul) + top 5 autres marchés
+   à fort volume (récession, géopo, crypto) comme edge, croisés avec le calendrier
+   dans `week_ahead` (« FOMC mercredi · Polymarket : maintien 99,2 % »).
+3. **ATH réels injectés** (`ath_by_asset`, CoinGecko) — les cibles LT s'ancrent
+   dessus ; colonne « vs ATH réel » dans le tableau LT hebdo. Fin du « retest ATH
+   >73k » quand l'ATH BTC réel est ~108k. Interdiction prompt de « n/d » sec en LT.
+4. **Cohérence chiffres** — règle « une seule valeur par métrique » (CPI 4,2 vs
+   4,3 dans le même mail), cohérence FX (EUR/USD qui monte ≠ « fuite vers le
+   dollar » sans explication), labels FR partout (« Peur Extrême »), un même
+   chiffre d'analyse cité ≤ 2 fois (bêta STX répété 4×).
+
+## Tracker & scoring (le chantier prioritaire)
+
+5. **« La dernière reco prime »** — `add_recommendation` : une ré-émission MET À
+   JOUR la reco ouverte (confiance, rationale, prix signal) au lieu de l'ignorer.
+   Choix technique assumé : `entry_price` et `created_at` d'ORIGINE sont préservés
+   (sinon la cible se ré-ancre chaque matin → win rate inatteignable, et la fenêtre
+   30 j glisse à l'infini). Compteur `reissues` + `last_issued_at` pour la traçabilité.
+6. **Détail de scoring 100 % Python** — `build_scoring_detail()` : UNE ligne par
+   (actif, action), la plus récente prime, avec date d'entrée réelle, prix
+   entrée→actuel, Δ %, jours de détention, statut (✓ ✗ ● =). Gemini ne génère PLUS
+   ce tableau (cause des « 11 recos clôturées en 1 jour » à résultats contradictoires) ;
+   il n'écrit que la leçon. Header et détail partagent LA MÊME source : compteurs
+   recomposés depuis le détail, win rate affiché seulement à ≥ 5 clôturées (seuil
+   écrit dans le mail), légende du score sous le tableau.
+7. **BTC HOLD : même fenêtre que le P&L** — base = valeur PTF il y a 7 j ×
+   perf BTC 7 j (libellé « [fenêtre : 7 jours] »). Fin du −4,5 % vs −1,7 %
+   contradictoires. Fenêtre du P&L explicitée : « 1 773 $ (il y a 7 j) → 1 686 $ ».
+8. **Sources de la semaine réelles** — `compute_weekly_source_stats()` : moyenne
+   quotidienne depuis `source_health` (le « 4/23 » reflétait le seul run dominical
+   à 6 sources max). Header hebdo : « 21/25 sources actives en moyenne (pic 23) ».
+9. **Regret honnête** — fini « Aucune erreur coûteuse · discipline maintenue »
+   sous un tableau de pertes : sans clôture, on écrit que la mesure n'existe pas
+   encore. Nouveau bloc « Mon erreur de la semaine » (`my_errors`, nominatif).
+
+## Garde-fous Python sur les recos (défense en profondeur)
+
+10. **R:R > 8:1 → SURVEILLER automatique** (un 13:1 vient toujours d'un SL collé) ;
+    SL absent / du mauvais côté / à < 1,5 % de l'entrée → même bascule, avec la
+    raison AFFICHÉE dans la carte (« ⛉ Garde-fou : ... »). Badge R:R synchronisé
+    (favorable seulement entre 1,5 et 8 ; > 8 = « irréaliste (SL trop serré) »).
+11. **Compteur header honnête** — « X recos fermes · Y sous surveillance »
+    (le « 4 thèses fondées » avec 100 % de SURVEILLER était mensonger).
+12. **Mouvements PTF > ±10 % obligatoirement commentés** (`ptf_big_movers_24h`
+    injecté + règle prompt) — le NOT +10,8 % ne passe plus sous silence ; le soir,
+    tout mover > ±8 % reçoit un niveau dans `levels_tonight`.
+
+## Lisibilité (sans perdre la profondeur)
+
+13. Morning — EN BREF en 2-4 puces typées ✓/⚠/✗ ; score de risque décomposé en
+    4 mini-barres (Drawdown/Concentration/Cash/Sentiment) ; Polymarket en 3
+    mini-barres ; on-chain en tableau 3 colonnes (Indicateur | Valeur | Lecture) ;
+    histoire du jour bornée à 5-7 lignes ; news cap STRICT à 6, triées, datées en
+    FR (« hier 15:41 ») via `_fr_when`, confiance normalisée 0-100 (fin du
+    « Confiance 4 % ») ; corrélations < 0,4 masquées du bloc quantitatif ;
+    heatmap auto-suffisante avec 17ᵉ cellule « +N autres (moy. pondérée) » ;
+    DXY sous-titré « indice large Fed (échelle ≠) » ; ordre de fin : À surveiller
+    → Invalidation (liste ▸ chiffrée) → Auto-critique (puces, EN DERNIER) ;
+    auto-critique macro fusionnée (plus de doublon).
+14. Evening — header factuel « matin 10h14 · soir 19h32 · Δ9h » ; P&L à 2
+    décimales + « journée neutre » + $ adaptatif (< 10 $ → centimes) ; mini-heatmap
+    soir (3 ↑ / 3 ↓) ; ligne « International · Europe & Asie » (Stoxx/Nikkei/
+    EUR-USD/USD-JPY) + ligne Polymarket dominant ; nouveau bloc « Actions à poser
+    ce soir » (checklist ☐, fond sombre) ; checks « demain matin » interdits de
+    répéter les niveaux de la nuit.
+15. Weekly — période couverte explicite (« du 5 au 12 juin ») ; vue PTF remontée
+    juste après le bilan ; calibration FUSIONNÉE dans la carte scoring ; sparkline
+    SVG → mini-barres (Gmail bloque les SVG inline) ; top movers élargis à 5+5 ;
+    secteurs < 1 % regroupés en « Divers » + fusion Indexing/Infra→Infra ;
+    poussières unifiées < 10 $ et cantonnées à l'exit plan (jamais en watchlist) ;
+    watchlist avec ≥ 1 entrée fondée ; scénarios à probabilités JUSTIFIÉES
+    (somme 100, cohérents avec le dominant Polymarket, déclencheur daté) ;
+    bilan CAUSAL (chaîne, pas constats) ; hausses ratées nommées ; nouveau bloc
+    « Stratégie de la semaine » (consigne 3 phrases, fond sombre) ; score
+    QUALITÉ PTF 4 axes 0-10 (formules transparentes) avec delta WoW (stocké
+    dans les snapshots hebdo).
+
+## Transverse
+
+16. `APP_VERSION = "v15"` unique (email_html), injectée dans les 3 footers (le
+    « v13 » en dur ne peut plus mentir). Règle cash : exception explicite
+    « injection de cash externe » réservée aux opportunités exceptionnelles,
+    toujours annoncée comme telle. Diagnostic : 2 checks ajoutés (« Polymarket
+    étendu (v15) », « Calendrier macro consolidé (v15) » — ne doit JAMAIS être
+    vide). Normalisation rétro-compatible des formats Gemini (string ↔ puces).
+
+17. **Workflows : double-envoi corrigé À LA SOURCE** — les blocs `schedule:`
+    natifs de morning/evening sont retirés du repo (cron-job.org via
+    `repository_dispatch` reste l'unique déclencheur planifié ; weekly garde son
+    schedule natif, il n'a pas de cron externe). Le fix n'existait que dans le
+    Codespace : sans ça, écraser le code aurait réintroduit les mails en double.
+
+## Ce qui n'a PAS pu être vérifié ici (réseau coupé chez Claude)
+
+Aucun appel API réel n'a été exécuté pendant le chantier : les URL Boursorama
+candidates, l'agrégation Polymarket étendue et le calendrier FRED réel se
+valident au `python diagnostic_apis.py` du Codespace puis au test à blanc.
+Les filets Python garantissent une dégradation propre dans tous les cas.
+
+---
+
 # Audit pré-déploiement v14 — correctifs appliqués (2026-06-10)
 
 9 bugs confirmés corrigés + 4 fixes secondaires. 105/105 tests verts (88 d'origine + 17 régressions ajoutées).

@@ -28,7 +28,8 @@
       <td style="vertical-align:top;">
         <p style="font-size:12px;color:#5a5852;margin:0 0 4px 0;">{{header.time_casablanca or header.date}}{% if header.week_number %} · semaine {{header.week_number}}/{{header.year or 2026}}{% endif %}</p>
         <h1 style="margin:0;font-size:25px;font-weight:500;line-height:1.2;">Rapport hebdomadaire</h1>
-        <p style="font-size:12px;color:#8a8880;margin:6px 0 0 0;">Bilan semaine passée · focus semaine à venir</p>
+        <p style="font-size:12px;color:#8a8880;margin:6px 0 0 0;">Bilan{% if header.period_covered %} {{header.period_covered}}{% else %} semaine passée{% endif %} · focus semaine à venir</p>
+        {% if header.sources_week_label %}<p style="font-size:10px;color:#8a8880;margin:4px 0 0 0;">{{header.sources_week_label}}</p>{% endif %}
       </td>
       <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">PTF</p>
@@ -48,122 +49,6 @@
 <div style="background:#f5f4ee;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
   <p style="margin:0;font-size:13px;line-height:1.7;">{{ weekly_summary|md if weekly_summary else "Synthèse de la semaine en cours de préparation." }}</p>
 </div>
-
-{# ── FIL ROUGE MACRO · semaine à venir (B6) ── #}
-{% if macro_panorama %}
-<div style="background:#eef2f7;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;border-left:3px solid #534AB7;">
-  <p style="font-size:10px;color:#534AB7;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Fil rouge macro · semaine à venir</p>
-  <p style="margin:0;font-size:13px;line-height:1.65;color:#28415c;">{{macro_panorama|md}}</p>
-</div>
-{% endif %}
-
-{# ── SCORING PRÉDICTIONS (table 4 col mail-safe, win rate gris si 0/0) ──
-   Points 11 (table 4 col), 12 (gris quand 0), 13 (suppression phrase
-   redondante), 14 (leçon 12px italique #1a1a18), 38 (ligne win rate
-   secondaire claire). #}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Mes prédictions de la semaine · scoring</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  {% if predictions_scoring %}
-  {% set _ps = predictions_scoring %}
-  {% set _wr_total = (_ps.validated|num(0)) + (_ps.invalidated|num(0)) + (_ps.neutral|num(0)) %}
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
-    <tr>
-      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;border-radius:6px 0 0 6px;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">Recos émises</p>
-        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:#1a1a18;">{{_ps.issued or 0}}</p>
-      </td>
-      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">Validées</p>
-        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if (_ps.validated|num(0)) > 0 %}#3B6D11{% else %}#5a5852{% endif %};">{{_ps.validated or 0}}</p>
-      </td>
-      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">Invalidées</p>
-        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if (_ps.invalidated|num(0)) > 0 %}#A32D2D{% else %}#5a5852{% endif %};">{{_ps.invalidated or 0}}</p>
-      </td>
-      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;border-radius:0 6px 6px 0;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">Win rate sem.</p>
-        {# Point 12 : "—" gris si _wr_total < 5 (insuffisant pour calculer). #}
-        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if _wr_total >= 5 and (_ps.win_rate_pct|num(none)) is not none and (_ps.win_rate_pct|num(0)) >= 50 %}#3B6D11{% elif _wr_total >= 5 and (_ps.win_rate_pct|num(none)) is not none and (_ps.win_rate_pct|num(0)) < 50 %}#A32D2D{% else %}#5a5852{% endif %};">{% if _wr_total < 5 or (_ps.win_rate_pct|num(none)) is none %}—{% else %}{{_ps.win_rate_pct}}%{% endif %}</p>
-      </td>
-    </tr>
-  </table>
-  {# Point 38 : ligne secondaire claire "Win rate sem. · — · Win rate 30j · —". #}
-  <p style="font-size:11px;color:#8a8880;margin:8px 0 0 0;">Win rate sem. · {% if _wr_total < 5 or (_ps.win_rate_pct|num(none)) is none %}—{% else %}{{_ps.win_rate_pct}}%{% endif %} · Win rate 30j · {% if _ps.win_rate_30d is not none %}{{_ps.win_rate_30d}}%{% else %}—{% endif %}</p>
-
-  {% if _ps.detail %}
-  <p style="font-size:12px;color:#1a1a18;margin:14px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Détail</p>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;table-layout:fixed;">
-    <tr style="background:#f5f4ee;">
-      <th style="width:70px;text-align:left;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;">Asset</th>
-      <th style="width:80px;text-align:left;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;">Reco</th>
-      <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;">Résultat</th>
-      <th style="width:70px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;">Score</th>
-    </tr>
-    {% for d in _ps.detail %}
-    {% set bg = '#EAF3DE' if d.reco in ['RENFORCER','BUY'] else ('#FCEBEB' if d.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] else '#E6F1FB') %}
-    {% set fg = '#27500A' if d.reco in ['RENFORCER','BUY'] else ('#791F1F' if d.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] else '#0C447C') %}
-    {% set score_color = '#3B6D11' if (d.score|num) is not none and (d.score|num(0)) > 0 else ('#A32D2D' if (d.score|num) is not none and (d.score|num(0)) < 0 else '#8a8880') %}
-    <tr style="border-top:0.5px solid #e5e4dc;">
-      <td style="padding:6px 8px;font-size:11px;font-weight:500;">{{d.asset}}</td>
-      <td style="padding:6px 8px;"><span style="background:{{bg}};color:{{fg}};font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;">{{d.reco}}</span></td>
-      <td style="padding:6px 8px;font-size:11px;color:#5a5852;">{{d.result}}</td>
-      <td style="padding:6px 8px;font-size:11px;text-align:right;color:{{score_color}};font-weight:500;">{% if (d.score|num) is not none and (d.score|num(0)) > 0 %}✓ +{{d.score}}{% elif (d.score|num) is not none and (d.score|num(0)) < 0 %}✗ {{d.score}}{% else %}= 0{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% endif %}
-
-  {# Point 14 : leçon de la semaine 12px #1a1a18 italique. #}
-  {% if _ps.lesson %}
-  <p style="font-size:12px;color:#1a1a18;margin:12px 0 0 0;font-style:italic;line-height:1.55;"><span style="font-weight:500;font-style:normal;">Leçon de la semaine ·</span> {{_ps.lesson}}</p>
-  {% endif %}
-  {% else %}
-  <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ predictions_empty_reason or "Première semaine, pas encore d'historique de prédictions à scorer." }}</p>
-  {% endif %}
-</div>
-
-{# ── PERTES ↔ RECOS (A7) — lien honnête baisses/recos émises ── #}
-{% if losses_vs_recos %}
-<div style="background:#FCEBEB;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;font-size:12px;line-height:1.6;color:#501313;">
-  <p style="margin:0 0 3px 0;font-weight:600;color:#791F1F;">Pertes de la semaine · lien avec mes recos</p>
-  {{losses_vs_recos|md}}
-</div>
-{% endif %}
-
-{# ── CALIBRATION · CONFIANCE ANNONCÉE VS RÉALISÉE (TOUJOURS présent, point 3) ── #}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Calibration · confiance annoncée vs réalisée</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  {% if calibration and calibration.buckets %}
-  {% for b in calibration.buckets %}
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}">
-    <tr>
-      <td style="padding:6px 0;font-size:13px;color:#5a5852;">Confiance {{b.range}} annoncée</td>
-      <td style="padding:6px 0;font-size:13px;font-weight:500;text-align:right;">réalisé {{b.realized_pct}}%{% if b.label %} <span style="font-size:11px;color:{% if b.label == 'sur-confiance' %}#A32D2D{% elif b.label == 'sous-confiance' %}#0C447C{% else %}#3B6D11{% endif %};">({{b.label}})</span>{% endif %}</td>
-    </tr>
-  </table>
-  {% endfor %}
-  {% if calibration.reading %}<p style="font-size:12px;color:#5a5852;margin:10px 0 0 0;line-height:1.5;">{{calibration.reading}}</p>{% endif %}
-  {% else %}
-  <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ (calibration and calibration.empty_reason) or "Pas encore d'historique · calibration disponible après 5 recos clôturées minimum." }}</p>
-  {% endif %}
-</div>
-
-{# ── COÛT DES ERREURS (point 15 : mini-bannière si vide, structure dense sinon) ── #}
-{% if regret and regret.entries %}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Coût des erreurs · le regret de la semaine</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  {% for it in regret.entries %}
-  <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:13px;line-height:1.5;">
-    <span style="font-weight:500;">{{it.asset}}</span> — {{it.description}}{% if it.cost_pct is not none %} <span style="color:#A32D2D;font-weight:500;">{{ it.cost_pct|fmt_pct }} {{it.cost_label or 'non capturés'}}</span>{% endif %}{% if it.cost_usd %} ≈ {{ it.cost_usd|fmt_price }}{% endif %}
-  </div>
-  {% endfor %}
-  {% if regret.total_note %}<p style="font-size:12px;color:#5a5852;margin:10px 0 0 0;line-height:1.5;"><span style="font-weight:500;">Regret total :</span> {{regret.total_note}}</p>{% endif %}
-</div>
-{% else %}
-<div style="background:#F1EFE8;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;font-size:12px;color:#5a5852;line-height:1.5;">
-  <span style="font-weight:500;color:#1a1a18;">Coût des erreurs :</span> {{ (regret and regret.empty_reason) or "Aucune erreur coûteuse cette semaine · discipline maintenue." }}
-</div>
-{% endif %}
 
 {# ── PORTFOLIO · VUE D'ENSEMBLE (table 4 col 25%, P&L semaine remplace
    drawdown — points 9+10) ── #}
@@ -205,21 +90,32 @@
   </div>
   {% endif %}
 
-  {# ── B1 — SPARKLINE évolution PTF (SVG inline, mail-safe) ── #}
+  {# ── B1 v15 — ÉVOLUTION PTF en mini-BARRES mail-safe (audit : le SVG
+     inline ne se rend pas dans Gmail ; les div à hauteur fixe passent partout). #}
   {% if ptf_evolution and (ptf_evolution|length) >= 2 %}
   {% set _vals = [] %}
   {% for _e in ptf_evolution %}{% if (_e.value is not none) and (_e.value is number) %}{% set _ = _vals.append(_e.value) %}{% endif %}{% endfor %}
   {% if (_vals|length) >= 2 %}
   {% set _mn = _vals|min %}{% set _mx = _vals|max %}{% set _rng = (_mx - _mn) if (_mx - _mn) > 0 else 1 %}
-  {% set _n = _vals|length %}{% set _w = 280 %}{% set _h = 40 %}{% set _step = (_w / (_n - 1)) %}
   <div style="margin:14px 0 0 0;">
-    <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Évolution PTF ({{_n}} semaines)</p>
-    <svg width="{{_w}}" height="{{_h}}" viewBox="0 0 {{_w}} {{_h}}" xmlns="http://www.w3.org/2000/svg" style="display:block;">
-      <polyline fill="none" stroke="{% if _vals[-1] >= _vals[0] %}#3B6D11{% else %}#A32D2D{% endif %}" stroke-width="2" points="{% for v in _vals %}{{ (loop.index0 * _step)|round(1) }},{{ (_h - 4 - ((v - _mn) / _rng) * (_h - 8))|round(1) }} {% endfor %}"/>
-    </svg>
+    <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Évolution PTF ({{_vals|length}} semaines)</p>
+    <table role="presentation" cellpadding="0" cellspacing="2" border="0" style="border-collapse:separate;">
+      <tr>
+        {% for v in _vals %}
+        {% set _hh = (6 + ((v - _mn) / _rng) * 26)|round(0)|int %}
+        <td style="vertical-align:bottom;width:18px;">
+          <div style="background:{% if loop.last and _vals[-1] >= _vals[0] %}#3B6D11{% elif loop.last %}#A32D2D{% else %}#cfcdc3{% endif %};height:{{_hh}}px;width:14px;border-radius:2px 2px 0 0;font-size:0;line-height:0;">&nbsp;</div>
+        </td>
+        {% endfor %}
+      </tr>
+    </table>
     <p style="font-size:10px;color:#8a8880;margin:2px 0 0 0;">{{ _vals[0]|fmt_price }} → {{ _vals[-1]|fmt_price }}</p>
   </div>
   {% endif %}
+  {% endif %}
+  {# v15 (audit P0-8) — fenêtre du P&L semaine EXPLICITE : début → fin. #}
+  {% if portfolio_snapshot.week_start_value and portfolio_snapshot.week_end_value %}
+  <p style="font-size:10px;color:#8a8880;margin:10px 0 0 0;">Fenêtre du P&amp;L semaine : {{portfolio_snapshot.week_start_value|fmt_price}} (il y a 7 j) → {{portfolio_snapshot.week_end_value|fmt_price}} (aujourd'hui){% if header.period_covered %} · {{header.period_covered}}{% endif %}.</p>
   {% endif %}
   {% if btc_hold_comparison %}
   <div style="background:#f5f4ee;border-radius:8px;padding:10px 12px;margin:14px 0 0 0;">
@@ -236,7 +132,37 @@
         </td>
       </tr>
     </table>
-    {% if btc_hold_comparison.verdict %}<p style="font-size:11px;margin:8px 0 0 0;color:{% if btc_hold_comparison.outperforms %}#3B6D11{% else %}#A32D2D{% endif %};line-height:1.5;">{{btc_hold_comparison.verdict}}</p>{% endif %}
+    {% if btc_hold_comparison.verdict %}<p style="font-size:11px;margin:8px 0 0 0;color:{% if btc_hold_comparison.outperforms %}#3B6D11{% else %}#A32D2D{% endif %};line-height:1.5;">{{btc_hold_comparison.verdict}}{% if btc_hold_comparison.window_label %} <span style="color:#8a8880;">[fenêtre : {{btc_hold_comparison.window_label}}]</span>{% endif %}</p>{% endif %}
+  </div>
+  {% endif %}
+
+  {# ── v15 — SCORE QUALITÉ PTF (4 axes 0-10, formules Python transparentes) ── #}
+  {% if ptf_quality_score %}
+  {% set _q = ptf_quality_score %}
+  <div style="background:#f5f4ee;border-radius:8px;padding:10px 12px;margin:14px 0 0 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+      <tr>
+        <td style="vertical-align:middle;white-space:nowrap;padding-right:14px;">
+          <span style="font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;">Qualité PTF</span><br>
+          <span style="font-size:20px;font-weight:700;color:{% if (_q.score|num(0)) >= 6.5 %}#3B6D11{% elif (_q.score|num(0)) >= 4 %}#BA7517{% else %}#A32D2D{% endif %};">{{_q.score}}</span><span style="font-size:11px;color:#8a8880;">/10</span>
+          {% if _q.delta_wow is not none %}<br><span style="font-size:10px;color:{% if (_q.delta_wow|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (_q.delta_wow|num(0)) >= 0 else '' }}{{_q.delta_wow}} vs sem. dernière</span>{% endif %}
+        </td>
+        <td style="vertical-align:middle;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+            {% for ax in _q.axes %}
+            {% set _aw = ((ax.score|num(0)) * 10)|round(0)|int %}
+            <tr>
+              <td style="font-size:10px;color:#5a5852;white-space:nowrap;padding:1px 8px 1px 0;width:108px;">{{ax.label}}</td>
+              <td style="vertical-align:middle;padding:1px 8px 1px 0;">
+                <div style="background:#e5e4dc;border-radius:3px;height:6px;width:100%;max-width:150px;"><div style="background:{% if _aw >= 65 %}#3B6D11{% elif _aw >= 40 %}#BA7517{% else %}#A32D2D{% endif %};border-radius:3px;height:6px;width:{{[_aw, 2]|max}}%;"></div></div>
+              </td>
+              <td style="font-size:10px;color:#8a8880;white-space:nowrap;padding:1px 0;width:118px;">{{ax.score}}/10 · {{ax.detail}}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </td>
+      </tr>
+    </table>
   </div>
   {% endif %}
 
@@ -302,6 +228,134 @@
   {% endif %}
 </div>
 
+{# ── FIL ROUGE MACRO · semaine à venir (B6) ── #}
+{% if macro_panorama %}
+<div style="background:#eef2f7;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;border-left:3px solid #534AB7;">
+  <p style="font-size:10px;color:#534AB7;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Fil rouge macro · semaine à venir</p>
+  <p style="margin:0;font-size:13px;line-height:1.65;color:#28415c;">{{macro_panorama|md}}</p>
+</div>
+{% endif %}
+
+{# ── SCORING PRÉDICTIONS (table 4 col mail-safe, win rate gris si 0/0) ──
+   Points 11 (table 4 col), 12 (gris quand 0), 13 (suppression phrase
+   redondante), 14 (leçon 12px italique #1a1a18), 38 (ligne win rate
+   secondaire claire). #}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Mes prédictions de la semaine · scoring</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  {% if predictions_scoring %}
+  {% set _ps = predictions_scoring %}
+  {% set _wr_total = (_ps.validated|num(0)) + (_ps.invalidated|num(0)) + (_ps.neutral|num(0)) %}
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
+    <tr>
+      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;border-radius:6px 0 0 6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Recos émises</p>
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:#1a1a18;">{{_ps.issued or 0}}</p>
+      </td>
+      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Validées</p>
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if (_ps.validated|num(0)) > 0 %}#3B6D11{% else %}#5a5852{% endif %};">{{_ps.validated or 0}}</p>
+      </td>
+      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Invalidées</p>
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if (_ps.invalidated|num(0)) > 0 %}#A32D2D{% else %}#5a5852{% endif %};">{{_ps.invalidated or 0}}</p>
+      </td>
+      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;border-radius:0 6px 6px 0;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Win rate sem.</p>
+        {# Point 12 : "—" gris si _wr_total < 5 (insuffisant pour calculer). #}
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if _wr_total >= 5 and (_ps.win_rate_pct|num(none)) is not none and (_ps.win_rate_pct|num(0)) >= 50 %}#3B6D11{% elif _wr_total >= 5 and (_ps.win_rate_pct|num(none)) is not none and (_ps.win_rate_pct|num(0)) < 50 %}#A32D2D{% else %}#5a5852{% endif %};">{% if _wr_total < 5 or (_ps.win_rate_pct|num(none)) is none %}—{% else %}{{_ps.win_rate_pct}}%{% endif %}</p>
+      </td>
+    </tr>
+  </table>
+  {# Point 38 : ligne secondaire claire "Win rate sem. · — · Win rate 30j · —". #}
+  <p style="font-size:11px;color:#8a8880;margin:8px 0 0 0;">Win rate sem. · {% if _wr_total < 5 or (_ps.win_rate_pct|num(none)) is none %}—{% else %}{{_ps.win_rate_pct}}%{% endif %} · Win rate 30j · {% if _ps.win_rate_30d is not none %}{{_ps.win_rate_30d}}%{% else %}—{% endif %}</p>
+
+  {% if _ps.detail %}
+  <p style="font-size:12px;color:#1a1a18;margin:14px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Détail <span style="font-size:9px;color:#8a8880;text-transform:none;font-weight:400;">· 1 ligne par actif, la reco la plus récente prime (calcul Python)</span></p>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+    <tr style="background:#f5f4ee;">
+      <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;">Actif</th>
+      <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;">Reco</th>
+      <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;">Entrée</th>
+      <th style="text-align:right;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;">Δ</th>
+      <th style="text-align:right;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;">Jours</th>
+      <th style="text-align:right;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;">Statut</th>
+    </tr>
+    {% for d in _ps.detail %}
+    {% set bg = '#EAF3DE' if d.reco in ['RENFORCER','BUY'] else ('#FCEBEB' if d.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] else '#E6F1FB') %}
+    {% set fg = '#27500A' if d.reco in ['RENFORCER','BUY'] else ('#791F1F' if d.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] else '#0C447C') %}
+    {% set _stmap = {'validated':['✓ validée','#3B6D11'],'invalidated':['✗ invalidée','#A32D2D'],'in_progress':['● en cours','#0C447C'],'neutral':['= neutre','#8a8880']} %}
+    {% set _sd = _stmap.get(d.status, ['= —','#8a8880']) %}
+    <tr style="border-top:0.5px solid #e5e4dc;">
+      <td style="padding:6px 8px;font-size:11px;font-weight:700;">{{d.asset}}</td>
+      <td style="padding:6px 8px;"><span style="background:{{bg}};color:{{fg}};font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;">{{d.reco}}</span></td>
+      <td style="padding:6px 8px;font-size:11px;color:#5a5852;white-space:nowrap;">{{d.entry_date or '—'}}{% if d.entry_price is not none %} à {{d.entry_price|fmt_money}}{% endif %}</td>
+      <td style="padding:6px 8px;font-size:11px;text-align:right;font-weight:600;color:{% if d.delta_pct is not none and (d.delta_pct|num(0)) >= 0 %}#3B6D11{% elif d.delta_pct is not none %}#A32D2D{% else %}#8a8880{% endif %};">{% if d.delta_pct is not none %}{{ d.delta_pct|fmt_pct }}{% else %}—{% endif %}</td>
+      <td style="padding:6px 8px;font-size:11px;text-align:right;color:#5a5852;">{% if d.holding_days is not none %}{{d.holding_days}}j{% else %}—{% endif %}</td>
+      <td style="padding:6px 8px;font-size:11px;text-align:right;white-space:nowrap;color:{{_sd[1]}};font-weight:600;">{{_sd[0]}}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p style="font-size:9px;color:#8a8880;margin:6px 0 0 0;">Légende statut : ✓ cible atteinte · ✗ stop/seuil d'invalidation touché · ● position suivie (ouverte) · = clôturée sans verdict (fenêtre 30j échue).{% if _ps.winrate_gate_label %} {{_ps.winrate_gate_label}}.{% endif %}</p>
+  {% endif %}
+
+  {# Point 14 : leçon de la semaine 12px #1a1a18 italique. #}
+  {% if _ps.lesson %}
+  <p style="font-size:12px;color:#1a1a18;margin:12px 0 0 0;font-style:italic;line-height:1.55;"><span style="font-weight:500;font-style:normal;">Leçon de la semaine ·</span> {{_ps.lesson}}</p>
+  {% endif %}
+  {# v15 (audit P3-2) — calibration FUSIONNÉE ici (sous-bloc compact) : plus de
+     section dédiée qui répétait « pas encore d'historique ». #}
+  <div style="margin:12px 0 0 0;padding-top:10px;border-top:0.5px solid #f0efe8;">
+    <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Calibration · confiance annoncée vs réalisée</p>
+    {% if calibration and calibration.buckets %}
+    {% for b in calibration.buckets %}
+    <p style="margin:0 0 2px 0;font-size:11px;color:#5a5852;">Confiance {{b.range}} → réalisé <span style="font-weight:600;color:#1a1a18;">{{b.realized_pct}}%</span>{% if b.label %} <span style="color:{% if b.label == 'sur-confiance' %}#A32D2D{% elif b.label == 'sous-confiance' %}#0C447C{% else %}#3B6D11{% endif %};">({{b.label}})</span>{% endif %}</p>
+    {% endfor %}
+    {% if calibration.reading %}<p style="font-size:11px;color:#5a5852;margin:6px 0 0 0;line-height:1.5;">{{calibration.reading}}</p>{% endif %}
+    {% else %}
+    <p style="font-size:11px;color:#8a8880;font-style:italic;margin:0;">{{ (calibration and calibration.empty_reason) or "Disponible après 5 recos clôturées minimum." }}</p>
+    {% endif %}
+  </div>
+  {% else %}
+  <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ predictions_empty_reason or "Première semaine, pas encore d'historique de prédictions à scorer." }}</p>
+  {% endif %}
+</div>
+
+{# ── PERTES ↔ RECOS (A7) — lien honnête baisses/recos émises ── #}
+{% if losses_vs_recos %}
+<div style="background:#FCEBEB;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;font-size:12px;line-height:1.6;color:#501313;">
+  <p style="margin:0 0 3px 0;font-weight:600;color:#791F1F;">Pertes de la semaine · lien avec mes recos</p>
+  {{losses_vs_recos|md}}
+</div>
+{% endif %}
+
+{# ── CALIBRATION · CONFIANCE ANNONCÉE VS RÉALISÉE (TOUJOURS présent, point 3) ── #}
+{# v15 — la calibration vit désormais DANS la carte scoring (fusion P3-2). #}
+
+{# ── COÛT DES ERREURS (point 15 : mini-bannière si vide, structure dense sinon) ── #}
+{% if regret and regret.entries %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Coût des erreurs · le regret de la semaine</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  {% for it in regret.entries %}
+  <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:13px;line-height:1.5;">
+    <span style="font-weight:500;">{{it.asset}}</span> — {{it.description}}{% if it.cost_pct is not none %} <span style="color:#A32D2D;font-weight:500;">{{ it.cost_pct|fmt_pct }} {{it.cost_label or 'non capturés'}}</span>{% endif %}{% if it.cost_usd %} ≈ {{ it.cost_usd|fmt_price }}{% endif %}
+  </div>
+  {% endfor %}
+  {% if regret.total_note %}<p style="font-size:12px;color:#5a5852;margin:10px 0 0 0;line-height:1.5;"><span style="font-weight:500;">Regret total :</span> {{regret.total_note}}</p>{% endif %}
+</div>
+{% else %}
+<div style="background:#F1EFE8;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;font-size:12px;color:#5a5852;line-height:1.5;">
+  <span style="font-weight:500;color:#1a1a18;">Coût des erreurs :</span> {{ (regret and regret.empty_reason) or "Pas encore de reco clôturée sur la fenêtre · mesure disponible dès la première clôture." }}
+</div>
+{% endif %}
+
+{# ── v15 — MON ERREUR DE LA SEMAINE (honnêteté nominative, audit) ── #}
+{% if my_errors %}
+<div style="background:#FAEEDA;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;border-left:2px solid #BA7517;border-top-left-radius:0;border-bottom-left-radius:0;">
+  <p style="margin:0 0 3px 0;font-size:11px;font-weight:600;color:#633806;text-transform:uppercase;letter-spacing:0.5px;">Mon erreur de la semaine</p>
+  <p style="margin:0;font-size:12px;line-height:1.6;color:#412402;">{{my_errors|md}}</p>
+</div>
+{% endif %}
+
 {# ── EXIT PLAN · POUSSIÈRES (table compacte 2 col, point 17) ── #}
 {% if exit_plan %}
 <h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Exit plan · positions condamnées</h2>
@@ -327,17 +381,18 @@
 {% endif %}
 
 {# ── SEMAINE À VENIR · CALENDRIER (P3-A5 : dates RÉELLES FRED prioritaires) ── #}
-{% set _cal_facts = (upcoming_calendar_facts.events if (upcoming_calendar_facts and upcoming_calendar_facts.available) else none) %}
+{% set _cal_facts = (week_ahead if week_ahead else (upcoming_calendar_facts.events if (upcoming_calendar_facts and upcoming_calendar_facts.available) else none)) %}
 {% if _cal_facts or upcoming_calendar %}
 <h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Semaine à venir{% if header.upcoming_week %} · {{header.upcoming_week}}{% endif %} · ce qui peut bouger</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
-  <p style="font-size:12px;color:#1a1a18;margin:0 0 12px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Calendrier événements à impact crypto</p>
+  <p style="font-size:12px;color:#1a1a18;margin:0 0 12px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Calendrier événements à impact crypto <span style="font-size:9px;color:#8a8880;text-transform:none;font-weight:400;">· FRED + Boursorama + calendriers banques centrales</span></p>
   {% if _cal_facts %}
   {% for ev in _cal_facts %}
   <div style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:13px;">
-    <span style="background:#F1EFE8;color:#5a5852;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;">{{ev.when}}</span>
+    <span style="background:{% if ev.importance == 'high' %}#FCEBEB{% else %}#F1EFE8{% endif %};color:{% if ev.importance == 'high' %}#791F1F{% else %}#5a5852{% endif %};font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;">{{ev.when}}</span>
     <span style="font-weight:500;margin-left:6px;">{{ev.label}}</span>
     <span style="color:#8a8880;font-size:11px;"> · {{ev.date}}</span>
+    {% if ev.polymarket_note %}<br><span style="display:inline-block;margin:4px 0 0 0;background:#E6F1FB;color:#0C447C;font-size:10px;padding:2px 7px;border-radius:4px;">{{ev.polymarket_note}}</span>{% endif %}
   </div>
   {% endfor %}
   {% else %}
@@ -423,6 +478,14 @@
 </div>
 {% endif %}
 
+{# ── v15 — STRATÉGIE DE LA SEMAINE (consigne 3 phrases, fond sombre) ── #}
+{% if strategy_focus %}
+<div style="background:#1f1e1d;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
+  <p style="font-size:10px;color:#8a8880;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Stratégie de la semaine</p>
+  <p style="margin:0;font-size:13px;line-height:1.65;color:#f5f4ee;">{{strategy_focus|md}}</p>
+</div>
+{% endif %}
+
 {# ── PLAN D'ACTION DE LA SEMAINE (B4) — conditionnel, chiffré ── #}
 {% if weekly_action_plan %}
 <h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Plan d'action de la semaine</h2>
@@ -461,12 +524,14 @@
   <p style="font-size:12px;color:#1a1a18;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Cibles long terme · révision hebdomadaire</p>
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;table-layout:fixed;">
     <tr style="background:#f5f4ee;">
-      <th style="width:60px;text-align:left;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;letter-spacing:0.3px;">Asset</th>
+      <th style="width:56px;text-align:left;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;letter-spacing:0.3px;">Asset</th>
       <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;letter-spacing:0.3px;">Thèse</th>
-      <th style="width:110px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;letter-spacing:0.3px;">Cible 6-12m</th>
-      <th style="width:90px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;letter-spacing:0.3px;">Statut</th>
+      <th style="width:104px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;letter-spacing:0.3px;">vs ATH réel</th>
+      <th style="width:104px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;letter-spacing:0.3px;">Cible 6-12m</th>
+      <th style="width:86px;text-align:right;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;letter-spacing:0.3px;">Statut</th>
     </tr>
     {% for lt in long_term_positioning %}
+    {% set _ath = (ath_facts or {}).get(lt.asset) %}
     <tr style="border-top:0.5px solid #e5e4dc;">
       <td style="padding:6px 8px;font-size:11px;font-weight:700;color:#1a1a18;vertical-align:top;">{{lt.asset}}</td>
       <td style="padding:6px 8px;font-size:11px;color:#5a5852;line-height:1.5;vertical-align:top;">
@@ -475,6 +540,7 @@
         <details style="margin:4px 0 0 0;"><summary style="font-size:10px;color:#8a8880;cursor:pointer;list-style:none;">▸ thèse complète</summary><p style="margin:4px 0 0 0;font-size:11px;color:#5a5852;line-height:1.5;">{{lt.thesis|md}}</p></details>
         {% endif %}
       </td>
+      <td style="padding:6px 8px;font-size:11px;text-align:right;color:#5a5852;vertical-align:top;white-space:nowrap;">{% if _ath and _ath.ath %}{{_ath.ath|fmt_money}}{% if _ath.from_ath_pct is not none %}<br><span style="font-size:10px;color:#A32D2D;">{{_ath.from_ath_pct|fmt_pct}}</span>{% endif %}{% else %}—{% endif %}</td>
       <td style="padding:6px 8px;font-size:11px;text-align:right;font-weight:500;color:#1a1a18;vertical-align:top;">{{lt.target}}</td>
       <td style="padding:6px 8px;font-size:11px;text-align:right;vertical-align:top;"><span style="display:inline-block;padding:2px 7px;border-radius:10px;background:{% if lt.status_color == '#3B6D11' %}#EAF3DE{% elif lt.status_color == '#A32D2D' %}#FCEBEB{% else %}#F1EFE8{% endif %};color:{{lt.status_color or '#5a5852'}};font-weight:500;font-size:10px;">{{lt.status}}</span></td>
     </tr>
@@ -521,6 +587,6 @@
   {% endif %}
   <p style="font-size:10px;color:#8a8880;margin:0;">Prochain rapport · {{footer.next_morning or footer.next_report_at or 'demain 08h30'}}</p>
   <p style="font-size:10px;color:#8a8880;margin:4px 0 0 0;">Prochain rapport hebdo · {{footer.next_weekly or 'dimanche prochain 12:00'}}</p>
-  <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · v14</p>
+  <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · {{app_version or "v15"}}</p>
   <p style="font-size:9px;color:#8a8880;margin:8px 0 0 0;font-style:italic;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
 </div>

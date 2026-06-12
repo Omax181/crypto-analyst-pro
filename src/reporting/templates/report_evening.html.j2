@@ -25,7 +25,7 @@
       <td style="vertical-align:top;">
         <p style="font-size:12px;color:#5a5852;margin:0 0 4px 0;">{{header.time_casablanca or header.date}}</p>
         <h1 style="margin:0;font-size:25px;font-weight:500;line-height:1.2;">Veille crypto · soir</h1>
-        <p style="font-size:12px;color:#8a8880;margin:6px 0 0 0;">Complément au rapport matin{% if header.morning_time_label %} ({{header.morning_time_label}}){% endif %}{% if header.since_morning_label %} · {{header.since_morning_label}}{% endif %}</p>
+        <p style="font-size:12px;color:#8a8880;margin:6px 0 0 0;">Complément au rapport matin{% if header.timing_line %} · {{header.timing_line}}{% else %}{% if header.morning_time_label %} ({{header.morning_time_label}}){% endif %}{% if header.since_morning_label %} · {{header.since_morning_label}}{% endif %}{% endif %}</p>
       </td>
       <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Portefeuille</p>
@@ -45,11 +45,14 @@
     <tr>
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">P&amp;L jour</p>
-        <p style="font-size:18px;font-weight:700;margin:2px 0 0 0;color:{% if (_pnl_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if _pnl_pct is not none %}{{ _pnl_pct|fmt_pct }}{% else %}—{% endif %}</p>
+        {# v15 (audit P0) : 2 décimales — « +0.0% avec +$1 » mangeait le
+           signal ; « neutre » explicite quand le mouvement est réellement nul. #}
+        <p style="font-size:18px;font-weight:700;margin:2px 0 0 0;color:{% if daily_pnl.day_change_label == 'neutre' %}#8a8880{% elif (_pnl_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if _pnl_pct is not none %}{% set _pv = _pnl_pct|num(0) %}{{ '+' if _pv >= 0 else '−' }}{{ '%.2f'|format(_pv|abs) }}%{% else %}—{% endif %}</p>
+        {% if daily_pnl.day_change_label == 'neutre' %}<p style="font-size:9px;color:#8a8880;margin:0;">journée neutre</p>{% endif %}
       </td>
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">En $</p>
-        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if (daily_pnl.day_change_usd|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% set _d = daily_pnl.day_change_usd|num(none) %}{% if _d is not none %}{{ '+' if _d >= 0 else '−' }}${{ '{:,.0f}'.format(_d|abs) }}{% else %}—{% endif %}</p>
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if daily_pnl.day_change_label == 'neutre' %}#8a8880{% elif (daily_pnl.day_change_usd|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% set _d = daily_pnl.day_change_usd|num(none) %}{% if _d is not none %}{{ '+' if _d >= 0 else '−' }}${% if _d|abs < 10 %}{{ '%.2f'|format(_d|abs) }}{% else %}{{ '{:,.0f}'.format(_d|abs) }}{% endif %}{% else %}—{% endif %}</p>
       </td>
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Valeur PTF</p>
@@ -78,6 +81,25 @@
     {% for m in daily_pnl.top_movers %}<span style="display:inline-block;margin-right:14px;white-space:nowrap;"><strong>{{m.symbol}}</strong> <span style="color:{% if (m.change|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (m.change|num(0)) >= 0 else '' }}{{m.change}}%</span> <span style="color:#8a8880;font-size:11px;">({% set _pu = m.pnl_usd|num(0) %}{{ '+' if _pu >= 0 else '−' }}${{ '{:,.0f}'.format(_pu|abs) }})</span></span>{% endfor %}
   </p>
   {% endif %}
+</div>
+{% endif %}
+
+{# ════════ BLOC 2ter (v15) · HEATMAP SOIR — 3 hausses / 3 baisses du PTF ════════ #}
+{% if evening_heatmap and (evening_heatmap.gainers or evening_heatmap.losers) %}
+<div style="margin-bottom:1.5rem;">
+  <table role="presentation" cellpadding="0" cellspacing="3" border="0" style="width:100%;border-collapse:separate;table-layout:fixed;">
+    <tr>
+      {% for m in (evening_heatmap.gainers or []) + (evening_heatmap.losers or []) %}
+      {% set ch = m.change|num(0) %}
+      {% set bg = '#C0DD97' if ch >= 5 else ('#EAF3DE' if ch >= 0 else ('#F7C1C1' if ch <= -5 else '#FCEBEB')) %}
+      <td style="background:{{bg}};border-radius:3px;padding:6px 4px;text-align:center;height:36px;vertical-align:middle;">
+        <div style="font-size:11px;font-weight:700;color:#1a1a18;line-height:1.2;">{{m.symbol}}</div>
+        <div style="font-size:10px;color:#1a1a18;line-height:1.2;">{{ '+' if ch >= 0 else '−' }}{{ '%.1f'|format(ch|abs) }}%</div>
+      </td>
+      {% endfor %}
+    </tr>
+  </table>
+  <p style="font-size:9px;color:#8a8880;margin:4px 0 0 0;">Plus fortes hausses / baisses du PTF · 24h (poussières exclues)</p>
 </div>
 {% endif %}
 
@@ -148,6 +170,42 @@
       </td>
     </tr>
   </table>
+  {% endif %}
+  {# v15 (audit B-3) — ligne 3 : INTERNATIONAL (le crypto ne vit pas qu'aux USA). #}
+  {% if _em.nikkei or _em.stoxx50 or _em.eur_usd or _em.usd_jpy %}
+  <p style="font-size:9px;color:#8a8880;margin:12px 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;border-top:0.5px solid #f0efe8;padding-top:10px;">International · Europe &amp; Asie</p>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
+    <tr>
+      {% if _em.stoxx50 %}
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Stoxx 50</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format(_em.stoxx50|num(0)) }}{{ arrow24(_em.stoxx50, _em.stoxx50_delta) }}</p>
+      </td>
+      {% endif %}
+      {% if _em.nikkei %}
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Nikkei 225</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format(_em.nikkei|num(0)) }}{{ arrow24(_em.nikkei, _em.nikkei_delta) }}</p>
+      </td>
+      {% endif %}
+      {% if _em.eur_usd %}
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">EUR/USD</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.4f'|format(_em.eur_usd|num(0)) }}</p>
+      </td>
+      {% endif %}
+      {% if _em.usd_jpy %}
+      <td style="width:25%;vertical-align:top;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">USD/JPY</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.2f'|format(_em.usd_jpy|num(0)) }}</p>
+      </td>
+      {% endif %}
+    </tr>
+  </table>
+  {% endif %}
+  {% if polymarket_facts and polymarket_facts.fed_bars %}
+  {% set _pf = polymarket_facts.fed_bars %}
+  <p style="font-size:10px;color:#5a5852;margin:10px 0 0 0;border-top:0.5px solid #f0efe8;padding-top:8px;">Polymarket · taux Fed{% if _pf.meeting_hint %} ({{_pf.meeting_hint}}){% endif %} : <strong>{{_pf.dominant}} {{ '%.1f'|format(_pf.dominant_pct|num(0)) }}%</strong> · baisse {{ '%.1f'|format(_pf.cut_pct|num(0)) }}% · hausse {{ '%.1f'|format(_pf.hike_pct|num(0)) }}%</p>
   {% endif %}
 </div>
 {% endif %}
@@ -239,6 +297,19 @@
 </div>
 {% endif %}
 
+{# ════════ BLOC 7bis (v15) · ACTIONS À POSER CE SOIR — fond sombre ════════ #}
+{% if actions_tonight %}
+<div style="background:#1f1e1d;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
+  <p style="font-size:11px;color:#8a8880;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Actions à poser ce soir</p>
+  {% for a in actions_tonight %}
+  <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;"><tr>
+    <td style="width:20px;vertical-align:top;font-size:12px;line-height:1.6;color:#e5b567;">☐</td>
+    <td style="font-size:13px;line-height:1.6;color:#f5f4ee;">{{a|md}}</td>
+  </tr></table>
+  {% endfor %}
+</div>
+{% endif %}
+
 {# ════════ BLOC 8 · DEMAIN MATIN · CHECK LIST ════════ #}
 {% set _tc = tomorrow_checklist or {} %}
 {% if _tc.calendar or _tc.checks or _tc.scenario or _tc.invalidation or tomorrow_macro_events %}
@@ -263,6 +334,6 @@
   {% endif %}
   <p style="font-size:11px;color:#8a8880;margin:0;">Prochain rapport · {{ footer.next_report_at or ("demain " ~ (footer.next_morning_time or '08h30')) }} · format complet</p>
   <p style="font-size:11px;color:#8a8880;margin:4px 0 0 0;">Bonne soirée.</p>
-  <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · v14</p>
+  <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · {{app_version or "v15"}}</p>
   <p style="font-size:9px;color:#b5b3ab;margin:2px 0 0 0;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
 </div>

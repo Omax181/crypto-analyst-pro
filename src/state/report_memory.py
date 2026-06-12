@@ -130,16 +130,41 @@ def add_recommendation(reco: dict[str, Any]) -> None:
     asset = reco.get("asset")
     new_action = (reco.get("action") or "").upper()
 
-    # Doublon exact (même actif + même action, déjà ouvert) -> on garde l'original.
+    # v15 (audit Omar, evening P0 partie B / weekly « la dernière reco prime ») :
+    # même actif + même action déjà OUVERTE -> on MET À JOUR la reco existante
+    # avec le contenu le plus récent (confiance, rationale, prix signal du jour)
+    # au lieu de l'ignorer. On préserve VOLONTAIREMENT deux ancrages :
+    #   - entry_price : prix de la PREMIÈRE émission — sinon la cible +10%/-8%
+    #     se ré-ancrerait chaque matin et le win rate deviendrait inatteignable
+    #     (biais structurel) ;
+    #   - created_at : date de première émission — sinon la fenêtre de 30j
+    #     glisserait indéfiniment et aucune reco ne serait jamais invalidée.
+    # Tout le reste reflète la dernière émission (« on est à jour »), et
+    # ``reissues`` compte les ré-émissions pour la transparence.
     for r in recos:
         if (
             r.get("asset") == asset
             and (r.get("action") or "").upper() == new_action
             and (r.get("status") or "in_progress") == "in_progress"
         ):
+            preserved_entry = r.get("entry_price")
+            preserved_created = r.get("created_at")
+            for k, v in reco.items():
+                if k in ("entry_price", "created_at", "id"):
+                    continue
+                if v is not None:
+                    r[k] = v
+            if preserved_entry is not None:
+                r["entry_price"] = preserved_entry
+            if preserved_created:
+                r["created_at"] = preserved_created
+            r["last_issued_at"] = now_iso()
+            r["reissues"] = int(r.get("reissues") or 0) + 1
+            save_active_recommendations(recos)
             logger.info(
-                "Reco %s %s déjà ouverte (entrée d'origine conservée), doublon ignoré.",
-                asset, new_action,
+                "Reco %s %s ré-émise : contenu mis à jour (entrée d'origine "
+                "conservée pour le scoring, ré-émission n°%d).",
+                asset, new_action, r["reissues"],
             )
             return
 
@@ -256,13 +281,14 @@ def load_weekly_snapshots() -> list[dict[str, Any]]:
 
 def record_weekly_snapshot(
     value_usd: float, btc_price: float | None, week_label: str | None = None,
-    drawdown_ath_pct: float | None = None,
+    drawdown_ath_pct: float | None = None, quality_score: float | None = None,
 ) -> None:
     """Enregistre un snapshot hebdomadaire (valeur PTF + prix BTC + drawdown).
 
     Déduplique par semaine ISO : un seul snapshot par semaine (le dernier écrase).
     Garde les 12 dernières semaines. Le drawdown stocké permet de calculer la
-    variation de drawdown semaine vs semaine (champ ``drawdown_change_pts``).
+    variation de drawdown semaine vs semaine (champ ``drawdown_change_pts``) ;
+    ``quality_score`` (v15) permet l'évolution WoW du score qualité PTF.
     """
     import datetime as _dt
 
@@ -280,6 +306,7 @@ def record_weekly_snapshot(
             "value_usd": round(value_usd, 2) if value_usd is not None else None,
             "btc_price": round(btc_price, 2) if btc_price else None,
             "drawdown_ath_pct": round(drawdown_ath_pct, 1) if drawdown_ath_pct is not None else None,
+            "quality_score": round(quality_score, 1) if quality_score is not None else None,
         }
     )
     # Tri chronologique + garde 12 semaines.
@@ -312,6 +339,52 @@ def record_source_health(all_sources: list[str], active_sources: list[str]) -> N
         except (ValueError, TypeError):
             kept.append(entry)
     _write(SOURCE_HEALTH_FILE, kept[-120:])
+
+
+def compute_weekly_source_stats(total_sources: int) -> dict[str, Any]:
+    """Sources actives RÉELLES sur la semaine écoulée (pour le header hebdo).
+
+    v15 (audit weekly P0) : « Sources actives 4/23 » affichait le compte du
+    seul run hebdo (6 sources max interrogées le dimanche) alors que le matin
+    même en avait 16/23 — chiffre trompeur qui faisait croire à une collecte
+    en panne. On calcule désormais, depuis ``source_health.json`` (alimenté à
+    chaque run matin), la MOYENNE quotidienne de sources actives sur 7 jours
+    + le meilleur jour, ce qui reflète la réalité de la semaine.
+
+    Returns:
+        ``{available, avg_active, best_active, days_observed, total}``.
+    """
+    import datetime as _dt
+
+    logs = _read(SOURCE_HEALTH_FILE, [])
+    if not logs or total_sources <= 0:
+        return {"available": False}
+    now = _dt.datetime.now(_dt.timezone.utc)
+    start = now - _dt.timedelta(days=7)
+    per_day_active: dict[str, int] = {}
+    for entry in logs:
+        try:
+            when = _dt.datetime.fromisoformat(entry.get("date", ""))
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=_dt.timezone.utc)
+        except (ValueError, TypeError):
+            continue
+        if not (start <= when < now):
+            continue
+        day = when.strftime("%Y-%m-%d")
+        active = total_sources - len(entry.get("down", []))
+        # Plusieurs runs/jour (matin+soir) : on garde le meilleur du jour.
+        per_day_active[day] = max(per_day_active.get(day, 0), active)
+    if not per_day_active:
+        return {"available": False}
+    vals = list(per_day_active.values())
+    return {
+        "available": True,
+        "avg_active": round(sum(vals) / len(vals)),
+        "best_active": max(vals),
+        "days_observed": len(vals),
+        "total": total_sources,
+    }
 
 
 def compute_blind_spots_weekly() -> dict[str, Any]:

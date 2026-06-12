@@ -1,8 +1,8 @@
 name: Evening Crypto Report
 
 on:
-  # Déclenchement externe fiable via cron-job.org (POST repository_dispatch).
-  # Le schedule GitHub natif est gardé en filet de sécurité (souvent en retard).
+  # v15 — schedule GitHub natif RETIRÉ : cron-job.org déclenche déjà via
+  # repository_dispatch, et les deux tombaient ensemble → MAILS EN DOUBLE.
   # Variantes underscore acceptées (un type non listé = 202 silencieux sans run).
   repository_dispatch:
     types: [evening, evening-report, evening_report, run-evening, run_evening]

@@ -135,6 +135,11 @@ class PredictionTracker:
             status = self.evaluate_recommendation(reco, price)
             reco["status"] = status
             reco["current_price"] = price
+            created = _parse(reco.get("created_at"))
+            if created is not None:
+                reco["holding_days"] = max(
+                    0, (datetime.now(timezone.utc) - created).days
+                )
             if status in ("validated", "invalidated", "neutral"):
                 reco["closed_at"] = mem.now_iso()
                 history.append(reco)
@@ -143,6 +148,82 @@ class PredictionTracker:
         mem.save_active_recommendations(still_active)
         mem.save_prediction_history(history)
         return still_active
+
+    def build_scoring_detail(
+        self, price_lookup: dict[str, float], period_days: int = 7
+    ) -> list[dict[str, Any]]:
+        """Tableau de scoring hebdo 100% Python (audit weekly P0).
+
+        v14 laissait Gemini générer ``predictions_scoring.detail`` depuis
+        l'historique brut → 11 lignes pour 5 actifs, doublons à résultats
+        opposés, scores fantaisistes. v15 : le tableau est construit ICI,
+        déterministe, UNE ligne par (actif, action) — la plus récente prime —
+        depuis recos actives + clôturées de la fenêtre.
+
+        Returns:
+            Liste triée (clôturées d'abord, puis actives) de dicts
+            ``{asset, reco, entry_date, entry_price, current_price,
+            delta_pct, holding_days, status, score}`` où score ∈ {+1,-1,0}
+            (+1 validée, -1 invalidée, 0 en cours/neutre).
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(days=period_days)
+        rows: dict[tuple, dict[str, Any]] = {}
+
+        def _consider(reco: dict[str, Any], is_active: bool) -> None:
+            asset = reco.get("asset")
+            action = (reco.get("action") or "").upper()
+            if not asset or action in ("", "SURVEILLER", "MAINTENIR"):
+                return
+            created = _parse(reco.get("created_at"))
+            closed = _parse(reco.get("closed_at"))
+            anchor = closed or created
+            if anchor is None or anchor < cutoff:
+                return
+            key = (asset, action)
+            prev = rows.get(key)
+            prev_anchor = prev.get("_anchor") if prev else None
+            if prev_anchor is not None and anchor <= prev_anchor:
+                return  # la plus récente prime (dédup audit)
+            entry = reco.get("entry_price")
+            cur = price_lookup.get(asset) or reco.get("current_price")
+            delta = None
+            if entry and cur:
+                try:
+                    delta = round((float(cur) - float(entry)) / float(entry) * 100, 1)
+                except (ValueError, TypeError, ZeroDivisionError):
+                    delta = None
+            status = reco.get("status") or ("in_progress" if is_active else "neutral")
+            score = (1 if status == "validated"
+                     else -1 if status == "invalidated" else 0)
+            holding = reco.get("holding_days")
+            if holding is None and created is not None:
+                ref = closed or datetime.now(timezone.utc)
+                holding = max(0, (ref - created).days)
+            rows[key] = {
+                "asset": asset,
+                "reco": "ALLÉGER" if action == "ALLEGER" else action,
+                "entry_date": created.strftime("%d/%m") if created else "—",
+                "entry_price": entry,
+                "current_price": cur,
+                "delta_pct": delta,
+                "holding_days": holding,
+                "status": status,
+                "score": score,
+                "_anchor": anchor,
+            }
+
+        for reco in mem.load_prediction_history():
+            _consider(reco, is_active=False)
+        for reco in mem.load_active_recommendations():
+            _consider(reco, is_active=True)
+
+        out = sorted(
+            rows.values(),
+            key=lambda r: (0 if r["score"] != 0 else 1, r["asset"]),
+        )
+        for r in out:
+            r.pop("_anchor", None)
+        return out
 
     def extract_lesson(self, period_days: int = 7) -> str:
         """Identifie la principale leçon de la période (erreur la plus coûteuse).
