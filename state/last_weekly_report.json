@@ -1,0 +1,958 @@
+{
+  "header": {
+    "date": "vendredi 12 juin 2026",
+    "time_casablanca": "19:23",
+    "week_number": 24,
+    "upcoming_week": "8-14 juin",
+    "week": "Semaine 24 · vendredi 12 juin 2026",
+    "year": 2026,
+    "period_covered": "du 5 juin au 12 juin",
+    "total_sources_count": 25,
+    "active_sources_count": 20,
+    "sources_week_label": "20/25 sources actives en moyenne cette semaine (pic 20, 1 j observés)",
+    "active_sources": [
+      "CoinGecko",
+      "CoinMarketCap",
+      "Polymarket",
+      "Calendrier macro",
+      "Corrélations"
+    ]
+  },
+  "weekly_summary": "Les marchés actions mondiaux (S&P 500 +35.81, Nasdaq +90.57, Nikkei +1802.77) ont affiché un fort appétit pour le risque cette semaine, soutenu par un DXY en léger recul à 99.744 et un VIX en baisse à 18.29. Cependant, le sentiment crypto reste à la 'Peur extrême' (F&G 12) et le rallye de l'or (+127.1$) signale une prudence sous-jacente. Les sorties nettes continues des ETF Bitcoin et Ethereum ont maintenu une pression vendeuse institutionnelle sur les actifs majeurs. Pour votre portefeuille, cela s'est traduit par une résilience du secteur AI (+0.93% / 24h) mais une sous-performance des L1 (-1.27% / 24h), accentuant le drawdown global à -75.5% de l'ATH. La forte concentration de vos actifs amplifie ce risque de marché.",
+  "predictions_scoring": {
+    "lesson": "Première semaine : pas encore d'historique de recos clôturées. Patience.",
+    "win_rate_pct": null,
+    "validated": 0,
+    "invalidated": 0,
+    "no_history": true,
+    "detail": [],
+    "issued": 0,
+    "open_count": 0,
+    "closed_count": 0,
+    "min_closed_for_winrate": 5,
+    "winrate_gate_label": "Recos clôturées : 0/5 minimum pour calibration",
+    "win_rate_trend": "≈ 0% le mois",
+    "trend_direction": "flat",
+    "win_rate_trend_note": "Win rate 0% cette semaine, stable vs 30j (0%)."
+  },
+  "predictions_empty_reason": "Aucune recommandation ferme n'a été émise cette semaine, donc pas de score à évaluer.",
+  "sector_exposure": [
+    {
+      "sector": "L1",
+      "ptf_pct": 46.6,
+      "value_usd": 793.87
+    },
+    {
+      "sector": "AI",
+      "ptf_pct": 25.8,
+      "value_usd": 439.8
+    },
+    {
+      "sector": "DeFi",
+      "ptf_pct": 6.4,
+      "value_usd": 108.87
+    },
+    {
+      "sector": "Oracle/Infra",
+      "ptf_pct": 6.2,
+      "value_usd": 105.68
+    },
+    {
+      "sector": "IoT/Data",
+      "ptf_pct": 3.8,
+      "value_usd": 65.36
+    },
+    {
+      "sector": "Payments",
+      "ptf_pct": 3.5,
+      "value_usd": 59.37
+    },
+    {
+      "sector": "Infra",
+      "ptf_pct": 3.5,
+      "value_usd": 59.94
+    },
+    {
+      "sector": "L2",
+      "ptf_pct": 3.4,
+      "value_usd": 58.33
+    },
+    {
+      "sector": "Divers (<1% · 4 secteurs)",
+      "ptf_pct": 0.7,
+      "value_usd": 12.32
+    }
+  ],
+  "concentration_reading": "Votre portefeuille est entièrement investi et fortement concentré (100% dans un cluster de 12 actifs corrélés), comme le souligne le rapport précédent. Cette structure amplifie le risque en cas de choc systémique ou de rotation sectorielle défavorable, car la diversification est limitée. Une stratégie d'allègement sélectif sur les rebonds pour réduire le nombre d'actifs et consolider les positions de conviction est recommandée pour mieux gérer ce risque.",
+  "upcoming_calendar": [
+    {
+      "day": "Mar 16 juin",
+      "day_bg": "#F0F0F0",
+      "day_color": "#333333",
+      "title": "Décision BoJ (taux Japon)",
+      "impact_label": "Impact élevé",
+      "detail": "Une surprise hawkish de la BoJ pourrait déclencher un débouclage du carry trade yen, pesant sur les actifs risqués mondiaux."
+    },
+    {
+      "day": "Mer 17 juin",
+      "day_bg": "#F0F0F0",
+      "day_color": "#333333",
+      "title": "Décision FOMC (taux Fed)",
+      "impact_label": "Impact élevé",
+      "detail": "Le marché anticipe un maintien des taux à 99.4% (Polymarket). Toute divergence par rapport à ce consensus aurait un impact majeur sur la liquidité et l'appétit pour le risque."
+    }
+  ],
+  "scenarios": [
+    {
+      "type": "neutral",
+      "label": "Neutre",
+      "probability_pct": 60,
+      "description": "Le scénario le plus probable est un maintien des taux Fed (Polymarket 99.4%) et une absence de surprise majeure de la BoJ, prolongeant le régime de transition. Le marché crypto pourrait évoluer en range, avec des rotations sectorielles et une persistance des sorties d'ETF, compensées par un léger appétit pour le risque sur les actions. Votre portefeuille verrait une continuation de la résilience de l'AI et une pression sur les L1.",
+      "action": "Maintenir les positions de conviction, chercher des opportunités d'allègement sur les poussières et les positions faibles lors de rebonds tactiques, et renforcer les leaders de l'AI sur des dips."
+    },
+    {
+      "type": "bearish",
+      "label": "Baissier",
+      "probability_pct": 25,
+      "description": "Une surprise hawkish de la BoJ (relèvement de taux) ou une réaffirmation d'une politique 'plus élevée plus longtemps' par la Fed, combinée à une accélération des sorties d'ETF BTC/ETH, pourrait déclencher une correction plus profonde. Le DXY casserait à la hausse 100.5 et le S&P 500 chuterait sous 7300. Votre portefeuille, déjà en drawdown important, subirait une pression accrue sur l'ensemble de ses actifs.",
+      "action": "Préparer un plan d'allègement agressif sur les actifs les plus volatils et les moins fondamentaux (ex: RSR, CKB) pour préserver le capital et se positionner pour une future accumulation sur les leaders."
+    },
+    {
+      "type": "bullish",
+      "label": "Haussier",
+      "probability_pct": 15,
+      "description": "Un discours plus dovish que prévu de la Fed (malgré Polymarket), une inversion significative des flux ETF Bitcoin/Ethereum, ou un catalyseur crypto majeur (non identifié actuellement) pourrait relancer l'appétit pour le risque. Le DXY reculerait sous 99 et le S&P 500 dépasserait 7500. Votre portefeuille bénéficierait d'un rebond généralisé, en particulier les actifs AI et L1.",
+      "action": "Identifier les actifs de conviction (BTC, ETH, TAO) pour un renforcement tactique, financé par l'allègement des positions sous-performantes ou des poussières sur les premiers rebonds."
+    }
+  ],
+  "strategy_focus": "La stratégie de la semaine vise un biais neutre à légèrement haussier sur les actifs de conviction, en privilégiant la gestion du risque de concentration. La priorité n°1 est d'optimiser les sorties de poussières et d'alléger les positions faibles sur des rebonds tactiques. Une bascule vers un biais plus agressif serait conditionnée par un DXY sous 99 et une inversion durable des flux ETF Bitcoin/Ethereum.",
+  "my_errors": "L'erreur potentielle de la semaine aurait été de sous-estimer la persistance des sorties d'ETF Bitcoin et Ethereum, malgré un appétit pour le risque apparent sur les marchés actions. Le correctif est de maintenir une vigilance accrue sur ces flux pour la semaine à venir, en les intégrant comme un facteur clé de pression institutionnelle.",
+  "weekly_action_plan": [
+    {
+      "priority": 1,
+      "action": "Liquider les poussières (< 10$ USD) sur un spike de +30%.",
+      "rationale": "Réduire le nombre d'actifs non significatifs et libérer du capital pour des positions de conviction."
+    },
+    {
+      "priority": 2,
+      "action": "Surveiller ETH pour un renforcement tactique si le prix teste 1600$.",
+      "rationale": "ETH (MVRV 0.97) est sous-évalué et 1600$ représente un support psychologique fort pour une zone d'accumulation. Financer en allégeant RSR ou CKB."
+    },
+    {
+      "priority": 3,
+      "action": "Préparer l'allègement de 10% de RSR si le prix atteint 0.0015$.",
+      "rationale": "RSR est une poussière à faible conviction, un rebond offrirait une opportunité de réduire l'exposition et de financer d'autres positions."
+    }
+  ],
+  "losses_vs_recos": "Aucune recommandation ferme n'ayant été émise cette semaine, il n'y a pas de lien direct à établir entre nos conseils et les pertes. Le portefeuille reste en drawdown significatif (-75.5% de l'ATH), reflétant la pression générale du marché crypto et la persistance des sorties d'ETF. Les actifs L1, représentant 46.6% du portefeuille, ont particulièrement souffert cette semaine (-1.27% / 24h).",
+  "watchlist": [
+    {
+      "asset": "ETH",
+      "direction": "entrée",
+      "trigger": "si ETH < 1600$",
+      "rationale": "MVRV 0.97 indique une sous-évaluation, 1600$ est un support clé pour une accumulation long terme. Financer en allégeant RSR ou CKB."
+    },
+    {
+      "asset": "TAO",
+      "direction": "entrée",
+      "trigger": "si TAO < 200$",
+      "rationale": "Le secteur AI montre de la résilience, un dip sous 200$ offrirait un point d'entrée tactique sur un actif de conviction. Financer en allégeant CKB ou ANKR."
+    },
+    {
+      "asset": "RSR",
+      "direction": "sortie",
+      "trigger": "si RSR > 0.0015$",
+      "rationale": "Position poussière à faible conviction, un rebond permettrait de réduire l'exposition et de réallouer le capital."
+    }
+  ],
+  "macro_panorama": "La semaine à venir sera dominée par les décisions de politique monétaire de la BoJ (16 juin) et du FOMC (17 juin). Si Polymarket anticipe un maintien des taux Fed à 99.4%, une surprise de la BoJ (ex: relèvement de taux) pourrait déclencher un débouclage du carry trade yen, pesant sur les actifs risqués mondiaux, y compris votre portefeuille. Les sorties continues des ETF BTC/ETH signalent une pression institutionnelle persistante, rendant tout rebond difficile sans un catalyseur macro fort. La divergence entre un VIX bas (18.29) et une 'Peur extrême' (F&G 12) suggère une complaisance des marchés traditionnels qui pourrait être mise à l'épreuve.",
+  "exit_plan": {
+    "subtitle": "Poussières à liquider sur rebond",
+    "diagnosis": "Votre portefeuille contient 9 positions de poussières (< 10$ USD) pour une valeur totale non significative. Ces actifs, tels que ADA (8.55$), GRT (8.52$), ARB (8.57$), AR (7.57$), NOT (6.81$), AXL (5.49$), ZK (3.45$), SATS (0.01$), FIL (0.01$), représentent une dispersion de capital sans impact notable sur la performance globale.",
+    "monitoring": "L'objectif est de liquider ces positions sur des spikes de +30% ou plus, afin de consolider le portefeuille et de réallouer le capital vers des actifs de conviction. Une surveillance active des volumes et des mouvements de prix est nécessaire pour identifier ces opportunités de sortie."
+  },
+  "long_term_positioning": [
+    {
+      "asset": "BTC",
+      "thesis": "Digital Gold, actif macro de référence. Potentiel de retest de l'ATH et au-delà avec un assouplissement monétaire global.",
+      "target": "Retest ATH (126080$), puis 150k-200k$ sur le cycle.",
+      "status": "accumulation",
+      "status_color": "#4CAF50"
+    },
+    {
+      "asset": "ETH",
+      "thesis": "Écosystème L1 dominant, moteur de la DeFi et des innovations Web3. Sous-évalué (MVRV 0.97).",
+      "target": "Retest ATH (4946.05$), puis 6k-8k$ sur le cycle.",
+      "status": "accumulation",
+      "status_color": "#2196F3"
+    },
+    {
+      "asset": "TAO",
+      "thesis": "Leader de l'infrastructure AI décentralisée. Forte corrélation avec le secteur tech et l'innovation GPU.",
+      "target": "500-600$ à moyen terme, puis retest ATH (757.6$) sur le cycle AI.",
+      "status": "en route",
+      "status_color": "#FFC107"
+    },
+    {
+      "asset": "LINK",
+      "thesis": "Oracle décentralisé essentiel, colonne vertébrale de la DeFi. Adoption croissante par les institutions.",
+      "target": "25-30$ à moyen terme, puis retest ATH (52.7$) sur le cycle DeFi.",
+      "status": "consolide",
+      "status_color": "#FF9800"
+    }
+  ],
+  "sources_review": {
+    "summary": "L'analyse a été menée en s'appuyant sur 5 sources actives sur un total de 25 disponibles, incluant les données macroéconomiques (DXY, S&P 500, VIX, Gold), les calendriers des banques centrales (BoJ, FOMC), et les probabilités de marché de Polymarket. Les prix des actifs proviennent de CoinGecko.",
+    "gaps": "Les principales lacunes identifiées sont l'ancienneté des données on-chain avancées pour BTC et ETH (23/05), limitant leur pertinence tactique. L'absence de données sur les flux ETF au comptant pour la journée en cours représente également un angle mort pour évaluer la pression institutionnelle immédiate. De plus, la divergence persistante entre un VIX bas (18.29) et un sentiment de 'Peur extrême' (F&G 12) crée une ambiguïté sur l'appétit réel pour le risque."
+  },
+  "footer": {
+    "next_morning": "Samedi 13 juin 2026, 09:00 Casablanca",
+    "next_weekly": "dimanche 14 juin 2026, 12:00 Casablanca",
+    "next_report_at": "demain 08h30"
+  },
+  "portfolio_snapshot": {
+    "value_usd": 1703.54,
+    "weekly_pnl_usd": 56.03,
+    "weekly_pnl_pct": 3.4,
+    "change_7d_pct": 3.4,
+    "change_7d_usd": 56.03,
+    "week_start_value": 1647.51,
+    "week_end_value": 1703.54,
+    "vs_btc_7d_pct": -0.28,
+    "vs_eth_7d_pct": 0.01,
+    "ptf_7d_pct": 3.4,
+    "btc_7d_pct": 3.68,
+    "eth_7d_pct": 3.39
+  },
+  "portfolio_overview": {
+    "drawdown_pct": -75.5
+  },
+  "position_correlation": {
+    "available": true,
+    "pairs_high_corr": [
+      {
+        "a": "LINK",
+        "b": "XRP",
+        "corr": 0.94
+      },
+      {
+        "a": "ETH",
+        "b": "LINK",
+        "corr": 0.93
+      },
+      {
+        "a": "LINK",
+        "b": "TAO",
+        "corr": 0.93
+      },
+      {
+        "a": "ANKR",
+        "b": "CKB",
+        "corr": 0.92
+      },
+      {
+        "a": "ANKR",
+        "b": "STX",
+        "corr": 0.9
+      },
+      {
+        "a": "LINK",
+        "b": "STX",
+        "corr": 0.9
+      },
+      {
+        "a": "ANKR",
+        "b": "LINK",
+        "corr": 0.88
+      },
+      {
+        "a": "CKB",
+        "b": "LINK",
+        "corr": 0.88
+      },
+      {
+        "a": "CKB",
+        "b": "STX",
+        "corr": 0.88
+      },
+      {
+        "a": "ETH",
+        "b": "XRP",
+        "corr": 0.88
+      }
+    ],
+    "clusters": [
+      {
+        "members": [
+          "ANKR",
+          "BTC",
+          "CFX",
+          "CKB",
+          "ETH",
+          "FET",
+          "INJ",
+          "JASMY",
+          "LINK",
+          "RENDER",
+          "RSR",
+          "STX",
+          "TAO",
+          "XRP"
+        ],
+        "ptf_pct": 97.5,
+        "value_usd": 1804.03
+      }
+    ],
+    "max_cluster_pct": 97.5,
+    "concentration_reading": "14 positions corrélées (ANKR, BTC, CFX, CKB, ETH, FET, INJ, JASMY, LINK, RENDER, RSR, STX, TAO, XRP) pèsent 97.5% du portefeuille et tendent à bouger ensemble. Un choc commun les impacterait simultanément — risque de concentration réel au-delà de la diversification apparente.",
+    "threshold": 0.7
+  },
+  "upcoming_calendar_facts": {
+    "available": true,
+    "events": [
+      {
+        "label": "Décision BoJ (taux Japon)",
+        "date": "2026-06-16",
+        "when": "dans 4j",
+        "days_ahead": 4
+      },
+      {
+        "label": "Décision FOMC (taux Fed)",
+        "date": "2026-06-17",
+        "when": "dans 5j",
+        "days_ahead": 5
+      }
+    ]
+  },
+  "polymarket_facts": {
+    "fed_bars": {
+      "cut_pct": 0.2,
+      "hold_pct": 99.4,
+      "hike_pct": 0.4,
+      "dominant": "maintien",
+      "dominant_pct": 99.4,
+      "meeting_hint": "réunion juin 2026"
+    },
+    "extra_markets": [
+      {
+        "question": "Will Netherlands win the 2026 FIFA World Cup?",
+        "probability_pct": 4.7,
+        "volume_usd": 43123920,
+        "end_date": "2026-07-20T00:00:00Z"
+      },
+      {
+        "question": "Will the U.S. invade Iran before 2027?",
+        "probability_pct": 19.5,
+        "volume_usd": 36615454,
+        "end_date": "2026-12-31T00:00:00Z"
+      },
+      {
+        "question": "Will China invade Taiwan by end of 2026?",
+        "probability_pct": 6.2,
+        "volume_usd": 34364554,
+        "end_date": "2026-12-31T00:00:00Z"
+      },
+      {
+        "question": "US x Iran permanent peace deal by June 15, 2026?",
+        "probability_pct": 16.6,
+        "volume_usd": 33372772,
+        "end_date": "2026-06-15T00:00:00Z"
+      },
+      {
+        "question": "US x Iran permanent peace deal by June 30, 2026?",
+        "probability_pct": 42.0,
+        "volume_usd": 26612494,
+        "end_date": "2026-05-31T00:00:00Z"
+      }
+    ]
+  },
+  "btc_hold_comparison": {
+    "btc_hold_value": 1708.08,
+    "actual_value": 1703.54,
+    "outperforms": false,
+    "window_label": "7 jours",
+    "verdict": "Ta gestion active sous-performe un simple BTC hold de 0.3% sur 7 jours (même fenêtre que le P&L semaine)."
+  },
+  "weekly_movers": {
+    "gainers": [
+      {
+        "symbol": "ATOM",
+        "change": 16.4
+      },
+      {
+        "symbol": "NOT",
+        "change": 13.1
+      },
+      {
+        "symbol": "ZK",
+        "change": 7.5
+      },
+      {
+        "symbol": "IMX",
+        "change": 7.1
+      },
+      {
+        "symbol": "TAO",
+        "change": 6.4
+      }
+    ],
+    "losers": [
+      {
+        "symbol": "AR",
+        "change": -8.3
+      },
+      {
+        "symbol": "HBAR",
+        "change": -3.0
+      },
+      {
+        "symbol": "FET",
+        "change": -2.7
+      },
+      {
+        "symbol": "GRT",
+        "change": -2.5
+      },
+      {
+        "symbol": "RENDER",
+        "change": -0.9
+      }
+    ]
+  },
+  "calibration": {
+    "available": false,
+    "empty_reason": "Pas encore d'historique · calibration disponible après 5 recos clôturées minimum."
+  },
+  "regret": {
+    "available": true,
+    "entries": [],
+    "total_note": "Aucune erreur coûteuse cette semaine. Discipline maintenue."
+  },
+  "week_ahead": [
+    {
+      "label": "Décision BoJ (taux Japon)",
+      "date": "2026-06-16",
+      "when": "dans 4j",
+      "days_ahead": 4,
+      "importance": "high",
+      "source": "Calendrier BoJ officiel"
+    },
+    {
+      "label": "Décision FOMC (taux Fed)",
+      "date": "2026-06-17",
+      "when": "dans 5j",
+      "days_ahead": 5,
+      "importance": "high",
+      "source": "Calendrier Fed officiel",
+      "polymarket_note": "Polymarket : maintien 99.4%"
+    }
+  ],
+  "ath_facts": {
+    "TAO": {
+      "ath": 757.6,
+      "from_ath_pct": -72.0
+    },
+    "BTC": {
+      "ath": 126080,
+      "from_ath_pct": -49.5
+    },
+    "ETH": {
+      "ath": 4946.05,
+      "from_ath_pct": -66.4
+    },
+    "RENDER": {
+      "ath": 13.53,
+      "from_ath_pct": -87.8
+    },
+    "JASMY": {
+      "ath": 4.79,
+      "from_ath_pct": -99.9
+    },
+    "LINK": {
+      "ath": 52.7,
+      "from_ath_pct": -85.1
+    },
+    "RSR": {
+      "ath": 0.117424,
+      "from_ath_pct": -98.9
+    },
+    "INJ": {
+      "ath": 52.62,
+      "from_ath_pct": -90.3
+    },
+    "CKB": {
+      "ath": 0.04370633,
+      "from_ath_pct": -97.5
+    },
+    "ANKR": {
+      "ath": 0.213513,
+      "from_ath_pct": -98.2
+    },
+    "STX": {
+      "ath": 3.86,
+      "from_ath_pct": -95.3
+    },
+    "FET": {
+      "ath": 3.45,
+      "from_ath_pct": -94.5
+    },
+    "XRP": {
+      "ath": 3.65,
+      "from_ath_pct": -69.0
+    },
+    "QNT": {
+      "ath": 427.42,
+      "from_ath_pct": -84.5
+    },
+    "CFX": {
+      "ath": 1.7,
+      "from_ath_pct": -97.4
+    },
+    "ATOM": {
+      "ath": 43.84,
+      "from_ath_pct": -95.5
+    },
+    "HBAR": {
+      "ath": 0.569229,
+      "from_ath_pct": -86.4
+    },
+    "ACH": {
+      "ath": 0.198666,
+      "from_ath_pct": -97.3
+    },
+    "IMX": {
+      "ath": 9.52,
+      "from_ath_pct": -98.5
+    },
+    "ADA": {
+      "ath": 3.09,
+      "from_ath_pct": -94.5
+    },
+    "GRT": {
+      "ath": 2.84,
+      "from_ath_pct": -99.3
+    },
+    "ARB": {
+      "ath": 2.39,
+      "from_ath_pct": -96.5
+    },
+    "AR": {
+      "ath": 89.24,
+      "from_ath_pct": -97.9
+    },
+    "NOT": {
+      "ath": 0.02836145,
+      "from_ath_pct": -98.5
+    },
+    "AXL": {
+      "ath": 2.64,
+      "from_ath_pct": -98.4
+    },
+    "ZK": {
+      "ath": 0.320983,
+      "from_ath_pct": -96.5
+    },
+    "SATS": {
+      "ath": 9.22983e-07,
+      "from_ath_pct": -99.0
+    },
+    "FIL": {
+      "ath": 236.84,
+      "from_ath_pct": -99.7
+    }
+  },
+  "blind_spots_weekly": {
+    "available": false,
+    "empty_reason": "Pas encore assez d'historique · bilan disponible après 2 semaines de données."
+  },
+  "weekly_source_stats": {
+    "available": true,
+    "avg_active": 20,
+    "best_active": 20,
+    "days_observed": 1,
+    "total": 25
+  },
+  "sector_exposure_computed": {
+    "available": true,
+    "total_usd": 1703.54,
+    "sectors": [
+      {
+        "sector": "L1",
+        "ptf_pct": 46.6,
+        "value_usd": 793.87,
+        "market_change_24h": -1.27,
+        "holdings": [
+          "ADA",
+          "AR",
+          "ATOM",
+          "BTC",
+          "CKB",
+          "ETH",
+          "HBAR",
+          "STX"
+        ]
+      },
+      {
+        "sector": "AI",
+        "ptf_pct": 25.8,
+        "value_usd": 439.8,
+        "market_change_24h": 0.93,
+        "holdings": [
+          "FET",
+          "RENDER",
+          "TAO"
+        ]
+      },
+      {
+        "sector": "DeFi",
+        "ptf_pct": 6.4,
+        "value_usd": 108.87,
+        "market_change_24h": -2.81,
+        "holdings": [
+          "INJ",
+          "RSR"
+        ]
+      },
+      {
+        "sector": "Oracle/Infra",
+        "ptf_pct": 6.2,
+        "value_usd": 105.68,
+        "market_change_24h": -0.4,
+        "holdings": [
+          "LINK",
+          "QNT"
+        ]
+      },
+      {
+        "sector": "IoT/Data",
+        "ptf_pct": 3.8,
+        "value_usd": 65.36,
+        "market_change_24h": -2.41,
+        "holdings": [
+          "JASMY"
+        ]
+      },
+      {
+        "sector": "Payments",
+        "ptf_pct": 3.5,
+        "value_usd": 59.37,
+        "market_change_24h": -0.35,
+        "holdings": [
+          "ACH",
+          "XRP"
+        ]
+      },
+      {
+        "sector": "Infra",
+        "ptf_pct": 3.5,
+        "value_usd": 59.94,
+        "market_change_24h": -1.84,
+        "holdings": [
+          "ANKR",
+          "GRT"
+        ]
+      },
+      {
+        "sector": "L2",
+        "ptf_pct": 3.4,
+        "value_usd": 58.33,
+        "market_change_24h": -0.81,
+        "holdings": [
+          "ARB",
+          "CFX",
+          "IMX",
+          "ZK"
+        ]
+      },
+      {
+        "sector": "Divers (<1% · 4 secteurs)",
+        "ptf_pct": 0.7,
+        "value_usd": 12.32,
+        "market_change_24h": null,
+        "holdings": []
+      }
+    ]
+  },
+  "crypto_price_status": {
+    "BTC": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 63658.0
+    },
+    "ETH": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 1663.36
+    },
+    "XRP": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 1.13
+    },
+    "ADA": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.170294
+    },
+    "LINK": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 7.83
+    },
+    "HBAR": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.077686
+    },
+    "TAO": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 212.1
+    },
+    "ATOM": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 1.96
+    },
+    "QNT": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 66.05
+    },
+    "RENDER": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 1.65
+    },
+    "FIL": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.747835
+    },
+    "ARB": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.083629
+    },
+    "INJ": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 5.11
+    },
+    "FET": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.188656
+    },
+    "STX": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.179498
+    },
+    "CFX": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.04441683
+    },
+    "JASMY": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.00466153
+    },
+    "GRT": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.0196461
+    },
+    "AR": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 1.87
+    },
+    "IMX": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.141388
+    },
+    "ZK": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.0112321
+    },
+    "RSR": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.0013459
+    },
+    "CKB": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.00110854
+    },
+    "AXL": {
+      "status": "confirmed",
+      "gap_pct": 0.5,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.04261345
+    },
+    "NOT": {
+      "status": "confirmed",
+      "gap_pct": 0.0,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.00042681
+    },
+    "ANKR": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.00385415
+    },
+    "SATS": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 9.565e-09
+    },
+    "ACH": {
+      "status": "confirmed",
+      "gap_pct": 0.1,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.00544505
+    }
+  },
+  "ptf_quality_score": {
+    "score": 3.8,
+    "axes": [
+      {
+        "label": "Diversification",
+        "score": 5.7,
+        "detail": "top secteur 47% du PTF"
+      },
+      {
+        "label": "Réserve cash",
+        "score": 0.0,
+        "detail": "USDC 0.0% du PTF"
+      },
+      {
+        "label": "Momentum vs BTC",
+        "score": 4.9,
+        "detail": "-0.3 pts vs BTC 7j"
+      },
+      {
+        "label": "Solidité (vs ATH)",
+        "score": 4.7,
+        "detail": "n/d"
+      }
+    ],
+    "prev_score": null,
+    "delta_wow": null
+  },
+  "_saved_at": "2026-06-12T18:25:09.083007+00:00"
+}
