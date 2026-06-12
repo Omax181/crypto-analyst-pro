@@ -1,0 +1,396 @@
+{
+  "header": {
+    "date": "vendredi 12 juin 2026 · 19:20 Casablanca",
+    "time_casablanca": "vendredi 12 juin 2026 · 19:20 Casablanca",
+    "hours_since_morning": 1,
+    "morning_time_label": "19h14",
+    "since_morning_label": "il y a 4min",
+    "evening_time_label": "19h18",
+    "timing_line": "matin 19h14 · soir 19h18 · il y a 4min",
+    "ptf_value_delta_since_morning": -0.19,
+    "ptf_value_pct_since_morning": -0.01
+  },
+  "portfolio_snapshot": {
+    "value_usd": 1706.8,
+    "change_since_morning_pct": -0.01
+  },
+  "delta_summary": [
+    "Sentiment stable mais marchés US ralentissent: Le sentiment de 'Peur Extrême' (F&G 12) persiste. Les indices US (S&P 500 +25.94, Nasdaq +37.41) progressent moins vite qu'en matinée.",
+    "Rotation sectorielle persistante: Le secteur AI (RENDER +3.17%) continue de surperformer, tandis que STX (-3.78%) et RSR (-3.35%) affichent des baisses notables, accentuant la divergence interne du portefeuille.",
+    "Légère hausse du taux BoJ: Le taux de la Banque du Japon a été ajusté à 0.727% (vs 0.7% ce matin), un signal de normalisation monétaire avant la décision officielle dans 4 jours."
+  ],
+  "market_changes": [
+    {
+      "status": "unchanged",
+      "description": "Le Fear & Greed Index reste à 12 ('Peur Extrême'), confirmant la prudence sous-jacente malgré la hausse des actions.",
+      "source": "Fear & Greed Index 19h18"
+    },
+    {
+      "status": "confirmed",
+      "description": "Le S&P 500 (+25.94 à 7420.24) et le Nasdaq (+37.41 à 25847.068) maintiennent une progression, mais à un rythme ralenti par rapport au matin.",
+      "source": "Yahoo Finance 19h18"
+    },
+    {
+      "status": "new",
+      "description": "Le taux de la Banque du Japon a été ajusté à 0.727% (vs 0.7% ce matin), un mouvement mineur avant la décision officielle attendue dans 4 jours.",
+      "source": "Yahoo Finance 19h18"
+    },
+    {
+      "status": "new",
+      "description": "AMD surperforme (+5.12%), MSTR (+2.03%) et MARA (+3.27%) sont en hausse, tandis que NVDA est en léger recul (-0.17%), montrant des dynamiques variées dans les actions liées aux cryptos.",
+      "source": "Yahoo Finance 19h18"
+    },
+    {
+      "status": "unchanged",
+      "description": "Le régime macro reste en 'transition', avec des signaux contradictoires entre la 'Peur Extrême' et la résilience des marchés actions.",
+      "source": "Rapport matin 19h13"
+    }
+  ],
+  "news_today": [
+    {
+      "title": "Sam Bankman-Fried perd son appel",
+      "source": "Cointelegraph",
+      "time": "16h39",
+      "impact": "Cette nouvelle est négative pour la réputation générale de l'industrie crypto, mais son impact sur les prix est probablement déjà intégré.",
+      "status": "intégré"
+    },
+    {
+      "title": "Ancien président de la SEC rejette l'autorité de la CFTC sur les marchés de prédiction",
+      "source": "The Block",
+      "time": "17h49",
+      "impact": "Clarification réglementaire potentiellement positive pour les projets de marchés de prédiction, mais l'impact sur le portefeuille est indirect et probablement déjà intégré.",
+      "status": "intégré"
+    },
+    {
+      "title": "Faible probabilité d'accord de paix US-Iran",
+      "source": "Polymarket",
+      "time": "19h18",
+      "impact": "Polymarket indique une probabilité de seulement 16.6% pour un accord de paix permanent US-Iran d'ici le 15 juin, suggérant une persistance des tensions géopolitiques qui pourrait peser sur le sentiment global.",
+      "status": "actionnable"
+    }
+  ],
+  "levels_tonight": [
+    {
+      "asset": "BTC",
+      "level": "63 000 $",
+      "type": "support",
+      "trigger": "sous 63k → risque de test du support psychologique à 62k, alléger 10% de la position BTC si cassure confirmée."
+    },
+    {
+      "asset": "BTC",
+      "level": "64 500 $",
+      "type": "resistance",
+      "trigger": "au-dessus de 64.5k → potentiel de rebond vers 65k, renforcer 5% de la position BTC financé par allègement de 5% de STX."
+    },
+    {
+      "asset": "ETH",
+      "level": "1 650 $",
+      "type": "support",
+      "trigger": "sous 1650 $ → risque de glissade vers 1600 $, surveiller."
+    },
+    {
+      "asset": "DXY",
+      "level": "99.5",
+      "type": "support",
+      "trigger": "sous 99.5 → signal de faiblesse du dollar, potentiellement favorable aux actifs risqués."
+    },
+    {
+      "asset": "DXY",
+      "level": "100.5",
+      "type": "critical",
+      "trigger": "au-dessus de 100.5 (clôture journalière) → invalidation du scénario de rebond crypto, pression baissière confirmée. (Source: Rapport matin)"
+    },
+    {
+      "asset": "RENDER",
+      "level": "1.60 $",
+      "type": "support",
+      "trigger": "sous 1.60 $ → invalidation de la force relative du secteur AI, surveiller."
+    },
+    {
+      "asset": "STX",
+      "level": "0.175 $",
+      "type": "support",
+      "trigger": "sous 0.175 $ → confirmation de la faiblesse, envisager alléger 10% de la position STX."
+    }
+  ],
+  "actions_tonight": [
+    "Placer une alerte BTC à 63 000 $ pour surveiller le support clé.",
+    "Placer une alerte DXY à 100.5 pour surveiller le seuil d'invalidation macro."
+  ],
+  "tomorrow_checklist": {
+    "calendar": [
+      {
+        "label": "Décision BoJ (taux Japon)",
+        "date": "2026-06-16",
+        "when": "dans 4j",
+        "days_ahead": 4,
+        "source": "Calendrier BoJ officiel",
+        "importance": "high"
+      },
+      {
+        "label": "Décision FOMC (taux Fed)",
+        "date": "2026-06-17",
+        "when": "dans 5j",
+        "days_ahead": 5,
+        "source": "Calendrier Fed officiel",
+        "importance": "high"
+      }
+    ],
+    "checks": "Le secteur AI (RENDER, TAO, FET) maintient-il sa force relative overnight ? · Les flux ETF Bitcoin et Ethereum (si disponibles demain matin) montrent-ils un retour des acheteurs institutionnels ?",
+    "scenario": "Le marché crypto devrait consolider autour des niveaux actuels, avec une légère pression baissière si le DXY reste au-dessus de 99.7 et les tensions géopolitiques persistent.",
+    "invalidation": "BTC clôture sous 62 000 $ OU DXY clôture au-dessus de 100.5."
+  },
+  "blind_spots": "L'absence de données sur les flux ETF au comptant pour la journée en cours limite l'évaluation de la pression institutionnelle immédiate.",
+  "footer": {
+    "next_morning_time": "08h30",
+    "next_report_at": "demain 08h30"
+  },
+  "daily_pnl": {
+    "value_usd": 1706.8,
+    "day_change_usd": -0.19,
+    "day_change_pct": -0.01,
+    "day_change_label": "neutre",
+    "top_movers": [
+      {
+        "symbol": "STX",
+        "change": -3.8,
+        "pnl_usd": -1.58,
+        "value_usd": 41.72
+      },
+      {
+        "symbol": "RSR",
+        "change": -3.4,
+        "pnl_usd": -1.93,
+        "value_usd": 57.57
+      },
+      {
+        "symbol": "RENDER",
+        "change": 3.2,
+        "pnl_usd": 2.07,
+        "value_usd": 65.31
+      },
+      {
+        "symbol": "JASMY",
+        "change": -2.7,
+        "pnl_usd": -1.74,
+        "value_usd": 65.43
+      },
+      {
+        "symbol": "IMX",
+        "change": -2.5,
+        "pnl_usd": -0.41,
+        "value_usd": 16.53
+      }
+    ]
+  },
+  "reco_bilan": [],
+  "evening_heatmap": {
+    "gainers": [
+      {
+        "symbol": "RENDER",
+        "change": 3.2,
+        "pnl_usd": 2.07,
+        "value_usd": 65.31
+      },
+      {
+        "symbol": "TAO",
+        "change": 1.1,
+        "pnl_usd": 3.67,
+        "value_usd": 340.54
+      },
+      {
+        "symbol": "BTC",
+        "change": 0.5,
+        "pnl_usd": 1.6,
+        "value_usd": 333.16
+      }
+    ],
+    "losers": [
+      {
+        "symbol": "STX",
+        "change": -3.8,
+        "pnl_usd": -1.58,
+        "value_usd": 41.72
+      },
+      {
+        "symbol": "RSR",
+        "change": -3.4,
+        "pnl_usd": -1.93,
+        "value_usd": 57.57
+      },
+      {
+        "symbol": "JASMY",
+        "change": -2.7,
+        "pnl_usd": -1.74,
+        "value_usd": 65.43
+      }
+    ]
+  },
+  "polymarket_facts": {
+    "fed_bars": {
+      "cut_pct": 0.2,
+      "hold_pct": 99.4,
+      "hike_pct": 0.4,
+      "dominant": "maintien",
+      "dominant_pct": 99.4,
+      "meeting_hint": "réunion juin 2026"
+    },
+    "extra_markets": [
+      {
+        "question": "Will Netherlands win the 2026 FIFA World Cup?",
+        "probability_pct": 4.7,
+        "volume_usd": 43123920,
+        "end_date": "2026-07-20T00:00:00Z"
+      },
+      {
+        "question": "Will the U.S. invade Iran before 2027?",
+        "probability_pct": 19.5,
+        "volume_usd": 36615454,
+        "end_date": "2026-12-31T00:00:00Z"
+      },
+      {
+        "question": "Will China invade Taiwan by end of 2026?",
+        "probability_pct": 6.2,
+        "volume_usd": 34364554,
+        "end_date": "2026-12-31T00:00:00Z"
+      },
+      {
+        "question": "US x Iran permanent peace deal by June 15, 2026?",
+        "probability_pct": 16.6,
+        "volume_usd": 33372772,
+        "end_date": "2026-06-15T00:00:00Z"
+      },
+      {
+        "question": "US x Iran permanent peace deal by June 30, 2026?",
+        "probability_pct": 42.0,
+        "volume_usd": 26612494,
+        "end_date": "2026-05-31T00:00:00Z"
+      }
+    ]
+  },
+  "risk_score": {
+    "score": 4.1,
+    "level": "modéré",
+    "level_color": "#BA7517",
+    "factors": [
+      "concentration L1 47%",
+      "aucune réserve cash (USDC ~0%)",
+      "sentiment Peur Extrême (F&G 12)"
+    ],
+    "components": [
+      {
+        "label": "Drawdown 7j",
+        "pts": 0.0,
+        "max": 3.0
+      },
+      {
+        "label": "Concentration",
+        "pts": 1.3,
+        "max": 2.5
+      },
+      {
+        "label": "Cash",
+        "pts": 1.5,
+        "max": 1.5
+      },
+      {
+        "label": "Sentiment",
+        "pts": 1.0,
+        "max": 1.5
+      }
+    ]
+  },
+  "evening_macro": {
+    "btc_price": 63763,
+    "btc_change_24h": 0.4799038269209168,
+    "fear_greed": 12,
+    "fear_greed_label": "Peur extrême",
+    "fear_greed_delta": 0,
+    "gold_usd": 4241.3,
+    "gold_delta": 127.30000000000018,
+    "sp500": 7420.24,
+    "sp500_delta": 25.9399999999996,
+    "nasdaq": 25847.068,
+    "nasdaq_delta": 37.40799999999945,
+    "vix": 18.25,
+    "vix_delta": -1.1900000000000013,
+    "brent_usd": 87.27,
+    "brent_delta": -3.1099999999999994,
+    "dxy": 99.757,
+    "dxy_broad": 120.0831,
+    "dxy_ice": 99.757,
+    "dxy_delta": -0.10099999999999909,
+    "nikkei": 66020.04,
+    "nikkei_delta": 1802.7699999999968,
+    "stoxx50": 6187.63,
+    "stoxx50_delta": 130.67000000000007,
+    "eur_usd": 1.1577,
+    "usd_jpy": 160.222,
+    "ecb_deposit_rate": 2.0,
+    "boj_rate": 0.727
+  },
+  "macro_source_status": {
+    "gold_usd": "single",
+    "brent_usd": "single",
+    "wti_usd": "single",
+    "sp500": "confirmed",
+    "nasdaq": "confirmed",
+    "vix": "confirmed",
+    "us_10y": "single",
+    "dxy_ice": "single",
+    "dxy": "single",
+    "eur_usd": "confirmed",
+    "usd_jpy": "confirmed",
+    "nikkei": "confirmed",
+    "stoxx50": "single",
+    "dax": "single",
+    "ecb_deposit_rate": "single",
+    "boj_rate": "single"
+  },
+  "tomorrow_macro_events": [
+    {
+      "label": "Décision BoJ (taux Japon)",
+      "date": "2026-06-16",
+      "when": "dans 4j",
+      "days_ahead": 4,
+      "source": "Calendrier BoJ officiel",
+      "importance": "high"
+    },
+    {
+      "label": "Décision FOMC (taux Fed)",
+      "date": "2026-06-17",
+      "when": "dans 5j",
+      "days_ahead": 5,
+      "source": "Calendrier Fed officiel",
+      "importance": "high"
+    }
+  ],
+  "intraday_news": [
+    {
+      "title": "Bond Investor Ken Leech Pleads Guilty to Obstructing SEC Probe",
+      "source": "Barron's",
+      "timestamp": "2026-06-12T18:10:00+00:00"
+    },
+    {
+      "title": "Former SEC Chair Gensler rejects CFTC claim of authority over prediction market sports betting",
+      "source": "The Block",
+      "timestamp": "2026-06-12T17:49:07+00:00"
+    },
+    {
+      "title": "CNB Community Bancorp raises quarterly dividend by 3% to $0.34/share",
+      "source": "Seeking Alpha",
+      "timestamp": "2026-06-12T17:45:46+00:00"
+    },
+    {
+      "title": "Iran-Linked Group That Hacked Kash Patel's Email Threatens World Cup With Hijacked FBI Drones",
+      "source": "Decrypt",
+      "timestamp": "2026-06-12T17:12:36+00:00"
+    },
+    {
+      "title": "Sam Bankman-Fried loses appeal to overturn 25-year prison sentence",
+      "source": "Cointelegraph",
+      "timestamp": "2026-06-12T16:39:16+00:00"
+    }
+  ],
+  "_saved_at": "2026-06-12T18:20:13.567119+00:00"
+}
