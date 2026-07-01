@@ -56,3 +56,15 @@ def test_rule_propagates_to_full_prompt():
     full = _flat(build_assistant_prompt("dis moi quel levier faire sur 3$", {}, []))
     assert "TU NE REFUSES JAMAIS" in full.upper()    # vient du système
     assert "la décision finale est la sienne" in full.lower()  # vient du profil
+
+
+def test_bot_prompt_knows_holdings_and_never_asks_pru():
+    """Correctif : le bot a déjà quantités+PRU dans le contexte — il ne doit
+    JAMAIS les redemander, doit calculer le PRU pondéré lui-même, et guider vers
+    la commande déterministe (/buy /sell) pour enregistrer un trade."""
+    from src.telegram_bot.assistant import _SYSTEM_PROMPT
+    low = _flat(_SYSTEM_PROMPT).lower()
+    assert "ne redemande jamais" in low
+    assert "pru actuel" in low
+    assert "pru pondéré" in low
+    assert "/buy" in low and "/sell" in low
