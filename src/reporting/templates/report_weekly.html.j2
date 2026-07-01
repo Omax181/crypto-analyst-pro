@@ -1,0 +1,683 @@
+{# Rapport hebdo V8 — bilan semaine + scénarios + LT, mail-safe.
+   Refonte intégrale appliquant les 37 points du prompt utilisateur :
+   - Header en <table> mail-safe (point 31 h1 25px)
+   - Portfolio 4 KPI horizontaux : Valeur · vs BTC 7j · P&L semaine · Cash USDC
+     (points 1+9+10) — drawdown supprimé, P&L semaine partout en remplacement
+   - Scoring en table 4 col (point 11), win rate gris quand 0 (point 12)
+   - Calibration toujours présente + message neutre si vide (point 3)
+   - Coût des erreurs : mini-bannière 1 ligne si vide, structure dense sinon (point 15)
+   - Top movers en 2-col 50% (point 16), format "WLD · +33.5%" (point 33)
+   - Exit plan : tableau compact 2-col tickers/valeur (point 17)
+   - Scénarios : titre split + badge proba + bannière action + repli (points 18-20)
+   - Probabilités scénarios : note de bas (point 7)
+   - Positionnement LT : vrai tableau compact (Option A point 21)
+   - Bilan angles morts récurrents toujours présent + message neutre (point 4)
+   - Sources actives bilan : 2 sous-listes structurées (point 27)
+   - h1 25px, h2 17px (point 31), sous-titres uppercase 12px #1a1a18 (point 32)
+   - Format prix unifié via fmt_price (point 34), % 1 décimale via fmt_pct (point 35)
+   - Pastilles ² (point 6)
+   - Footer heures Casablanca HH:MM (point 39), corrections cron (points 29-30) #}
+
+{% set _cps = crypto_price_status or {} %}
+{% set _mss = macro_source_status or {} %}
+
+{# ── HEADER (table mail-safe, h1 25px) ── #}
+<div style="border-bottom:0.5px solid #e5e4dc;padding-bottom:1rem;margin-bottom:1.5rem;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+    <tr>
+      <td style="vertical-align:top;">
+        <p style="font-size:12px;color:#5a5852;margin:0 0 4px 0;">{{header.time_casablanca or header.date}}{% if header.week_number %} · semaine {{header.week_number}}/{{header.year or 2026}}{% endif %}</p>
+        <h1 style="margin:0;font-size:25px;font-weight:500;line-height:1.2;">Rapport hebdomadaire</h1>
+        <p style="font-size:12px;color:#8a8880;margin:6px 0 0 0;">Bilan{% if header.period_covered %} {{header.period_covered}}{% else %} semaine passée{% endif %} · focus semaine à venir</p>
+        {% if header.sources_week_label %}<p style="font-size:10px;color:#8a8880;margin:4px 0 0 0;">{{header.sources_week_label}}</p>{% endif %}
+      </td>
+      <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">PTF</p>
+        {# Bug 2 : si value_usd absent, masquer la zone valeur (pas de tiret orphelin). #}
+        {% if portfolio_snapshot.value_usd %}
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;">{{ portfolio_snapshot.value_usd|fmt_price }}</p>
+        {% endif %}
+        {% if (portfolio_snapshot.weekly_pnl_pct|default(none)) is not none %}<p style="font-size:10px;color:{% if (portfolio_snapshot.weekly_pnl_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ portfolio_snapshot.weekly_pnl_pct|fmt_pct }} sem.</p>{% endif %}
+        {# v23 — winrate 30j en tête (une fois, comme le matin/soir). #}
+        {% set _wr_parts_w = (header.win_rate_total or '0/0').split('/') %}
+        {% set _wr_total_w = (_wr_parts_w[1]|num(0)) if (_wr_parts_w|length > 1) else 0 %}
+        {% set _wr_val_w = header.win_rate_30d|num(none) %}
+        <p style="font-size:10px;color:#8a8880;margin:8px 0 0 0;">Win rate 30j · <span style="font-weight:600;color:{% if _wr_total_w >= 5 and _wr_val_w is not none and _wr_val_w >= 50 %}#3B6D11{% elif _wr_total_w >= 5 and _wr_val_w is not none and _wr_val_w < 50 %}#A32D2D{% else %}#5a5852{% endif %};">{% if _wr_total_w < 1 or _wr_val_w is none %}— pas encore d'historique{% else %}{{ '%.0f'|format(_wr_val_w) }}%{% if _wr_total_w < 5 %} ({{header.win_rate_total}}){% endif %}{% endif %}</span></p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+{# ── BILAN SEMAINE (v16 : bulletpoints explicatifs + gras sur termes clés) ── #}
+<h2 style="margin:0 0 0.75rem 0;font-size:17px;font-weight:500;">Bilan semaine{% if header.week_number %} {{header.week_number}}{% endif %} · ce qui s'est passé</h2>
+<div style="background:#f5f4ee;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
+  {% if weekly_summary is iterable and weekly_summary is not string %}
+  {% for b in weekly_summary %}
+  <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;"><tr>
+    <td style="width:16px;vertical-align:top;font-size:13px;line-height:1.6;color:#534AB7;">•</td>
+    <td style="font-size:13px;line-height:1.6;color:#1a1a18;padding-bottom:{{ '6px' if not loop.last else '0' }};">{{ (b.text if b is mapping else b)|md }}</td>
+  </tr></table>
+  {% endfor %}
+  {% else %}
+  <p style="margin:0;font-size:13px;line-height:1.7;">{{ weekly_summary|md if weekly_summary else "Synthèse de la semaine en cours de préparation." }}</p>
+  {% endif %}
+</div>
+
+{# ── PORTFOLIO · VUE D'ENSEMBLE (table 4 col 25%, P&L semaine remplace
+   drawdown — points 9+10) ── #}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Portfolio · vue d'ensemble</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
+    <tr>
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Valeur</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;color:#1a1a18;">{% if portfolio_snapshot.value_usd %}{{ portfolio_snapshot.value_usd|fmt_price }}{% else %}—{% endif %}</p>
+      </td>
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">vs BTC 7j</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;color:{% if (portfolio_snapshot.vs_btc_7d_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if (portfolio_snapshot.vs_btc_7d_pct|default(none)) is not none %}{{ portfolio_snapshot.vs_btc_7d_pct|fmt_pct }}{% else %}—{% endif %}</p>
+        {% if (portfolio_snapshot.vs_btc_7d_pct|default(none)) is not none %}<p style="font-size:10px;color:#8a8880;margin:0;">{{ 'outperform' if (portfolio_snapshot.vs_btc_7d_pct|num(0)) >= 0 else 'underperform' }}</p>{% endif %}
+      </td>
+      <td style="width:25%;vertical-align:top;padding-right:6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">P&amp;L semaine</p>
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;color:{% if (portfolio_snapshot.weekly_pnl_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if (portfolio_snapshot.weekly_pnl_pct|default(none)) is not none %}{{ portfolio_snapshot.weekly_pnl_pct|fmt_pct }}{% else %}—{% endif %}</p>
+        {% if (portfolio_snapshot.weekly_pnl_usd|default(none)) is not none %}<p style="font-size:10px;color:#5a5852;margin:0;">{% if (portfolio_snapshot.weekly_pnl_usd|num(0)) >= 0 %}+${{ '{:,.0f}'.format((portfolio_snapshot.weekly_pnl_usd)|num(0)) }}{% else %}−${{ '{:,.0f}'.format(((portfolio_snapshot.weekly_pnl_usd)|num(0))|abs) }}{% endif %}</p>{% endif %}
+      </td>
+      <td style="width:25%;vertical-align:top;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Cash USDC</p>
+        {% set _ucp = portfolio_snapshot.usdc_pct|num(none) %}
+        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;color:#1a1a18;">{% if _ucp is not none %}{{ _ucp|round|int }}%{% else %}—{% endif %}</p>
+        {% if _ucp is not none and _ucp < 1 %}<p style="font-size:10px;color:#8a8880;margin:0;">100% investi</p>{% elif portfolio_snapshot.usdc_usd %}<p style="font-size:10px;color:#8a8880;margin:0;">{{ portfolio_snapshot.usdc_usd|fmt_price }}</p>{% endif %}
+      </td>
+    </tr>
+  </table>
+
+  {# ── B2 — PERF vs BENCHMARKS (PTF / BTC / ETH sur 7j) ── #}
+  {% if (portfolio_snapshot.ptf_7d_pct|default(none)) is not none and (portfolio_snapshot.eth_7d_pct|default(none)) is not none %}
+  <div style="margin:14px 0 0 0;font-size:12px;color:#5a5852;line-height:1.6;">
+    <span style="font-weight:500;color:#1a1a18;">Perf 7j vs benchmarks :</span>
+    PTF <span style="font-weight:600;color:{% if (portfolio_snapshot.ptf_7d_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ portfolio_snapshot.ptf_7d_pct|fmt_pct }}</span>
+    {% if (portfolio_snapshot.btc_7d_pct|default(none)) is not none %} · BTC <span style="color:{% if (portfolio_snapshot.btc_7d_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ portfolio_snapshot.btc_7d_pct|fmt_pct }}</span>{% endif %}
+    · ETH <span style="color:{% if (portfolio_snapshot.eth_7d_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ portfolio_snapshot.eth_7d_pct|fmt_pct }}</span>
+    {% if (portfolio_snapshot.vs_eth_7d_pct|default(none)) is not none %}<span style="color:#8a8880;"> · PTF vs ETH {{ portfolio_snapshot.vs_eth_7d_pct|fmt_pct }}</span>{% endif %}
+  </div>
+  {% endif %}
+
+  {# ── v23 — ÉVOLUTION PTF : vraie COURBE (aire + base 100 vs BTC) en image CID.
+     Repli sur mini-barres HTML/CSS (Gmail-safe) si le PNG n'a pas été généré
+     (matplotlib absent / historique < 3 points). ── #}
+  {% set _vals = [] %}
+  {% for _e in (ptf_evolution or []) %}{% if (_e.value is not none) and (_e.value is number) %}{% set _ = _vals.append(_e.value) %}{% endif %}{% endfor %}
+  {% if charts and charts.get('ptf_evolution') %}
+  <div style="margin:14px 0 0 0;">
+    <img src="cid:chart_ptf_evolution" alt="Évolution du portefeuille" style="width:100%;max-width:660px;height:auto;display:block;border:0.5px solid #e5e4dc;border-radius:8px;">
+    {% if (_vals|length) >= 2 %}<p style="font-size:10px;color:#8a8880;margin:3px 0 0 0;">{{ _vals[0]|fmt_price }} (il y a {{_vals|length - 1}} sem.) → {{ _vals[-1]|fmt_price }} (auj.)</p>{% endif %}
+  </div>
+  {% elif (_vals|length) >= 2 %}
+  {% set _mn = _vals|min %}{% set _mx = _vals|max %}{% set _rng = (_mx - _mn) if (_mx - _mn) > 0 else 1 %}
+  <div style="margin:14px 0 0 0;">
+    <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Évolution PTF ({{_vals|length}} semaines)</p>
+    <table role="presentation" cellpadding="0" cellspacing="2" border="0" style="border-collapse:separate;">
+      <tr>
+        {% for v in _vals %}
+        {% set _hh = (6 + ((v - _mn) / _rng) * 26)|round(0)|int %}
+        <td style="vertical-align:bottom;width:18px;">
+          <div style="background:{% if loop.last and _vals[-1] >= _vals[0] %}#3B6D11{% elif loop.last %}#A32D2D{% else %}#cfcdc3{% endif %};height:{{_hh}}px;width:14px;border-radius:2px 2px 0 0;font-size:0;line-height:0;">&nbsp;</div>
+        </td>
+        {% endfor %}
+      </tr>
+    </table>
+    <p style="font-size:10px;color:#8a8880;margin:2px 0 0 0;">{{ _vals[0]|fmt_price }} (il y a {{_vals|length - 1}} sem.) → {{ _vals[-1]|fmt_price }} (auj.)</p>
+  </div>
+  {% endif %}
+  {# v15 (audit P0-8) — fenêtre du P&L semaine EXPLICITE : début → fin. #}
+  {% if portfolio_snapshot.week_start_value and portfolio_snapshot.week_end_value %}
+  <p style="font-size:10px;color:#8a8880;margin:10px 0 0 0;">Fenêtre du P&amp;L semaine : {{portfolio_snapshot.week_start_value|fmt_price}} (il y a 7 j) → {{portfolio_snapshot.week_end_value|fmt_price}} (aujourd'hui){% if header.period_covered %} · {{header.period_covered}}{% endif %}.</p>
+  {% endif %}
+  {# ── GESTION ACTIVE VS BTC HOLD : SUPPRIMÉ en v16 (Omar dispose déjà de cette
+     comparaison ailleurs ; règle au passage le doublon « [fenêtre : 7 jours] »). ── #}
+
+  {# ── v15 — SCORE QUALITÉ PTF (4 axes 0-10, formules Python transparentes) ── #}
+  {% if ptf_quality_score %}
+  {% set _q = ptf_quality_score %}
+  <div style="background:#f5f4ee;border-radius:8px;padding:10px 12px;margin:14px 0 0 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+      <tr>
+        <td style="vertical-align:middle;white-space:nowrap;padding-right:14px;">
+          <span style="font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;">Santé du portefeuille</span><br>
+          <span style="font-size:20px;font-weight:700;color:{% if (_q.score|num(0)) >= 6.5 %}#3B6D11{% elif (_q.score|num(0)) >= 4 %}#BA7517{% else %}#A32D2D{% endif %};">{{_q.score}}</span><span style="font-size:11px;color:#8a8880;">/10</span>
+          {% if _q.delta_wow is not none %}<br><span style="font-size:10px;color:{% if (_q.delta_wow|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (_q.delta_wow|num(0)) >= 0 else '' }}{{_q.delta_wow}} vs sem. dernière</span>{% endif %}
+        </td>
+        <td style="vertical-align:middle;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+            {% for ax in _q.axes %}
+            {% set _aw = ((ax.score|num(0)) * 10)|round(0)|int %}
+            <tr>
+              <td style="font-size:10px;color:#5a5852;white-space:nowrap;padding:1px 8px 1px 0;width:108px;">{{ax.label}}</td>
+              <td style="vertical-align:middle;padding:1px 8px 1px 0;">
+                <div style="background:#e5e4dc;border-radius:3px;height:6px;width:100%;max-width:150px;"><div style="background:{% if _aw >= 65 %}#3B6D11{% elif _aw >= 40 %}#BA7517{% else %}#A32D2D{% endif %};border-radius:3px;height:6px;width:{{[_aw, 2]|max}}%;"></div></div>
+              </td>
+              <td style="font-size:10px;color:#8a8880;white-space:nowrap;padding:1px 0;width:118px;">{{ax.score}}/10 · {{ax.detail}}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </td>
+      </tr>
+    </table>
+    {% if _q.improve %}<p style="font-size:11px;color:#1a1a18;margin:8px 0 0 0;"><span style="font-weight:600;">Pour l'améliorer :</span> {{_q.improve}}</p>{% endif %}
+    <p style="font-size:9px;color:#8a8880;margin:6px 0 0 0;font-style:italic;">Santé du portefeuille = santé structurelle (diversification, momentum vs BTC, solidité vs ATH), moyenne des 3 axes — même logique que la note Santé des mails matin/soir.</p>
+  </div>
+  {% endif %}
+  {% if weekly_movers and (weekly_movers.gainers or weekly_movers.losers) %}
+  <p style="font-size:12px;color:#1a1a18;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Top mouvements de la semaine</p>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;border-top:0.5px solid #e5e4dc;padding-top:8px;">
+    <tr>
+      <td style="width:50%;vertical-align:top;padding:8px 8px 0 0;">
+        <p style="font-size:10px;color:#3B6D11;margin:0 0 4px 0;font-weight:700;">▲ Gagnants</p>
+        {% for g in weekly_movers.gainers %}
+        <div style="font-size:12px;line-height:1.5;color:#1a1a18;">{{g.symbol}}{{ _cps.get(g.symbol, {}).get('status') | pastille }} · <span style="color:#3B6D11;font-weight:600;">{{ g.change|fmt_pct }}</span></div>
+        {% endfor %}
+        {% if not weekly_movers.gainers %}<div style="font-size:12px;color:#8a8880;font-style:italic;">Pas de gagnant cette semaine</div>{% endif %}
+      </td>
+      <td style="width:50%;vertical-align:top;padding:8px 0 0 8px;border-left:0.5px solid #e5e4dc;">
+        <p style="font-size:10px;color:#A32D2D;margin:0 0 4px 0;font-weight:700;">▼ Perdants</p>
+        {% for l in weekly_movers.losers %}
+        <div style="font-size:12px;line-height:1.5;color:#1a1a18;">{{l.symbol}}{{ _cps.get(l.symbol, {}).get('status') | pastille }} · <span style="color:#A32D2D;font-weight:600;">{{ l.change|fmt_pct }}</span></div>
+        {% endfor %}
+        {% if not weekly_movers.losers %}<div style="font-size:12px;color:#8a8880;font-style:italic;">Pas de perdant cette semaine</div>{% endif %}
+      </td>
+    </tr>
+  </table>
+  {% endif %}
+
+  {# v23.x — exposition sectorielle en CASES colorées (homogène avec la heatmap
+     du matin) : 5 secteurs individuels + « Autres secteurs » = 6 cases. Chaque
+     case affiche les variations marché 24h / 7j / 30j (une ligne chacune, lisible)
+     et jusqu'à 5 cryptos du secteur (séparées par des virgules) + « +N » pour le
+     reste. Fallback barres si absent. #}
+  {% if sector_exposure_cells %}
+  <p style="font-size:12px;color:#1a1a18;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Exposition sectorielle du portefeuille</p>
+  <table role="presentation" cellpadding="0" cellspacing="4" border="0" style="width:100%;border-collapse:separate;table-layout:fixed;">
+    {% for row in sector_exposure_cells|batch(3) %}
+    <tr>
+      {% for s in row %}
+      {% set _pp = s.ptf_pct|num(0) %}
+      {% set _bg = '#E6F1FB' if _pp >= 40 else ('#EEF4FA' if _pp >= 20 else '#F4F7FB') %}
+      <td style="background:{{_bg}};border-radius:6px;padding:10px 9px;width:33%;vertical-align:top;">
+        <div style="font-size:11px;font-weight:700;color:#1a1a18;line-height:1.25;">{{s.sector}}</div>
+        <div style="font-size:15px;font-weight:700;color:#0C447C;line-height:1.3;margin-bottom:3px;">{{ '%.1f'|format(_pp) }}% <span style="font-size:9px;font-weight:400;color:#8a8880;">du PTF</span></div>
+        {% for _lbl, _k in [('24h','market_change_24h'),('7j','market_change_7d'),('30j','market_change_30d')] %}
+          {% set _v = s[_k]|default(none) %}
+          {% if _v is not none %}<div style="font-size:9.5px;line-height:1.45;color:#5a5852;"><span style="display:inline-block;width:24px;color:#8a8880;">{{_lbl}}</span><span style="color:{% if (_v|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};font-weight:600;">{{ '+' if (_v|num(0)) >= 0 else '−' }}{{ '%.1f'|format((_v|num(0))|abs) }}%</span></div>{% endif %}
+        {% endfor %}
+        {% if s.holdings %}<div style="font-size:9px;color:#5a5852;line-height:1.3;margin-top:3px;">{{ s.holdings[:5]|join(', ') }}{% if s.holdings|length > 5 %} +{{s.holdings|length - 5}}{% endif %}</div>{% endif %}
+      </td>
+      {% endfor %}
+      {% if row|length < 3 %}{% for _ in range(3 - row|length) %}<td style="width:33%;"></td>{% endfor %}{% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  {% set _sectors = (sector_exposure_computed.sectors if (sector_exposure_computed and sector_exposure_computed.available) else sector_exposure) %}
+  {% if _sectors %}
+  <p style="font-size:12px;color:#1a1a18;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Exposition sectorielle du portefeuille</p>
+  {% for s in _sectors %}
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}">
+    <tr>
+      <td style="width:148px;padding:6px 0;font-size:12px;vertical-align:top;"><strong>{{s.sector}}</strong>{% if s.holdings %} <span style="color:#8a8880;font-size:10px;">({{ s.holdings[:3]|join(', ') }}{% if s.holdings|length > 3 %}…{% endif %})</span>{% endif %}</td>
+      <td style="padding:6px 12px;vertical-align:middle;">
+        <div style="height:6px;background:#f5f4ee;border-radius:3px;position:relative;">
+          <div style="position:absolute;left:0;top:0;height:100%;width:{{ s.ptf_pct|num(0) }}%;background:{{s.color or '#534AB7'}};border-radius:3px;"></div>
+        </div>
+      </td>
+      <td style="width:138px;padding:6px 0;font-size:11px;text-align:right;color:#5a5852;vertical-align:top;">{{s.ptf_pct}}% PTF{% if (s.market_change_24h|default(none)) is not none %} · {{ s.market_change_24h|fmt_pct }}/24h{% elif s.market_pct %} · {{s.market_pct}}% marché{% endif %}</td>
+    </tr>
+  </table>
+  {% endfor %}
+  {% endif %}
+  {% endif %}
+
+  {# ── CORRÉLATION ENTRE TES POSITIONS : SUPPRIMÉ en v16 — les actifs exemples
+     sont désormais affichés directement à côté de chaque secteur ci-dessus,
+     ce qui rend ce bloc redondant. On garde la « Lecture concentration ». ── #}
+
+  {# v23.x — UN SEUL bloc « Lecture concentration » (Omar : fusion des 2 textes).
+     Si une alerte de concentration est active (déterministe, chiffrée), elle EST
+     la lecture (faits + action, zéro blabla) et le bloc prend un accent d'alerte ;
+     sinon, la lecture qualitative de l'IA. Plus jamais deux blocs redondants. #}
+  {% set _alerting = rebalance_alert and rebalance_alert.active %}
+  {% set _conc = rebalance_alert.message if _alerting else (concentration_reading or position_correlation.concentration_reading) %}
+  {% if _conc %}
+  <div style="background:{{ '#FBF3E4' if _alerting else '#f5f4ee' }};{% if _alerting %}border:1px solid #E5C168;border-left:3px solid #BA7517;{% endif %}border-radius:8px;padding:10px 12px;margin:12px 0 0 0;font-size:12px;line-height:1.6;color:{{ '#5a4a28' if _alerting else '#1a1a18' }};">
+    <p style="margin:0 0 4px 0;font-size:{{ '9px' if _alerting else '11px' }};text-transform:uppercase;{% if _alerting %}letter-spacing:1px;font-weight:700;color:#8A5A12;{% else %}letter-spacing:0.3px;font-weight:500;color:#1a1a18;{% endif %}">{% if _alerting %}⚖️ {% endif %}Lecture concentration</p>
+    {{ _conc|md }}
+  </div>
+  {% endif %}
+</div>
+
+{# ── HEATMAP PORTFOLIO · 7J (v23.x — identique au matin mais sur 7 jours, placée
+   sous l'exposition sectorielle). Tri par |perf 7j| décroissante, même code
+   couleur, 4 lignes × 5 cases + « +N autres ». #}
+{% if portfolio_heatmap_7d and portfolio_heatmap_7d.cells %}
+<div style="margin-bottom:1.5rem;">
+  <p style="font-size:11px;color:#5a5852;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Heatmap · performance 7j</p>
+  {% set _hm_cells = portfolio_heatmap_7d.cells %}
+  {% if portfolio_heatmap_7d.extra and portfolio_heatmap_7d.extra.count %}
+  {% set _hm_cells = portfolio_heatmap_7d.cells + [{'symbol': '+' ~ portfolio_heatmap_7d.extra.count ~ ' autres', 'change_24h': portfolio_heatmap_7d.extra.avg_change_24h, 'ptf_pct': portfolio_heatmap_7d.extra.ptf_pct, 'is_extra': true}] %}
+  {% endif %}
+  <table role="presentation" cellpadding="0" cellspacing="3" border="0" style="width:100%;border-collapse:separate;table-layout:fixed;">
+    {% for row in _hm_cells|batch(5) %}
+    <tr>
+      {% for cell in row %}
+      {% set ch = cell.change_24h|num(none) %}
+      {% set bg = '#e5e4dc' if ch is none else ('#C0DD97' if ch >= 5 else ('#EAF3DE' if ch >= 2 else ('#F4F8EC' if ch >= 0 else ('#F7C1C1' if ch <= -5 else ('#FCEBEB' if ch <= -2 else '#FDF1F1'))))) %}
+      <td style="background:{{bg}};border-radius:3px;padding:6px 3px;text-align:center;width:20%;height:46px;vertical-align:middle;{% if cell.is_extra %}border:1px dashed #b5b3ab;{% endif %}">
+        <div style="font-size:{% if cell.is_extra %}9px{% else %}11px{% endif %};font-weight:700;color:#1a1a18;line-height:1.25;">{{cell.symbol}}</div>
+        <div style="font-size:10px;color:#1a1a18;line-height:1.25;">{% if ch is not none %}{{ '+' if ch >= 0 else '−' }}{{ '%.1f'|format(ch|abs) }}%{% else %}—{% endif %}</div>
+        <div style="font-size:9px;color:#5a5852;line-height:1.25;">{% if (cell.ptf_pct|num(none)) is not none %}{{ '%.1f'|format(cell.ptf_pct|num(0)) }}% PTF{% if cell.is_extra %} <span style="font-size:8px;">moy.</span>{% endif %}{% endif %}</div>
+      </td>
+      {% endfor %}
+      {% if row|length < 5 %}{% for _ in range(5 - row|length) %}<td style="width:20%;"></td>{% endfor %}{% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+  {% if portfolio_heatmap_7d.extra and portfolio_heatmap_7d.extra.count %}
+  <p style="font-size:10px;font-style:italic;color:#8a8880;margin:6px 0 0 0;">Chaque case : actif · perf 7j · poids PTF. « +{{portfolio_heatmap_7d.extra.count}} autres » = {{ '%.1f'|format(portfolio_heatmap_7d.extra.ptf_pct|num(0)) }}% du PTF (${{ '%.0f'|format(portfolio_heatmap_7d.extra.value_usd|num(0)) }}), perf 7j moyenne pondérée.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{# v23.x — FIL ROUGE MACRO déplacé SOUS « Semaine à venir · ce qui peut bouger »
+   (demande d'Omar) : il commente désormais le calendrier qui le précède. #}
+
+{# ── SCORING PRÉDICTIONS (table 4 col mail-safe, win rate gris si 0/0) ──
+   Points 11 (table 4 col), 12 (gris quand 0), 13 (suppression phrase
+   redondante), 14 (leçon 12px italique #1a1a18), 38 (ligne win rate
+   secondaire claire). #}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Mes prédictions de la semaine · scoring</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  {% if predictions_scoring %}
+  {% set _ps = predictions_scoring %}
+  {% set _wr_total = (_ps.validated|num(0)) + (_ps.invalidated|num(0)) + (_ps.neutral|num(0)) %}
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
+    <tr>
+      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;border-radius:6px 0 0 6px;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Recos émises</p>
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:#1a1a18;">{{_ps.issued or 0}}</p>
+      </td>
+      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Validées</p>
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if (_ps.validated|num(0)) > 0 %}#3B6D11{% else %}#5a5852{% endif %};">{{_ps.validated or 0}}</p>
+      </td>
+      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Invalidées</p>
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if (_ps.invalidated|num(0)) > 0 %}#A32D2D{% else %}#5a5852{% endif %};">{{_ps.invalidated or 0}}</p>
+      </td>
+      <td style="width:25%;vertical-align:top;padding:8px;background:#f5f4ee;border-radius:0 6px 6px 0;">
+        <p style="font-size:10px;color:#8a8880;margin:0;">Win rate sem.</p>
+        {# Point 12 : "—" gris si _wr_total < 5 (insuffisant pour calculer). #}
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{% if _wr_total >= 5 and (_ps.win_rate_pct|num(none)) is not none and (_ps.win_rate_pct|num(0)) >= 50 %}#3B6D11{% elif _wr_total >= 5 and (_ps.win_rate_pct|num(none)) is not none and (_ps.win_rate_pct|num(0)) < 50 %}#A32D2D{% else %}#5a5852{% endif %};">{% if _wr_total < 5 or (_ps.win_rate_pct|num(none)) is none %}—{% else %}{{_ps.win_rate_pct}}%{% endif %}</p>
+      </td>
+    </tr>
+  </table>
+  {# Point 38 : ligne secondaire claire "Win rate sem. · — · Win rate 30j · —". #}
+  <p style="font-size:11px;color:#8a8880;margin:8px 0 0 0;">Win rate sem. · {% if _wr_total < 5 or (_ps.win_rate_pct|num(none)) is none %}—{% else %}{{_ps.win_rate_pct}}%{% endif %} · Win rate 30j · {% if (_ps.win_rate_30d|num(none)) is not none %}{{_ps.win_rate_30d}}%{% else %}—{% endif %}</p>
+  {# v16 — jauge de calibration explicite dans le header (et plus seulement en
+     légende) : « Recos clôturées : X/5 minimum pour calibration ». #}
+  {% if _ps.winrate_gate_label %}
+  <p style="font-size:11px;color:#BA7517;margin:4px 0 0 0;font-weight:500;">⚖ {{_ps.winrate_gate_label}}</p>
+  {% endif %}
+
+  {# v23.x — le DÉTAIL par-actif (entrée/Δ/jours/statut) a été FUSIONNÉ dans le
+     tableau unique « Positions · 30j & long terme » plus bas (anti-doublon : il
+     répétait aussi le suivi des mails matin/soir). Ici, on ne garde que le
+     SCORING agrégé (win-rate, calibration, espérance, leçon). #}
+
+  {# Point 14 : leçon de la semaine 12px #1a1a18 italique. #}
+  {% if _ps.lesson %}
+  <p style="font-size:12px;color:#1a1a18;margin:12px 0 0 0;font-style:italic;line-height:1.55;"><span style="font-weight:500;font-style:normal;">Leçon de la semaine ·</span> {{_ps.lesson}}</p>
+  {% endif %}
+  {# v15 (audit P3-2) — calibration FUSIONNÉE ici (sous-bloc compact) : plus de
+     section dédiée qui répétait « pas encore d'historique ». #}
+  {# v21 (W8) — si AUCUNE des 3 métriques (calibration / espérance / cibles) n'a
+     encore de données, UNE seule note consolidée au lieu de répéter 3× la même
+     phrase « disponible après 5 recos ». Détail complet dès qu'une métrique existe. #}
+  {% set _calib_on = calibration and calibration.buckets %}
+  {% set _exp_on = expectancy and expectancy.available %}
+  {% set _tgt_on = target_calibration and target_calibration.available %}
+  {% if not (_calib_on or _exp_on or _tgt_on) %}
+  <div style="margin:12px 0 0 0;padding-top:10px;border-top:0.5px solid #f0efe8;">
+    <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Calibration · espérance · cibles</p>
+    <p style="font-size:11px;color:#8a8880;font-style:italic;margin:0;line-height:1.5;">Calibration de confiance, espérance mathématique et calibration des cibles de prix : disponibles dès 5 recos clôturées (avec niveaux et cibles). Aucune clôturée pour l'instant.</p>
+  </div>
+  {% else %}
+  <div style="margin:12px 0 0 0;padding-top:10px;border-top:0.5px solid #f0efe8;">
+    <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Calibration · confiance annoncée vs réalisée</p>
+    {% if calibration and calibration.buckets %}
+    {% for b in calibration.buckets %}
+    <p style="margin:0 0 2px 0;font-size:11px;color:#5a5852;">Confiance {{b.range}} → réalisé <span style="font-weight:600;color:#1a1a18;">{{b.realized_pct}}%</span>{% if b.label %} <span style="color:{% if b.label == 'sur-confiance' %}#A32D2D{% elif b.label == 'sous-confiance' %}#0C447C{% else %}#3B6D11{% endif %};">({{b.label}})</span>{% endif %}</p>
+    {% endfor %}
+    {% if calibration.reading %}<p style="font-size:11px;color:#5a5852;margin:6px 0 0 0;line-height:1.5;">{{calibration.reading}}</p>{% endif %}
+    {% else %}
+    <p style="font-size:11px;color:#8a8880;font-style:italic;margin:0;">{{ (calibration and calibration.empty_reason) or "Disponible après 5 recos clôturées minimum." }}</p>
+    {% endif %}
+  </div>
+  {# v18 (W-B12) — espérance mathématique des recos (gain moyen × winrate −
+     perte moyenne × échec). Métrique de pilotage clé : une stratégie peut avoir
+     un win rate < 50% et rester gagnante si les gains > pertes. #}
+  <div style="margin:12px 0 0 0;padding-top:10px;border-top:0.5px solid #f0efe8;">
+    <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Espérance mathématique · par reco</p>
+    {% if expectancy and expectancy.available %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr>
+      <td style="vertical-align:middle;white-space:nowrap;padding-right:14px;">
+        <span style="font-size:20px;font-weight:700;color:{% if (expectancy.expectancy_pct|num(0)) > 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (expectancy.expectancy_pct|num(0)) >= 0 else '' }}{{expectancy.expectancy_pct}}%</span>
+        <span style="font-size:10px;color:#8a8880;"> / reco</span>
+      </td>
+      <td style="vertical-align:middle;font-size:11px;color:#5a5852;line-height:1.5;">{{expectancy.reading}}</td>
+    </tr></table>
+    {% else %}
+    <p style="font-size:11px;color:#8a8880;font-style:italic;margin:0;">{{ (expectancy and expectancy.reason) or "Disponible après 5 recos clôturées avec niveaux." }}</p>
+    {% endif %}
+  </div>
+  {# v18 (Chantier E #15) — calibration des CIBLES DE PRIX (auto-apprentissage) :
+     les cibles sont-elles atteintes ? Trop optimistes ? #}
+  <div style="margin:12px 0 0 0;padding-top:10px;border-top:0.5px solid #f0efe8;">
+    <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Calibration des cibles de prix</p>
+    {% if target_calibration and target_calibration.available %}
+    <p style="margin:0;font-size:11px;color:#5a5852;line-height:1.5;"><span style="font-weight:600;color:{% if target_calibration.bias == 'calibrées' %}#3B6D11{% elif target_calibration.bias == 'légèrement optimistes' %}#BA7517{% else %}#A32D2D{% endif %};">{{target_calibration.hit_rate_pct}}% atteintes</span> · {{target_calibration.reading}}</p>
+    {% else %}
+    <p style="font-size:11px;color:#8a8880;font-style:italic;margin:0;">{{ (target_calibration and target_calibration.reason) or "Disponible après 5 recos clôturées avec cible et prix de sortie." }}</p>
+    {% endif %}
+  </div>
+  {% endif %}{# fin consolidation v21 (W8) #}
+  {% else %}
+  <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ predictions_empty_reason or "Première semaine, pas encore d'historique de prédictions à scorer." }}</p>
+  {% endif %}
+</div>
+{# anchor-weekly-scoring-card-end #}
+
+{# ── PERTES ↔ RECOS (A7) — lien honnête baisses/recos émises ── #}
+{% if losses_vs_recos %}
+<div style="background:#FCEBEB;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;font-size:12px;line-height:1.6;color:#501313;">
+  <p style="margin:0 0 3px 0;font-weight:600;color:#791F1F;">Pertes de la semaine · lien avec mes recos</p>
+  {{losses_vs_recos|md}}
+</div>
+{% endif %}
+
+{# ── CALIBRATION · CONFIANCE ANNONCÉE VS RÉALISÉE (TOUJOURS présent, point 3) ── #}
+{# v15 — la calibration vit désormais DANS la carte scoring (fusion P3-2). #}
+
+{# ── COÛT DES ERREURS (point 15 : mini-bannière si vide, structure dense sinon) ── #}
+{% if regret and regret.entries %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Coût des erreurs · le regret de la semaine</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
+  {% for it in regret.entries %}
+  <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:13px;line-height:1.5;">
+    <span style="font-weight:500;">{{it.asset}}</span> — {{it.description}}{% if it.cost_pct is not none %} <span style="color:#A32D2D;font-weight:500;">{{ it.cost_pct|fmt_pct }} {{it.cost_label or 'non capturés'}}</span>{% endif %}{% if it.cost_usd %} ≈ {{ it.cost_usd|fmt_price }}{% endif %}
+  </div>
+  {% endfor %}
+  {% if regret.total_note %}<p style="font-size:12px;color:#5a5852;margin:10px 0 0 0;line-height:1.5;"><span style="font-weight:500;">Regret total :</span> {{regret.total_note}}</p>{% endif %}
+</div>
+{% else %}
+<div style="background:#F1EFE8;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;font-size:12px;color:#5a5852;line-height:1.5;">
+  <span style="font-weight:500;color:#1a1a18;">Coût des erreurs :</span> {{ (regret and regret.empty_reason) or "Pas encore de reco clôturée sur la fenêtre · mesure disponible dès la première clôture." }}
+</div>
+{% endif %}
+
+{# ── v15 — MON ERREUR DE LA SEMAINE (honnêteté nominative, audit) ── #}
+{% if my_errors %}
+<div style="background:#FAEEDA;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;border-left:2px solid #BA7517;border-top-left-radius:0;border-bottom-left-radius:0;">
+  <p style="margin:0 0 3px 0;font-size:11px;font-weight:600;color:#633806;text-transform:uppercase;letter-spacing:0.5px;">Mon erreur de la semaine</p>
+  <p style="margin:0;font-size:12px;line-height:1.6;color:#412402;">{{my_errors|md}}</p>
+</div>
+{% endif %}
+
+{# v18 (W-B14) — MÉMOIRE D'APPRENTISSAGE : schémas dans les thèses invalidées
+   (boucle d'apprentissage déterministe, calculée Python sur 60j). #}
+{% if invalidation_lessons and invalidation_lessons.available %}
+<div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;">
+  <p style="margin:0 0 3px 0;font-size:11px;font-weight:600;color:#5a5852;text-transform:uppercase;letter-spacing:0.5px;">Mémoire · ce que les invalidations m'apprennent</p>
+  <p style="margin:0;font-size:12px;line-height:1.6;color:#33312e;">{{ invalidation_lessons.reading }}</p>
+  {% if invalidation_lessons.repeated_assets %}
+  <p style="margin:6px 0 0 0;font-size:10px;color:#8a8880;">Actifs invalidés ≥2 fois : {% for ra in invalidation_lessons.repeated_assets %}<strong>{{ra.asset}}</strong> ({{ra.times}}×){% if not loop.last %} · {% endif %}{% endfor %}</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── EXIT PLAN · POUSSIÈRES (table compacte 2 col, point 17) ── #}
+{% if exit_plan %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Exit plan · positions condamnées</h2>
+<p style="font-size:12px;color:#5a5852;margin:0 0 1rem 0;">{{exit_plan.subtitle or "Plan de sortie pour les poussières du portfolio"}}</p>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;border-left:2px solid #888780;border-top-left-radius:0;border-bottom-left-radius:0;">
+  {% if exit_plan.diagnosis %}<p style="font-size:13px;line-height:1.65;margin:0 0 12px 0;">{{exit_plan.diagnosis|md}}</p>{% endif %}
+  {% if exit_plan.dust_table %}
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin-top:8px;">
+    <tr style="background:#f5f4ee;">
+      <th style="text-align:left;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;letter-spacing:0.3px;">Ticker</th>
+      <th style="text-align:right;font-size:10px;text-transform:uppercase;color:#5a5852;font-weight:500;padding:6px 8px;letter-spacing:0.3px;">Valeur</th>
+    </tr>
+    {% for d in exit_plan.dust_table %}
+    <tr style="border-top:0.5px solid #e5e4dc;">
+      <td style="padding:6px 8px;font-size:12px;font-weight:500;">{{d.ticker}}</td>
+      <td style="padding:6px 8px;font-size:12px;text-align:right;color:#1a1a18;">{{ d.value|fmt_price }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  {% if exit_plan.monitoring %}<p style="margin:10px 0 0 0;font-size:12px;color:#5a5852;line-height:1.55;">{{exit_plan.monitoring|md}}</p>{% endif %}
+</div>
+{% endif %}
+
+{# ── SEMAINE À VENIR · CALENDRIER (P3-A5 : dates RÉELLES FRED prioritaires) ── #}
+{% set _cal_facts = (week_ahead if week_ahead else (upcoming_calendar_facts.events if (upcoming_calendar_facts and upcoming_calendar_facts.available) else none)) %}
+{% if _cal_facts or upcoming_calendar %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Semaine à venir{% if header.upcoming_week %} · {{header.upcoming_week}}{% endif %} · ce qui peut bouger</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
+  <p style="font-size:12px;color:#1a1a18;margin:0 0 12px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Calendrier événements à impact crypto <span style="font-size:9px;color:#8a8880;text-transform:none;font-weight:400;">· FRED (dates réelles) + calendriers banques centrales (Fed/BCE/BoJ)</span></p>
+  {% if _cal_facts %}
+  {% for ev in _cal_facts %}
+  <div style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:13px;">
+    <span style="background:{% if ev.importance == 'high' %}#FCEBEB{% else %}#F1EFE8{% endif %};color:{% if ev.importance == 'high' %}#791F1F{% else %}#5a5852{% endif %};font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;">{{ev.when}}</span>
+    <span style="font-weight:500;margin-left:6px;">{{ev.label}}</span>
+    <span style="color:#8a8880;font-size:11px;"> · {{ev.date_label or ev.date}}</span>
+    {% if ev.polymarket_note %}<br><span style="display:inline-block;margin:4px 0 0 0;background:#E6F1FB;color:#0C447C;font-size:10px;padding:2px 7px;border-radius:4px;">{{ev.polymarket_note}}</span>{% endif %}
+  </div>
+  {% endfor %}
+  {% else %}
+  {% for ev in upcoming_calendar %}
+  <div style="padding:10px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+      <tr>
+        <td style="width:80px;vertical-align:top;">
+          <span style="background:#F1EFE8;color:#5a5852;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;">{{ev.day}}</span>
+        </td>
+        <td style="vertical-align:top;">
+          <p style="margin:0;font-size:13px;font-weight:500;">{{ev.title}}</p>
+          {% if ev.detail %}<p style="margin:4px 0 0 0;font-size:12px;color:#5a5852;line-height:1.55;">{{ev.detail}}</p>{% endif %}
+        </td>
+        {% if ev.impact_label %}
+        <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:8px;">
+          <span style="font-size:10px;color:#5a5852;">{{ev.impact_label}}</span>
+        </td>
+        {% endif %}
+      </tr>
+    </table>
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+{% else %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Semaine à venir{% if header.upcoming_week %} · {{header.upcoming_week}}{% endif %} · ce qui peut bouger</h2>
+<div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#5a5852;font-style:italic;">{{ upcoming_calendar_empty_reason or "Aucun événement macro majeur identifié pour la semaine à venir." }}</div>
+{% endif %}
+
+{# ── FIL ROUGE MACRO · semaine à venir (B6) — v23.x : placé SOUS le calendrier
+   (il en fait la lecture transversale). ── #}
+{% if macro_panorama %}
+<div style="background:#eef2f7;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;border-left:3px solid #534AB7;">
+  <p style="font-size:10px;color:#534AB7;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Fil rouge macro · semaine à venir</p>
+  <p style="margin:0;font-size:13px;line-height:1.65;color:#28415c;">{{macro_panorama|md}}</p>
+</div>
+{% endif %}
+
+{# ── SIGNAUX TAUX (Polymarket) & FLUX ETF (P3-A5) — données factuelles ── #}
+{% if polymarket_facts and polymarket_facts.available or etf_flows_facts and etf_flows_facts.available %}
+<div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:11px;color:#5a5852;line-height:1.7;">
+  {% if polymarket_facts and polymarket_facts.available %}
+  <p style="margin:0;"><span style="font-weight:600;color:#1a1a18;">📊 Probas taux Fed (Polymarket) ·</span> {% for mk in polymarket_facts.markets[:3] %}{{mk.question}} {{mk.probability_pct}}%{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  {% endif %}
+  {% if etf_flows_facts and etf_flows_facts.available %}
+  <p style="margin:0;"><span style="font-weight:600;color:#1a1a18;">💵 Flux ETF ·</span> {% if etf_flows_facts.btc %}BTC {{etf_flows_facts.btc.total_flow_musd if etf_flows_facts.btc.total_flow_musd is defined else etf_flows_facts.btc}}M$ ({{etf_flows_facts.btc.date if etf_flows_facts.btc.date is defined else ''}}){% endif %}{% if etf_flows_facts.eth %} · ETH {{etf_flows_facts.eth.total_flow_musd if etf_flows_facts.eth.total_flow_musd is defined else etf_flows_facts.eth}}M${% endif %}</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── SCÉNARIOS POUR LA SEMAINE (titre split + badge proba + bannière action
+   + repli détails, points 18-20+7) ── #}
+{% if scenarios %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Scénarios pour la semaine</h2>
+<div style="margin-bottom:1.5rem;">
+  {% for s in scenarios %}
+  {% set scen_bg = '#FCEBEB' if s.type == 'bearish' else ('#EAF3DE' if s.type == 'bullish' else '#FAEEDA') %}
+  {% set scen_label = '#791F1F' if s.type == 'bearish' else ('#27500A' if s.type == 'bullish' else '#633806') %}
+  {% set scen_text = '#501313' if s.type == 'bearish' else ('#173404' if s.type == 'bullish' else '#412402') %}
+  {% set proba_bg = '#A32D2D' if s.type == 'bearish' else ('#3B6D11' if s.type == 'bullish' else '#BA7517') %}
+  <div style="background:{{scen_bg}};border-radius:8px;padding:12px 14px;{% if not loop.last %}margin-bottom:10px;{% endif %}">
+    {# Titre split : nom uppercase à gauche + badge proba à droite. #}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+      <tr>
+        <td style="vertical-align:middle;">
+          <p style="margin:0;font-size:12px;color:{{scen_label}};text-transform:uppercase;letter-spacing:0.3px;font-weight:700;">{{s.label}}</p>
+        </td>
+        <td style="vertical-align:middle;text-align:right;white-space:nowrap;padding-left:8px;">
+          <span style="display:inline-block;background:{{proba_bg}};color:#ffffff;font-size:11px;padding:3px 9px;border-radius:12px;font-weight:700;">{{s.probability_pct}}%</span>
+        </td>
+      </tr>
+    </table>
+    {# Description compactée à 3-4 lignes max. v17 (W-A3) : <details> retiré
+       (non supporté Gmail → affichait l'analyse en doublon). La description
+       porte l'essentiel ; l'action est en bannière ci-dessous. #}
+    {% if s.description %}<p style="margin:6px 0 0 0;font-size:12px;line-height:1.55;color:{{scen_text}};">{{s.description|md}}</p>{% endif %}
+    {# Action en mini-bannière en bas de carte (point 19). #}
+    {% if s.action %}
+    <div style="background:{% if s.type == 'bearish' %}#F7C1C1{% elif s.type == 'bullish' %}#C0DD97{% else %}#F7D8AA{% endif %};border-radius:6px;padding:6px 10px;margin:8px 0 0 0;">
+      <p style="margin:0;font-size:11px;color:{{scen_label}};font-weight:700;">ACTION · <span style="font-weight:500;">{{s.action|md}}</span></p>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {# Point 7 : disclaimer probabilités estimées par IA, pas modèle statistique. #}
+  <p style="font-size:11px;color:#8a8880;font-style:italic;margin:8px 0 0 0;line-height:1.5;">Probabilités ancrées sur Polymarket, volatilité implicite (DVOL), régime macro, technique et calendrier — ajustées au jugement. Ordres de grandeur, pas une certitude.</p>
+</div>
+{% endif %}
+
+{# ── v15 — STRATÉGIE DE LA SEMAINE (consigne 3 phrases, fond sombre) ── #}
+{% if strategy_focus %}
+<div style="background:#1f1e1d;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
+  <p style="font-size:10px;color:#8a8880;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Stratégie de la semaine</p>
+  <p style="margin:0;font-size:13px;line-height:1.65;color:#f5f4ee;">{{strategy_focus|md}}</p>
+</div>
+{% endif %}
+
+{# ── PLAN D'ACTION DE LA SEMAINE (B4) — conditionnel, chiffré ── #}
+{% if weekly_action_plan %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Plan d'action de la semaine</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 1rem;margin-bottom:1.5rem;">
+  {% for a in weekly_action_plan %}
+  <div style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr>
+      <td style="vertical-align:top;width:26px;"><span style="display:inline-block;width:20px;height:20px;background:#534AB7;color:#fff;border-radius:50%;text-align:center;line-height:20px;font-size:11px;font-weight:700;">{{a.priority or loop.index}}</span></td>
+      <td style="vertical-align:top;font-size:12px;line-height:1.5;"><span style="font-weight:600;color:#1a1a18;">{{a.action|md}}</span>{% if a.rationale %}<br><span style="color:#5a5852;font-size:11px;">{{a.rationale|md}}</span>{% endif %}</td>
+    </tr></table>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── WATCHLIST · entrées / sorties (B7) ── #}
+{% if watchlist %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Watchlist · entrées / sorties</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 1rem;margin-bottom:1.5rem;">
+  {% for w in watchlist %}
+  {% set _entry = (w.direction or '')|lower in ['entrée','entree','achat','buy','in'] %}
+  <div style="padding:7px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;">
+    <span style="font-size:10px;padding:1px 7px;border-radius:6px;font-weight:700;background:{% if _entry %}#EAF3DE{% else %}#FCEBEB{% endif %};color:{% if _entry %}#27500A{% else %}#791F1F{% endif %};">{{ '▲ ENTRÉE' if _entry else '▼ SORTIE' }}</span>
+    <span style="font-weight:600;color:#1a1a18;margin-left:6px;">{{w.asset}}</span>{% if w.trigger %} · <span style="color:#1a1a18;">{{w.trigger}}</span>{% endif %}{% if w.rationale %}<br><span style="color:#5a5852;font-size:11px;margin-left:2px;">{{w.rationale}}</span>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── POSITIONS · 30j & LONG TERME (v23.x) — UN seul tableau par actif qui
+   FUSIONNE l'ancien « scoring · détail » (perf reco 30j) et l'ancien
+   « positionnement long terme » (phase de cycle + cible). 2 horizons en
+   colonnes distinctes pour zéro confusion. ATH et thèse-description SUPPRIMÉS
+   (inutiles) ; le statut = phase + analyse chiffrée + couleurs LOGIQUES
+   (vert/teal = zone d'achat, ambre = prudence). ── #}
+{% if positions_review %}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Positions · horizon 30j &amp; long terme</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.75rem 1rem;margin-bottom:1.5rem;">
+  {% set _phasemap = {'capitulation':['Capitulation','#0E6B5E','#E1F5EE'],'accumulation':['Accumulation','#27500A','#EAF3DE'],'expansion':['Expansion','#0C447C','#E6F1FB'],'distribution':['Distribution','#8A5A12','#F4E4C1']} %}
+  {% set _actmap = {'renforcer':['Renforcer','#27500A','#EAF3DE'],'garder':['Garder','#33312e','#F1EFE8'],'alléger':['Alléger','#8A5A12','#F4E4C1'],'alleger':['Alléger','#8A5A12','#F4E4C1'],'sortir':['Sortir','#791F1F','#FCEBEB']} %}
+  {% set _h30map = {'validated':['✓ validée','#3B6D11'],'invalidated':['✗ invalidée','#A32D2D'],'in_progress':['● en cours','#0C447C'],'neutral':['= neutre','#8a8880']} %}
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-size:11px;">
+    <tr style="background:#f5f4ee;color:#5a5852;">
+      <th style="text-align:left;font-size:10px;text-transform:uppercase;font-weight:500;padding:6px 6px;letter-spacing:0.3px;">Actif</th>
+      <th style="text-align:right;font-size:10px;text-transform:uppercase;font-weight:500;padding:6px 6px;letter-spacing:0.3px;">Prix · PRU</th>
+      <th style="text-align:left;font-size:10px;text-transform:uppercase;font-weight:500;padding:6px 6px;letter-spacing:0.3px;">Horizon 30j</th>
+      <th style="text-align:left;font-size:10px;text-transform:uppercase;font-weight:500;padding:6px 6px;letter-spacing:0.3px;">Long terme</th>
+      <th style="text-align:center;font-size:10px;text-transform:uppercase;font-weight:500;padding:6px 6px;letter-spacing:0.3px;">Action</th>
+    </tr>
+    {% for r in positions_review %}
+    {% set _ph = _phasemap.get(r.lt_status, [r.lt_status or '—','#5a5852','#F1EFE8']) %}
+    {% set _ac = _actmap.get((r.action or '')|lower, [r.action or '—','#5a5852','#F1EFE8']) %}
+    <tr style="border-top:0.5px solid #e5e4dc;">
+      <td style="padding:6px 6px;vertical-align:top;"><span style="font-size:12px;font-weight:700;color:#1a1a18;">{{r.asset}}</span>{% if r.conviction %}<br><span style="font-size:8px;color:#27500A;text-transform:uppercase;letter-spacing:0.3px;">★ cœur</span>{% else %}<br><span style="font-size:8px;color:#8a8880;text-transform:uppercase;letter-spacing:0.3px;">satellite</span>{% endif %}</td>
+      <td style="padding:6px 6px;text-align:right;vertical-align:top;white-space:nowrap;"><span style="font-weight:600;color:#1a1a18;">{{ r.current_price|fmt_price }}</span>{% if r.pru_pct is not none %}<br><span style="font-size:10px;color:{% if (r.pru_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ r.pru_pct|fmt_pct }} <span style="color:#8a8880;">/PRU</span></span>{% endif %}</td>
+      <td style="padding:6px 6px;vertical-align:top;">{% if r.h30 and r.h30.reco %}{% set _hs = _h30map.get(r.h30.status, ['—','#8a8880']) %}<span style="background:{% if r.h30.reco in ['RENFORCER','BUY'] %}#EAF3DE{% elif r.h30.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] %}#FCEBEB{% else %}#E6F1FB{% endif %};color:{% if r.h30.reco in ['RENFORCER','BUY'] %}#27500A{% elif r.h30.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] %}#791F1F{% else %}#0C447C{% endif %};font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">{{r.h30.reco}}</span><br><span style="font-size:10px;color:{{_hs[1]}};">{% if r.h30.delta_pct is not none %}{{ r.h30.delta_pct|fmt_pct }} · {% endif %}{{_hs[0]}}</span>{% else %}<span style="font-size:10px;color:#b5b3ab;">pas de reco active</span>{% endif %}</td>
+      <td style="padding:6px 6px;vertical-align:top;"><span style="display:inline-block;padding:1px 7px;border-radius:10px;background:{{_ph[2]}};color:{{_ph[1]}};font-weight:600;font-size:9px;">{{_ph[0]}}</span>{% if r.lt_target %}<br><span style="font-size:10px;color:#5a5852;">cible {{ r.lt_target|fmt_price }}{% set _ltp = r.lt_target_pct|num(none) %}{% if _ltp is not none %} <span style="color:{% if _ltp >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">({{ '+' if _ltp >= 0 else '' }}{{_ltp|int}}%)</span>{% endif %}</span>{% else %}<br><span style="font-size:10px;color:#b5b3ab;">cible à définir</span>{% endif %}</td>
+      <td style="padding:6px 6px;text-align:center;vertical-align:top;"><span style="display:inline-block;padding:2px 8px;border-radius:6px;background:{{_ac[2]}};color:{{_ac[1]}};font-weight:700;font-size:10px;white-space:nowrap;">{{_ac[0]}}</span></td>
+    </tr>
+    {% if r.analysis %}<tr><td colspan="5" style="padding:0 6px 6px 6px;color:#8a8880;font-size:10px;line-height:1.35;">⚙ {{ r.analysis }}</td></tr>{% endif %}
+    {% endfor %}
+  </table>
+  <p style="font-size:9px;color:#a8a6a0;margin:8px 6px 0 6px;font-style:italic;">Horizon 30j = perf de la reco en cours (Δ depuis l'entrée) · Long terme = phase de cycle + cible 6-12m · ★ cœur = conviction (vs satellite à offloader sur force).</p>
+</div>
+{% endif %}
+
+{# ── SOURCES & ANGLES MORTS (fusion v23.x — Omar : « angles morts récurrents »
+   et « sources actives / lacunes structurelles » parlent du MÊME sujet, la
+   couverture des sources et ses trous → UN seul bloc, gain d'espace). Le suivi
+   QUANTIFIÉ des sources en panne récurrente (X j/7, semaine sur semaine) est
+   désormais une sous-section des lacunes, à côté du panorama LLM. ── #}
+{% if sources_review or (blind_spots_weekly and blind_spots_weekly.entries) or (header.active_sources_count is not none) %}
+<div style="background:#F1EFE8;border-radius:8px;padding:12px 14px;margin-bottom:1.5rem;font-size:12px;color:#5a5852;line-height:1.6;">
+  <p style="margin:0 0 6px 0;font-weight:500;color:#1a1a18;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Sources &amp; angles morts récurrents · {{header.active_sources_count or 0}}{% if header.total_sources_count %} / {{header.total_sources_count}}{% endif %} actives</p>
+  {% if sources_review.summary %}
+  <p style="margin:6px 0 0 0;font-size:11px;color:#1a1a18;font-weight:500;">Sources actives</p>
+  <div style="margin:2px 0 0 0;font-size:12px;color:#5a5852;">{{sources_review.summary|md}}</div>
+  {% endif %}
+  {% if sources_review.gaps or (blind_spots_weekly and blind_spots_weekly.entries) %}
+  <p style="margin:8px 0 0 0;font-size:11px;color:#1a1a18;font-weight:500;">Lacunes &amp; angles morts récurrents</p>
+  {% if sources_review.gaps %}<div style="margin:2px 0 0 0;font-size:12px;color:#5a5852;">{{sources_review.gaps|md}}</div>{% endif %}
+  {% if blind_spots_weekly and blind_spots_weekly.entries %}
+  {% for bs in blind_spots_weekly.entries %}
+  <p style="margin:3px 0 0 0;font-size:11px;color:#5a5852;line-height:1.5;">• <span style="font-weight:500;">{{bs.source|humanize_source}}</span> indispo {{bs.days_down}} j/7{% if bs.prev_days_down is not none %} <span style="color:#8a8880;">(vs {{bs.prev_days_down}} j/7 sem. dernière)</span>{% endif %}{% if bs.note %} — {{bs.note}}{% endif %}</p>
+  {% endfor %}
+  {% if blind_spots_weekly.reading %}<p style="margin:6px 0 0 0;font-size:11px;color:#5a5852;line-height:1.5;">{{blind_spots_weekly.reading}}</p>{% endif %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── FOOTER (heures Casablanca HH:MM, points 29-30-39) ── #}
+<div style="border-top:0.5px solid #e5e4dc;padding-top:1rem;text-align:center;">
+  {# Point 30 : matin = 08:30 (cron 30 7 * * *) ; point 29 : hebdo = dimanche 12:00. #}
+  {% if _degraded or footer.note %}
+  <p style="font-size:11px;color:#BA7517;margin:0 0 6px 0;font-weight:600;">⚠️ {{ footer.note or "Rapport généré en mode dégradé." }}</p>
+  {% endif %}
+  <p style="font-size:10px;color:#8a8880;margin:0;">Prochain rapport · {{footer.next_morning or footer.next_report_at or 'demain 08h30'}}</p>
+  <p style="font-size:10px;color:#8a8880;margin:4px 0 0 0;">Prochain rapport hebdo · {{footer.next_weekly or 'dimanche prochain 12:00'}}</p>
+  <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · {{app_version or "v15"}}</p>
+  <p style="font-size:9px;color:#8a8880;margin:8px 0 0 0;font-style:italic;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
+</div>

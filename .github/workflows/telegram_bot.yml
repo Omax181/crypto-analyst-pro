@@ -1,0 +1,83 @@
+name: Telegram Bot
+
+# v18.1 (Chantier G) — assistant Telegram conversationnel, mode « réveil par
+# message ». Le bot tourne sans serveur : un Worker Cloudflare reçoit le webhook
+# Telegram, empile le message dans une file KV et déclenche ce workflow via
+# repository_dispatch. Le run draine la file (GET /pull du relais), répond,
+# persiste l'historique, puis se termine. Plus de cron toutes les 5 min → zéro
+# minute gaspillée (cf. relay/cloudflare-worker.js + relay/README.md).
+# Les actions sur le state (dismiss/validate/snooze) sont committées ci-dessous.
+on:
+  # Déclenché par le relais Cloudflare à chaque message d'Omar.
+  repository_dispatch:
+    types: [telegram, telegram-bot, telegram_bot]
+  # Déclenchement manuel pour tester depuis l'onglet Actions.
+  workflow_dispatch:
+
+# Empêche deux exécutions simultanées (sinon double traitement / course state).
+concurrency:
+  group: telegram-bot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run Telegram bot
+        env:
+          # Cœur du bot.
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          # Le bot lit le portefeuille live → mêmes clés que les rapports.
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+          COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
+          COINMARKETCAL_API_KEY: ${{ secrets.COINMARKETCAL_API_KEY }}
+          # v18.1 — relais Cloudflare (réveil par message). Si RELAY_PULL_URL est
+          # défini, le bot draine la file du relais au lieu de poller getUpdates.
+          # Absents → le bot retombe sur le polling getUpdates (rétro-compat).
+          RELAY_PULL_URL: ${{ secrets.RELAY_PULL_URL }}
+          RELAY_SECRET: ${{ secrets.RELAY_SECRET }}
+          # v21 — mot de passe d'édition du portefeuille (/buy /sell /set). Si le
+          # secret est absent/vide, le code retombe sur le défaut « Omax181 ».
+          PORTFOLIO_EDIT_PASSWORD: ${{ secrets.PORTFOLIO_EDIT_PASSWORD }}
+        run: python -m src.telegram_bot.bot
+      - name: Commit state changes (offset, history, reco actions, portfolio edits)
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # state/ = offset/historique/recos ; config/portfolio.yaml = éditions de
+          # positions par le bot (/buy /sell /set) qui doivent persister entre runs.
+          git add -A state/ config/portfolio.yaml 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "Aucun changement de state à committer."
+            exit 0
+          fi
+          git commit -m "chore(telegram): update bot state [skip ci]"
+          # Rebase avant push pour ne pas écraser le state d'un run de rapport
+          # qui tournerait en parallèle.
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" \
+              && git push && { echo "State poussé."; break; }
+            echo "Push tentative $i échouée, nouvelle tentative dans 5s…"
+            sleep 5
+          done
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-logs-telegram
+          path: logs/

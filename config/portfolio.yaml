@@ -1,0 +1,189 @@
+# =============================================================================
+# PORTFOLIO — source de vérité du PTF
+# =============================================================================
+# Tiers :
+#   1 = analyse deep (mention si mouvement >5%, signal techn. fort, ou news)
+#   2 = analyse condensée (mention si mouvement >5% ou news significative)
+#   3 = silence sauf mouvement >10% ou news
+#   4 = poussières : silence sauf spike >30% ou news critique
+#
+# value_usd = BASELINE (fallback). La valeur réelle affichée est recalculée
+# dynamiquement à chaque run : quantité × prix live du marché. Si le prix live
+# est indisponible, on retombe sur ce value_usd (= dernier snapshot connu).
+#
+# Portefeuille 100% crypto — AUCUN cash / réserve. La valeur du PTF =
+# somme(quantité × prix live) des positions ci-dessous, exclusivement.
+#
+# `symbol` optionnel : par défaut on prend la clé (ex. RENDER -> RNDR).
+# `target_pct` optionnel (v18) : cible d'allocation en % du PTF pour cette
+#   position. Si renseigné, l'analyse calcule la sur/sous-pondération (gap vs
+#   cible). Laisser vide tant que les cibles ne sont pas définies — le code gère
+#   l'absence proprement (aucune cible = pas d'analyse d'allocation).
+# `pru` (v21) : prix de revient unitaire moyen en USD, calculé depuis
+#   l'historique Binance complet (coût moyen pondéré). Sert au P&L réel par
+#   position (prix live vs pru). Mettre à jour à chaque achat/vente via le bot.
+# Pour mettre à jour : éditer ce fichier puis git commit && git push.
+# =============================================================================
+
+meta:
+  base_currency: "USD"
+  notes: "Portefeuille 100% crypto, aucun cash. Valeur = somme(quantite x prix live), recalculee a chaque run. Les value_usd ci-dessous sont un fallback (dernier snapshot connu). pru = cout moyen pondere (historique Binance)."
+
+portfolio:
+  # === TIER 1 (analyse deep) ===
+  BTC:
+    quantity: 0.01422
+    value_usd: 911.78
+    pru: 58618.35
+    tier: 1
+  ETH:
+    quantity: 0.3004
+    value_usd: 500.12
+    pru: 3092.84
+    tier: 1
+  TAO:
+    quantity: 1.6
+    value_usd: 422.82
+    pru: 223.83
+    tier: 1
+    notes: "Plus grosse position - narrative AI"
+  JASMY:
+    quantity: 14028
+    value_usd: 72.37
+    pru: 0.024771
+    tier: 1
+  RENDER:
+    symbol: RNDR
+    quantity: 39.6
+    value_usd: 68.48
+    pru: 4.45
+    tier: 1
+    notes: "narrative AI"
+  LINK:
+    quantity: 7.99
+    value_usd: 62.77
+    pru: 11.49
+    tier: 1
+  RSR:
+    quantity: 42697.19
+    value_usd: 58.88
+    pru: 0.006487
+    tier: 1
+  CKB:
+    quantity: 50046.34
+    value_usd: 55.77
+    pru: 0.010192
+    tier: 1
+  ANKR:
+    quantity: 13354.26
+    value_usd: 51.88
+    pru: 0.029165
+    tier: 1
+  INJ:
+    quantity: 10.07
+    value_usd: 50.84
+    pru: 17.44
+    tier: 1
+  QNT:
+    quantity: 0.653
+    value_usd: 43.84
+    pru: 70.64
+    tier: 1
+  STX:
+    quantity: 232.29
+    value_usd: 43.06
+    pru: 1.4922
+    tier: 1
+  XRP:
+    quantity: 35.35
+    value_usd: 40.21
+    pru: 0.9677
+    tier: 1
+  FET:
+    quantity: 186.22
+    value_usd: 37.09
+    pru: 0.9794
+    tier: 1
+    notes: "narrative AI - alliance ASI"
+  # === TIER 2 (analyse condensee) ===
+  ATOM:
+    quantity: 15.77
+    value_usd: 31.13
+    pru: 4.95
+    tier: 2
+  # === TIER 1 (analyse deep) ===
+  CFX:
+    quantity: 671.09
+    value_usd: 29.83
+    pru: 0.11429
+    tier: 1
+  # === TIER 2 (analyse condensee) ===
+  HBAR:
+    quantity: 326.69
+    value_usd: 25.16
+    pru: 0.05305
+    tier: 2
+  ACH:
+    quantity: 3567.32
+    value_usd: 18.68
+    pru: 0.021041
+    tier: 2
+  IMX:
+    quantity: 116.76
+    value_usd: 16.34
+    pru: 1.2491
+    tier: 2
+  GRT:
+    quantity: 433.92
+    value_usd: 8.56
+    pru: 0.16886
+    tier: 2
+  ARB:
+    quantity: 102.5
+    value_usd: 8.56
+    pru: 0.6462
+    tier: 2
+  ADA:
+    quantity: 50.21
+    value_usd: 8.3
+    pru: 0.81
+    tier: 2
+  # === TIER 3 (silence sauf mouvement >10%) ===
+  AR:
+    quantity: 4.05
+    value_usd: 8.04
+    pru: 16.81
+    tier: 3
+  NOT:
+    quantity: 15968.65
+    value_usd: 8.04
+    pru: 0.009036
+    tier: 3
+  AXL:
+    quantity: 129.21
+    value_usd: 5.97
+    pru: 0.68003
+    tier: 3
+  ZK:
+    quantity: 307.57
+    value_usd: 3.37
+    pru: 0.11706
+    tier: 3
+  # === TIER 4 (poussieres) ===
+  W:
+    quantity: 227.69
+    value_usd: 2.08
+    pru: 0.21536
+    tier: 4
+  SXT:
+    quantity: 16.64
+    value_usd: 0.26
+    pru: 0
+    tier: 4
+    notes: "recu gratuitement (airdrop/recompense) - PRU 0"
+  1000SATS:
+    quantity: 787600
+    value_usd: 130.74
+    pru: 0.000166
+    tier: 4
+    notes: "VERIFIER coingecko_id + unite (risque facteur 1000 sur prix live)"

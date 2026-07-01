@@ -1,0 +1,36 @@
+# =============================================================================
+# YOUTUBE CHANNELS — chaînes de référence à scanner (vidéos < 24h)
+# Logique : récupérer les transcripts récents, les passer à Gemini pour une
+# SYNTHÈSE GLOBALE. NE JAMAIS citer une chaîne individuellement dans le rapport.
+# =============================================================================
+
+youtube_channels:
+  fr_analysis:
+    - "Hasheur"
+    - "Bourse pour tous"
+  en_analysis:
+    - "Coin Bureau"
+    - "InvestAnswers"
+  fr_macro:
+    - "Heu?reka"
+    - "HugoDécrypte"
+
+# Channel IDs explicites (v23) — VÉRIFIÉS un par un (page chaîne -> externalId +
+# titre confirmé). Évite la résolution par handle/recherche à chaque run : tue
+# les 404 sur playlistItems (id mal résolu) ET économise 100 unités de quota par
+# chaîne non résolue par handle. Si un id devient invalide, le code retombe
+# automatiquement sur la résolution par handle/recherche (dégradation gracieuse).
+# Les clés DOIVENT matcher exactement les noms de `youtube_channels` ci-dessus.
+channel_ids:
+  "Hasheur": "UCd1AdBu2cmlN0P_TxtzN6ew"
+  "Bourse pour tous": "UCdmdl6qM7bNHemOTGCkN_CQ"
+  "Coin Bureau": "UCnThE8FLrlN-tYvZhZL0uaA"
+  "InvestAnswers": "UCH6KS5IiLfTyunVHPCDYT8Q"
+  "Heu?reka": "UC96E3Puc9M-RCVdVLGIrHFw"
+  "HugoDécrypte": "UCUo1RqYV8tGjV38sQ8S5p9A"
+
+settings:
+  max_age_hours: 24
+  max_videos_per_channel: 2
+  transcript_languages: ["fr", "en"]
+  priority_channel: "Hasheur"   # scanné en premier, résumé dédié

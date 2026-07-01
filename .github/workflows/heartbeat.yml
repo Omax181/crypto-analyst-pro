@@ -1,0 +1,24 @@
+name: Heartbeat
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'   # 1er du mois (évite la désactivation des crons après 60j)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Update timestamp
+        run: |
+          echo "Last heartbeat: $(date -u)" > .heartbeat
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .heartbeat
+          # [skip ci] empêche le commit de déclencher d'autres workflows.
+          git commit -m "chore: heartbeat $(date +%Y-%m) [skip ci]" || exit 0
+          git push
