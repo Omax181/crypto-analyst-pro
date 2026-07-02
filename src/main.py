@@ -1731,7 +1731,9 @@ def _apply_macro_guardrail_override(payload: dict[str, Any]) -> None:
     )
     bias = (readout.get("crypto_bias") or "").strip()
     if "pruden" not in bias.lower():
-        readout["crypto_bias"] = ("⚠ Prudence forcée (garde-fou macro). " + bias).strip()
+        # v24 — libellé AUTONOME (ne plus concaténer le biais LLM brut, qui laissait
+        # pendre « … (garde-fou macro). défavorable » — redondant avec risk-off).
+        readout["crypto_bias"] = "⚠ Prudence forcée (garde-fou macro)"
 
 
 def _compute_portfolio_risk_score(
@@ -2624,9 +2626,9 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
                 payload["thesis_empty_reason"] = (
                     f"Aucune thèse à conviction suffisante ce matin : les pistes "
                     f"étudiées ({_assets}) plafonnent à {_best:.0f}% de confiance, "
-                    f"sous le seuil de {THESIS_CONFIDENCE_FLOOR}% requis pour une "
-                    f"reco affichée. Il manque une convergence plus nette (cassure "
-                    f"de niveau confirmée, signal on-chain franc ou catalyseur daté). "
+                    f"en dessous des {THESIS_CONFIDENCE_FLOOR}% requis pour une reco "
+                    f"ferme. Il manque une convergence plus nette (cassure de niveau "
+                    f"confirmée, signal on-chain franc ou catalyseur daté). "
                     f"On surveille, on n'agit pas dans le bruit."
                 )
         theses = filtered
@@ -3870,6 +3872,22 @@ def run_evening() -> int:
     return 0 if ok else 1
 
 
+def _is_core_asset(sym: str, info: dict[str, Any] | None) -> bool:
+    """★ cœur = conviction RÉELLE (BTC/ETH/TAO/LINK), PAS le tier d'analyse.
+
+    Override par actif via ``core: true|false`` dans portfolio.yaml (prioritaire),
+    sinon le set CORE_ASSETS du profil. SOURCE DE VÉRITÉ UNIQUE du label
+    cœur/satellite — utilisée à la fois par le tableau Positions du hebdo ET par
+    l'exit plan des poussières (avant : tier 1/2 des deux côtés → poussières comme
+    RSR/JASMY étiquetées « cœur »).
+    """
+    from src.ai_brain.prompts.investor_profile import CORE_ASSETS
+    c = (info or {}).get("core")
+    if isinstance(c, bool):
+        return c
+    return str(sym).upper() in CORE_ASSETS
+
+
 def _build_positions_review(
     long_term: Any, scoring_detail: Any,
     portfolio: dict[str, Any], market: dict[str, Any]
@@ -3878,12 +3896,13 @@ def _build_positions_review(
 
     Joint le positionnement LONG TERME (LLM : analyse, cible, phase de cycle,
     action) avec la performance de la reco à 30j (Python : reco, Δ, statut) et
-    enrichit DÉTERMINISTIQUEMENT prix actuel, % vs PRU et conviction (tier).
+    enrichit DÉTERMINISTIQUEMENT prix actuel, % vs PRU et conviction (cœur —
+    cf. _is_core_asset : set CORE_ASSETS du profil + override portfolio).
     Union par actif : positions LT d'abord (ordre LLM), puis recos sans thèse LT.
     """
     price_by = {s.upper(): _parse_num((market.get(s) or {}).get("price")) for s in portfolio}
     pru_by = {s.upper(): _parse_num((portfolio.get(s) or {}).get("pru")) for s in portfolio}
-    tier_by = {s.upper(): (portfolio.get(s) or {}).get("tier", 3) for s in portfolio}
+    core_by = {s.upper(): _is_core_asset(s, portfolio.get(s) or {}) for s in portfolio}
 
     lt_by: dict[str, dict] = {}
     order: list[str] = []
@@ -3921,7 +3940,7 @@ def _build_positions_review(
                    "status": d.get("status")}
         out.append({
             "asset": a,
-            "conviction": tier_by.get(a, 3) in (1, 2),
+            "conviction": core_by.get(a, _is_core_asset(a, None)),
             "current_price": price,
             "pru_pct": pru_pct,
             "h30": h30,
@@ -3992,7 +4011,10 @@ def run_weekly() -> int:
                 "asset": s,
                 "value_usd": round(_pv, 2),
                 "tier": _tier_cfg,
-                "conviction": _tier_cfg in (1, 2),
+                # v24 — conviction = vrai set cœur (cf. _is_core_asset), PAS le tier
+                # d'analyse : sinon une poussière tier 1/2 (RSR…) serait « protégée »
+                # de l'exit plan à tort. Source de vérité unique cœur/satellite.
+                "conviction": _is_core_asset(s, portfolio.get(s) or {}),
                 "active_reco": False,
             })
 
@@ -4758,9 +4780,18 @@ def run_weekly() -> int:
         # moyenne pondérée par le poids). Vue compacte et homogène avec le matin.
         _wk_secs = _weekly_sector_exposure.get("sectors") or []
         if _wk_secs:
+            def _is_agg(_s: dict[str, Any]) -> bool:
+                return bool(_s.get("is_aggregate")) or str(
+                    _s.get("sector", "")).startswith("Autres secteurs")
+
             _sorted_secs = sorted(
                 _wk_secs, key=lambda s: s.get("ptf_pct") or 0, reverse=True
             )
+            # v24 — le bucket agrégé « Autres secteurs » DOIT rester en dernier :
+            # trié par poids, il s'intercalait avant des secteurs nommés plus petits
+            # (audit : « Autres (4) » 7.0% affiché avant Oracle/Infra 4.0%).
+            _sorted_secs = ([s for s in _sorted_secs if not _is_agg(s)]
+                            + [s for s in _sorted_secs if _is_agg(s)])
             # v23.x — 6 cases : 5 secteurs individuels (les plus gros) + 1 case
             # « Autres secteurs » agrégeant le reste. (_compute_sector_exposure
             # plafonne déjà à 6 ; ce repli reste cohérent si jamais davantage de

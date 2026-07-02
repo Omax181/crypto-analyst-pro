@@ -373,6 +373,10 @@ INSTRUCTIONS :
          est ancien (miroir daté), ne présente pas une métrique on-chain comme un
          « signal du jour » ; cite l'as_of une seule fois. Prix/technique/dérivés
          sont « live ».
+       • v24 — RENFORCÉ : une métrique on-chain de PLUS DE 2 SEMAINES (ex. MVRV au
+         23/05 alors qu'on est en juillet) est un CONTEXTE STRUCTUREL, jamais un
+         déclencheur d'accumulation présenté comme actuel — vaut AUSSI dans l'EN
+         BREF, les thèses et la watchlist, pas seulement la grille on-chain.
      La confiance doit refléter la CONVERGENCE MULTIDIMENSIONNELLE, pas
      l'enthousiasme. Sous le seuil du type, n'émets PAS la thèse. Si aucun actif
      n'atteint son seuil, renvoie thesis_of_the_day vide + thesis_empty_reason.

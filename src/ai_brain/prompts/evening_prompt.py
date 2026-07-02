@@ -114,6 +114,11 @@ INSTRUCTIONS :
    d'impact + statut (intégré / actionnable). UNIQUEMENT les news qui CHANGENT
    quelque chose vs le matin. Ne répète pas une news déjà couverte dans
    market_changes. Pas de % de confiance (inutile, le matin a déjà trié).
+   v24 — ZÉRO news SANS IMPACT crypto/PTF : si l'impact se résume à « aucun impact
+   direct » (ex. dividende d'un ETF obligataire, résultat sportif, actu people),
+   NE L'AFFICHE PAS DU TOUT — ne la liste pas juste pour dire qu'elle est neutre.
+   Mieux vaut 2 news pertinentes que 5 dont une creuse. L'audit a vu « Global X
+   Zero Coupon Bond ETF declares dividend — pas d'impact direct » : à bannir.
    v18 (E-B3) : « depuis ce matin » est LITTÉRAL — n'inclus QUE des news dont
    l'heure est POSTÉRIEURE au rapport du matin (~08h30 Casablanca). Une news de
    la nuit ou d'avant le matin a déjà été vue : elle n'a rien à faire ici. Si une

@@ -424,9 +424,24 @@ def test_defillama():
 
 @test("DeFiLlama (unlocks v14.1)", None)
 def test_defillama_unlocks():
-    """Remplace l'endpoint MORT api.unlocks.app (404 définitif)."""
+    """v25 — ALIGNÉ sur le pipeline réel (token_unlocks.py) : l'endpoint
+    /emissions est PAYANT depuis v21 (402, corps parfois vide → JSONDecodeError).
+    Le pipeline ne l'appelle PAS par défaut (gate DEFILLAMA_PAID) et dégrade
+    proprement. Le diagnostic reflète ce comportement au lieu de crasher en ❌
+    sur un endpoint que le code n'utilise pas."""
+    if os.environ.get("DEFILLAMA_PAID", "").strip().lower() not in ("1", "true", "yes"):
+        report("DeFiLlama (unlocks v14.1)", "warn",
+               "désactivé par défaut (endpoint /emissions payant · 402) — "
+               "dégradation gracieuse ; activable via DEFILLAMA_PAID=1")
+        return
     r = http_get("https://api.llama.fi/emissions", timeout=20)
-    data = r.json()
+    try:
+        data = r.json()
+    except ValueError:  # corps vide / non-JSON (typique du 402)
+        report("DeFiLlama (unlocks v14.1)", "warn",
+               f"HTTP {r.status_code}, corps non-JSON — plan payant requis ; "
+               "l'agent dégrade proprement")
+        return
     items = data if isinstance(data, list) else (data or {}).get("data", [])
     if isinstance(items, list) and items:
         report("DeFiLlama (unlocks v14.1)", "ok",
@@ -566,7 +581,7 @@ def test_gmail():
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main() -> int:
-    print("\n═══ Diagnostic Crypto Analyst Pro · v24 ═══\n")
+    print("\n═══ Diagnostic Crypto Analyst Pro · v25 ═══\n")
     sections = [
         ("Cœur — prix & marché", [test_coingecko, test_coinmarketcap,
                                   test_fear_greed, test_yahoo,

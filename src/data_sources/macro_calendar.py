@@ -23,7 +23,7 @@ les récurrences statistiques sont étiquetées « estimé » dans le label fina
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, Optional
 
 from src.data_sources import fred
 from src.data_sources.boursorama_calendar import get_boursorama_calendar
@@ -91,20 +91,63 @@ def _recurring_estimates(today: date, horizon_days: int) -> list[dict[str, Any]]
     return out
 
 
-def _norm_key(label: str, d: str) -> str:
-    """Clé de dédup : libellé normalisé + date (CPI FRED == CPI estimé)."""
+# Familles d'événements pour la dédup cross-source (FR + EN : FRED & ForexFactory
+# sont en anglais, récurrences/banques centrales en français). v24 : le générique
+# « fed » a été RETIRÉ (il capturait « Fed … Speaks » de ForexFactory et fusionnait
+# des speeches distincts) — seul « fomc » marque la famille FOMC.
+_FAMILY_TOKENS = (
+    # v25 — libellés ForexFactory des DÉCISIONS de taux : même famille que le
+    # calendrier officiel (sinon « Federal Funds Rate (US) » s'affichait EN PLUS
+    # de « Décision FOMC » le jour J — doublon du même événement).
+    ("federal funds rate", "fomc"), ("main refinancing rate", "bce"),
+    ("cpi", "cpi"), ("inflation", "cpi"),
+    ("non-farm", "nfp"), ("nonfarm", "nfp"), ("employment change", "nfp"),
+    ("payroll", "nfp"), ("emploi", "nfp"), ("nfp", "nfp"),
+    ("fomc", "fomc"), ("boj", "boj"), ("bce", "bce"), ("ecb", "bce"),
+    ("pce", "pce"), ("pib", "gdp"), ("gdp", "gdp"),
+    ("retail sales", "retail"), ("retail", "retail"), ("ventes au détail", "retail"),
+)
+
+
+def _family(label: str) -> Optional[str]:
+    """Famille d'un événement (nfp/cpi/fomc/…) pour la dédup, ou None si autre."""
     low = (label or "").lower()
-    fam = "other"
-    for token, name in (("cpi", "cpi"), ("inflation", "cpi"), ("emploi", "nfp"),
-                        ("nfp", "nfp"), ("payroll", "nfp"), ("fomc", "fomc"),
-                        ("fed", "fomc"), ("boj", "boj"), ("bce", "bce"),
-                        ("ecb", "bce"), ("pce", "pce"), ("pib", "gdp"),
-                        ("gdp", "gdp"), ("retail", "retail"),
-                        ("ventes au détail", "retail")):
+    # v25 (audit M2) — un DISCOURS n'est pas la décision/publication : deux
+    # « FOMC Member X/Y Speaks » le même jour restent deux lignes distinctes.
+    if "speak" in low or "speech" in low or "testif" in low:
+        return None
+    # v25 (audit M2) — « Inflation Expectations » (UoM) n'est PAS le CPI : ni
+    # fusion avec un vrai CPI, ni suppression de la récurrence CPI estimée.
+    if "inflation expectations" in low:
+        return None
+    for token, name in _FAMILY_TOKENS:
         if token in low:
-            fam = name
-            break
-    return f"{fam}:{d}" if fam != "other" else f"other:{low[:32]}:{d}"
+            return name
+    return None
+
+
+# v25 — marqueurs de zone NON-US dans les libellés (ForexFactory ajoute
+# « (Zone euro) », « (Japon) »…). Sans eux, un « GDP q/q (UK) » et le PIB US le
+# même jour partageraient la famille « gdp » et fusionneraient À TORT. Défaut =
+# us (FRED, récurrences et banques centrales US n'ont pas de marqueur).
+_ZONE_MARKERS = (("zone euro", "eu"), ("japon", "jp"), ("uk", "uk"),
+                 ("chine", "cn"), ("(eur)", "eu"), ("(jpy)", "jp"),
+                 ("(gbp)", "uk"), ("(cny)", "cn"))
+
+
+def _zone_of(label_low: str) -> str:
+    for marker, code in _ZONE_MARKERS:
+        if marker in label_low:
+            return code
+    return "us"
+
+
+def _norm_key(label: str, d: str) -> str:
+    """Clé de dédup : famille + zone + date (CPI FRED == CPI estimé US le même
+    jour ; un CPI zone euro ne fusionne jamais avec le CPI US)."""
+    low = (label or "").lower()
+    fam = _family(label)
+    return f"{fam}:{_zone_of(low)}:{d}" if fam else f"other:{low[:32]}:{d}"
 
 
 def _parse_bourso_events(raw: dict[str, Any], today: date,
@@ -180,7 +223,34 @@ def get_consolidated_calendar(horizon_days: int = 8) -> dict[str, Any]:
                       "importance": e.get("importance", "high"), "source": "FRED",
                       "estimated": False})
 
-        # Couche 2 — Boursorama (demande explicite d'Omar).
+        # Couche 1a — banques centrales (calendriers officiels 2026). AVANT
+        # ForexFactory pour que le libellé officiel « Décision FOMC/BCE/BoJ » gagne
+        # sa clé de famille face à un éventuel speech du même jour.
+        for e in _CENTRAL_BANK_EVENTS:
+            _add(e)
+        if any(v.get("source", "").startswith("Calendrier") for v in merged.values()):
+            sources_used.append("Calendriers banques centrales")
+
+        # Couche 1b — ForexFactory (v24) : calendrier éco RICHE, gratuit, criticité.
+        # LA source qui donne enfin une vraie couverture de la semaine (avant, le
+        # weekly n'affichait qu'un seul événement). Corrige aussi les décalages de
+        # date (ex. NFP avancé au jeudi quand le vendredi est férié aux US).
+        try:
+            from src.data_sources import econ_calendar as _ec
+            ff = _ec.get_econ_calendar(horizon_days=horizon_days)
+            if ff.get("available"):
+                sources_used.append("ForexFactory")
+                for e in ff.get("events", []):
+                    _add({"label": e.get("label"), "date": e.get("date"),
+                          "importance": e.get("importance", "medium"),
+                          "source": "ForexFactory", "estimated": False,
+                          "time": e.get("time"), "zone": e.get("zone"),
+                          "forecast": e.get("forecast"),
+                          "previous": e.get("previous")})
+        except Exception as exc:  # noqa: BLE001
+            logger.info("Calendrier éco (ForexFactory) indisponible : %s", exc)
+
+        # Couche 2 — Boursorama (demande historique d'Omar ; souvent JS-only).
         try:
             bourso = get_boursorama_calendar()
             b_events = _parse_bourso_events(bourso, today, horizon_days)
@@ -191,18 +261,33 @@ def get_consolidated_calendar(horizon_days: int = 8) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001
             logger.info("Boursorama calendrier indisponible : %s", exc)
 
-        # Couche 3a — banques centrales (calendriers officiels 2026).
-        for e in _CENTRAL_BANK_EVENTS:
-            _add(e)
-        if any(v.get("source", "").startswith("Calendrier") for v in merged.values()):
-            sources_used.append("Calendriers banques centrales")
-
-        # Couche 3b — récurrences estimées, seulement pour les familles encore
-        # absentes (jamais en doublon d'une date réelle, cf. _norm_key).
+        # Couche 3 — récurrences ESTIMÉES, seulement pour les (famille, ZONE)
+        # ENCORE absentes des sources RÉELLES (v24/v25 : suppression par famille
+        # ET zone — un vrai NFP ForexFactory supprime « NFP (estimé) », mais un
+        # CPI zone euro réel ne supprime PAS l'estimation du CPI US). Jamais en
+        # doublon d'une date réelle non plus (cf. _norm_key).
+        _real_fams = set()
+        for v in merged.values():
+            if v.get("estimated"):
+                continue
+            _f = _family(v.get("label", ""))
+            if _f:
+                _real_fams.add((_f, _zone_of((v.get("label") or "").lower())))
         for e in _recurring_estimates(today, horizon_days):
+            _f = _family(e.get("label", ""))
+            if _f and (_f, "us") in _real_fams:  # récurrences = US uniquement
+                continue
             _add(e)
 
         events = sorted(merged.values(), key=lambda e: (e["date"], e["label"]))
+        # v24 — cap anti-mur : garde TOUS les high + complète avec les medium les
+        # plus proches (plafond 28) pour ne pas noyer le mail sous 50 lignes.
+        _MAXE = 28
+        if len(events) > _MAXE:
+            _highs = [e for e in events if e.get("importance") == "high"]
+            _meds = [e for e in events if e.get("importance") != "high"]
+            events = sorted(_highs + _meds[:max(0, _MAXE - len(_highs))],
+                            key=lambda e: (e["date"], e["label"]))
         for e in events:
             if e.get("estimated"):
                 e["label"] = f"{e['label']} (estimé)"

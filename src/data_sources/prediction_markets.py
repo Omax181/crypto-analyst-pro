@@ -111,6 +111,13 @@ _EXTRA_BLOCKLIST = (
     "fifa", "world cup", "super bowl", "nba", "nfl", "ufc", "olympic", "champions league",
     "premier league", "ballon", "oscar", "grammy", "album", "movie", "box office",
     "rihanna", "taylor swift", "kanye", "celebrity", "tournament", "playoff", "world series",
+    # v24 — sport/divertissement ÉLARGI : l'audit a vu « Wimbledon WTA: Solana
+    # Sierra vs Coco Gauff » passer (le prénom « Solana » matchait le thème crypto).
+    # Le tennis / golf / F1 etc. n'ont aucune valeur de trading pour le PTF.
+    "wimbledon", "tennis", "wta", "atp", "grand slam", "grand chelem", "roland garros",
+    "us open", "australian open", "french open", "golf", "pga", "nhl", "mlb",
+    "cricket", "rugby", "boxing", "mma", "formula 1", "formula1", "grand prix",
+    "motogp", "eurovision", "miss universe",
 )
 _FED_NEXT_PATTERNS = {
     # famille -> mots-clés question (insensible casse)
@@ -120,6 +127,25 @@ _FED_NEXT_PATTERNS = {
 }
 
 
+def _wb(words: tuple[str, ...]) -> "re.Pattern[str]":
+    """Compile un motif MOT ENTIER, pluriel toléré (« s » final optionnel).
+
+    v25 (audit) : sans le ``s?``, « tariffs », « stablecoins », « memecoins »,
+    « playoffs »… ne matchaient plus (faux négatifs sur de VRAIS marchés macro
+    et des trous dans la blocklist sport). Les questions sont déjà minuscules.
+    """
+    return re.compile(r"\b(" + "|".join(re.escape(w) for w in words) + r")s?\b")
+
+
+# v24 — TOUT est matché en MOT ENTIER (plus de sous-chaîne). Les thèmes en
+# sous-chaîne créaient des faux positifs : « netflix » contient « etf »,
+# « Solana Sierra » (joueuse de tennis) contient « solana », etc. Le mot entier
+# règle la classe entière de ces bugs (les vrais marchés « Solana … », « ETF … »
+# restent matchés car « solana »/« etf » y apparaissent bien comme mots).
+_THEME_RE = _wb(_CRYPTO_THEMES)
+_MACRO_RE = _wb(_MACRO_THEMES)
+_GEO_RE = _wb(_GEO_THEMES)
+_BLOCK_RE = _wb(_EXTRA_BLOCKLIST)  # sport/divertissement, en mot entier aussi
 _TICKER_RE = re.compile(r"\b(" + "|".join(_CRYPTO_TICKERS) + r")\b")
 _WAR_RE = re.compile(r"\bwar\b")  # mot entier : pas « stewart », « warren », « toward »
 
@@ -128,15 +154,15 @@ def _market_tier(ql: str) -> Optional[int]:
     """Tier de pertinence (crypto-first) d'une question Polymarket en minuscules.
 
     1 = crypto direct · 2 = macro · 3 = géopolitique · ``None`` = hors-sujet
-    (élections/nominations, météo, people…). Les tokens courts/ambigus (tickers
-    btc/eth/…, « war ») sont matchés en MOT ENTIER pour éviter les faux positifs
-    (« eth » dans « whether », « war » dans « stewart »).
+    (élections/nominations, météo, people…). TOUT est matché en MOT ENTIER pour
+    éviter les faux positifs (« etf » dans « netflix », « solana » dans le nom
+    « Solana Sierra », « war » dans « stewart »…).
     """
-    if any(t in ql for t in _CRYPTO_THEMES) or _TICKER_RE.search(ql):
+    if _THEME_RE.search(ql) or _TICKER_RE.search(ql):
         return 1
-    if any(t in ql for t in _MACRO_THEMES):
+    if _MACRO_RE.search(ql):
         return 2
-    if any(t in ql for t in _GEO_THEMES) or _WAR_RE.search(ql):
+    if _GEO_RE.search(ql) or _WAR_RE.search(ql):
         return 3
     return None
 
@@ -236,8 +262,8 @@ def get_key_markets() -> dict[str, Any]:
             ql = q.lower()
             if any(k in ql for k in _KEYWORDS):
                 continue  # déjà couvert par les barres Fed
-            # v18 (M-B2) : exclusion DURE des thèmes sport/divertissement.
-            if any(b in ql for b in _EXTRA_BLOCKLIST):
+            # v18 (M-B2) / v24 : exclusion DURE sport/divertissement (mot entier).
+            if _BLOCK_RE.search(ql):
                 continue
             # v23.x : ne garder QUE les marchés pertinents (crypto > macro > géo) ;
             # tout le reste (élections/nominations, météo…) est écarté.

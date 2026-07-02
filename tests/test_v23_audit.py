@@ -15,7 +15,7 @@ import inspect
 # --------------------------------------------------------------------------- #
 def test_app_version_v23():
     from src.reporting.email_html import APP_VERSION
-    assert APP_VERSION == "v24"
+    assert APP_VERSION == "v25"
 
 
 # --------------------------------------------------------------------------- #

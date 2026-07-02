@@ -64,7 +64,10 @@ def test_bot_prompt_knows_holdings_and_never_asks_pru():
     la commande déterministe (/buy /sell) pour enregistrer un trade."""
     from src.telegram_bot.assistant import _SYSTEM_PROMPT
     low = _flat(_SYSTEM_PROMPT).lower()
+    # Ne redemande jamais des données qu'il possède (quantité + PRU).
     assert "ne redemande jamais" in low
     assert "pru actuel" in low
+    # Calcule le PRU pondéré lui-même.
     assert "pru pondéré" in low
+    # Guide vers la commande d'enregistrement déterministe.
     assert "/buy" in low and "/sell" in low

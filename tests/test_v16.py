@@ -98,6 +98,9 @@ def test_calendar_consolidated_sorted_and_dated(monkeypatch):
                         lambda horizon_days=8: {"available": False})
     monkeypatch.setattr(mc, "get_boursorama_calendar",
                         lambda: {"available": False})
+    from src.data_sources import econ_calendar as _ec
+    monkeypatch.setattr(_ec, "get_econ_calendar",
+                        lambda horizon_days=8: {"available": False, "events": []})
     monkeypatch.setattr(CACHE, "get_or_compute", lambda k, ttl, fn: fn())
     out = mc.get_consolidated_calendar(horizon_days=400)
     assert out["available"] is True
@@ -220,7 +223,7 @@ def test_render_morning_v16_no_history_onchain_grid():
     # macro reste affichée telle quelle, actionnable.
     assert "Donc :" not in html
     assert "TAO à alléger si DXY casse 100" in html  # implication macro présente
-    assert "Crypto Analyst Pro · v24" in html
+    assert "Crypto Analyst Pro · v25" in html
 
 
 def test_render_evening_v16_bars_no_heatmap():
@@ -253,7 +256,7 @@ def test_render_evening_v16_bars_no_heatmap():
     assert "accord : 17% Polymarket" in html or "accord : 17%" in html
     assert "RISQUE" in html.upper()                 # tag rendu
     assert "Pas d'événement macro majeur dans les 48h" in html
-    assert "Crypto Analyst Pro · v24" in html
+    assert "Crypto Analyst Pro · v25" in html
 
 
 def test_render_weekly_v16_no_btc_hold_bullets_sectors():
@@ -284,4 +287,4 @@ def test_render_weekly_v16_no_btc_hold_bullets_sectors():
     assert "drawdown pondéré -50% vs ATH" in html         # plus de « n/d »
     assert "0/5 minimum pour calibration" in html         # gate label dans header
     assert "13 juin" in html                              # upcoming_week corrigé
-    assert "Crypto Analyst Pro · v24" in html
+    assert "Crypto Analyst Pro · v25" in html

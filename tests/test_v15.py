@@ -56,6 +56,9 @@ def test_calendar_consolidated_never_empty(monkeypatch):
                         lambda horizon_days=8: {"available": False})
     monkeypatch.setattr(mc, "get_boursorama_calendar",
                         lambda: {"available": False})
+    from src.data_sources import econ_calendar as _ec
+    monkeypatch.setattr(_ec, "get_econ_calendar",
+                        lambda horizon_days=8: {"available": False, "events": []})
     monkeypatch.setattr(CACHE, "get_or_compute", lambda k, ttl, fn: fn())
     out = mc.get_consolidated_calendar(horizon_days=400)
     # Sur 400 jours, le repli banques centrales garantit des événements.
@@ -441,7 +444,7 @@ def test_render_morning_v15_blocks():
     assert "réseau sain" in html                     # v16 : grille on-chain horizontale
     assert "Bilan on-chain : neutre" in html         # v16 : verdict-first
     assert "DXY &gt; 101" in html or "DXY > 101" in html
-    assert "Crypto Analyst Pro · v24" in html
+    assert "Crypto Analyst Pro · v25" in html
     # Ordre : invalidation AVANT auto-critique.
     assert html.index("invalider mon scénario") < html.index("Auto-critique de l'analyse")
 
@@ -470,7 +473,7 @@ def test_render_evening_v15_blocks():
     assert "Actions à poser ce soir" in html and "ordre limite BTC" in html
     assert "International · Europe" in html and "Nikkei 225" in html
     assert "maintien" in html and "99.2%" in html
-    assert "Crypto Analyst Pro · v24" in html
+    assert "Crypto Analyst Pro · v25" in html
 
 
 def test_render_weekly_v15_blocks():
@@ -560,6 +563,6 @@ def test_render_weekly_v15_blocks():
     assert "Renforcer" in html and "Alléger" in html
     assert "Stratégie de la semaine" in html
     assert "1\u202f773" in html or "1,773" in html or "1 773" in html  # fenêtre P&L
-    assert "Crypto Analyst Pro · v24" in html
+    assert "Crypto Analyst Pro · v25" in html
     # Ordre : la vue PTF arrive avant le fil rouge macro (P3-1).
     assert html.index("Portfolio · vue d'ensemble") < html.index("Fil rouge macro")

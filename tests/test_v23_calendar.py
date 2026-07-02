@@ -109,6 +109,9 @@ def test_consolidated_calendar_merges_multiple_fred(monkeypatch):
             {"label": "Inscriptions chômage hebdo", "date": d2, "importance": "medium"},
         ]})
     monkeypatch.setattr(mc, "get_boursorama_calendar", lambda: {"available": False})
+    from src.data_sources import econ_calendar as _ec
+    monkeypatch.setattr(_ec, "get_econ_calendar",
+                        lambda horizon_days=8: {"available": False, "events": []})
     try:
         mc.CACHE._store.clear()
     except Exception:

@@ -617,13 +617,15 @@
 
 {# ── THÈSES DU JOUR ── #}
 <h2 style="margin:2rem 0 0.75rem 0;font-size:17px;font-weight:500;">Thèses du jour</h2>
-<p style="font-size:12px;color:#5a5852;margin:0 0 1rem 0;">Recos fermes du jour (RENFORCER / ALLÉGER) avec plan de trade complet. La sous-ligne <strong>⚙ moteur</strong> résume les signaux qui déclenchent chaque reco ; <span style="color:#BA7517;">★</span> = conviction développée en détail plus bas.</p>
 {# v23.x — le mail n'affiche QUE les recos FERMES ; les SURVEILLER restent en
    interne (bot/état) mais ne sont plus rendues. Liste dérivée de thesis_of_the_day
    pour rester robuste aux payloads de test qui ne passent pas firm_theses. #}
 {% set _firm_theses = [] %}
 {% for t in (thesis_of_the_day or []) if t.action in ['RENFORCER','ALLÉGER','ALLEGER'] %}{% set _ = _firm_theses.append(t) %}{% endfor %}
 {% if _firm_theses %}
+{# v24 — caption DANS le bloc : ne l'affiche plus au-dessus d'un tableau vide
+   (« ★ = conviction développée en détail plus bas » n'a pas de sens sans reco). #}
+<p style="font-size:12px;color:#5a5852;margin:0 0 1rem 0;">Recos fermes du jour (RENFORCER / ALLÉGER) avec plan de trade complet. La sous-ligne <strong>⚙ moteur</strong> résume les signaux qui déclenchent chaque reco ; <span style="color:#BA7517;">★</span> = conviction développée en détail plus bas.</p>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:0 0 0.5rem 0;font-size:10px;">
   <tr style="border-bottom:1px solid #e5e4dc;color:#8a8880;">
     <td style="padding:5px 3px;font-weight:600;">Actif</td>

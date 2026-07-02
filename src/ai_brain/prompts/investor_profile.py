@@ -100,3 +100,10 @@ non-invention et de cohérence des chiffres).
   laisse sur sa faim. Plusieurs paragraphes si l'analyse l'exige, sinon concis.
 - Mix analyse + suggestions concrètes à VRAIE valeur ajoutée.
 """
+
+# Actifs CŒUR (intouchables, conservés des années) — SOURCE DE VÉRITÉ UNIQUE,
+# alignée sur la section « CŒUR vs SATELLITES » ci-dessus (« INTOUCHABLES : BTC,
+# ETH, TAO — puis LINK »). Sert au label ★ cœur vs satellite du bilan hebdo (et
+# tout usage cœur/satellite déterministe). Un actif peut être forcé core/non-core
+# au cas par cas via ``core: true|false`` dans config/portfolio.yaml (prioritaire).
+CORE_ASSETS = frozenset({"BTC", "ETH", "TAO", "LINK"})

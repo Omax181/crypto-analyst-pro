@@ -51,7 +51,9 @@
 {# ── BILAN SEMAINE (v16 : bulletpoints explicatifs + gras sur termes clés) ── #}
 <h2 style="margin:0 0 0.75rem 0;font-size:17px;font-weight:500;">Bilan semaine{% if header.week_number %} {{header.week_number}}{% endif %} · ce qui s'est passé</h2>
 <div style="background:#f5f4ee;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
-  {% if weekly_summary is iterable and weekly_summary is not string %}
+  {# v25 — truthiness D'ABORD : un weekly_summary ABSENT (Undefined) passait le
+     test « is iterable » → boîte VIDE au lieu du texte de repli. #}
+  {% if weekly_summary and weekly_summary is iterable and weekly_summary is not string %}
   {% for b in weekly_summary %}
   <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;"><tr>
     <td style="width:16px;vertical-align:top;font-size:13px;line-height:1.6;color:#534AB7;">•</td>
@@ -168,27 +170,9 @@
     <p style="font-size:9px;color:#8a8880;margin:6px 0 0 0;font-style:italic;">Santé du portefeuille = santé structurelle (diversification, momentum vs BTC, solidité vs ATH), moyenne des 3 axes — même logique que la note Santé des mails matin/soir.</p>
   </div>
   {% endif %}
-  {% if weekly_movers and (weekly_movers.gainers or weekly_movers.losers) %}
-  <p style="font-size:12px;color:#1a1a18;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Top mouvements de la semaine</p>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;border-top:0.5px solid #e5e4dc;padding-top:8px;">
-    <tr>
-      <td style="width:50%;vertical-align:top;padding:8px 8px 0 0;">
-        <p style="font-size:10px;color:#3B6D11;margin:0 0 4px 0;font-weight:700;">▲ Gagnants</p>
-        {% for g in weekly_movers.gainers %}
-        <div style="font-size:12px;line-height:1.5;color:#1a1a18;">{{g.symbol}}{{ _cps.get(g.symbol, {}).get('status') | pastille }} · <span style="color:#3B6D11;font-weight:600;">{{ g.change|fmt_pct }}</span></div>
-        {% endfor %}
-        {% if not weekly_movers.gainers %}<div style="font-size:12px;color:#8a8880;font-style:italic;">Pas de gagnant cette semaine</div>{% endif %}
-      </td>
-      <td style="width:50%;vertical-align:top;padding:8px 0 0 8px;border-left:0.5px solid #e5e4dc;">
-        <p style="font-size:10px;color:#A32D2D;margin:0 0 4px 0;font-weight:700;">▼ Perdants</p>
-        {% for l in weekly_movers.losers %}
-        <div style="font-size:12px;line-height:1.5;color:#1a1a18;">{{l.symbol}}{{ _cps.get(l.symbol, {}).get('status') | pastille }} · <span style="color:#A32D2D;font-weight:600;">{{ l.change|fmt_pct }}</span></div>
-        {% endfor %}
-        {% if not weekly_movers.losers %}<div style="font-size:12px;color:#8a8880;font-style:italic;">Pas de perdant cette semaine</div>{% endif %}
-      </td>
-    </tr>
-  </table>
-  {% endif %}
+  {# v24 — bloc « Top mouvements de la semaine » (▲ Gagnants / ▼ Perdants) SUPPRIMÉ
+     à la demande d'Omar. Les mouvements restent dispo dans la heatmap 7j + le
+     contexte LLM (bilan semaine), mais ne sont plus affichés en section dédiée. #}
 
   {# v23.x — exposition sectorielle en CASES colorées (homogène avec la heatmap
      du matin) : 5 secteurs individuels + « Autres secteurs » = 6 cases. Chaque
@@ -396,41 +380,38 @@
 </div>
 {# anchor-weekly-scoring-card-end #}
 
-{# ── PERTES ↔ RECOS (A7) — lien honnête baisses/recos émises ── #}
-{% if losses_vs_recos %}
-<div style="background:#FCEBEB;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;font-size:12px;line-height:1.6;color:#501313;">
-  <p style="margin:0 0 3px 0;font-weight:600;color:#791F1F;">Pertes de la semaine · lien avec mes recos</p>
-  {{losses_vs_recos|md}}
-</div>
-{% endif %}
-
-{# ── CALIBRATION · CONFIANCE ANNONCÉE VS RÉALISÉE (TOUJOURS présent, point 3) ── #}
-{# v15 — la calibration vit désormais DANS la carte scoring (fusion P3-2). #}
-
-{# ── COÛT DES ERREURS (point 15 : mini-bannière si vide, structure dense sinon) ── #}
-{% if regret and regret.entries %}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Coût des erreurs · le regret de la semaine</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  {% for it in regret.entries %}
-  <div style="padding:6px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:13px;line-height:1.5;">
-    <span style="font-weight:500;">{{it.asset}}</span> — {{it.description}}{% if it.cost_pct is not none %} <span style="color:#A32D2D;font-weight:500;">{{ it.cost_pct|fmt_pct }} {{it.cost_label or 'non capturés'}}</span>{% endif %}{% if it.cost_usd %} ≈ {{ it.cost_usd|fmt_price }}{% endif %}
+{# ── POST-MORTEM DE LA SEMAINE (fusion v24) — les 3 blocs qui parlaient de la
+   même chose (pertes↔recos + coût des erreurs + mon erreur) regroupés en UNE
+   seule carte, sous-titres + couleurs sémantiques conservées, séparateurs légers.
+   La calibration vit dans la carte scoring (fusion P3-2). ── #}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Post-mortem de la semaine · pertes, coûts &amp; erreur</h2>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;font-size:12px;line-height:1.6;color:#33312e;">
+  {% if losses_vs_recos %}
+  <div style="padding-bottom:10px;margin-bottom:10px;border-bottom:0.5px solid #efeee7;">
+    <p style="margin:0 0 3px 0;font-weight:600;color:#791F1F;">Pertes de la semaine · lien avec mes recos</p>
+    <div style="color:#501313;">{{losses_vs_recos|md}}</div>
   </div>
-  {% endfor %}
-  {% if regret.total_note %}<p style="font-size:12px;color:#5a5852;margin:10px 0 0 0;line-height:1.5;"><span style="font-weight:500;">Regret total :</span> {{regret.total_note}}</p>{% endif %}
+  {% endif %}
+  <div{% if my_errors %} style="padding-bottom:10px;margin-bottom:10px;border-bottom:0.5px solid #efeee7;"{% endif %}>
+    <p style="margin:0 0 3px 0;font-weight:600;color:#1a1a18;">Coût des erreurs · le regret de la semaine</p>
+    {% if regret and regret.entries %}
+    {% for it in regret.entries %}
+    <div style="padding:4px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}line-height:1.5;">
+      <span style="font-weight:500;">{{it.asset}}</span> — {{it.description}}{% if it.cost_pct is not none %} <span style="color:#A32D2D;font-weight:500;">{{ it.cost_pct|fmt_pct }} {{it.cost_label or 'non capturés'}}</span>{% endif %}{% if it.cost_usd %} ≈ {{ it.cost_usd|fmt_price }}{% endif %}
+    </div>
+    {% endfor %}
+    {% if regret.total_note %}<p style="color:#5a5852;margin:8px 0 0 0;line-height:1.5;"><span style="font-weight:500;">Regret total :</span> {{regret.total_note}}</p>{% endif %}
+    {% else %}
+    <p style="margin:0;color:#5a5852;">{{ (regret and regret.empty_reason) or "Pas encore de reco clôturée sur la fenêtre · mesure disponible dès la première clôture." }}</p>
+    {% endif %}
+  </div>
+  {% if my_errors %}
+  <div>
+    <p style="margin:0 0 3px 0;font-weight:600;color:#633806;">Mon erreur de la semaine</p>
+    <div style="color:#412402;">{{my_errors|md}}</div>
+  </div>
+  {% endif %}
 </div>
-{% else %}
-<div style="background:#F1EFE8;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;font-size:12px;color:#5a5852;line-height:1.5;">
-  <span style="font-weight:500;color:#1a1a18;">Coût des erreurs :</span> {{ (regret and regret.empty_reason) or "Pas encore de reco clôturée sur la fenêtre · mesure disponible dès la première clôture." }}
-</div>
-{% endif %}
-
-{# ── v15 — MON ERREUR DE LA SEMAINE (honnêteté nominative, audit) ── #}
-{% if my_errors %}
-<div style="background:#FAEEDA;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;border-left:2px solid #BA7517;border-top-left-radius:0;border-bottom-left-radius:0;">
-  <p style="margin:0 0 3px 0;font-size:11px;font-weight:600;color:#633806;text-transform:uppercase;letter-spacing:0.5px;">Mon erreur de la semaine</p>
-  <p style="margin:0;font-size:12px;line-height:1.6;color:#412402;">{{my_errors|md}}</p>
-</div>
-{% endif %}
 
 {# v18 (W-B14) — MÉMOIRE D'APPRENTISSAGE : schémas dans les thèses invalidées
    (boucle d'apprentissage déterministe, calculée Python sur 60j). #}
@@ -473,7 +454,7 @@
 {% if _cal_facts or upcoming_calendar %}
 <h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Semaine à venir{% if header.upcoming_week %} · {{header.upcoming_week}}{% endif %} · ce qui peut bouger</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
-  <p style="font-size:12px;color:#1a1a18;margin:0 0 12px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Calendrier événements à impact crypto <span style="font-size:9px;color:#8a8880;text-transform:none;font-weight:400;">· FRED (dates réelles) + calendriers banques centrales (Fed/BCE/BoJ)</span></p>
+  <p style="font-size:12px;color:#1a1a18;margin:0 0 12px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Calendrier événements à impact crypto <span style="font-size:9px;color:#8a8880;text-transform:none;font-weight:400;">· ForexFactory + FRED (dates réelles) + banques centrales (Fed/BCE/BoJ)</span></p>
   {% if _cal_facts %}
   {% for ev in _cal_facts %}
   <div style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:13px;">
@@ -516,7 +497,14 @@
 {% if macro_panorama %}
 <div style="background:#eef2f7;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;border-left:3px solid #534AB7;">
   <p style="font-size:10px;color:#534AB7;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Fil rouge macro · semaine à venir</p>
+  {# v24 — bullets (driver + chiffre + implication) au lieu d'un pavé ; repli prose. #}
+  {% if macro_panorama is iterable and macro_panorama is not string %}
+  <ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.55;color:#28415c;">
+    {% for mp in macro_panorama %}<li style="margin:2px 0;">{{ mp|md }}</li>{% endfor %}
+  </ul>
+  {% else %}
   <p style="margin:0;font-size:13px;line-height:1.65;color:#28415c;">{{macro_panorama|md}}</p>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -554,10 +542,22 @@
         </td>
       </tr>
     </table>
-    {# Description compactée à 3-4 lignes max. v17 (W-A3) : <details> retiré
-       (non supporté Gmail → affichait l'analyse en doublon). La description
-       porte l'essentiel ; l'action est en bannière ci-dessous. #}
-    {% if s.description %}<p style="margin:6px 0 0 0;font-size:12px;line-height:1.55;color:{{scen_text}};">{{s.description|md}}</p>{% endif %}
+    {# v24 — DÉCLENCHEURS : conditions concrètes qui activent le scénario, en liste
+       claire (le « si X et Y et Z »), pour qu'Omar les garde en tête sur la semaine. #}
+    {% if s.triggers and s.triggers is iterable and s.triggers is not string %}
+    <p style="margin:8px 0 2px 0;font-size:11px;color:{{scen_label}};font-weight:700;">🎯 Se déclenche si :</p>
+    <ul style="margin:0;padding-left:18px;color:{{scen_text}};font-size:12px;line-height:1.5;">
+      {% for t in s.triggers %}<li style="margin:1px 0;">{{ t|md }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    {# v24 — ANALYSE EN BULLETS : mêmes idées/chiffres que l'ancienne prose dense,
+       découpées en points lisibles (1 idée/ligne). Repli sur la prose si l'IA n'a
+       pas fourni de points. v17 (W-A3) : pas de <details> (non supporté Gmail). #}
+    {% if s.points and s.points is iterable and s.points is not string %}
+    <ul style="margin:6px 0 0 0;padding-left:18px;color:{{scen_text}};font-size:12px;line-height:1.55;">
+      {% for p in s.points %}<li style="margin:2px 0;">{{ p|md }}</li>{% endfor %}
+    </ul>
+    {% elif s.description %}<p style="margin:6px 0 0 0;font-size:12px;line-height:1.55;color:{{scen_text}};">{{s.description|md}}</p>{% endif %}
     {# Action en mini-bannière en bas de carte (point 19). #}
     {% if s.action %}
     <div style="background:{% if s.type == 'bearish' %}#F7C1C1{% elif s.type == 'bullish' %}#C0DD97{% else %}#F7D8AA{% endif %};border-radius:6px;padding:6px 10px;margin:8px 0 0 0;">
@@ -571,19 +571,25 @@
 </div>
 {% endif %}
 
-{# ── v15 — STRATÉGIE DE LA SEMAINE (consigne 3 phrases, fond sombre) ── #}
-{% if strategy_focus %}
-<div style="background:#1f1e1d;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
-  <p style="font-size:10px;color:#8a8880;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Stratégie de la semaine</p>
-  <p style="margin:0;font-size:13px;line-height:1.65;color:#f5f4ee;">{{strategy_focus|md}}</p>
-</div>
-{% endif %}
-
-{# ── PLAN D'ACTION DE LA SEMAINE (B4) — conditionnel, chiffré ── #}
-{% if weekly_action_plan %}
+{# ── PLAN D'ACTION DE LA SEMAINE (v24) — la STRATÉGIE (synthèse en bullets, fond
+   BLANC homogène) est REGROUPÉE en tête de cette section (sous le H2), suivie des
+   actions numérotées. Ancien bloc noir « Stratégie de la semaine » supprimé. ── #}
+{% if weekly_action_plan or strategy_focus %}
 <h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Plan d'action de la semaine</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 1rem;margin-bottom:1.5rem;">
-  {% for a in weekly_action_plan %}
+  {% if strategy_focus %}
+  <div style="padding:10px 0;{% if weekly_action_plan %}border-bottom:0.5px solid #e5e4dc;{% endif %}">
+    <p style="font-size:10px;color:#8a8880;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Stratégie de la semaine</p>
+    {% if strategy_focus is iterable and strategy_focus is not string %}
+    <ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.55;color:#1a1a18;">
+      {% for sp in strategy_focus %}<li style="margin:2px 0;">{{ sp|md }}</li>{% endfor %}
+    </ul>
+    {% else %}
+    <p style="margin:0;font-size:12px;line-height:1.6;color:#1a1a18;">{{ strategy_focus|md }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% for a in (weekly_action_plan or []) %}
   <div style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr>
       <td style="vertical-align:top;width:26px;"><span style="display:inline-block;width:20px;height:20px;background:#534AB7;color:#fff;border-radius:50%;text-align:center;line-height:20px;font-size:11px;font-weight:700;">{{a.priority or loop.index}}</span></td>
@@ -599,7 +605,7 @@
 <h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Watchlist · entrées / sorties</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 1rem;margin-bottom:1.5rem;">
   {% for w in watchlist %}
-  {% set _entry = (w.direction or '')|lower in ['entrée','entree','achat','buy','in'] %}
+  {% set _entry = (w.direction or '')|lower in ['entrée','entree','achat','buy','in', 'entry'] %}
   <div style="padding:7px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;">
     <span style="font-size:10px;padding:1px 7px;border-radius:6px;font-weight:700;background:{% if _entry %}#EAF3DE{% else %}#FCEBEB{% endif %};color:{% if _entry %}#27500A{% else %}#791F1F{% endif %};">{{ '▲ ENTRÉE' if _entry else '▼ SORTIE' }}</span>
     <span style="font-weight:600;color:#1a1a18;margin-left:6px;">{{w.asset}}</span>{% if w.trigger %} · <span style="color:#1a1a18;">{{w.trigger}}</span>{% endif %}{% if w.rationale %}<br><span style="color:#5a5852;font-size:11px;margin-left:2px;">{{w.rationale}}</span>{% endif %}

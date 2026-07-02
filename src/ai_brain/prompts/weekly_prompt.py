@@ -27,13 +27,13 @@ _WEEKLY_SCHEMA = """
   "sector_exposure": [{"sector","ptf_pct","market_pct","color (hex)"}],
   "concentration_reading": "string (PROSE : lecture concentration + recommandation structurelle)",
   "upcoming_calendar": [{"day (ex. 'Mer 18h')","day_bg (hex)","day_color (hex)","title","impact_label (Impact élevé/moyen/Catalyseur crypto)","detail (PROSE)"}],
-  "scenarios": [{"type (bearish|neutral|bullish)","label (ex. 'baissier')","probability_pct (ANCRÉ sur data.scenario_scaffold.prior — cf. RÈGLE 5 ; somme des 3 = 100)","description (PROSE DENSE & PROFONDE : croise macro+Polymarket+technique/niveaux BTC+DVOL+dérivés+sentiment+géo+calendrier daté, chiffres à l'appui, et la dérivation de la proba ; PAS de remplissage)","action (PROSE : que faire CONCRÈTEMENT sur CE PTF, positions nommées)"}],
-  "strategy_focus": "string (v15 — LA stratégie de la semaine en 3 phrases MAX : le biais directionnel, la priorité n°1, la condition qui ferait tout changer. Pas un résumé : une consigne.)",
+  "scenarios": [{"type (bearish|neutral|bullish)","label (ex. 'baissier')","probability_pct (ANCRÉ sur data.scenario_scaffold.prior — cf. RÈGLE 5 ; somme des 3 = 100)","triggers (LISTE de 2 à 4 CONDITIONS courtes et TESTABLES qui activent ce scénario — chacune une phrase avec le SEUIL/niveau chiffré quand pertinent, ex. 'NFP ressort > consensus (emploi fort)', 'DXY casse 102,0 en clôture', 'la Fed reste hawkish'. C'est le « si X et Y et Z » qu'Omar garde en tête pour la semaine)","points (LISTE de 3 à 5 BULLETS courts qui STRUCTURENT l'analyse — 1 idée par ligne, chiffres à l'appui : mécanisme macro, niveaux BTC support/résistance, DVOL/dérivés, sentiment, IMPLICATION PTF. MÊME profondeur que l'analyse dense, juste DÉCOUPÉE en points — NE RETIRE RIEN, ne sur-résume pas)","description (OPTIONNEL — repli prose UNIQUEMENT si tu ne fournis pas points ; privilégie TOUJOURS points)","action (PROSE courte : que faire CONCRÈTEMENT sur CE PTF, positions nommées)"}],
+  "strategy_focus": ["LISTE de 2 à 3 BULLETS COURTS (v24 — direct au but, PAS de phrases longues) : (1) le BIAIS directionnel de la semaine, (2) la PRIORITÉ n°1, (3) la CONDITION qui ferait tout basculer. Une consigne synthétique, jamais un pavé."],
   "my_errors": "string (v15 — 1-2 phrases : LA pire erreur d'analyse de la semaine écoulée, nommée honnêtement, avec le correctif. Si vraiment aucune : ce qui a failli mal tourner.)",
-  "weekly_action_plan": [{"priority (1-3)","action (concret ex. 'Si BTC < 60k → alléger TAO de 30%')","rationale (1 phrase)"}],
+  "weekly_action_plan": [{"priority (1-5, ordre d'importance)","action (SPÉCIFIQUE : déclencheur PRÉCIS daté/niveau chiffré + position NOMMÉE + geste chiffré en % ou $. Ex. 'Si ETH replie sous 1 500 $ (bande basse W1) après le NFP → renforcer +15% le cœur ETH depuis USDC'. INTERDIT le générique 'si BTC monte → vends les alts')","rationale (1 phrase : le POURQUOI ancré dans l'analyse RÉELLE — macro/technique/on-chain/PRU de CETTE position)"}],
   "losses_vs_recos": "string — 1-3 phrases : relie les plus fortes baisses de la semaine aux recos qu'on avait émises (ex. 'ZK était en SURVEILLER lundi, -21% depuis : sortie au-dessus de 0.005 aurait évité -X%'). Honnête sur les erreurs.",
   "watchlist": [{"asset","direction (entrée/sortie)","trigger (niveau/condition précis)","rationale (1 phrase fondée)"}],
-  "macro_panorama": "string — 2-3 phrases : panorama macro de la semaine à venir (Fed/CPI/NFP du calendrier réel + Polymarket + ETF flows, ET la dimension internationale si fournie : BCE, BoJ/carry trade yen, Nikkei/Stoxx — le crypto ne vit pas qu'aux USA) et son implication pour le PTF. Le fil rouge macro.",
+  "macro_panorama": ["LISTE de 3 à 5 BULLETS COURTS (v24 — lisibilité, PAS de pavé) : chaque bullet = UN driver macro de la semaine + son CHIFFRE + son IMPLICATION crypto/PTF, sans mots de liaison inutiles ('Cependant', 'La semaine sera dominée par…'). Couvre : le catalyseur clé DATÉ (Fed/CPI/NFP du calendrier réel + proba Polymarket), le vent de face (DXY, taux réels 10Y), les contrepoids (M2 / bilan Fed / liquidité), l'international si fourni (BCE, BoJ / carry yen, Nikkei / Stoxx), et TERMINE par 1 bullet SYNTHÈSE actionnable (« → … »). Explique quand ça ajoute de la valeur, jamais de remplissage."],
   "exit_plan": {"subtitle","diagnosis (PROSE chiffrée)","monitoring (PROSE : comment l'agent surveille)"},
   "long_term_positioning": [{"asset","analysis (v23.x — ≤ ~90 caractères, UNE ligne terminée par un POINT, JAMAIS tronquée. C'est une ANALYSE CHIFFRÉE : le POURQUOI de la phase de cycle + le signal clé du moment. PAS une description du projet (Omar sait à quoi sert chaque crypto — décrire = remplissage inutile). Ex. '−52% sous ATH, halving digéré, dominance en hausse : zone d'accumulation du cœur.')","target_price (NOMBRE | null — objectif de prix réaliste 6-12m, ancré sur l'ATH réel/MVRV/cycle. null si aucune base chiffrable — PAS de texte type 'cible à préciser')","status (v19/V18-W1 — vocabulaire de CYCLE selon la position vs ATH : 'capitulation' si drawdown vs ATH > 75% · 'accumulation' si 50-75% · 'expansion' si <50% et en hausse · 'distribution' si proche ATH et essoufflement. N'emploie PAS 'consolide' seul pour un actif à −85% de son ATH : c'est de la capitulation.)","action (renforcer | garder | alléger | sortir — verdict cohérent avec la phase ET la conviction de l'actif)"}],
   "sources_review": {"summary (PROSE bilan sources)","gaps (PROSE lacunes structurelles)"},
@@ -102,6 +102,12 @@ INSTRUCTIONS :
        .key_levels (support/résistance BTC) → définissent le RANGE neutre et les
        seuils de bascule bear/bull. .net_tilt = biais directionnel net ; .dispersion
        = largeur des queues (catalyseurs/vol ↑ → neutre ↓).
+       v24 — NE CONFONDS PAS RANGE et MOVE IMPLICITE : le range (bornes
+       support↔résistance des key_levels) peut être LARGE ; le move implicite ±X%
+       (DVOL) est une amplitude statistique 7j PLUS SERRÉE. N'écris JAMAIS qu'un
+       range large est « conforme au move implicite ±X% » si ses bornes dépassent
+       ±X% du prix actuel (audit : range 59 433–82 416 $ = +38% étiqueté « ±5,9% »).
+       Cite chaque borne avec SA source (niveau technique vs move implicite).
      • .event_risk.events = catalyseurs macro DATÉS ≤7j ; .polymarket = dominant Fed
        (+ %) + marchés extra ; .drivers = pistes par scénario (enrichis-les, source).
    CHAQUE scénario intègre EXPLICITEMENT, chiffres à l'appui : (1) MACRO (régime
@@ -112,7 +118,15 @@ INSTRUCTIONS :
    (7) ON-CHAIN si pertinent, (8) GÉOPO / NEWS datées, (9) IMPLICATION CONCRÈTE pour
    CE PTF (positions NOMMÉES + action). Le NEUTRE = range support↔résistance + move
    implicite ; BEAR/BULL = franchissement de niveau + DÉCLENCHEUR daté (« FOMC mer. :
-   si surprise hawkish → cassure 58k »). Le plus probable est COHÉRENT avec
+   si surprise hawkish → cassure 58k »).
+   v24 — FORMAT OBLIGATOIRE de chaque scénario (LISIBILITÉ, demande d'Omar) :
+   distribue ce contenu en (a) `triggers` = 2-4 CONDITIONS courtes et testables
+   (le « si X et Y et Z » qui active le scénario, avec seuils chiffrés) ; (b)
+   `points` = 3-5 BULLETS courts, 1 idée/ligne, structurant l'analyse (macro,
+   niveaux BTC, DVOL/dérivés, sentiment, implication PTF). N'écris PLUS un pavé de
+   prose : MÊME profondeur, MÊMES chiffres, juste DÉCOUPÉE en points. `description`
+   (prose) = repli seulement si tu ne remplis pas `points`.
+   Le plus probable est COHÉRENT avec
    .net_tilt ET le dominant Polymarket. Si .available=false (données insuffisantes),
    construis les % à la main MAIS cite quand même Polymarket + calendrier + technique.
    v18 (W-A17/W-B8) : tout actif cité dans un scénario doit (a) être réellement
@@ -122,13 +136,22 @@ INSTRUCTIONS :
 6. Exit plan poussières (< 10 $) : attendre spike +30%, statut par actif.
    v15 — les poussières (data.dust_positions) n'apparaissent QUE dans ce bloc :
    jamais dans la watchlist, les scénarios ou le plan d'action.
+   v24 — VALEUR ≠ PRIX UNITAIRE : chaque poussière porte sa VALEUR de position en $
+   (data.dust_positions[].value_usd). Cite CETTE valeur (ex. « NOT ~4 $ »), JAMAIS
+   le prix unitaire du token (ex. 0,00038 $). L'audit a vu « NOT (0,00038649 $) »
+   présenté comme une valeur de position — c'est le prix unitaire, faux et absurde.
    v16 — CONFLIT THÈSE LT vs POUSSIÈRE : chaque dust_position porte un flag
-   `conviction` (tier 1-2). Un actif `conviction:true` qui passe sous 10 $ est
+   `conviction` (v25 : true = actif CŒUR du profil — BTC/ETH/TAO/LINK ou
+   `core: true` dans le portfolio — PAS le tier d'analyse). Un actif
+   `conviction:true` qui passe sous 10 $ est
    SOUS-PONDÉRÉ, pas une poussière à liquider : NE LE METS PAS dans l'exit plan
    des poussières, et NE le liste JAMAIS comme « à liquider sur spike +30% ».
-   Si tu lui consacres une thèse long terme (long_term_positioning), il est par
-   définition exclu de l'exit plan — un même actif ne peut pas être à la fois
-   « conviction long terme » et « poussière condamnée ». Cohérence absolue.
+   Si tu consacres à un actif une thèse long terme POSITIVE (accumulation /
+   renforcer), il est exclu de l'exit plan — un même actif ne peut pas être à la
+   fois « conviction long terme » et « poussière condamnée ». v25 : un SATELLITE
+   (conviction:false) peut avoir une ligne long_term_positioning DESCRIPTIVE
+   (capitulation, alléger) ET figurer dans l'exit plan — les CONCLUSIONS doivent
+   simplement raconter la même histoire. Cohérence absolue.
    v16.1 — RÈGLE GÉNÉRALE ANTI-CONTRADICTION (vaut pour TOUS les actifs, pas un
    cas précis) : si un actif a une reco VALIDÉE ou EN COURS cette semaine dans
    data.predictions_scoring (statut validated/in_progress, ou tu viens de saluer
@@ -245,8 +268,9 @@ INSTRUCTIONS :
    pas des généralités. Et l'action proposée doit être cohérente avec la
    composition réelle (concentration L1/AI, absence de cash).
    v19/W-A17 + v23.x — Les probability_pct NE SONT PAS arbitraires : ancre-les sur
-   data.scenario_scaffold.prior (cf. RÈGLE 5) et EXPLIQUE la dérivation dans la
-   description (Polymarket dominant, DVOL/move implicite, net_tilt, niveaux BTC,
+   data.scenario_scaffold.prior (cf. RÈGLE 5) et EXPLIQUE la dérivation dans UN
+   des `points` (bullets) du scénario — v25 : PAS dans `description` (simple
+   repli) — (Polymarket dominant, DVOL/move implicite, net_tilt, niveaux BTC,
    calendrier). Décompose une issue conditionnelle plutôt que de la sous-estimer
    (ex. un scénario « réaction hawkish » ne peut peser 15% si Polymarket donne 99%
    de maintien sans poser P(maintien)×P(commentaire hawkish|maintien)). Somme = 100.
@@ -254,8 +278,23 @@ INSTRUCTIONS :
 13. ALLÉGEMENTS SPÉCIFIQUES (A9) : ne dis jamais « alléger les positions exposées »
    en vague. NOMME les positions (ex. « alléger TAO : 25% du PTF, secteur AI -9%/j,
    β-DXY défavorable »), avec un argument ET un contre-argument.
-14. PLAN D'ACTION SEMAINE (weekly_action_plan) : 2-4 actions concrètes,
-   conditionnelles et chiffrées pour la semaine (« si X → fais Y »).
+14. PLAN D'ACTION SEMAINE (weekly_action_plan) — QUALITÉ AVANT QUANTITÉ (v24) :
+   liste le NOMBRE d'actions RÉELLEMENT actionnables cette semaine (1 à 5), PAS un
+   quota fixe : si une seule chose mérite d'être faite, n'en invente pas trois.
+   Chaque action = (a) DÉCLENCHEUR précis (niveau chiffré OU événement daté de la
+   semaine, ex. « après le NFP de vendredi », « si ETH < 1 500 $ »), (b) POSITION
+   NOMMÉE, (c) GESTE chiffré (% de la position ou $), (d) POURQUOI ancré dans
+   l'analyse RÉELLE (macro/technique/on-chain/PRU de CETTE position).
+   INTERDIT ABSOLU du générique paresseux « si BTC monte → vends les alts » / « si
+   BTC baisse → renforce BTC » : c'est du remplissage, pas un plan. Chaque action
+   doit être SPÉCIFIQUE à une position et à un catalyseur RÉEL de la semaine.
+   Respecte le PROFIL : accumulation des CONVICTIONS (BTC/ETH/TAO/LINK) sur repli
+   sous support/PRU ou MVRV bas ; offload des SATELLITES sur un PUMP nommé
+   (niveau/%), pas « si BTC monte » ; jamais d'allègement d'une conviction sur du
+   bruit CT ; horizon ≥ quelques jours (ZÉRO intraday). Ancre sur les VRAIS
+   catalyseurs datés (calendrier) et les VRAIS niveaux. Si le marché est en pure
+   attente d'un catalyseur, UNE seule action honnête (« attendre le NFP, ne rien
+   forcer avant ») vaut mieux que 3 actions creuses. Plan et watchlist COHÉRENTS.
 15. WATCHLIST (watchlist) : actifs à entrer/sortir avec trigger précis et raison
    FONDÉE (analysée), pas une liste au hasard. v15 — ÉQUILIBRE : vise au moins
    1 ENTRÉE fondée (niveau d'accumulation sur un actif de conviction) en plus
@@ -277,7 +316,7 @@ INSTRUCTIONS :
    v19 (NUANCES ÉDITORIALES — à respecter) :
    • (V18-W6/V18-W7 — WATCHLIST & PLAN COHÉRENTS LT) : les triggers de watchlist
      et du plan d'action respectent le profil LONG TERME. Un « RSI < 30 D1 » ou
-     « alléger si prix > X » sur un actif de CONVICTION (tier 1-2) est un réflexe
+     « alléger si prix > X » sur un actif de CONVICTION (cœur : BTC/ETH/TAO/LINK) est un réflexe
      tactique CT contradictoire : badge-le TACTIQUE, ou utilise un trigger LT
      (accumulation sous PRU, invalidation de thèse W1). N'allège PAS une conviction
      (ex. TAO) dans un scénario HAUSSIER.
@@ -313,8 +352,13 @@ INSTRUCTIONS :
      là qu'il vient, sans le présenter comme un flux mesuré.
    • (v20/M20 — PROPRETÉ) : phrases complètes, parenthèses fermées, pas de mot répété
      collé, « se rapprocher DE » (pas « à »).
-16. strategy_focus (v15) : 3 phrases MAX — biais directionnel de la semaine,
-   priorité n°1, condition de bascule. C'est une CONSIGNE, pas un résumé.
+16. strategy_focus (v24) : une LISTE de 2-3 BULLETS COURTS (pas de phrases
+   longues) — (1) le BIAIS directionnel de la semaine, (2) la PRIORITÉ n°1, (3) la
+   CONDITION qui ferait tout basculer. Direct au but : une consigne, jamais un pavé.
+16bis. macro_panorama (v24) : une LISTE de 3-5 BULLETS, PAS un pavé de 7-8 lignes.
+   1 bullet = 1 driver macro + son chiffre + son implication crypto/PTF ; enlève
+   les mots de liaison inutiles, garde les explications à VALEUR ajoutée. Dernier
+   bullet = SYNTHÈSE actionnable (« → prudence mais terrain d'accumulation… »).
 17. my_errors (v16) : nomme LA pire erreur RÉELLE de la semaine (reco ratée,
    lecture macro démentie) + le correctif. INTERDIT le conditionnel d'esquive
    (« l'erreur AURAIT été… », « on aurait pu… ») : c'est une dérobade. Tu
@@ -340,6 +384,10 @@ INSTRUCTIONS :
    un autre couple recalculé par toi. L'audit a vu 3 valeurs différentes pour la
    même semaine (+13,9% / +12,7% / +11,21%) : c'est interdit. Un seul chiffre 7j
    PTF dans tout le mail, celui de data.portfolio_snapshot.
+   v24 — n'utilise JAMAIS la perf 7j d'un rapport du MATIN (basket éventuellement
+   pré-achat, donc légèrement différente) : UNIQUEMENT data.portfolio_snapshot du
+   HEBDO. L'audit a vu la puce « −4,48% » à côté du header « −3,0% » (= chiffre du
+   matin repris à tort). Le header et TOUTES les puces citent le même % hebdo.
    v18 (W-A18 — F&G UNIQUE) : l'indice Fear & Greed est une donnée Python unique
    (data.fear_greed). Cite EXACTEMENT cette valeur partout dans le mail (bilan,
    scénarios, divergence sentiment). L'audit a vu « F&G 13 » à un endroit et
