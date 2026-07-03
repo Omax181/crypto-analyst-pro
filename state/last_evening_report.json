@@ -1,164 +1,176 @@
 {
   "header": {
-    "date": "jeudi 2 juillet 2026 · 20:02 Casablanca",
-    "time_casablanca": "jeudi 2 juillet 2026 · 20:02 Casablanca",
-    "hours_since_morning": 7,
-    "morning_time_label": "12h37",
-    "since_morning_label": "il y a 7h",
-    "win_rate_30d": null,
-    "win_rate_total": "0/0",
+    "date": "vendredi 3 juillet 2026 · 20:02 Casablanca",
+    "time_casablanca": "vendredi 3 juillet 2026 · 20:02 Casablanca",
+    "hours_since_morning": 11,
+    "morning_time_label": "08h39",
+    "since_morning_label": "il y a 11h",
+    "win_rate_30d": 100,
+    "win_rate_total": "1/1",
     "evening_time_label": "20h01",
-    "timing_line": "matin 12h37 · soir 20h01 · Δ7h",
-    "ptf_value_delta_since_morning": 27.99,
-    "ptf_value_pct_since_morning": 1.06
+    "timing_line": "matin 08h39 · soir 20h01 · Δ11h",
+    "ptf_value_delta_since_morning": 31.3,
+    "ptf_value_pct_since_morning": 1.17
   },
   "portfolio_snapshot": {
-    "value_usd": 2662.72,
-    "change_since_morning_pct": 1.06
+    "value_usd": 2709.25,
+    "change_since_morning_pct": 1.17
   },
   "delta_summary": [
     {
       "icon": "✓",
-      "text": "Le portefeuille a rebondi de +1.06% depuis ce matin, porté par les gains sur ETH (+5.0%), LINK (+5.4%) et RSR (+7.4%)."
-    },
-    {
-      "icon": "✗",
-      "text": "Les indices actions US (S&P 500 -31.06 points, Nasdaq -315.05 points) ont poursuivi leur baisse, renforçant le régime 'risk-off'."
+      "text": "Le rapport sur l'emploi US (NFP) faible a déclenché un rebond du BTC (+0.79% depuis ce matin) et des entrées significatives sur les ETF Bitcoin (CryptoSlate, 16h05), renforçant le biais dovish de la Fed et l'appétit pour le risque."
     },
     {
       "icon": "✓",
-      "text": "Le DXY a légèrement reculé de 101.042 à 100.854, offrant un léger répit aux actifs risqués en fin de séance US."
+      "text": "Le portefeuille a progressé de +1.17% depuis ce matin, porté par la forte performance d'ADA (+12.32%), IMX (+7.3%) et RSR (+7.2%), confirmant la résilience des alts dans le rebond post-NFP."
     },
     {
       "icon": "⚠",
-      "text": "Le Fear & Greed Index reste à 19 ('Peur extrême'), confirmant la prudence dominante du marché crypto."
+      "text": "Des baleines Bitcoin ont transféré 49 000 BTC vers les exchanges (CryptoSlate, 14h05), signalant une potentielle prise de profit ou une anticipation de faiblesse du rebond actuel."
+    },
+    {
+      "icon": "⚠",
+      "text": "Le Nasdaq a reculé de -207 points, tandis que les actions crypto-liées COIN (+3.92%) et MSTR (+7.9%) ont fortement rebondi, indiquant une divergence de performance entre la tech US et le secteur crypto post-NFP."
     }
   ],
   "market_changes": [
     {
+      "status": "confirmed",
+      "tag": "Macro",
+      "importance": 5,
+      "description": "Le rapport sur l'emploi US (NFP) a été plus faible que prévu, entraînant un rebond du BTC et des entrées d'ETF Bitcoin, comme anticipé ce matin pour un tel scénario.",
+      "source": "CryptoSlate 16h05"
+    },
+    {
+      "status": "unchanged",
+      "tag": "Sentiment",
+      "importance": 2,
+      "description": "L'indice Fear & Greed reste à 21 (Peur extrême), inchangé depuis ce matin, signalant une prudence persistante du marché malgré le rebond des prix.",
+      "source": "Fear & Greed Index"
+    },
+    {
       "status": "unchanged",
       "tag": "Macro",
-      "importance": 3,
-      "description": "Les indices actions US ont poursuivi leur baisse : le S&P 500 a perdu -31.06 points et le Nasdaq -315.05 points, confirmant la pression 'risk-off' observée ce matin.",
+      "importance": 2,
+      "description": "Le DXY est resté stable à 100.842, avec une légère baisse de -0.015 points depuis ce matin, ne déclenchant pas le seuil de vigilance de 101.0.",
       "source": "Yahoo Finance"
     },
     {
-      "status": "new",
-      "tag": "Macro",
-      "importance": 2,
-      "description": "Le DXY a légèrement reculé de 101.042 (matin) à 100.854 (soir), ce qui a pu soulager temporairement les actifs risqués.",
-      "source": "ICE Futures US"
-    },
-    {
-      "status": "new",
+      "status": "confirmed",
       "tag": "Macro",
       "importance": 3,
-      "description": "Les marchés européens (Euro Stoxx 50 +77.97 points) ont montré une résilience accrue, augmentant leur gain de +35.48 points (matin) à +77.97 points (soir).",
+      "description": "L'or a poursuivi sa hausse de +61.6 $ depuis ce matin, confirmant la persistance d'une fuite vers les actifs refuges malgré le rebond crypto.",
       "source": "Yahoo Finance"
     },
     {
       "status": "new",
       "tag": "Catalyseur",
       "importance": 4,
-      "description": "Les proxies Bitcoin COIN (+4.2%) et MSTR (+8.01%) ont fortement rebondi en séance US, signalant un regain d'intérêt institutionnel malgré la faiblesse des indices tech.",
+      "description": "Coinbase (COIN) et MicroStrategy (MSTR) ont fortement rebondi de +3.92% et +7.9% respectivement en séance US, agissant comme des proxys haussiers pour le sentiment Bitcoin post-NFP.",
       "source": "Yahoo Finance"
     },
     {
-      "status": "invalidated",
+      "status": "new",
       "tag": "Risque",
-      "importance": 4,
-      "description": "MARA, le mineur de Bitcoin, a chuté de -9.84% en séance, indiquant une pression vendeuse sur le secteur du minage, potentiellement liée à la baisse du BTC plus tôt dans la journée.",
-      "source": "Yahoo Finance"
-    },
-    {
-      "status": "unchanged",
-      "tag": "Sentiment",
       "importance": 3,
-      "description": "Le Fear & Greed Index est resté stable à 19 ('Peur extrême'), indiquant que le sentiment général du marché crypto n'a pas fondamentalement changé depuis ce matin.",
-      "source": "Alternative.me"
+      "description": "Les ETF à effet de levier sud-coréens ont atteint un record de 45 milliards de dollars, les investisseurs de détail se détournant du crypto, signalant une rotation des capitaux hors du secteur (Stocktwits, 13h03).",
+      "source": "Stocktwits 13h03"
     }
   ],
   "news_today": [
     {
-      "title": "Humanity Protocol repositions toward enterprise AI after $36 million hack",
-      "source": "The Block",
-      "time": "15h46",
-      "impact": "Un hack de 36 M$ est un risque, mais le pivot vers l'IA d'entreprise pourrait être un catalyseur long terme pour le secteur AI/Web3.",
-      "status": "intégré"
-    },
-    {
-      "title": "Shiba Inu (SHIB) Whales Aggressively Take Profits",
-      "source": "Bitget (via Stocktwits)",
-      "time": "15h23",
-      "impact": "Cette prise de profit sur SHIB indique une rotation potentielle hors des memecoins, libérant du capital pour des actifs plus fondamentaux.",
-      "status": "intégré"
-    },
-    {
-      "title": "Ethena announces new partnership with Blackrock",
-      "source": "Bitget (via Stocktwits)",
-      "time": "15h19",
-      "impact": "Le partenariat avec Blackrock est un catalyseur institutionnel majeur pour Ethena (ENA) et renforce la crédibilité du secteur DeFi.",
+      "title": "Trump s'opposera à une forte régulation de l'IA aux États-Unis",
+      "source": "Financial Times",
+      "time": "15h32",
+      "impact": "Positionnement pro-innovation de Trump favorable aux projets crypto liés à l'IA comme TAO et RENDER, réduisant le risque réglementaire à long terme.",
       "status": "actionnable"
+    },
+    {
+      "title": "L'upgrade Ironwood de Zcash approche pour restaurer la confiance",
+      "source": "Decrypt",
+      "time": "18h56",
+      "impact": "L'approche de l'upgrade Ironwood pour Zcash pourrait restaurer la confiance après son crash, mais ZEC n'est pas dans le portefeuille et n'a pas d'impact direct sur les positions actuelles.",
+      "status": "intégré"
     }
   ],
   "levels_tonight": [
     {
       "asset": "BTC",
-      "level": "$62,000",
+      "level": "$63,000",
       "type": "resistance",
-      "trigger": "Au-dessus de $62,000 → potentiel de continuation haussière vers $63,500."
+      "trigger": "au-dessus → confirmation du rebond post-NFP, cible $64,500"
     },
     {
       "asset": "BTC",
       "level": "$60,000",
       "type": "support",
-      "trigger": "Sous $60,000 → risque de retest du plus bas récent, vigilance accrue."
+      "trigger": "sous → risque de retest des plus bas récents, invalidation du rebond"
     },
     {
       "asset": "ETH",
-      "level": "$1,720",
+      "level": "$1,750",
       "type": "resistance",
-      "trigger": "Au-dessus de $1,720 → cible $1,780, confirmation de la force relative d'ETH."
+      "trigger": "au-dessus → continuation de la dynamique haussière, cible $1,800"
     },
     {
       "asset": "ETH",
-      "level": "$1,650",
+      "level": "$1,700",
       "type": "support",
-      "trigger": "Sous $1,650 → retour à la zone d'accumulation du matin, la thèse reste valide."
+      "trigger": "sous → prise de profit tactique, retour sur le support d'entrée"
     },
     {
       "asset": "DXY",
-      "level": "100.50",
-      "type": "support",
-      "trigger": "Sous 100.50 → soulagement durable pour les actifs risqués, potentiel de rebond crypto."
+      "level": "101.0",
+      "type": "threshold",
+      "trigger": "au-dessus → regain d'aversion au risque, pression sur les actifs risqués"
     },
     {
-      "asset": "DXY",
-      "level": "101.20",
+      "asset": "ADA",
+      "level": "$0.1850",
       "type": "resistance",
-      "trigger": "Au-dessus de 101.20 → pression vendeuse renouvelée sur le marché crypto."
+      "trigger": "atteinte → allègement tactique de 10-15% sur la force, prise de profit"
+    },
+    {
+      "asset": "IMX",
+      "level": "$0.1350",
+      "type": "resistance",
+      "trigger": "atteinte → allègement tactique de 10-15% sur la force, prise de profit"
     },
     {
       "asset": "RSR",
-      "level": "$0.0012",
+      "level": "$0.001250",
       "type": "resistance",
-      "trigger": "Au-dessus de $0.0012 → poursuite du pump, opportunité d'allègement tactique pour dégager du capital."
-    },
-    {
-      "asset": "MARA",
-      "level": "$11.50",
-      "type": "support",
-      "trigger": "Sous $11.50 → faiblesse confirmée du secteur minier, impact négatif sur le sentiment BTC."
+      "trigger": "atteinte → allègement tactique de 10-15% sur la force, prise de profit"
     }
   ],
-  "actions_tonight": [],
+  "actions_tonight": [
+    {
+      "action": "Alléger 15% de RSR",
+      "rationale": "RSR a rebondi de +7.2% aujourd'hui (+12.5% depuis l'entrée du 02/07 à $0.00109995), butant sur la résistance à $0.001250. Prise de profit tactique sur la force.",
+      "rebuy": "Racheter vers $0.001150-$0.001180 en cas de repli, sur test du support court terme.",
+      "horizon": "Geste tactique court terme, la thèse d'accumulation du matin reste valide sur repli."
+    },
+    {
+      "action": "Alléger 15% de IMX",
+      "rationale": "IMX a fortement rebondi de +7.3% aujourd'hui, atteignant une zone de résistance à $0.1350. Opportunité de dégager du capital sur un satellite.",
+      "rebuy": "",
+      "horizon": "Geste tactique de prise de profit sur un satellite."
+    },
+    {
+      "action": "Alléger 10% de ADA",
+      "rationale": "ADA est le top performer du jour avec +12.32%, atteignant la résistance à $0.1850. Prise de profit sur une position satellite qui a surperformé.",
+      "rebuy": "",
+      "horizon": "Geste tactique de prise de profit sur un satellite."
+    }
+  ],
   "tomorrow_checklist": {
-    "calendar": "Les chiffres de l'emploi US (Average Hourly Earnings m/m, Non-Farm Employment Change, Unemployment Claims, Unemployment Rate) sont attendus aujourd'hui. Demain, des discours du gouverneur de la BOE Bailey et de la présidente de la BCE Lagarde sont au calendrier.",
-    "checks": "BTC tient-il au-dessus de $61,500 overnight ? · Le DXY maintient-il son repli sous 101 ? · Les proxies BTC (COIN/MSTR) continuent-ils de surperformer les indices tech ?",
-    "scenario": "Consolidation latérale pour BTC/ETH autour des niveaux actuels, avec une sensibilité accrue aux mouvements du DXY et aux déclarations des banquiers centraux demain.",
-    "invalidation": "BTC clôture sous $60,000 + S&P 500 casse 7400 points = accélération du risk-off et invalidation des rebonds tactiques."
+    "calendar": "Pas d'événement macro majeur dans les 48h.",
+    "checks": "Les allègements tactiques sur RSR, IMX et ADA ont-ils été exécutés aux niveaux cibles ? · Le BTC maintient-il le niveau des $62,000 après le rebond post-NFP ? · Le DXY reste-t-il sous 101.0, confirmant l'absence de fuite vers le dollar ?",
+    "scenario": "Le marché crypto devrait consolider les gains post-NFP, avec une légère pression vendeuse si les baleines BTC continuent de transférer des fonds vers les exchanges.",
+    "invalidation": "BTC clôture sous $60,000 ou DXY casse 101.0 à la hausse = signal de faiblesse du rebond et risque de correction."
   },
-  "blind_spots": "Les données sur les flux ETF (Farside/CoinGlass) restent indisponibles, limitant la visibilité sur les flux institutionnels.",
+  "blind_spots": "Les flux ETF restent indisponibles, limitant la visibilité sur l'activité institutionnelle.",
   "footer": {
     "next_morning_time": "08h30",
     "next_report_at": "demain 08h30"
@@ -169,47 +181,47 @@
     "reason": "Espérance mathématique disponible dès 5 recos clôturées avec niveaux (actuellement 0)."
   },
   "daily_pnl": {
-    "value_usd": 2662.72,
-    "day_change_usd": 27.99,
-    "day_change_pct": 1.06,
+    "value_usd": 2709.25,
+    "day_change_usd": 31.3,
+    "day_change_pct": 1.17,
     "day_change_label": null,
     "top_movers": [
       {
+        "symbol": "IMX",
+        "change": 7.3,
+        "pnl_usd": 1.11,
+        "value_usd": 15.16
+      },
+      {
         "symbol": "RSR",
-        "change": 7.4,
-        "pnl_usd": 3.67,
-        "value_usd": 49.27
+        "change": 7.2,
+        "pnl_usd": 3.82,
+        "value_usd": 52.82
       },
       {
-        "symbol": "LINK",
-        "change": 5.4,
-        "pnl_usd": 3.35,
-        "value_usd": 61.92
+        "symbol": "INJ",
+        "change": 5.3,
+        "pnl_usd": 2.62,
+        "value_usd": 49.14
       },
       {
-        "symbol": "FET",
-        "change": 5.1,
-        "pnl_usd": 1.77,
-        "value_usd": 34.69
+        "symbol": "XRP",
+        "change": 3.6,
+        "pnl_usd": 1.43,
+        "value_usd": 39.95
       },
       {
-        "symbol": "ETH",
-        "change": 5.0,
-        "pnl_usd": 25.4,
-        "value_usd": 510.58
-      },
-      {
-        "symbol": "RENDER",
-        "change": 4.6,
-        "pnl_usd": 2.89,
-        "value_usd": 62.96
+        "symbol": "CFX",
+        "change": 3.5,
+        "pnl_usd": 1.06,
+        "value_usd": 30.66
       }
     ]
   },
   "reco_bilan": [],
   "polymarket_facts": {
     "fed_bars": {
-      "cut_pct": 0.9,
+      "cut_pct": 0.7,
       "hold_pct": 89.5,
       "hike_pct": 9.7,
       "dominant": "maintien",
@@ -219,8 +231,8 @@
     "extra_markets": [
       {
         "question": "Will the U.S. invade Iran before 2027?",
-        "probability_pct": 14,
-        "volume_usd": 39149529,
+        "probability_pct": 12,
+        "volume_usd": 39217921,
         "end_date": "2026-12-31T00:00:00Z"
       }
     ]
@@ -230,8 +242,8 @@
     "level": "maîtrisé",
     "level_color": "#3B6D11",
     "factors": [
-      "concentration L1 67%",
-      "sentiment Peur Extrême (F&G 19)"
+      "concentration L1 66%",
+      "sentiment Peur Extrême (F&G 21)"
     ],
     "components": [
       {
@@ -308,11 +320,11 @@
   },
   "risk_unchanged_since_morning": {
     "active": true,
-    "morning_score": 4.1,
-    "note": "Risque stable depuis ce matin (4.1/10 → 3.8/10) — composition du portefeuille inchangée."
+    "morning_score": 3.9,
+    "note": "Risque stable depuis ce matin (3.9/10 → 3.8/10) — composition du portefeuille inchangée."
   },
   "health_score": {
-    "score": 3.2,
+    "score": 3.3,
     "level": "à risque",
     "level_color": "#A32D2D",
     "axes": [
@@ -320,56 +332,56 @@
         "label": "Diversification",
         "score": 1.7,
         "max": 10.0,
-        "detail": "top secteur 67% du PTF"
+        "detail": "top secteur 66% du PTF"
       },
       {
         "label": "Momentum vs BTC",
-        "score": 5.0,
+        "score": 5.3,
         "max": 10.0,
-        "detail": "+0.0 pts vs BTC 7j"
+        "detail": "+0.5 pts vs BTC 7j"
       },
       {
         "label": "Solidité (vs ATH)",
         "score": 2.9,
         "max": 10.0,
-        "detail": "drawdown -68% vs ATH"
+        "detail": "drawdown -67% vs ATH"
       }
     ],
-    "driver": "Portée par Momentum vs BTC (5.0/10), pénalisée par Diversification (1.7/10).",
+    "driver": "Portée par Momentum vs BTC (5.3/10), pénalisée par Diversification (1.7/10).",
     "improve": "Alléger le secteur dominant sur rebond et étaler sur d'autres narratifs."
   },
   "health_unchanged_since_morning": {
     "active": true,
-    "note": "Santé stable depuis ce matin (3.2/10 → 3.2/10) — composition du portefeuille inchangée."
+    "note": "Santé stable depuis ce matin (3.3/10 → 3.3/10) — composition du portefeuille inchangée."
   },
   "evening_macro": {
-    "btc_price": 61683,
-    "btc_change_24h": 2.465553952921691,
-    "eth_price": 1699.66,
-    "eth_change_24h": 4.974766162203606,
-    "fear_greed": 19,
+    "btc_price": 62150,
+    "btc_change_24h": 0.7896419606446431,
+    "eth_price": 1737.35,
+    "eth_change_24h": 2.183181085857573,
+    "fear_greed": 21,
     "fear_greed_label": "Peur extrême",
     "fear_greed_delta": 0,
-    "gold_usd": 4136.5,
-    "gold_delta": 54.09999999999991,
-    "sp500": 7452.17,
-    "sp500_delta": -31.05999999999949,
-    "nasdaq": 25724.984,
-    "nasdaq_delta": -315.04699999999866,
-    "vix": 16.63,
-    "vix_delta": 0.03999999999999915,
-    "brent_usd": 71.67,
-    "brent_delta": 0.10000000000000853,
-    "dxy": 100.854,
+    "gold_usd": 4187.3,
+    "gold_delta": 61.600000000000364,
+    "sp500": 7483.24,
+    "sp500_delta": 0.010000000000218279,
+    "nasdaq": 25832.672,
+    "nasdaq_delta": -207.35900000000038,
+    "vix": 15.81,
+    "vix_delta": -0.3399999999999981,
+    "brent_usd": 72.13,
+    "brent_delta": 0.3299999999999983,
+    "dxy": 100.842,
     "dxy_broad": 120.8866,
-    "dxy_ice": 100.854,
-    "dxy_delta": -0.5379999999999967,
-    "nikkei": 68733.15,
-    "nikkei_delta": -1741.8100000000122,
-    "stoxx50": 6360.47,
-    "stoxx50_delta": 77.97000000000025,
-    "eur_usd": 1.1435,
-    "usd_jpy": 161.057,
+    "dxy_ice": 100.842,
+    "dxy_delta": -0.015000000000000568,
+    "nikkei": 69744.07,
+    "nikkei_delta": 1010.9200000000128,
+    "stoxx50": 6412.68,
+    "stoxx50_delta": 52.210000000000036,
+    "eur_usd": 1.1442,
+    "usd_jpy": 161.354,
     "ecb_deposit_rate": 2.25,
     "boj_rate": 0.727
   },
@@ -393,50 +405,10 @@
   },
   "tomorrow_macro_events": [
     {
-      "label": "Average Hourly Earnings m/m (US)",
-      "date": "2026-07-02",
-      "when": "aujourd'hui",
-      "days_ahead": 0,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "jeudi",
-      "date_label": "jeudi 2 juillet"
-    },
-    {
-      "label": "Non-Farm Employment Change (US)",
-      "date": "2026-07-02",
-      "when": "aujourd'hui",
-      "days_ahead": 0,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "jeudi",
-      "date_label": "jeudi 2 juillet"
-    },
-    {
-      "label": "Unemployment Claims (US)",
-      "date": "2026-07-02",
-      "when": "aujourd'hui",
-      "days_ahead": 0,
-      "source": "ForexFactory",
-      "importance": "medium",
-      "weekday_label": "jeudi",
-      "date_label": "jeudi 2 juillet"
-    },
-    {
-      "label": "Unemployment Rate (US)",
-      "date": "2026-07-02",
-      "when": "aujourd'hui",
-      "days_ahead": 0,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "jeudi",
-      "date_label": "jeudi 2 juillet"
-    },
-    {
       "label": "BOE Gov Bailey Speaks (UK)",
       "date": "2026-07-03",
-      "when": "demain",
-      "days_ahead": 1,
+      "when": "aujourd'hui",
+      "days_ahead": 0,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "vendredi",
@@ -445,40 +417,50 @@
     {
       "label": "ECB President Lagarde Speaks (Zone euro)",
       "date": "2026-07-03",
-      "when": "demain",
-      "days_ahead": 1,
+      "when": "aujourd'hui",
+      "days_ahead": 0,
       "source": "ForexFactory",
       "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 3 juillet"
+    },
+    {
+      "label": "Emploi US (NFP) (estimé)",
+      "date": "2026-07-03",
+      "when": "aujourd'hui",
+      "days_ahead": 0,
+      "source": "récurrence",
+      "importance": "high",
       "weekday_label": "vendredi",
       "date_label": "vendredi 3 juillet"
     }
   ],
   "intraday_news": [
     {
-      "title": "Bayer's new unit for Roundup business sparks breakup speculation; Deutsche Bank raises to Buy",
-      "source": "Seeking Alpha",
-      "timestamp": "2026-07-02T18:58:42+00:00"
+      "title": "Zcash Ironwood Upgrade Nears as Developers Work to Restore Confidence After ZEC Crash",
+      "source": "Decrypt",
+      "timestamp": "2026-07-03T17:56:03+00:00"
     },
     {
-      "title": "Walmart halts its weekly drop: Technicals show recovery, fundamentals show risk",
-      "source": "Seeking Alpha",
-      "timestamp": "2026-07-02T18:49:54+00:00"
-    },
-    {
-      "title": "Trump administration aims to cut regulations on US commercial fishing",
+      "title": "In the West Bank, Israeli settlers take over Palestinian’s dream home",
       "source": "Investing.com",
-      "timestamp": "2026-07-02T18:42:33+00:00"
+      "timestamp": "2026-07-03T17:19:10+00:00"
     },
     {
-      "title": "Form 4 Affinity Bancshares Inc For: 2 July",
-      "source": "Investing.com",
-      "timestamp": "2026-07-02T18:42:07+00:00"
+      "title": "ESMA warns many prediction market event contracts already face EU retail ban",
+      "source": "Cointelegraph",
+      "timestamp": "2026-07-03T16:54:20+00:00"
     },
     {
-      "title": "Silicom falls 10% despite analyst upgrade after AI-driven rally",
-      "source": "Seeking Alpha",
-      "timestamp": "2026-07-02T18:34:41+00:00"
+      "title": "Bitcoin ETFs see biggest inflow since May after weak US jobs report sparks BTC price rebound",
+      "source": "CryptoSlate",
+      "timestamp": "2026-07-03T16:05:13+00:00"
+    },
+    {
+      "title": "Trump will oppose heavy US AI regulation, says outgoing tech adviser",
+      "source": "Financial Times",
+      "timestamp": "2026-07-03T14:32:49+00:00"
     }
   ],
-  "_saved_at": "2026-07-02T19:02:27.967804+00:00"
+  "_saved_at": "2026-07-03T19:02:17.071059+00:00"
 }
