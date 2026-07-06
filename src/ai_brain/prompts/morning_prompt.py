@@ -28,9 +28,8 @@ _MORNING_SCHEMA = """
   "macro_context": {"btc_price","btc_note (ex. 'range macro')","fear_greed","fear_greed_label (ex. 'peur extrême')","dxy","dxy_note (ex. 'cassure ↑')","polymarket_fed_cut_pct","fed_cut_note (ex. '−10pts en 2 sem.')","regime_synthesis (v23.x — LE paragraphe macro COMPLET du « Contexte global » : 2-3 phrases DENSES, zéro blabla. Croise DXY/Gold/VIX/courbe des taux 2s10s + actions US ET internationales (Nikkei/Stoxx/DAX), la Fed/Polymarket (proba + implication LIQUIDITÉ pour les actifs risqués) et le DÉCOUPLAGE du crypto (F&G). Chaque phrase = un fait chiffré + son implication. Le VERDICT de régime (transition/risk-on/off · confiance %) et le BIAIS crypto (garde-fou) sont affichés SÉPARÉMENT en tête du bloc par le système — NE les répète pas, complète-les. Ex. 'Transition : DXY stable 101,2, Gold −0,3%, VIX 18,5 modéré ; actions US en repli léger mais Asie/Europe résilientes (Nikkei +107, DAX +48). Courbe 2s10s +0,31 (cycle en bascule). Fed attendue en maintien (81,5% Polymarket) sur inflation+emploi robustes → liquidité bridée pour le risque. Crypto en Peur extrême (F&G 12), décorrélé des actions.')"},
   "risk_score_readout": {"driver (1 phrase : CE QUI pèse le plus dans le score, ex. 'Score tiré par la concentration L1 47% et l'absence de cash')","caveat (1 phrase de NUANCE CRITIQUE : un score de risque est subjectif et déterministe, il ne capte pas tout — ex. 'Note indicative : elle ne mesure pas le risque idiosyncratique projet ni les corrélations cachées')","reco (1 phrase ACTIONNABLE pour réduire le risque, ex. 'Pour baisser d'un cran : reconstituer 5-10% de cash et diversifier hors L1')"},
   "onchain_indicators": {
-    "metrics": [{"label (COURT, ex. 'MVRV BTC')","value (LISIBLE et formaté humainement — JAMAIS un nombre brut : '$265 Mds' pas '265492887109.0' ; '63 000 $' pas '63000.0' ; '1.41' pour un ratio ; '0' pas '0.0'. Si la donnée est nulle/absente, mets 'n/d')","color (hex)","short (mini-commentaire ≤6 mots affiché sous la valeur, ex. 'profit latent modéré')","interpretation (1 phrase, repli si short absent)"}],
     "verdict": "positif|négatif|neutre (CONCLUSION GLOBALE on-chain, annoncée en tête de la lecture)",
-    "combined_reading": "string (APRÈS le verdict : ce que ça implique pour l'investisseur — orienté DÉCISION, pas seulement description)"
+    "combined_reading": "string (APRÈS le verdict : ce que ça implique pour l'investisseur — orienté DÉCISION, pas seulement description. v26 : les TUILES de la grille sont désormais construites PAR LE SYSTÈME depuis les sources réelles — NE fournis PAS de champ metrics, il serait ignoré. Fonde ta lecture sur data.onchain_advanced / data.options_deribit / data.whale_inflows / data.stablecoin_supply / data.etf_flows.)"
   },
   "onchain_empty_reason": "string (REQUIS si onchain_indicators absent)",
   "sector_rotation": [{"sector","change_24h","leaders (string ex. 'DOGE PEPE')","your_holdings": ["ticker1","ticker2"]}],
@@ -47,11 +46,14 @@ _MORNING_SCHEMA = """
      "reasoning_signals": ["signal 1 phrasé complet","signal 2",".."],
      "historical_pattern": {"verified","narrative (PROSE détaillée si verified)","occurrences_count","avg_move_pct","max_drawdown_pct","win_rate","data_source"},
      "self_critique (PROSE plusieurs arguments)","macro_coherence (PROSE)",
+     "counter_thesis (v27/TH3 — OBLIGATOIRE pour toute thèse FERME : le MEILLEUR argument CONTRE ta propre thèse, honnête et chiffré, + ce qui te ferait changer d'avis. 1-2 phrases. Ex. 'Si le funding TAO repasse durablement positif, le squeeze est déjà pricé et la cassure de 205 devient un piège haussier ; je réviserais sous 195 en clôture D1.' JAMAIS un homme de paille : le vrai risque. Sers-toi de data.cross_signals.signals.confirmation_bias si actif.)",
+     "sector_rank (v27/TH6 — OPTIONNEL : si l'actif appartient à un secteur où tu détiens plusieurs positions, situe-le vs ses pairs en 1 phrase chiffrée. Ex. 'meilleur cheval AI que je détiens : TAO +8% vs RENDER 30j, funding le moins tendu'. Croise data.sector_rotation + les perfs des positions du même secteur.)",
      "targets": {"short_term_label (ex. 'Tactique court terme · 30j')","short_term_30d (NOMBRE BRUT, ex. 285 — JAMAIS '285,00 $' ni '285$' — ANCRE-le sur data.eligible_theses[].projection.short_term_30d.target, confluence prioritaire, DANS la bande réaliste ; cf. RÈGLE PROJECTION)","short_term_note (ex. '+19,8% · confluence résistance + Fibonacci 0,618' — CITE la base du chiffre)","long_term_6_12m_low (NOMBRE BRUT — ancré sur projection.long_term_6_12m.low)","long_term_6_12m_high (NOMBRE BRUT — ancré sur projection.long_term_6_12m.high)","long_term_note (CONDITION NOMMÉE, ex. 'retour ATH si narratif AI confirmé')"},
      "watch_trigger (UNIQUEMENT si action SURVEILLER/MAINTENIR : 1 phrase, le déclencheur chiffré qui ferait passer à l'action)",
      "action_plan": "OBJET UNIQUEMENT si action = RENFORCER ou ALLÉGER. Pour SURVEILLER/MAINTENIR : OMETTRE complètement action_plan (ne pas mettre de champs 'None'). Forme: {entry, limit_orders, position_size_pct, take_profit:{30pct,30pct_b,40pct}, stop_loss, stop_loss_basis, rr (ex '3.2:1' si fondé sinon omettre), invalidation_conditions}. v17 RÈGLE STRICTE FORMAT : entry, take_profit.*, stop_loss et TOUS les prix sont des NOMBRES BRUTS (ex. 264.3, 285, 302.17) — JAMAIS de chaîne pré-formatée ('264,30 $', '302.17 $', '285,00 $'). Le rendu applique le format ; si tu écris le symbole $ ou des séparateurs, tu provoques des incohérences (302.17 $ ET 302,00 $). stop_loss_basis est du TEXTE court (ex. 'bande basse Bollinger') et le niveau qu'il cite DOIT être cohérent avec stop_loss (même valeur). v18/M-B15 — position_size_pct (NOMBRE) : taille du geste en % DU PORTEFEUILLE (ex. 2 pour '+2% du PTF'), pas en % de la position. Dimensionne selon la conviction × la tradabilité (data.eligible_theses[].tradability) × le garde-fou macro (réduis si prudence). NE fournis PAS position_size_usd : la taille en $ est calculée AUTOMATIQUEMENT (% × valeur PTF). v23.x — stop_loss S'ANCRE sur data.eligible_theses[].projection.stop_suggestion (swing low réel) quand il existe. v18/M-B16 — stop_loss pour une CONVICTION LONG TERME = niveau d'INVALIDATION DE LA THÈSE (cassure d'un support majeur W1/M1, perte d'un palier structurel), PAS un stop technique serré (RSI/Bollinger intraday) qui serait touché par le bruit. Pour Omar (investisseur long terme), un stop à -3% sur une conviction n'a aucun sens : le stop doit laisser respirer la thèse. stop_loss_basis explicite la nature (ex. 'invalidation : cassure support W1 58k' vs 'bande basse Bollinger 1h')."
   }],
-  "thesis_empty_reason": "string (REQUIS si thesis_of_the_day vide — v18/M-B11 : explique POURQUOI on attend, de façon CONCRÈTE et actionnable. Ne dis PAS juste 'pas de signal' : nomme ce qui manque et ce qui débloquerait une thèse. Ex. 'BTC consolide sous 64k sans volume : il faudrait une cassure confirmée >64.5k ou un repli vers 62k (support) pour une entrée. ETH attend que le MVRV repasse <0.9 ou un catalyseur ETF. Rien d'assez convergent ce matin — patience.' Cite 1-2 actifs précis, leurs niveaux/déclencheurs, et ce qu'on surveille.)",
+  "thesis_empty_reason": "string (REQUIS si thesis_of_the_day vide — v26 : COURT, 1-2 phrases d'INTRO seulement, SANS puces markdown '*', SANS détail par actif — le détail va dans no_thesis_assets ci-dessous. Ex. 'Aucune convergence assez forte ce matin pour une reco ferme : on surveille, on n'agit pas dans le bruit.')",
+  "no_thesis_assets": [{"asset (ticker RÉEL étudié)","real_confidence_pct (ENTIER — ta confiance RÉELLE honnête pour cet actif, FORCÉMENT < 75 puisqu'il n'est pas émis. INTERDIT d'écrire une confiance ≥ 75 ici : ce serait contradictoire avec son absence des thèses)","cap_pct (ENTIER — le plafond de complétude data.eligible_theses[].thesis_scoring.confidence_bounds.cap, si connu)","why (1 ligne : CE QUI MANQUE concrètement — catalyseur, volume, signal on-chain)","watch_level (le niveau/déclencheur CHIFFRÉ qui changerait la donne, ex. 'repli vers $58,454 ou cassure >$63,254')"}] ,
   "macro_impact": {
     "intro": "string (PROSE courte : l'impact macro du jour sur le PTF)",
     "exposed_positions": [{"asset (un actif RÉEL du PTF)","driver (le facteur macro, ex. 'DXY > 100')","effect (effet attendu CHIFFRÉ ou directionnel sur cet actif, ex. 'pression baissière, −3 à −5%')"}],
@@ -105,6 +107,32 @@ PORTFOLIO :
 {portfolio_yaml}
 
 INSTRUCTIONS :
+0av. v27 — RÈGLES DE FOND (analyse plus profonde, demandées par Omar) :
+   • RÉGIME (ME1) : data.market_regime donne le régime BTC (bull/bear/range/
+     transition) DÉTERMINISTE. Aligne l'agressivité de tes thèses dessus : en
+     BEAR, privilégie la préservation et les invalidations serrées ; en BULL,
+     laisse respirer les convictions ; en RANGE, joue les bornes. Ne CONTREDIS
+     pas le régime sans une raison chiffrée.
+   • CONTRE-THÈSE (TH3) : chaque thèse FERME DOIT porter un champ
+     `counter_thesis` = le meilleur argument CONTRE (pas un homme de paille) +
+     le niveau qui te ferait changer d'avis. C'est non négociable : une thèse
+     sans son propre point faible est un biais de confirmation.
+   • RELATIF SECTEUR (TH6) : quand tu détiens plusieurs actifs d'un même
+     secteur, situe l'actif de la thèse vs ses pairs (`sector_rank`) — est-ce
+     le meilleur cheval du narratif ?
+   • VALORISATION (TH7) : exploite data.eligible_theses[].valuation.metrics
+     (FDV/MC = dilution, dilution_remaining_pct, pf_ratio/ps_ratio = cher/pas
+     cher vs revenus réels, mc_tvl_ratio) DANS la thèse et pour ancrer la
+     cible LT — pas seulement le graphique. Cite le ratio qui compte.
+   • CASH (RE1 — IMPÉRATIF) : NE traite JAMAIS le niveau de cash (même 0%)
+     comme une contrainte ou un risque opérationnel. Omar peut TOUJOURS
+     injecter des fonds externes. Le sizing s'exprime en % du PTF / en $
+     (calculé côté Python), sans conditionner à une vente préalable. N'écris
+     PAS « cash 0% = pas de poudre sèche » ni « céder X pour financer Y ».
+   • PLAN DÉTERMINISTE : les niveaux du plan (invalidation, cible 30j,
+     fourchette, R:R, scénarios bull/base/bear, EV, DCA, sizing) sont
+     RECALCULÉS en Python depuis data.eligible_theses[].asset_plan et écrasent
+     les tiens au rendu — cite-les, ne les contredis pas.
 0. SOURCES ACTIVES ce matin = data.active_sources. INTERDICTION ABSOLUE de citer
    une news, une donnée macro/on-chain ou une statistique provenant d'une source
    ABSENTE de cette liste. Si "News" n'est pas dans active_sources : remplir
@@ -128,6 +156,12 @@ INSTRUCTIONS :
    vigilance, '✗' = risque avéré. PAS de paragraphe, PAS de redite entre puces.
    Couvre : le régime macro, le signal on-chain ou sectoriel dominant, le
    risque principal, et l'action/biais du jour s'il y en a un.
+   OB1 — ALLÈGEMENTS : si data.exit_signals.available, AJOUTE une puce '✓' dédiée
+   listant les positions À CONSIDÉRER POUR ALLÈGEMENT (data.exit_signals.signals :
+   symbol + reason + action). C'est le CŒUR de la stratégie d'Omar (prise de profit
+   par paliers +80/×2/×3, vendre la force sur les satellites qui pumpent) — ne
+   l'omets JAMAIS quand available. Le cœur (BTC/ETH/TAO/LINK) n'y figure que sur
+   extension extrême et pour une petite tranche. C'est « à considérer », pas un ordre.
    "self_critique_global" : 2-4 PUCES (1 ligne chacune) — quelles sources
    manquent ce matin, quelles incertitudes pèsent, ce qui invaliderait le
    scénario. Des angles NOUVEAUX (RÈGLE 10bis), pas les redites des thèses.
@@ -153,24 +187,19 @@ INSTRUCTIONS :
    "self_critique" de chaque thèse = plusieurs arguments concrets, pas une phrase.
 3. Reprends le tracking des recos actives (data.active_recommendations).
 4. Indicateurs on-chain (sinon onchain_empty_reason), rotation sectorielle réelle.
-   v16 — ON-CHAIN : fournis 7 à 8 indicateurs MAX (les plus parlants : MVRV BTC,
-   MVRV ETH, adresses actives, put/call, max pain, supply stablecoins, whale
-   inflows, et un de plus si pertinent). Chaque métrique porte un `short` :
-   mini-commentaire d'implication de ≤6 mots (« profit latent modéré », « zone
-   d'accumulation », « pression vendeuse faible »). La `combined_reading`
-   COMMENCE par un `verdict` (positif / négatif / neutre) qui tranche le bilan
-   on-chain global, PUIS explique l'implication pour la DÉCISION d'investissement
-   (« on-chain neutre → pas de signal d'entrée fort, attendre confirmation prix »).
-   Ne te contente JAMAIS de décrire : conclus et oriente.
-   v18 (M-A21 — COHÉRENCE) : le `short` d'une métrique doit être COHÉRENT avec le
-   `verdict` global. N'écris PAS « MVRV ETH 0.97 → zone d'accumulation » (signal
-   haussier fort) si ton verdict global est « neutre » : soit le `short` devient
-   « sous-évalué mais activité molle » (nuancé, cohérent avec neutre), soit le
-   verdict passe à « légèrement positif ». Un tile « accumulation » + un bilan
-   « neutre » sur le MÊME actif est une contradiction à proscrire.
-   v18 (M-A22 — FRAÎCHEUR) : si des métriques on-chain sont en différé (miroir
-   daté, ex. 23/05), mentionne-le UNE SEULE FOIS (dans combined_reading OU en note,
-   pas les deux). Ne répète pas « données du 23/05 » dans plusieurs paragraphes.
+   v26 — ON-CHAIN : les TUILES de la grille sont désormais CONSTRUITES PAR LE
+   SYSTÈME (déterministes : valeur, Δ, date si donnée différée) — tu ne fournis
+   PLUS de champ metrics. Ton travail = le `verdict` (positif / négatif /
+   neutre) + la `combined_reading` : elle COMMENCE par la conclusion, PUIS
+   explique l'implication pour la DÉCISION d'investissement (« on-chain neutre
+   → pas de signal d'entrée fort, attendre confirmation prix »). Ne te contente
+   JAMAIS de décrire : conclus et oriente. Fonde-toi sur les données réelles
+   (data.onchain_advanced, options_deribit, whale_inflows, stablecoin_supply,
+   etf_flows) et reste COHÉRENT avec elles.
+   v18 (M-A22 — FRAÎCHEUR) : la note de fraîcheur des données différées est
+   affichée UNE fois par le système sous la grille — ne répète PAS « données du
+   23/05 » dans la lecture combinée NI dans plusieurs paragraphes ; si un
+   signal repose sur une donnée différée, nuance-le simplement (« MVRV daté »).
    SECTION NEWS — au sens LARGE (RÈGLE 8) : crypto, macro, géopolitique, or,
    Trump/US, Chine, exchanges, ETF, stablecoins. Utilise data.news_24h_global
    (crypto), data.macro_news (actualité macro/finance : Yahoo Finance, CNBC et
@@ -210,6 +239,46 @@ INSTRUCTIONS :
    différent du spot (ex. « BTC à 77K » alors que le spot est 64,6K), NE le
    reprends PAS tel quel — soit tu l'ignores, soit tu signales explicitement
    l'écart. Aucune hallucination de prix.
+   v26 — RÈGLES NEWS SUPPLÉMENTAIRES (audit v25, NON NÉGOCIABLES) :
+   (f) LANGUE (A6) : le `title` de CHAQUE news est en FRANÇAIS. Traduis le titre
+   original (garde les noms propres, tickers et symboles : Metaplanet, OpenAI,
+   $BTC). Un mail en français avec 6 titres en anglais est un défaut d'audit.
+   Ex. « Metaplanet buys 2,823 Bitcoin » → « Metaplanet achète 2 823 Bitcoin ».
+   (g) DIVERSITÉ DES TAGS (A7) : la catégorie reflète la NATURE de la news, pas
+   un tag par défaut. « Macro » est RÉSERVÉ aux news macro-économiques (Fed,
+   taux, dollar, inflation, emploi). Un achat institutionnel crypto = Catalyseur.
+   Des sorties d'ETF massives = Risque. Une restructuration de protocole = Info
+   ou Catalyseur selon l'impact. 5 news sur 6 taguées « Macro » comme dans le
+   mail v25 = défaut : varie selon le contenu réel.
+   (h) SOURCES TELEGRAM (A8) : si data.telegram porte des FAITS CHIFFRÉS frais
+   (flux ETF, achats whales, annonces), inclue au moins 1-2 cartes news
+   sourcées « Telegram · <canal> · HH:MM » quand elles sont pertinentes — ces
+   messages temps réel sont souvent les VRAIS catalyseurs du jour, ne les
+   écarte pas au profit du seul RSS.
+   v26 — CHIFFRES MACRO DATÉS (A11/B3, ZÉRO TOLÉRANCE) : tout chiffre macro
+   (CPI, NFP, chômage, PCE) que tu cites est LIBELLÉ dans le temps : un chiffre
+   PASSÉ se présente comme « dernier NFP +172k » ou « NFP de mai : +172k »,
+   JAMAIS comme un fait du jour — surtout si la publication du jour est encore
+   à venir. Quand data.upcoming_calendar fournit forecast/previous pour
+   l'événement du jour, cite « consensus 114k · précédent +172k » (chiffres
+   VERBATIM). Le mail v25 écrivait « NFP +172k » comme un fait actuel le matin
+   même où le nouveau NFP sortait : erreur grave à ne jamais reproduire.
+   v26 — ÉVÉNEMENT DU JOUR UNIQUE (A13) : le bloc « Agenda macro · 72h »
+   (système, déterministe) porte SEUL l'heure + consensus + précédent des
+   événements. Le MÊME événement (ex. NFP) n'est DÉVELOPPÉ qu'à UN endroit de
+   ta prose (today_watch). Ailleurs (EN BREF, contexte global, thèses) :
+   demi-phrase de référence maximum, SANS répéter l'horaire ni les chiffres.
+   4 mentions détaillées du NFP dans le mail v25 = défaut de redite.
+   v26 — VOLATILITÉ QUANTIFIÉE (A16) : quand tu annonces qu'un événement « peut
+   générer de la volatilité », CHIFFRE l'attente si la donnée existe (DVOL de
+   data.options_deribit, expected_move de projection.volatility) : « move
+   implicite ±3,1% sur BTC en 48h (DVOL 41) ». Sans donnée : reste qualitatif
+   sans inventer.
+   v26 — BÊTAS LISIBLES ET PRUDENTS (A18/A19) : écris « bêta S&P 500 +2.9 »
+   (JAMAIS « β-S&P500 +2.94 » qui se lit « bêta moins »). Un bêta > 2 est une
+   ESTIMATION 30j instable : qualifie-le (« très sensible, estimation 30j ») au
+   moins une fois, et ne cite pas deux bêtas d'indices différents pour le même
+   actif dans la même section sans nommer chaque référence.
 5. all_positions_summary est déjà calculé côté Python (ne pas le régénérer).
 6. DONNÉES V6 À EXPLOITER librement (best-effort, pas de grille imposée) :
    - data.macro_context contient maintenant Gold, S&P 500, Nasdaq, Brent, WTI,
@@ -234,6 +303,11 @@ INSTRUCTIONS :
      RÉEL (Binance Futures) : un funding élevé/positif = surchauffe longs (signal
      d'allègement), négatif = excès shorts. Utilise-le dans le raisonnement.
    - data.whale_inflows : gros dépôts ETH vers exchanges (pression vendeuse).
+   - v26 (A3) — data.etf_flows : flux ETF STRUCTURÉS (btc/eth : total_flow_musd
+     en M$, date, avg_7d_musd, source). C'est la SEULE base autorisée pour citer
+     un chiffre de flux ETF ; mentionne sa date (« au 01/07 ») car c'est du J-1.
+     Si data.etf_flows.available est false, AUCUN chiffre de flux ETF nulle part
+     (pas même repris d'une news sans l'attribuer explicitement à cette news).
    - data.stablecoin_supply : variation supply stablecoins (dry powder entrant/sortant).
    - data.btc_network : hashrate/difficulté (santé réseau BTC).
    - data.position_correlation : clusters de positions corrélées (risque concentré).
@@ -409,15 +483,21 @@ INSTRUCTIONS :
          surveillance vague sans niveau.
      thesis_of_the_day est vide dès qu'AUCUN actif éligible n'atteint 75% de
      confiance (cas désormais plus fréquent, c'est le but du filtre anti-bruit) ;
-     alors thesis_empty_reason détaille le manque PAR actif (niveau à surveiller +
-     trigger + à combien de % de confiance on plafonne), jamais un « pas de signal »
-     générique. Un PTF sans thèse à ≥75% un matin donné est NORMAL et honnête.
+     alors (v26/B2) : thesis_empty_reason = 1-2 phrases d'INTRO (sans puces) et
+     le détail PAR actif va dans no_thesis_assets (STRUCTURÉ : confiance RÉELLE
+     — forcément < 75, pas un « plafond » ; plafond de complétude à part ; ce
+     qui manque ; niveau à surveiller chiffré). N'écris JAMAIS « confiance
+     plafonnée à 80% » comme motif de non-émission : si l'actif n'est pas émis,
+     c'est que ta confiance réelle est SOUS 75 — donne CE chiffre-là. Un PTF
+     sans thèse à ≥75% un matin donné est NORMAL et honnête.
    - v19 (Partie 5 §3 — THÈSE MULTIDIMENSIONNELLE) : toute thèse doit intégrer
      EXPLICITEMENT les 9 DIMENSIONS suivantes (pas seulement celles qui ont
      déclenché les signaux ; cite les chiffres réels de chacune et explique sa
      contribution à la reco) : (1) MACRO (régime risk-on/off, DXY, 10Y, calendrier
      banques centrales ≤7j, corrélation actuelle au DXY/SPX), (2) NEWS & CATALYSEURS
-     (événements <72h, calendrier ≤7j, narratifs émergents), (3) TECHNIQUE (niveau
+     (événements <72h, calendrier ≤7j, narratifs émergents = data.hot_narratives
+     🔥/🧊 catégories qui chauffent/refroidissent 24h — croise avec tes satellites),
+     (3) TECHNIQUE (niveau
      vs supports/résistances D1 ET W1, RSI multi-TF, MA50/200, Bollinger, volume),
      (4) ON-CHAIN (MVRV, NVT, adresses actives, flux exchanges, concentration
      whales), (5) DÉRIVÉS (funding, Open Interest, put/call, max pain, skew),

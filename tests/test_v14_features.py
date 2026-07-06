@@ -142,11 +142,14 @@ def test_reco_bilan_empty_renders_ras():
 # --------------------------------------------------------------------------- #
 # add_recommendation — dédup anti-doublons (fix tracker)
 # --------------------------------------------------------------------------- #
-def test_tracker_dedup_same_asset_action(monkeypatch=None):
+def test_tracker_dedup_same_asset_action(monkeypatch):
+    # Audit v26 final — monkeypatch (auto-restauré) au lieu d'une assignation
+    # directe qui écrasait le vrai I/O pour TOUS les tests suivants (fuite).
     import src.state.report_memory as rm
     store: dict = {}
-    rm._read = lambda f, default: store.get(f, default if default is not None else [])
-    rm._write = lambda f, data: store.__setitem__(f, data)
+    monkeypatch.setattr(rm, "_read",
+                        lambda f, default: store.get(f, default if default is not None else []))
+    monkeypatch.setattr(rm, "_write", lambda f, data: store.__setitem__(f, data))
     # 3 mornings BTC RENFORCER (ids datés différents) -> 1 seule reco
     for day in ("05", "06", "08"):
         rm.add_recommendation({"id": f"BTC-2026-06-{day}-RENFORCER", "asset": "BTC",
@@ -157,11 +160,12 @@ def test_tracker_dedup_same_asset_action(monkeypatch=None):
     assert btc[0]["entry_price"] == 60050  # prix d'entrée d'origine conservé
 
 
-def test_tracker_action_change_archives():
+def test_tracker_action_change_archives(monkeypatch):
     import src.state.report_memory as rm
     store: dict = {}
-    rm._read = lambda f, default: store.get(f, default if default is not None else [])
-    rm._write = lambda f, data: store.__setitem__(f, data)
+    monkeypatch.setattr(rm, "_read",
+                        lambda f, default: store.get(f, default if default is not None else []))
+    monkeypatch.setattr(rm, "_write", lambda f, data: store.__setitem__(f, data))
     rm.add_recommendation({"id": "ETH-1-RENFORCER", "asset": "ETH",
                            "action": "RENFORCER", "entry_price": 1600})
     rm.add_recommendation({"id": "ETH-2-ALLEGER", "asset": "ETH",
@@ -245,7 +249,7 @@ def test_evening_render_8_blocs():
     html = render(_enriched_evening_payload(), "evening")
     assert not re.search(r"\{\{|\{%", html)          # pas de Jinja non rendu
     assert "rendu simplifié" not in html             # pas de fallback
-    assert "Crypto Analyst Pro · v25" in html        # versioning
+    assert "Crypto Analyst Pro · v26" in html        # versioning
     # blocs présents
     assert "Bilan du jour" in html
     assert "Marchés · mi-séance" in html
@@ -338,7 +342,7 @@ def test_morning_arrows_and_plural_and_polymarket():
     assert "▼" in html                              # flèche down (Nasdaq)
     assert "données partielles" in html             # pluriel
     assert "maintien" in html and "99.8%" in html    # Polymarket reframé
-    assert "Crypto Analyst Pro · v25" in html
+    assert "Crypto Analyst Pro · v26" in html
 
 
 # ─────────────────── v14 AUDIT HARDENING TESTS ─────────────────── #

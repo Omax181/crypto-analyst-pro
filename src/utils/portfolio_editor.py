@@ -132,8 +132,16 @@ def apply_quantity_change(
     if action == "buy":
         new_qty = old_qty + qty
         if price is not None:
-            base_cost = (old_qty * old_pru) if old_pru is not None else 0.0
-            new_pru = (base_cost + qty * price) / new_qty if new_qty else price
+            if old_pru is None and old_qty > 0:
+                # Audit final v26 — PRU du stock existant INCONNU : l'ancien
+                # calcul le traitait comme GRATUIT (base_cost=0), produisant un
+                # PRU minuscule → faux gains latents affichés. Le seul coût
+                # CONNU est celui de cet achat : PRU = prix de l'achat
+                # (conservateur, jamais un gain fabriqué).
+                new_pru = price
+            else:
+                base_cost = (old_qty * old_pru) if old_pru is not None else 0.0
+                new_pru = (base_cost + qty * price) / new_qty if new_qty else price
     elif action == "sell":
         if qty > old_qty + 1e-12:
             raise PortfolioEditError(

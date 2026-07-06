@@ -26,7 +26,11 @@ logger = get_logger(__name__)
 _STATE_COMMANDS = {"/dismiss", "/validate", "/snooze", "/remember", "/forget"}
 _READ_COMMANDS = {"/recos", "/ptf", "/portefeuille", "/pos", "/positions",
                   "/risque", "/resume", "/résumé", "/aide", "/help", "/start",
-                  "/macro", "/memory", "/memoire", "/mémoire"}
+                  "/macro", "/memory", "/memoire", "/mémoire",
+                  # v27 (TG2/TG5) — analyse à la demande + explication de reco.
+                  "/analyse", "/analyze", "/pourquoi", "/why",
+                  # OB18 — suivi / track record consultable (mobile).
+                  "/suivi", "/historique", "/bilan", "/track"}
 
 
 def is_command(text: str) -> bool:
@@ -322,9 +326,12 @@ def _cmd_help() -> str:
         "rapports du jour.\n\n"
         "*Commandes lecture :*\n"
         "/recos — recos actives\n"
+        "/analyse SYM — plan complet à la demande (niveaux, R:R, scénarios)\n"
+        "/pourquoi SYM — la thèse derrière une reco active\n"
         "/ptf — portefeuille\n"
         "/risque — score de risque PTF\n"
         "/resume — synthèse du dernier rapport\n"
+        "/suivi — track record : win rate, espérance, recos actives\n"
         "/macro — contexte macro\n\n"
         "*Gestion des recos :*\n"
         "/validate SYM — valider une reco\n"
@@ -350,9 +357,197 @@ def _cmd_help() -> str:
     )
 
 
+def _cmd_analyse(args: list[str]) -> str:
+    """v27 (TG2) — /analyse SYM : plan complet à la demande pour tout actif.
+
+    Prix + readout technique + S/R calculés + plan (invalidation, cible 30j,
+    R:R, EV, zone d'accumulation) + dérivés. 100% déterministe (mêmes moteurs
+    que les mails) : aucune hallucination possible.
+    """
+    if not args:
+        return "Utilisation : `/analyse SYM` (ex. `/analyse TAO`)."
+    sym = args[0].upper().lstrip("$")
+    try:
+        from src.reporting.charts import _load_series
+        from src.analytics import key_levels as _kl
+        from src.analytics.asset_plan import compute_asset_plan
+        series = _load_series(sym, days=180)
+        if not series or not series.get("closes"):
+            return (f"Pas de série de prix pour *{sym}* (ticker inconnu de "
+                    "CoinGecko ou source indisponible). Vérifie le symbole.")
+        closes = series["closes"]
+        kl = _kl.compute_key_levels(sym, closes, series.get("volumes"),
+                                    price=closes[-1])
+        funding = None
+        try:
+            from src.data_sources import binance_futures as _bf
+            _d = _bf.get_derivatives(sym)
+            if _d.get("available"):
+                funding = _d.get("funding_annualized_pct")
+        except Exception:  # noqa: BLE001
+            funding = None
+        plan = compute_asset_plan(sym, closes, price=closes[-1],
+                                  funding_annualized_pct=funding,
+                                  key_levels_result=kl)
+        if not plan.get("available"):
+            return f"Analyse indisponible pour *{sym}* : {plan.get('reason')}."
+        lines = [f"*🔎 {sym} · {plan.get('price_label')}*"]
+        if kl.get("readout_line"):
+            lines.append(kl["readout_line"])
+        sups = kl.get("supports") or []
+        ress = kl.get("resistances") or []
+        if sups:
+            lines.append("Supports : " + " · ".join(
+                f"{s['level_label']} ({s['basis']})" for s in sups[:2]))
+        if ress:
+            lines.append("Résistances : " + " · ".join(
+                f"{r['level_label']} ({r['basis']})" for r in ress[:2]))
+        lines.append(f"📐 {plan['plan_line']}")
+        sc = plan.get("scenarios") or {}
+        if sc:
+            lines.append(
+                f"Scénarios 30j : bull {sc['bull']['probability_pct']}% "
+                f"→ {sc['bull']['level_label']} · base "
+                f"{sc['base']['probability_pct']}% · bear "
+                f"{sc['bear']['probability_pct']}% → {sc['bear']['level_label']}")
+        if funding is not None:
+            lines.append(f"Funding {funding:+.1f}%/an")
+        # Contexte PTF : position détenue ?
+        try:
+            from src.utils.portfolio_loader import load_portfolio
+            pos = (load_portfolio().get("portfolio") or {}).get(sym)
+            if pos and pos.get("pru"):
+                lines.append(("💼 En PTF · PRU "
+                              + f"{float(pos['pru']):,.4f} $").replace(",", " "))
+            elif pos:
+                lines.append("💼 En portefeuille")
+        except Exception:  # noqa: BLE001
+            pass
+        lines.append("_Niveaux calculés (pivots/MM/Fibo/Bollinger) · EV indicatif._")
+        return "\n".join(lines)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("/analyse %s échoué : %s", sym, exc)
+        return f"Analyse de {sym} momentanément indisponible ({exc})."
+
+
+def _cmd_pourquoi(args: list[str]) -> str:
+    """v27 (TG5) — /pourquoi SYM : développe la thèse derrière une reco active.
+
+    Reco (entrée, date, stop, cible, confiance) + observation/raisonnement de
+    la thèse du matin + contre-thèse. Sans reco active : le dit honnêtement
+    et oriente vers /analyse.
+    """
+    if not args:
+        return "Utilisation : `/pourquoi SYM` (ex. `/pourquoi TAO`)."
+    sym = args[0].upper().lstrip("$")
+    from src.tracking.prediction_scoring import latest_open_reco_by_asset
+    recos = latest_open_reco_by_asset(mem.load_active_recommendations())
+    reco = recos.get(sym)
+    if not reco:
+        return (f"Aucune reco active sur *{sym}*. "
+                f"Tape `/analyse {sym}` pour un plan à la demande.")
+    lines = [f"*🎯 Pourquoi {reco.get('action', '—')} {sym} ?*"]
+    _meta = []
+    if reco.get("created_at"):
+        _meta.append(f"émise le {str(reco['created_at'])[:10]}")
+    if reco.get("entry_price"):
+        _meta.append(f"entrée {reco['entry_price']}")
+    if reco.get("stop_loss"):
+        _meta.append(f"invalidation {reco['stop_loss']}")
+    if reco.get("ct_target") or reco.get("target_price"):
+        _meta.append(f"cible {reco.get('ct_target') or reco.get('target_price')}")
+    if reco.get("confidence"):
+        _meta.append(f"confiance {reco['confidence']}%")
+    if _meta:
+        lines.append(" · ".join(str(m) for m in _meta))
+    # La thèse d'origine (rapport du matin persisté).
+    morning = mem.load_morning_report() or {}
+    thesis = next(
+        (t for t in (morning.get("thesis_of_the_day") or [])
+         if isinstance(t, dict) and (t.get("asset") or "").upper() == sym),
+        None,
+    )
+    if thesis:
+        if thesis.get("observation"):
+            lines.append(f"👁 {str(thesis['observation'])[:350]}")
+        for i, s in enumerate((thesis.get("reasoning_signals") or [])[:3], 1):
+            lines.append(f"{i}. {str(s)[:160]}")
+        if thesis.get("counter_thesis"):
+            lines.append(f"⚖️ Contre-thèse : {str(thesis['counter_thesis'])[:200]}")
+        if thesis.get("plan_line"):
+            lines.append(f"📐 {thesis['plan_line']}")
+    else:
+        lines.append("_Thèse détaillée du matin non retrouvée dans le state — "
+                     f"`/analyse {sym}` pour l'état des lieux actuel._")
+    return "\n".join(lines)
+
+
+def _cmd_suivi() -> str:
+    """OB18 — SUIVI / TRACK RECORD consultable (mobile-first, 100 % déterministe).
+
+    Répond à « comment se comportent mes recos dans le temps ? » sans quitter
+    Telegram : win rate, espérance, recos actives, leçon récente. Best-effort —
+    chaque bloc est protégé, un historique vide affiche un message honnête.
+    """
+    from src.tracking.prediction_scoring import PredictionTracker
+    lines = ["*📊 Suivi & track record*"]
+    tk: Optional[PredictionTracker]
+    try:
+        tk = PredictionTracker()
+    except Exception:  # noqa: BLE001
+        tk = None
+    if tk is not None:
+        try:
+            wr = tk.compute_win_rate(90)
+            if wr.get("total"):
+                lines.append(
+                    f"• Clôturées 90j : *{wr.get('win_rate_pct')}%* de réussite "
+                    f"({wr.get('validated')} ✓ / {wr.get('invalidated')} ✗)")
+            else:
+                lines.append("• Clôturées 90j : aucune encore "
+                             "(historique en constitution)")
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            ex = tk.compute_expectancy(90)
+            if ex.get("available") and ex.get("expectancy_pct") is not None:
+                lines.append(
+                    f"• Espérance : *{ex['expectancy_pct']:+.1f}%* / reco "
+                    f"(éch. {ex.get('sample')})")
+                if ex.get("reading"):
+                    lines.append(f"  _{str(ex['reading'])[:160]}_")
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        recos = mem.load_active_recommendations() or []
+        if recos:
+            lines.append(f"• Recos actives : *{len(recos)}*")
+            for r in recos[:5]:
+                lines.append(
+                    f"   – {r.get('asset', '?')} · {r.get('action', '?')} "
+                    f"({r.get('status') or 'en cours'})")
+        else:
+            lines.append("• Recos actives : aucune")
+    except Exception:  # noqa: BLE001
+        pass
+    if tk is not None:
+        try:
+            lesson = tk.extract_lesson(30)
+            if lesson and str(lesson).strip():
+                lines.append(f"💡 {str(lesson).strip()[:300]}")
+        except Exception:  # noqa: BLE001
+            pass
+    lines.append("\n_Détail : /recos · /ptf · /risque_")
+    return "\n".join(lines)
+
+
 def handle_read_command(text: str) -> Optional[str]:
     """Exécute une commande de lecture ; renvoie None si ce n'en est pas une."""
-    cmd, _ = parse_command(text)
+    cmd, _args = parse_command(text)
+    if cmd in ("/analyse", "/analyze"):
+        return _cmd_analyse(_args)
+    if cmd in ("/pourquoi", "/why"):
+        return _cmd_pourquoi(_args)
     if cmd in ("/recos",):
         return _cmd_recos()
     if cmd in ("/ptf", "/portefeuille", "/pos", "/positions"):
@@ -365,6 +560,8 @@ def handle_read_command(text: str) -> Optional[str]:
         return _cmd_macro()
     if cmd in ("/memory", "/memoire", "/mémoire"):
         return _cmd_memory()
+    if cmd in ("/suivi", "/historique", "/bilan", "/track"):
+        return _cmd_suivi()
     if cmd in ("/aide", "/help", "/start"):
         return _cmd_help()
     return None

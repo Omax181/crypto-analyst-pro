@@ -124,6 +124,49 @@ def get_global() -> dict[str, Any]:
     }
 
 
+def get_categories() -> dict[str, Any]:
+    """OB6 — catégories/narratifs CoinGecko (gratuit, sans clé requise).
+
+    Sert de source de DÉTECTION DE NARRATIFS (remplace Kaito, mort en prod faute
+    de clé). Renvoie le brut minimal ; le filtrage/classement (bruit micro-cap,
+    exclusion des écosystèmes de chaînes) est fait dans ``analytics/narratives``.
+
+    Returns:
+        Dict ``{available, categories: [{name, market_cap, change_24h,
+        volume_24h, top_coins}]}``.
+    """
+    base, headers = _base_and_headers()
+
+    def _fetch() -> Optional[list[Any]]:
+        return get_json(f"{base}/coins/categories", headers=headers)
+
+    raw = CACHE.get_or_compute("cg:categories", 1800, _fetch)
+    if not isinstance(raw, list) or not raw:
+        return {"available": False, "categories": []}
+    cats: list[dict[str, Any]] = []
+    for c in raw:
+        if not isinstance(c, dict):
+            continue
+        try:
+            name = c.get("name")
+            mcap = c.get("market_cap")
+            chg = c.get("market_cap_change_24h")
+            if not name or mcap is None or chg is None:
+                continue
+            cats.append({
+                "name": str(name),
+                "market_cap": float(mcap),
+                "change_24h": round(float(chg), 2),
+                "volume_24h": float(c.get("volume_24h") or 0.0),
+                "top_coins": [str(x) for x in (c.get("top_3_coins_id") or []) if x][:3],
+            })
+        except (TypeError, ValueError):
+            continue
+    if not cats:
+        return {"available": False, "categories": []}
+    return {"available": True, "categories": cats}
+
+
 def get_ohlc(symbol: str, days: int = 90) -> Optional[list[dict[str, float]]]:
     """Récupère les bougies OHLC via CoinGecko (remplace Binance, non géo-bloqué).
 

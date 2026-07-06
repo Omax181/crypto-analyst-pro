@@ -15,7 +15,8 @@ import inspect
 # --------------------------------------------------------------------------- #
 def test_app_version_v23():
     from src.reporting.email_html import APP_VERSION
-    assert APP_VERSION == "v25"
+    # Nommage final : le livrable est étiqueté v26 (décision Omar, 2026-07-05).
+    assert APP_VERSION == "v26"
 
 
 # --------------------------------------------------------------------------- #

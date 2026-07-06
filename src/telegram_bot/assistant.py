@@ -22,17 +22,18 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Modèle du bot conversationnel : on VISE gemini-2.5-pro (raisonnement profond,
-# vrai contre-argumentaire) — disponible sur le palier gratuit de l'API ; le
-# volume d'Omar (quelques messages/jour) est très en-dessous des plafonds. Repli
-# automatique sur le modèle des rapports (flash) si pro est saturé/indisponible :
-# une erreur de quota n'étant jamais facturée, c'est « le meilleur quand dispo,
-# jamais de panne », à coût nul. Surchargeable par variables d'env si besoin.
-_BOT_PRIMARY_MODEL = os.environ.get("GEMINI_BOT_MODEL", "gemini-2.5-pro")
-# Filet de sécurité FIABLE et toujours distinct du primaire (flash par défaut),
-# indépendant du GEMINI_MODEL des rapports : garantit que le bot a TOUJOURS un
-# repli même si Omar pointe déjà GEMINI_MODEL sur pro.
-_BOT_FALLBACK_MODEL = os.environ.get("GEMINI_BOT_FALLBACK", "gemini-2.5-flash")
+# Modèle du bot conversationnel — palier GRATUIT ($0). Le pro (gemini-2.5-pro)
+# n'a AUCUN quota sur le palier gratuit (0/0) : le viser n'ajouterait qu'un appel
+# voué à l'échec avant de retomber sur flash. On part donc DIRECTEMENT sur le
+# flash (gemini-2.5-flash), sur son propre bucket de quota (distinct du
+# gemini-3.5-flash des rapports → pas de throttling croisé). « vide-safe » : un
+# secret supprimé (chaîne vide "") retombe sur le défaut. Pour repasser en pro un
+# jour (facturation API activée), poser le secret GEMINI_BOT_MODEL=gemini-2.5-pro.
+_BOT_PRIMARY_MODEL = (os.environ.get("GEMINI_BOT_MODEL") or "").strip() or "gemini-2.5-flash"
+# Filet de sécurité FIABLE et distinct du primaire : gemini-2.5-flash-lite, sur
+# un 3e bucket de quota — garantit une réponse même si le flash principal est
+# momentanément throttlé, sans empiéter sur le quota (serré) des rapports.
+_BOT_FALLBACK_MODEL = (os.environ.get("GEMINI_BOT_FALLBACK") or "").strip() or "gemini-2.5-flash-lite"
 
 
 _SYSTEM_PROMPT = """\
@@ -290,7 +291,8 @@ def answer(
         )
     try:
         from src.ai_brain.gemini_client import GeminiClient
-        # Le bot vise pro (raisonnement profond) avec repli flash automatique.
+        # Palier gratuit : le bot vise gemini-2.5-flash avec repli flash-lite
+        # (3e bucket de quota) — cf. _BOT_PRIMARY_MODEL/_BOT_FALLBACK_MODEL.
         fallback = (_BOT_FALLBACK_MODEL
                     if _BOT_FALLBACK_MODEL != _BOT_PRIMARY_MODEL else None)
         client = GeminiClient(model=_BOT_PRIMARY_MODEL, fallback_model=fallback)

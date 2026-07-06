@@ -35,6 +35,9 @@ RECO_DISMISSALS_FILE = "reco_dismissals.json"  # v19 (Partie 6) — recos écart
 TELEGRAM_OFFSET_FILE = "telegram_offset.json"  # v18 (G) — dernier update_id traité
 TELEGRAM_HISTORY_FILE = "telegram_history.json"  # v18 (G) — mémoire conversationnelle
 BOT_MEMORY_FILE = "bot_memory.json"  # v21 — mémoire DURABLE (décisions, notes, seuils)
+MARKET_REGIME_FILE = "market_regime.json"  # v27 (ME1) — régime courant + depuis quand
+THESIS_SCORES_FILE = "thesis_scores.json"  # v27 (TH4) — historique des scores par actif
+WEEKLY_CALLS_FILE = "weekly_calls.json"  # v27 (ME2/ME3) — appels du hebdo à évaluer
 
 
 def _path(name: str) -> Path:
@@ -92,15 +95,27 @@ def ensure_v18_reset() -> None:
 
 
 def _read(name: str, default: Any) -> Any:
-    """Lit un JSON de state, renvoie ``default`` si absent ou illisible."""
+    """Lit un JSON de state ; renvoie ``default`` si absent, illisible ou de TYPE
+    inattendu (OB23 — durcissement anti-corruption)."""
     p = _path(name)
     if not p.exists():
         return default
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
+        loaded = json.loads(p.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         logger.warning("State illisible %s : %s — défaut utilisé.", name, exc)
         return default
+    # OB23 — VALIDATION DE TYPE : un state corrompu (ou édité à la main) qui parse
+    # en type INATTENDU (ex. dict là où on attend une list, ou null) planterait le
+    # consommateur en aval (itération, .get, .append…). Quand le défaut est une
+    # list/dict, on EXIGE le même type ; sinon repli propre sur le défaut.
+    # (default=None → aucune contrainte, rétro-compatible.)
+    if isinstance(default, (list, dict)) and not isinstance(loaded, type(default)):
+        logger.warning(
+            "State %s de type inattendu (%s, attendu %s) — défaut utilisé.",
+            name, type(loaded).__name__, type(default).__name__)
+        return default
+    return loaded
 
 
 def _write(name: str, data: Any) -> None:
@@ -875,3 +890,108 @@ def remove_bot_memory(index: int) -> bool:
         _write(BOT_MEMORY_FILE, mems)
         return True
     return False
+
+
+# ---------------------------------------------------------------------------
+# v27 (ME1) — régime de marché persisté (continuité + détection de changement).
+# ---------------------------------------------------------------------------
+def load_market_regime() -> dict[str, Any]:
+    """Dernier régime enregistré : ``{regime, since}`` (dict vide si aucun)."""
+    data = _read(MARKET_REGIME_FILE, {})
+    return data if isinstance(data, dict) else {}
+
+
+def save_market_regime(state: dict[str, Any]) -> None:
+    """Persiste ``{regime, since}`` (écrase — un seul régime courant)."""
+    _write(MARKET_REGIME_FILE, state)
+
+
+# ---------------------------------------------------------------------------
+# v27 (TH4) — historique des scores de thèse par actif (delta de conviction).
+# ---------------------------------------------------------------------------
+def record_thesis_scores(scores_by_asset: dict[str, Any],
+                         *, max_days: int = 30) -> None:
+    """Ajoute le relevé du jour : ``{asset: {score, by_category}}``.
+
+    Dédupliqué par date (le dernier run du jour écrase). Garde ``max_days``
+    relevés — assez pour le delta 7 j sans gonfler le state.
+    """
+    if not isinstance(scores_by_asset, dict) or not scores_by_asset:
+        return
+    hist = _read(THESIS_SCORES_FILE, [])
+    if not isinstance(hist, list):
+        hist = []
+    today = now_iso()[:10]
+    hist = [h for h in hist if h.get("date") != today]
+    hist.append({"date": today, "scores": scores_by_asset})
+    hist.sort(key=lambda h: h.get("date") or "")
+    _write(THESIS_SCORES_FILE, hist[-max_days:])
+
+
+def load_thesis_score_deltas(days_back: int = 7) -> dict[str, Any]:
+    """Delta de conviction par actif vs le relevé d'il y a ~``days_back`` j.
+
+    Returns:
+        ``{asset: {score, prev_score, prev_date, delta, driver}}`` — driver =
+        la catégorie de signaux dont le poids a le PLUS bougé (le « moteur »
+        du changement). Dict vide si pas d'historique comparable.
+    """
+    hist = _read(THESIS_SCORES_FILE, [])
+    if not isinstance(hist, list) or len(hist) < 2:
+        return {}
+    latest = hist[-1]
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days_back)
+              ).date().isoformat()
+    ref = None
+    for h in hist[:-1]:
+        if (h.get("date") or "") <= cutoff:
+            ref = h  # le plus récent AVANT la fenêtre
+    if ref is None:
+        ref = hist[0] if hist[0] is not latest else None
+    if not ref:
+        return {}
+    out: dict[str, Any] = {}
+    for asset, cur in (latest.get("scores") or {}).items():
+        prev = (ref.get("scores") or {}).get(asset)
+        if not isinstance(cur, dict) or not isinstance(prev, dict):
+            continue
+        try:
+            score, prev_score = float(cur.get("score")), float(prev.get("score"))
+        except (TypeError, ValueError):
+            continue
+        driver = None
+        cur_cat = cur.get("by_category") or {}
+        prev_cat = prev.get("by_category") or {}
+        best = 0.0
+        for cat in set(cur_cat) | set(prev_cat):
+            try:
+                d = float(cur_cat.get(cat, 0)) - float(prev_cat.get(cat, 0))
+            except (TypeError, ValueError):
+                continue
+            if abs(d) > abs(best) + 1e-9:
+                best, driver = d, cat
+        out[asset] = {
+            "score": round(score, 1),
+            "prev_score": round(prev_score, 1),
+            "prev_date": ref.get("date"),
+            "delta": round(score - prev_score, 1),
+            "driver": (f"{driver} {'+' if best >= 0 else '−'}{abs(best):.1f}"
+                       if driver and abs(best) >= 0.05 else None),
+        }
+    return out
+
+
+# ---------------------------------------------------------------------------
+# v27 (ME2/ME3) — appels du hebdo persistés puis ÉVALUÉS la semaine suivante.
+# ---------------------------------------------------------------------------
+def save_weekly_calls(calls: dict[str, Any]) -> None:
+    """Persiste les appels du hebdo courant (scénario dominant, range BTC,
+    biais DXY, F&G…) pour le verdict de la semaine suivante."""
+    if isinstance(calls, dict) and calls:
+        _write(WEEKLY_CALLS_FILE, {**calls, "saved_at": now_iso()})
+
+
+def load_weekly_calls() -> dict[str, Any]:
+    """Appels du hebdo PRÉCÉDENT (dict vide si premier hebdo)."""
+    data = _read(WEEKLY_CALLS_FILE, {})
+    return data if isinstance(data, dict) else {}

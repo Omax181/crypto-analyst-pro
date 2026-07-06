@@ -19,8 +19,13 @@ from zoneinfo import ZoneInfo
 
 from src.analytics.coherence_checker import check_report
 from src.analytics.composite_score import composite_score
+from src.analytics.confidence_calibration import (
+    apply_multiplier as _apply_conf_mult,
+    compute_confidence_multiplier as _compute_conf_mult,
+)
+from src.analytics.exit_radar import compute_exit_signals
 from src.analytics.fundamentals import compute_ath_distance, fundamental_score_from_signals
-from src.analytics.narratives import sector_rotation
+from src.analytics.narratives import detect_hot_narratives, sector_rotation
 from src.analytics.projections import compute_price_projection
 from src.analytics.scenarios import compute_scenario_scaffold
 from src.analytics.technical import evaluate_technical
@@ -53,6 +58,7 @@ from src.data_sources import (
     kaito,
     lunarcrush,
     market_prices,
+    news_relevance,
     onchain_advanced,
     onchain_btc,
     prediction_markets,
@@ -103,7 +109,11 @@ THESIS_CONFIDENCE_FLOOR = 75
 # en sync avec ce qui est réellement tenté côté collecte.
 _ALL_SOURCES_LIST = [
     "CoinGecko", "Fear&Greed", "FRED", "On-chain", "Polymarket",
-    "ETF flows (Farside)", "Telegram", "DeFiLlama", "Kaito", "LunarCrush",
+    # v26 (B5) — les flux ETF ont désormais 3 couches (Farside → CoinGlass →
+    # canal Telegram ETF_Flows parsé en Python) : le libellé ne nomme plus
+    # uniquement Farside (source déclarée down alors que les chiffres Telegram
+    # étaient cités — contradiction A3 de l'audit v25).
+    "ETF flows", "Telegram", "DeFiLlama", "Kaito", "Social trending",
     "Token Unlocks", "News", "YouTube", "Géopolitique", "BTC Network",
     "Stablecoins", "Whale Tracking", "Yahoo Finance", "Calendrier macro",
     "RSS news (crypto + macro · 16 flux)",
@@ -566,10 +576,22 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
                 count += 1
         news_counts[s] = count
     telegram = telegram_reader.get_telegram_news(hours=24)
+    # v26 (B5/A3) — flux ETF STRUCTURÉS même quand Farside/CoinGlass sont KO
+    # (cas GitHub Actions) : parsing déterministe du canal Telegram ETF_Flows,
+    # repli aperçu web t.me. Fin de la contradiction « chiffres ETF cités dans
+    # l'EN BREF mais source déclarée indisponible » (audit v25 A3).
+    etf = etf_flows.merge_with_telegram(etf, telegram)
     defi = defillama.get_defi_tvl()
     narratives = kaito.get_trending_narratives()
     social_trending = lunarcrush.get_trending_coins()
-    unlocks = token_unlocks.get_upcoming_unlocks(days_ahead=30)
+    # OB6 — narratifs qui chauffent/refroidissent (catégories CoinGecko, gratuit,
+    # sans clé) : remplace Kaito, MORT en prod faute de secret KAITO_API_KEY.
+    # Filtré du bruit micro-cap / écosystèmes de chaînes / artefacts de composition.
+    hot_narratives = detect_hot_narratives(coingecko.get_categories())
+    # v26 (C2) — les événements CoinMarketCal (déjà en main) servent de repli
+    # aux unlocks depuis que DefiLlama /emissions est payant.
+    unlocks = token_unlocks.get_upcoming_unlocks(days_ahead=30,
+                                                 crypto_events=crypto_events)
     # CORRECTIF v18.1 — symboles avec un unlock IMMINENT (≤ 7j) : alimente le
     # signal catalyseur ``token_unlock_soon`` de thesis_scoring. Cette clé n'était
     # JAMAIS posée sur l'actif → signal catalyseur poids 2 MORT (même classe que
@@ -590,6 +612,15 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     btc_network = onchain_btc.get_btc_onchain()
     stablecoin_supply = stablecoins.get_stablecoin_supply()
     whale_inflows = whale_tracker.get_exchange_inflows()
+    # v26 (B1) — adresses actives BTC FRAÎCHES (blockchain.info / bitcoin-data,
+    # gratuit sans clé) : remplace l'absolu daté du miroir CoinMetrics dans la
+    # tuile on-chain (audit A2 : « légère hausse » qualifiait un snapshot gelé).
+    try:
+        from src.data_sources import bitcoin_data as _btc_data
+        btc_active_fresh = _btc_data.get_btc_active_addresses()
+    except Exception as _baexc:  # noqa: BLE001
+        logger.info("Adresses actives BTC fraîches ignorées : %s", _baexc)
+        btc_active_fresh = {"available": False}
     # v18 (Chantier E #5) — mouvements des wallets stratégiques connus (best-effort).
     try:
         _strategic_wallets = whale_tracker.get_strategic_wallet_activity()
@@ -844,6 +875,54 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
                 atr_pct=(asset.get("tech_local") or {}).get("atr_pct"),
                 change_30d=asset.get("change_30d"),
             ))
+            # v27 (TH1/TH2/RE2/RE3/ES1/ES2/ES3) — PLAN DÉTERMINISTE par actif
+            # éligible : invalidation chiffrée, cible 30j en fourchette, cible
+            # cycle, R:R, EV indicatif, bull/base/bear, zone d'accu + DCA.
+            # SOURCE DE VÉRITÉ du plan d'action de la thèse (le LLM commente,
+            # _merge_python_facts ré-écrase en post-génération).
+            try:
+                from src.analytics import asset_plan as _aplan
+                _ath_dist_e = asset.get("ath_distance_pct")
+                _plan_e = _aplan.compute_asset_plan(
+                    sym, closes_for_hist,
+                    price=asset["price"],
+                    ath=asset.get("ath"),
+                    ath_suspect=(isinstance(_ath_dist_e, (int, float))
+                                 and _ath_dist_e <= -99.5),
+                    funding_annualized_pct=(asset.get("derivatives") or {}
+                                            ).get("funding_annualized_pct"),
+                )
+                if _plan_e.get("available"):
+                    entry["asset_plan"] = _plan_e
+            except Exception as _apexc:  # noqa: BLE001
+                logger.info("asset_plan %s ignoré : %s", sym, _apexc)
+            # v27 (TH5) — CATALYSEURS DATÉS de l'actif (unlocks token +
+            # événements CoinMarketCal) : la thèse intègre le calendrier de SON
+            # actif. Structures réelles : unlocks[].{symbol,date,pct_supply} et
+            # crypto_events["events"][].{title,date,coins[]}.
+            _cats_e: list[str] = []
+            _symU = sym.upper()
+            for _u in (unlocks.get("unlocks") or []):
+                if str(_u.get("symbol") or "").upper() == _symU:
+                    _pct_u = _u.get("pct_supply")
+                    _cats_e.append(
+                        f"unlock {_u.get('date')}"
+                        + (f" ({_pct_u}% supply)" if _pct_u else ""))
+            _ev_list = (crypto_events.get("events")
+                        if isinstance(crypto_events, dict) else None) or []
+            for _ce in _ev_list:
+                if not isinstance(_ce, dict):
+                    continue
+                _coins = [str(c).upper() for c in (_ce.get("coins") or [])]
+                if _symU in _coins and _ce.get("title"):
+                    _cats_e.append(f"{_ce['title']} ({_ce.get('date')})")
+            if _cats_e:
+                entry["catalysts"] = _cats_e[:3]
+            # v27 (TH7) — les FONDAMENTAUX (dilution FDV/MC, P/F, P/S, MC/TVL)
+            # sont DÉJÀ calculés par valuation.py et exposés dans entry
+            # ["valuation"] ci-dessus ; le prompt v27 les exploite désormais
+            # explicitement dans la thèse (au lieu de les ignorer). Le NVT/MVRV
+            # frais arrivent via onchain_advanced ci-dessous.
             # On-chain avancé + options pour les actifs couverts (BTC/ETH).
             cm_asset = (onchain_cm.get("assets") or {}).get(sym)
             if cm_asset:
@@ -982,7 +1061,12 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         social=social_trending, unlocks=unlocks, news=bool(news_global_items),
         youtube=youtube_corpus, geopolitics=geopol,
         btc_network=btc_network, stablecoins=stablecoin_supply, whales=whale_inflows,
-        macro_news=bool(macro_news_items), macro_calendar=boursorama_cal,
+        # v26 (A9/B20) — le drapeau « Calendrier macro » reflète le calendrier
+        # CONSOLIDÉ (ForexFactory + FRED + banques centrales), pas seulement
+        # Boursorama (JS-only, quasi toujours down) : le mail v25 déclarait le
+        # calendrier « indisponible » alors que ForexFactory alimentait bien
+        # les événements — provenance mensongère corrigée.
+        macro_news=bool(macro_news_items), macro_calendar=upcoming_calendar,
         crypto_rss=rss_news.get("available"),
         onchain_adv=onchain_cm, options=options_deribit, macro_corr=macro_correlations,
         intl_markets=bool(
@@ -1123,6 +1207,18 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     # note de bas de page discrète (²) seulement en cas d'écart marqué.
     data_contradictions = _detect_data_contradictions(macro_context)
 
+    # OB1 — RADAR DE SORTIE/ALLÈGEMENT (déterministe) : paliers de prise de profit
+    # +80/×2/×3, offload des satellites sur pump, sur-concentration. Positions
+    # valorisées live (prix vs PRU). Import LOCAL (call-time) → zéro circularité.
+    # Best-effort : indisponible → liste vide, jamais bloquant.
+    try:
+        from src.telegram_bot.live_data import get_live_portfolio_snapshot
+        _exit_positions = (get_live_portfolio_snapshot() or {}).get("positions") or []
+    except Exception as _exit_exc:  # noqa: BLE001
+        logger.info("Radar de sortie : snapshot live indisponible (%s).", _exit_exc)
+        _exit_positions = []
+    exit_signals = compute_exit_signals(_exit_positions)
+
     # V10 — DIGEST ANALYTIQUE COMPACT : lignes condensées (économie de tokens)
     # que l'IA exploite pour un raisonnement CROISÉ. Chaque ligne est vide si la
     # source correspondante est indisponible (jamais d'invention).
@@ -1134,6 +1230,8 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         "per_asset_beta": digests.per_asset_beta_line(per_asset_beta),
         "onchain_advanced": digests.onchain_line(onchain_cm),
         "options": digests.options_line(options_deribit),
+        "narratives": digests.narratives_line(hot_narratives),  # OB6
+        "exit_radar": exit_signals.get("summary", ""),          # OB1
         "feedback": digests.feedback_line(per_asset_perf),
         # v14.1 — transmission actions → crypto (NVDA↔RENDER…), 1 ligne dense.
         "equity_crypto": digests.equity_crypto_line(equity_crypto_links, equity_quotes),
@@ -1145,6 +1243,11 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     )
     # v23 — note de SANTÉ PTF (affichée dans les mails à la place du risque).
     health_score = _compute_portfolio_health(snapshot, sector_exposure)
+
+    # v27 (ME1/TH4) — régime de marché + delta de conviction (best-effort).
+    _morning_market_regime, _morning_thesis_deltas = (
+        _compute_morning_regime_and_deltas(
+            eligible, datetime.now(TZ).date().isoformat()))
 
     return {
         "header_meta": {
@@ -1183,6 +1286,7 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         "economic_calendar": upcoming_calendar, "onchain_indicators": onchain,
         "polymarket": polymarket, "etf_flows": etf, "reddit": reddit_data,
         "telegram": telegram, "defi_tvl": defi, "kaito_narratives": narratives,
+        "hot_narratives": hot_narratives,        # OB6 — narratifs qui chauffent
         "social_trending": social_trending, "token_unlocks": unlocks,
         "sector_rotation": rotation, "news_counts": news_counts,
         "news_24h_global": news_global_items[:12],
@@ -1195,7 +1299,16 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         "youtube_corpus": youtube_corpus, "geopolitics": geopol,
         "btc_network": btc_network, "stablecoin_supply": stablecoin_supply,
         "whale_inflows": whale_inflows, "position_correlation": correlation,
+        # v26 (B1/B7) — tuiles on-chain déterministes : adresses actives BTC
+        # fraîches + dérivés BTC (funding/long-short déjà collectés par actif).
+        "btc_active_addresses": btc_active_fresh,
+        "btc_derivatives": (
+            (enriched.get("BTC") or {}).get("derivatives")
+            if isinstance((enriched.get("BTC") or {}).get("derivatives"), dict)
+            else None
+        ),
         "portfolio_risk": portfolio_risk,        # v22 (P1) — risque PTF consolidé
+        "exit_signals": exit_signals,            # OB1 — radar de sortie/allègement
         "active_sources": active_sources,
         "eligible_theses": eligible, "active_recommendations": active_recos,
         "active_recommendations_display": active_recos_display,
@@ -1221,19 +1334,70 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
             ),
             key=lambda m: abs(m["change_24h"]), reverse=True,
         ),
+        # v26 (A14/B17) — les sources down ne sont PLUS répétées ici : elles
+        # vivent au SEUL endroit « ⚠ Indisponibles » du footer (down_sources).
+        # Le bloc « Angles morts » ne garde que le contenu analytique réel
+        # (chiffres macro écartés, divergences de prix) — masqué si vide.
         "blind_spots": _blind_spots(
-            onchain, polymarket, etf, telegram, defi,
             macro_flags=list(_macro_validation_flags),
             price_discrepancies=price_discrepancies,
             price_divergences=price_divergences,
-            degraded_sources=[s for s in _ALL_SOURCES_LIST
-                              if s not in set(active_sources)],
         ),
         # v19/V18-M10/M-A20 — sources INDISPONIBLES nommées (pour le footer), au
         # lieu d'un simple « 21/25 » que l'utilisateur doit déchiffrer ailleurs.
         "down_sources": [s for s in _ALL_SOURCES_LIST
                          if s not in set(active_sources)],
+        # v27 (ME1) — RÉGIME DE MARCHÉ + (TH1) invalidations FRANCHIES/menacées
+        # + (TH4) delta de conviction. Calculés ici (accès tracker/price_lookup)
+        # et attachés au payload par _merge_python_facts.
+        "market_regime": _morning_market_regime,
+        "invalidations_deterministic": tracker.check_invalidations(price_lookup),
+        "thesis_score_deltas": _morning_thesis_deltas,
     }
+
+
+def _compute_morning_regime_and_deltas(
+    eligible: list[dict[str, Any]], today_iso: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """v27 (ME1/TH4) — régime de marché BTC + delta de conviction par actif.
+
+    Isolé pour rester best-effort : toute erreur → dicts vides, jamais de
+    blocage du run. Le régime a besoin d'une série BTC longue (MM200) ; le
+    delta relit l'historique des scores après avoir enregistré celui du jour.
+    """
+    regime: dict[str, Any] = {"available": False}
+    try:
+        from src.analytics import market_regime as _mr
+        _closes_reg = coingecko.get_dated_closes("BTC", 300)
+        if _closes_reg:
+            _series = [_closes_reg[d] for d in sorted(_closes_reg)]
+            regime = _mr.with_persistence(_mr.classify_regime(_series), today_iso)
+    except Exception as _rexc:  # noqa: BLE001
+        logger.info("Régime de marché indisponible : %s", _rexc)
+
+    deltas: dict[str, Any] = {}
+    try:
+        scores_by_asset: dict[str, Any] = {}
+        for e in (eligible or []):
+            sc = e.get("thesis_scoring") or {}
+            if sc.get("score") is None:
+                continue
+            by_cat: dict[str, float] = {}
+            for s in (sc.get("signals") or []):
+                cat = str(s.get("category") or "autre")
+                try:
+                    by_cat[cat] = by_cat.get(cat, 0.0) + float(s.get("weight") or 0)
+                except (TypeError, ValueError):
+                    continue
+            scores_by_asset[str(e.get("asset")).upper()] = {
+                "score": sc.get("score"), "by_category": by_cat,
+            }
+        if scores_by_asset:
+            mem.record_thesis_scores(scores_by_asset)
+            deltas = mem.load_thesis_score_deltas(7)
+    except Exception as _dexc:  # noqa: BLE001
+        logger.info("Delta de conviction indisponible : %s", _dexc)
+    return regime, deltas
 
 
 def _positions_summary(
@@ -2237,6 +2401,9 @@ def _macro_context(
         "boj_rate_date": boj_rate["date"],
         # Variation 24h du BTC (%) pour la flèche de tendance (v14 point 16).
         "btc_change_24h": (market.get("BTC") or {}).get("change_24h"),
+        # v26 (E-B10) — prix ETH : baseline du delta matin→soir du rapport du
+        # soir (le state matin ne portait que le BTC → delta ETH impossible).
+        "eth_price": (market.get("ETH") or {}).get("price"),
         # Provenance (pour transparence / debug ; non affiché par défaut).
         "_price_source": "yahoo+fred" if yq else "fred",
     }
@@ -2247,9 +2414,9 @@ def _active_sources(**flags: Any) -> list[str]:
     out: list[str] = []
     mapping = {
         "market": "CoinGecko", "fng": "Fear&Greed", "macro": "FRED",
-        "onchain": "On-chain", "polymarket": "Polymarket", "etf": "ETF flows (Farside)",
+        "onchain": "On-chain", "polymarket": "Polymarket", "etf": "ETF flows",
         "telegram": "Telegram", "defi": "DeFiLlama", "narratives": "Kaito",
-        "social": "LunarCrush", "unlocks": "Token Unlocks", "news": "News",
+        "social": "Social trending", "unlocks": "Token Unlocks", "news": "News",
         "youtube": "YouTube", "geopolitics": "Géopolitique",
         "btc_network": "BTC Network", "stablecoins": "Stablecoins", "whales": "Whale Tracking",
         "macro_news": "Yahoo Finance", "macro_calendar": "Calendrier macro",
@@ -2309,7 +2476,7 @@ def _blind_spots(
         # Set complet (M-A3) : on liste toutes les sources réellement dégradées.
         missing = list(dict.fromkeys(degraded_sources))  # dédup, ordre stable
     else:
-        labels = ["on-chain avancé", "Polymarket", "ETF flows (Farside)", "Telegram", "DeFiLlama"]
+        labels = ["on-chain avancé", "Polymarket", "ETF flows", "Telegram", "DeFiLlama"]
         missing = [labels[i] for i, src in enumerate(sources)
                    if not (src.get("available") if isinstance(src, dict) else src)]
     if missing:
@@ -2370,8 +2537,381 @@ def _blind_spots(
             )
 
     if not parts:
-        return "Couverture des sources complète aujourd'hui · chiffres clés cross-checkés sur 2 sources."
+        # v26 (A14/B17) — plus de phrase de remplissage : sans contenu
+        # analytique réel, la section « Angles morts » est simplement masquée
+        # (les sources down vivent déjà dans le footer « ⚠ Indisponibles »).
+        return ""
     return " ".join(parts)
+
+
+def _fr_ddmm(iso_date: Any) -> Optional[str]:
+    """« 2026-05-23 » → « 23/05 » (None si non parsable)."""
+    s = str(iso_date or "")[:10]
+    if len(s) == 10 and s[4] == "-" and s[7] == "-":
+        return f"{s[8:10]}/{s[5:7]}"
+    return None
+
+
+def _int_fr(value: Any) -> Optional[str]:
+    """Entier au format FR lisible (« 858 340 », espace fine insécable U+202F —
+    même convention que ``_fmt_num_human``). None si non numérique."""
+    v = _parse_num(value)
+    if v is None:
+        return None
+    return f"{int(v):,}".replace(",", " ")
+
+
+def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Optional[str]]:
+    """v26 (A1/A2/B19/B22/B7) — grille on-chain DÉTERMINISTE (fini Gemini).
+
+    L'audit v25 a montré que les tuiles générées par Gemini étaient instables
+    (« Whale Inflows ETH 0 · pas de signal vendeur » fabriqué depuis un vide,
+    absolus non datés sur données du 23/05, format différent d'un run à l'autre).
+    Les tuiles sont désormais construites en Python depuis les sources réelles,
+    au GABARIT UNIQUE « valeur · Δ · date si différée » (B19). Gemini ne produit
+    plus que le verdict et la lecture combinée.
+
+    Returns:
+        ``(tiles, freshness_note)`` — tiles peut être vide si tout est down ;
+        freshness_note = phrase unique de fraîcheur différée (ou None).
+    """
+    tiles: list[dict[str, Any]] = []
+    stale_notes: list[str] = []
+    _GREEN, _RED, _AMBER, _INK, _GRAY = ("#3B6D11", "#A32D2D", "#BA7517",
+                                         "#1a1a18", "#8a8880")
+
+    def _is_dated(iso: Any, tolerance_days: int = 2) -> bool:
+        """True si la donnée a plus de ``tolerance_days`` jours (différée)."""
+        s = str(iso or "")[:10]
+        try:
+            d = datetime.strptime(s, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            return False
+        return (datetime.now(TZ).date() - d).days > tolerance_days
+
+    # ── MVRV BTC / ETH (CoinMetrics + surcouches fraîcheur) ──
+    cm_assets = ((data.get("onchain_advanced") or {}).get("assets")
+                 if isinstance(data.get("onchain_advanced"), dict) else None) or {}
+    for sym in ("BTC", "ETH"):
+        entry = cm_assets.get(sym) or {}
+        mvrv = _parse_num(entry.get("mvrv"))
+        if mvrv is None:
+            continue
+        zone = entry.get("mvrv_zone") or ""
+        color = (_GREEN if mvrv < 1.0 else _INK if mvrv < 2.0
+                 else _AMBER if mvrv < 3.5 else _RED)
+        short = zone or "—"
+        dated = _is_dated(entry.get("as_of"))
+        if entry.get("mvrv_live_estimate"):
+            # Estimation prix live / prix de revient daté : libellée, jamais
+            # présentée comme une mesure on-chain du jour.
+            short = f"{zone} · estim. prix live"
+            if dated and _fr_ddmm(entry.get("as_of")):
+                stale_notes.append(
+                    f"MVRV {sym} estimé : prix live ÷ prix de revient au "
+                    f"{_fr_ddmm(entry.get('as_of'))}")
+        elif dated and _fr_ddmm(entry.get("as_of")):
+            short = f"{zone} · au {_fr_ddmm(entry.get('as_of'))}"
+            color = _GRAY
+            stale_notes.append(f"MVRV {sym} au {_fr_ddmm(entry.get('as_of'))}")
+        tiles.append({"label": f"MVRV {sym}", "value": f"{mvrv:.2f}",
+                      "color": color, "short": short})
+
+    # ── Adresses actives BTC (fraîches — blockchain.info/bitcoin-data) ──
+    fresh_btc = data.get("btc_active_addresses") or {}
+    if fresh_btc.get("available") and _int_fr(fresh_btc.get("value")):
+        trend = _parse_num(fresh_btc.get("trend_7d_pct"))
+        if trend is not None:
+            short = f"{trend:+.1f}% / 7j"
+            color = _GREEN if trend > 1 else _RED if trend < -1 else _INK
+        else:
+            short, color = "tendance 7j n/d", _INK
+        tiles.append({"label": "Adresses actives BTC",
+                      "value": _int_fr(fresh_btc.get("value")),
+                      "color": color, "short": short})
+    else:
+        # Repli miroir (daté) — affiché HONNÊTEMENT : delta + date, grisé.
+        btc_cm = cm_assets.get("BTC") or {}
+        if _int_fr(btc_cm.get("active_addresses")):
+            trend = _parse_num(btc_cm.get("active_addresses_trend_pct"))
+            dd = _fr_ddmm(btc_cm.get("as_of"))
+            short = (f"{trend:+.1f}% / 7j" if trend is not None else "Δ n/d")
+            if dd and _is_dated(btc_cm.get("as_of")):
+                short += f" · au {dd}"
+            tiles.append({"label": "Adresses actives BTC",
+                          "value": _int_fr(btc_cm.get("active_addresses")),
+                          "color": _GRAY, "short": short})
+
+    # ── Adresses actives ETH (miroir CoinMetrics — daté, grisé si différé) ──
+    eth_cm = cm_assets.get("ETH") or {}
+    if _int_fr(eth_cm.get("active_addresses")):
+        trend = _parse_num(eth_cm.get("active_addresses_trend_pct"))
+        dd = _fr_ddmm(eth_cm.get("as_of"))
+        dated = _is_dated(eth_cm.get("as_of"))
+        short = (f"{trend:+.1f}% / 7j" if trend is not None else "Δ n/d")
+        if dd and dated:
+            short += f" · au {dd}"
+            stale_notes.append(f"adresses actives ETH au {dd}")
+        tiles.append({"label": "Adresses actives ETH",
+                      "value": _int_fr(eth_cm.get("active_addresses")),
+                      "color": _GRAY if dated else _INK, "short": short})
+
+    # ── Dérivés Deribit : put/call, max pain, DVOL ──
+    opt_assets = ((data.get("options_deribit") or {}).get("assets")
+                  if isinstance(data.get("options_deribit"), dict) else None) or {}
+    btc_opt = opt_assets.get("BTC") or {}
+    pcr = _parse_num(btc_opt.get("put_call_ratio"))
+    if pcr is not None:
+        short, color = ("appétit calls (haussier)", _GREEN) if pcr < 0.7 else \
+            (("hedging puts (prudence)", _AMBER) if pcr > 1.3 else ("équilibré", _INK))
+        tiles.append({"label": "Put/Call BTC", "value": f"{pcr:.2f}",
+                      "color": color, "short": short})
+    mp = _parse_num(btc_opt.get("max_pain"))
+    if mp is not None:
+        gap = _parse_num(btc_opt.get("max_pain_gap_pct"))
+        if gap is not None and gap >= 1:
+            short, color = f"+{gap:.1f}% vs spot · aimant haussier CT", _GREEN
+        elif gap is not None and gap <= -1:
+            short, color = f"{gap:.1f}% vs spot · aimant baissier CT", _RED
+        else:
+            short, color = "proche du spot · effet neutre", _INK
+        tiles.append({"label": "Max Pain BTC", "value": f"${mp:,.0f}",
+                      "color": color, "short": short})
+
+    # ── Supply stablecoins : absolu ET Δ7j (B22 — les deux, plus jamais l'un
+    # sans l'autre) ──
+    st = data.get("stablecoin_supply") or {}
+    st_total = _parse_num(st.get("total_mcap_usd"))
+    if st.get("available") and st_total:
+        chg = _parse_num(st.get("total_change_7d_pct"))
+        if chg is not None:
+            word = "stable" if abs(chg) < 0.5 else (
+                "dry powder entrant" if chg > 0 else "capital sortant")
+            short = f"{chg:+.2f}% / 7j · {word}"
+            color = _GREEN if chg >= 0.5 else _RED if chg <= -0.5 else _INK
+        else:
+            short, color = "Δ 7j n/d", _INK
+        tiles.append({"label": "Supply Stablecoins",
+                      "value": f"{st_total / 1e9:,.1f} Mds$",
+                      "color": color, "short": short})
+
+    # ── Dépôts whales ETH (A1 : plus JAMAIS un « 0 » nu fabriqué d'un vide ;
+    # source indisponible → tuile omise) ──
+    wh = data.get("whale_inflows") or {}
+    if wh.get("available"):
+        n = wh.get("large_inflows_count")
+        thr = int(_parse_num(wh.get("threshold_eth")) or 200)
+        if isinstance(n, int) and n > 0:
+            total_in = _parse_num(wh.get("total_eth_in")) or 0
+            tiles.append({"label": "Dépôts whales ETH · 24h",
+                          "value": f"{total_in:,.0f} ETH".replace(",", " "),
+                          "color": _AMBER,
+                          "short": f"{n} dépôt{'s' if n > 1 else ''} ≥{thr} ETH · pression vendeuse possible"})
+        elif n == 0:
+            tiles.append({"label": "Dépôts whales ETH · 24h",
+                          "value": f"aucun ≥{thr} ETH",
+                          "color": _INK, "short": "pas de signal vendeur détecté"})
+
+    # ── Flux ETF BTC / ETH (B7/B22 — chiffres STRUCTURÉS et datés, cohérents
+    # avec la liste des sources actives : fin de l'audit A3) ──
+    etf = data.get("etf_flows") or {}
+    if etf.get("available"):
+        for sym in ("btc", "eth"):
+            row = etf.get(sym) or {}
+            flow = _parse_num(row.get("total_flow_musd"))
+            if flow is None:
+                continue
+            sign = "+" if flow >= 0 else "−"
+            value = f"{sign}${abs(flow):,.1f}M"
+            dd = _fr_ddmm(row.get("date"))
+            avg = _parse_num(row.get("avg_7d_musd"))
+            bits = []
+            if dd:
+                bits.append(f"au {dd}")
+            if avg is not None:
+                bits.append(f"7j moy {'+' if avg >= 0 else '−'}${abs(avg):,.0f}M")
+            bits.append("entrées nettes" if flow >= 0 else "sorties nettes")
+            tiles.append({"label": f"Flux ETF {sym.upper()}", "value": value,
+                          "color": _GREEN if flow >= 0 else _RED,
+                          "short": " · ".join(bits[:2]) if len(bits) > 2 else " · ".join(bits)})
+
+    # ── Funding BTC (B7 — dérivés discrets : funding + long/short) ──
+    der = data.get("btc_derivatives") or {}
+    fr_pct = _parse_num(der.get("funding_rate_pct"))
+    if fr_pct is not None:
+        if fr_pct >= 0.03:
+            short, color = "longs surchauffés (risque flush)", _AMBER
+        elif fr_pct <= -0.01:
+            short, color = "shorts dominants (squeeze possible)", _GREEN
+        else:
+            short, color = "équilibré", _INK
+        ls = _parse_num(der.get("long_short_ratio"))
+        if ls is not None:
+            short += f" · L/S {ls:.2f}"
+        tiles.append({"label": "Funding BTC", "value": f"{fr_pct:+.3f}%",
+                      "color": color, "short": short})
+
+    # ── DVOL (volatilité implicite) ──
+    bd = _parse_num(btc_opt.get("dvol"))
+    ed = _parse_num((opt_assets.get("ETH") or {}).get("dvol"))
+    dv = " · ".join(p for p in (
+        (f"BTC {bd:.0f}" if bd is not None else None),
+        (f"ETH {ed:.0f}" if ed is not None else None)) if p)
+    if dv:
+        tiles.append({"label": "Volatilité implicite (DVOL)", "value": dv,
+                      "color": "#5a5852", "short": "vol. options annualisée"})
+
+    # Note de fraîcheur UNIQUE (M-A22 : une seule mention, sous la grille).
+    note = None
+    if stale_notes:
+        note = ("Données différées — " + " · ".join(dict.fromkeys(stale_notes))
+                + ". Le reste de la grille est à jour (J ou J-1).")
+    return tiles[:12], note
+
+
+def _apply_asset_plans_to_theses(
+    payload: dict[str, Any], data: dict[str, Any]
+) -> None:
+    """v27 (TH1/TH2/RE1/RE2/RE3/ES1/ES2/ES3) — plan déterministe → thèses.
+
+    Écrase l'``action_plan`` et les ``targets`` de chaque thèse ferme avec les
+    valeurs Python de ``asset_plan`` (invalidation chiffrée + basis, R:R, cible
+    30j en fourchette, cible cycle), et attache ``asset_plan`` complet
+    (scénarios bull/base/bear, EV, zone d'accu + DCA, plan_line) + catalyseurs
+    + delta de conviction, pour le rendu. Le sizing (RE1) N'utilise JAMAIS le
+    cash comme contrainte. Le contenu ÉDITORIAL du LLM (observation,
+    raisonnement, contre-thèse) est conservé.
+    """
+    plans_by_asset = {
+        str(e.get("asset")).upper(): e.get("asset_plan")
+        for e in (data.get("eligible_theses") or [])
+        if isinstance(e.get("asset_plan"), dict) and e["asset_plan"].get("available")
+    }
+    cats_by_asset = {
+        str(e.get("asset")).upper(): e.get("catalysts")
+        for e in (data.get("eligible_theses") or []) if e.get("catalysts")
+    }
+    core_by_asset = {
+        str(e.get("asset")).upper(): bool(e.get("conviction"))
+        for e in (data.get("eligible_theses") or [])
+    }
+    val_by_asset = {
+        str(e.get("asset")).upper(): (e.get("value_usd") or 0.0)
+        for e in (data.get("eligible_theses") or [])
+    }
+    deltas = data.get("thesis_score_deltas") or {}
+    ptf_val = (data.get("portfolio_snapshot") or {}).get("value_usd")
+
+    from src.analytics.asset_plan import suggest_sizing
+
+    for t in (payload.get("thesis_of_the_day") or []):
+        if not isinstance(t, dict):
+            continue
+        asset = str(t.get("asset") or "").upper()
+        plan = plans_by_asset.get(asset)
+        # Delta de conviction (TH4) : toujours attaché si dispo.
+        d = deltas.get(asset)
+        if isinstance(d, dict) and d.get("delta") is not None:
+            t["conviction_delta"] = d
+        if cats_by_asset.get(asset):
+            t["catalysts"] = cats_by_asset[asset]
+        if not plan:
+            continue
+        # Attache le plan complet (rendu du nouveau bloc + Telegram /pourquoi).
+        t["asset_plan"] = plan
+        t["plan_line"] = plan.get("plan_line")
+        _act = (t.get("action") or "").upper()
+        _firm = any(k in _act for k in ("RENFORC", "ALLÉG", "ALLEG"))
+        if not _firm:
+            continue
+        inv = plan.get("invalidation") or {}
+        tgt = plan.get("target_30d") or {}
+        ap = t.get("action_plan") if isinstance(t.get("action_plan"), dict) else {}
+        # Invalidation + R:R = source de vérité Python.
+        ap["stop_loss"] = inv.get("level")
+        ap["stop_loss_basis"] = inv.get("basis")
+        ap["rr"] = plan.get("rr_30d")
+        ap["invalidation_conditions"] = (
+            f"sous {inv.get('level_label')} ({inv.get('basis')})")
+        # Entrée : zone d'accumulation (RE3) si le LLM n'en a pas fourni.
+        if not ap.get("entry"):
+            _az = plan.get("accumulation_zone") or {}
+            ap["entry"] = _az.get("high") or plan.get("price")
+        # Sizing (RE1) — % PTF + $, cash jamais une contrainte.
+        _w = (val_by_asset.get(asset, 0.0) / ptf_val * 100.0
+              if ptf_val else None)
+        _sz = suggest_sizing(
+            action_type=("bearish" if "ALLÉG" in _act or "ALLEG" in _act
+                         else "bullish"),
+            weight_pct=_w, ptf_value_usd=ptf_val,
+            is_core=core_by_asset.get(asset, False),
+            position_value_usd=val_by_asset.get(asset))
+        if _sz:
+            if _sz.get("add_pct_ptf") is not None:
+                ap["position_size_pct"] = _sz["add_pct_ptf"]
+                ap["position_size_usd"] = _sz.get("add_usd")
+            elif _sz.get("trim_pct_position") is not None:
+                ap["position_size_pct"] = -_sz["trim_pct_position"]
+                ap["position_size_usd"] = _sz.get("trim_usd")
+            ap["sizing_note"] = _sz.get("note")
+        t["action_plan"] = ap
+        # Cibles (ES1/ES2) : 30j en fourchette + cycle. On respecte le contenu
+        # LLM s'il existe, sinon on remplit avec les valeurs Python.
+        _tg = t.get("targets") if isinstance(t.get("targets"), dict) else {}
+        _tg.setdefault("short_term_30d", tgt.get("level"))
+        _tg.setdefault("short_term_label", "Cible 30j (technique)")
+        if not _tg.get("short_term_note") and tgt.get("low_label"):
+            _tg["short_term_note"] = (f"fourchette {tgt.get('low_label')}"
+                                      f"–{tgt.get('high_label')}")
+        _cyc = plan.get("target_cycle")
+        if _cyc:
+            _tg.setdefault("long_term_6_12m_low", _cyc.get("low"))
+            _tg.setdefault("long_term_6_12m_high", _cyc.get("high"))
+            if not _tg.get("long_term_note"):
+                _tg["long_term_note"] = (
+                    "reconquête ATH (cycle)" if _cyc.get("kind") == "cycle"
+                    else "objectif 6-12 mois")
+        t["targets"] = _tg
+
+
+def _compute_top_action(payload: dict[str, Any]) -> None:
+    """v27 (RE4) — « Si tu ne fais qu'UNE chose » : meilleure thèse ferme.
+
+    Classe les thèses fermes par (R:R × EV positif), et expose la n°1 en une
+    ligne actionnable. Déterministe : survit à une panne IA. Rien si aucune
+    thèse ferme exploitable.
+    """
+    best = None
+    best_score = 0.0
+    for t in (payload.get("thesis_of_the_day") or []):
+        if not isinstance(t, dict):
+            continue
+        if not any(k in (t.get("action") or "").upper()
+                   for k in ("RENFORC", "ALLÉG", "ALLEG")):
+            continue
+        plan = t.get("asset_plan") or {}
+        rr = plan.get("rr_30d")
+        ev = plan.get("ev_30d_pct")
+        if not isinstance(rr, (int, float)) or not isinstance(ev, (int, float)):
+            continue
+        score = rr * max(ev, 0.1)
+        if score > best_score:
+            best_score = score
+            ap = t.get("action_plan") or {}
+            _line = f"{t.get('action')} {t.get('asset')}"
+            if ap.get("sizing_note"):
+                _line += f" · {ap['sizing_note']}"
+            elif ap.get("entry"):
+                _line += f" ~{ap['entry']}"
+            if rr:
+                _line += f" · R:R {rr}"
+            best = {
+                "asset": t.get("asset"), "action": t.get("action"),
+                "line": _line, "rr": rr, "ev_pct": ev,
+                "invalidation": (plan.get("invalidation") or {}).get("level_label"),
+            }
+    if best:
+        payload["top_action"] = best
 
 
 def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp: str) -> dict[str, Any]:
@@ -2394,6 +2934,15 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
     snap = data.get("portfolio_snapshot") or {}
     if snap.get("value_usd"):
         payload["portfolio_snapshot"] = snap
+    # v26 (A17) — libellés adaptés aux runs HORS-CYCLE : un morning relancé à
+    # 12h35 affichait « P&L nuit » et « synthèse de la nuit ». Fenêtre matin
+    # nominale = 5h-11h (Casablanca) ; au-delà, libellés neutres et honnêtes.
+    _run_hour = datetime.now(TZ).hour
+    if not (5 <= _run_hour <= 11):
+        payload.setdefault("portfolio_snapshot", {})
+        if isinstance(payload["portfolio_snapshot"], dict):
+            payload["portfolio_snapshot"]["overnight_label"] = "P&L depuis dernier rapport"
+        header["subtitle_context"] = "run hors-cycle · point intrajournalier"
 
     # v18 (M-A6) : Gemini préfixe parfois le driver par le nom de l'actif, qui
     # est DÉJÀ affiché dans la colonne actif → « ETH | ETH Dépôts whales ETH ».
@@ -2418,6 +2967,51 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         existing = payload.get("macro_context") or {}
         existing.update({k: v for k, v in macro_ctx.items() if v is not None})
         payload["macro_context"] = existing
+
+    # v26 (B18/B21) — AGENDA MACRO déterministe (72h) : l'endroit UNIQUE où
+    # l'événement du jour vit avec son heure, sa prévision et son précédent
+    # (ForexFactory). Fini le NFP répété 4 fois sans chiffre de consensus, et
+    # fini le « NFP +172k » présenté comme un fait du jour alors que c'est le
+    # PRÉCÉDENT (audits A11/A13). Zéro Gemini : rendu direct.
+    _cal = data.get("upcoming_calendar") or {}
+    _agenda_items: list[dict[str, Any]] = []
+    if isinstance(_cal, dict) and _cal.get("available"):
+        for _ev in (_cal.get("events") or []):
+            if not isinstance(_ev, dict):
+                continue
+            _da = _ev.get("days_ahead")
+            if not isinstance(_da, (int, float)) or not (0 <= _da <= 3):
+                continue
+            _agenda_items.append({
+                "label": _ev.get("label"),
+                "when": _ev.get("when"),
+                "date_label": _ev.get("date_label"),
+                "time": _ev.get("time"),
+                "importance": _ev.get("importance"),
+                "forecast": _ev.get("forecast"),
+                "previous": _ev.get("previous"),
+                "estimated": bool(_ev.get("estimated")),
+                "_sort": (_da, 0 if _ev.get("importance") == "high" else 1),
+            })
+        # Ordre CHRONOLOGIQUE (High avant Medium le même jour). Cap 6 lignes :
+        # si trop d'événements, les Medium les plus lointains sautent d'abord
+        # (jamais un High), puis on retrie chronologiquement.
+        _agenda_items.sort(key=lambda x: x["_sort"])
+        if len(_agenda_items) > 6:
+            _keep = [x for x in _agenda_items if x["importance"] == "high"][:6]
+            for x in _agenda_items:
+                if len(_keep) >= 6:
+                    break
+                if x not in _keep:
+                    _keep.append(x)
+            _keep.sort(key=lambda x: x["_sort"])
+            _agenda_items = _keep
+        for x in _agenda_items:
+            x.pop("_sort", None)
+    if _agenda_items:
+        # NB : clé « events » (PAS « items ») — en Jinja, ``macro_agenda.items``
+        # résoudrait la MÉTHODE dict.items et casserait le rendu.
+        payload["macro_agenda"] = {"available": True, "events": _agenda_items}
 
     # v18 (M-B12/M-B14) — GARDE-FOU MACRO DÉTERMINISTE. Si déjà calculé en amont
     # (run_morning l'injecte dans data AVANT Gemini pour aligner le récit), on le
@@ -2547,9 +3141,15 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
     if data.get("reco_changes"):
         payload["reco_changes"] = data["reco_changes"]
 
-    # Blind spots : utiliser la phrase Python (factuelle)
-    if data.get("blind_spots"):
-        payload["blind_spots"] = data["blind_spots"]
+    # Blind spots : utiliser la phrase Python (factuelle). v26 (A14/B17) —
+    # override TOTAL : si Python n'a rien d'analytique à signaler, la section
+    # disparaît (Gemini ne peut plus y recopier la liste des sources down, qui
+    # ferait doublon avec le footer « ⚠ Indisponibles »).
+    if "blind_spots" in data:
+        if data.get("blind_spots"):
+            payload["blind_spots"] = data["blind_spots"]
+        else:
+            payload.pop("blind_spots", None)
 
     # On-chain : injecter les chiffres réels
     onc = data.get("onchain_indicators") or {}
@@ -2557,6 +3157,21 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         payload.setdefault("onchain_indicators", {}).update({
             k: v for k, v in onc.items() if k != "available" and v is not None
         })
+    # v26 (A1/A2/B19) — la GRILLE on-chain devient DÉTERMINISTE : tuiles
+    # construites en Python depuis les sources réelles (valeur · Δ · date si
+    # différée), Gemini ne garde que le verdict + la lecture combinée. Si le
+    # builder ne produit rien (toutes sources down), on conserve le repli
+    # Gemini existant plutôt qu'une grille vide.
+    try:
+        _det_tiles, _fresh_note = _build_onchain_tiles(data)
+    except Exception as _otexc:  # noqa: BLE001
+        logger.info("Tuiles on-chain déterministes ignorées : %s", _otexc)
+        _det_tiles, _fresh_note = [], None
+    if _det_tiles:
+        _oi_det = payload.setdefault("onchain_indicators", {})
+        _oi_det["metrics"] = _det_tiles
+        if _fresh_note:
+            _oi_det["freshness_note"] = _fresh_note
     # v23.x (Omar — anti-doublon « Contexte global ») : le bloc « Données
     # quantitatives · référence » est SUPPRIMÉ (il dupliquait les tuiles on-chain).
     # Sa seule donnée unique = la volatilité implicite DVOL → ajoutée ici comme
@@ -2834,6 +3449,39 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         hdr["firm_theses_count"] = _firm_n
         hdr["watch_theses_count"] = max(0, len(theses) - _firm_n)
 
+        # v26 (A20/B4) — JOUR SANS NOUVELLE RECO : bannière déterministe qui
+        # explique le contexte (les recos actives restent en vigueur) au lieu
+        # du seul pavé « aucune thèse ». Cas typique : 2e run du même jour,
+        # l'anti-répétition a raison de ne rien ré-émettre.
+        _tracked_n = len(data.get("active_recommendations_display")
+                         or data.get("active_recommendations") or [])
+        if _firm_n == 0 and _tracked_n > 0:
+            payload["thesis_context_note"] = (
+                f"Aucune nouvelle reco ce matin — les {_tracked_n} recos "
+                f"actives restent en vigueur (détail dans le Tracking "
+                f"ci-dessous). Une absence de nouveau signal est une "
+                f"information, pas un oubli."
+            )
+        # v26 (A4/B2) — le repli « zéro thèse » ne doit JAMAIS être un pavé
+        # markdown brut (« * BTC (Confiance plafonnée à 80%)… » affiché tel
+        # quel dans le mail v25). Deux filets :
+        #   1. si Gemini a fourni le champ STRUCTURÉ no_thesis_assets (schéma
+        #      v26), on le garde tel quel pour le rendu en lignes propres ;
+        #   2. sinon, on DÉCOUPE thesis_empty_reason sur ses puces « * » pour
+        #      produire des bullets rendues proprement.
+        _nta = payload.get("no_thesis_assets")
+        if not (isinstance(_nta, list) and _nta):
+            payload.pop("no_thesis_assets", None)
+            _reason = payload.get("thesis_empty_reason")
+            if isinstance(_reason, str) and " * " in f" {_reason}":
+                import re as _re_te
+                _parts = _re_te.split(r"\s\*\s+", " " + _reason.strip())
+                _intro = _parts[0].strip(" *")
+                _bullets = [p.strip() for p in _parts[1:] if p.strip()]
+                if _bullets:
+                    payload["thesis_empty_reason"] = _intro
+                    payload["thesis_empty_bullets"] = _bullets[:8]
+
     # PARTIE 3 : trier les news par importance décroissante. Priorité par
     # catégorie (Catalyseur > Risque > Macro > Géopolitique > Info) pondérée
     # par la confiance annoncée. Tri stable (Gemini peut fournir 'importance').
@@ -3023,6 +3671,50 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
             if isinstance(_cv, (int, float)) and _cv > 85:
                 _n["confidence"] = 80
 
+    # ── v27 — RÉGIME (ME1) + PLANS par actif (TH1/TH2/RE*/ES*) + TOP ACTION
+    # (RE4) + INVALIDATIONS déterministes franchies/menacées (TH1). ──
+    _reg = data.get("market_regime")
+    if isinstance(_reg, dict) and _reg.get("available"):
+        payload["market_regime"] = _reg
+    # OB17/OB1 — expose le RADAR DE SORTIE déterministe au template (section
+    # « À alléger aujourd'hui »), en plus du canal LLM (analytics_digest).
+    _exs = data.get("exit_signals")
+    if isinstance(_exs, dict) and _exs.get("available"):
+        payload["exit_signals"] = _exs
+    try:
+        _apply_asset_plans_to_theses(payload, data)
+        _compute_top_action(payload)
+    except Exception as _apexc:  # noqa: BLE001 — jamais bloquant
+        logger.info("Application des plans v27 ignorée : %s", _apexc)
+
+    # OB24 — CALIBRATION DE CONFIANCE « HUMBLE » : si l'agent a été historiquement
+    # SUR-confiant (track record), on RÉDUIT la confiance affichée des thèses
+    # (borné [0.70,1.00], JAMAIS un boost ; kill-switch LEARNING_ENABLED ; inerte
+    # tant que < 10 prédictions clôturées). Transparent : payload.confidence_
+    # calibration porte le multiplicateur + la raison. Jamais bloquant.
+    try:
+        _cal = _compute_conf_mult(PredictionTracker())
+        payload["confidence_calibration"] = _cal
+        _cmult = _cal.get("multiplier", 1.0)
+        if _cal.get("available") and isinstance(_cmult, (int, float)) and _cmult < 1.0:
+            for _th in (payload.get("thesis_of_the_day") or []):
+                if isinstance(_th, dict) and _th.get("confidence") is not None:
+                    _th["confidence"] = _apply_conf_mult(_th.get("confidence"), _cmult)
+    except Exception as _calexc:  # noqa: BLE001 — jamais bloquant
+        logger.info("Calibration de confiance ignorée : %s", _calexc)
+    # Fusion des invalidations DÉTERMINISTES (prix réel vs stop des recos
+    # actives) avec le bloc invalidation_watch : les FRANCHIES/menacées Python
+    # priment et passent en tête (le LLM ne peut pas les inventer ni les rater).
+    _inv_det = data.get("invalidations_deterministic") or []
+    if _inv_det:
+        _existing = payload.get("invalidation_watch")
+        _existing = _existing if isinstance(_existing, list) else []
+        _det_rows = [{"condition": r.get("condition"),
+                      "implication": r.get("implication"),
+                      "status": r.get("status")} for r in _inv_det
+                     if isinstance(r, dict) and r.get("condition")]
+        payload["invalidation_watch"] = (_det_rows + _existing)[:6] or None
+
     return payload
 
 
@@ -3124,6 +3816,18 @@ def _persist_firm_recos(payload: dict[str, Any], data: dict[str, Any]) -> None:
             "status": "in_progress",
             "rationale": th.get("thesis") or th.get("summary") or "",
         }
+        # v26 (A12/B6) — persister la CIBLE 30j et le STOP de la thèse : sans
+        # eux, le Tracking du lendemain ne pouvait ni afficher « cible/stop »
+        # ni mesurer la progression VERS l'objectif (badge « Sur objectif »
+        # attribué dès +3% arbitraires — audit A12).
+        _tgt = _parse_num((th.get("targets") or {}).get("short_term_30d")
+                          if isinstance(th.get("targets"), dict) else None)
+        _ap_th = th.get("action_plan") if isinstance(th.get("action_plan"), dict) else {}
+        _sl_th = _parse_num(_ap_th.get("stop_loss"))
+        if _tgt is not None and _tgt > 0:
+            reco["ct_target"] = _tgt
+        if _sl_th is not None and _sl_th > 0:
+            reco["stop_loss"] = _sl_th
         try:
             mem.add_recommendation(reco)
             persisted += 1
@@ -3207,11 +3911,44 @@ def run_morning() -> int:
     if isinstance(_xs, dict) and (_xs.get("signals") or _xs.get("readings")):
         payload["cross_signals"] = _xs
     mem.save_morning_report(payload)
-    # Graphiques prix+Bollinger pour les thèses DÉTAILLÉES (top-3 dépliées en
+    # Graphiques adaptés pour les thèses DÉTAILLÉES (top-3 dépliées en
     # prose, audit A1). limit=3 pour coller au détail rendu : générer un 4e
     # graphique l'attacherait en CID sans qu'il soit jamais référencé (orphelin).
+    # v26 — seules les thèses FERMES sont chartées (le template ne rend que
+    # leurs cartes ; une SURVEILLER chartée créait un CID orphelin latent).
     from src.reporting import charts
-    chart_imgs = charts.charts_for_theses(payload.get("thesis_of_the_day") or [], limit=3)
+    _firm_for_charts = [
+        t for t in (payload.get("thesis_of_the_day") or [])
+        if isinstance(t, dict)
+        and any(k in (t.get("action") or "").upper()
+                for k in ("RENFORC", "ALLÉG", "ALLEG"))
+    ]
+    chart_imgs = charts.charts_for_theses(_firm_for_charts, limit=3)
+    # v26 (B8/A20) — JOUR SANS NOUVELLE RECO : le mail ne perd plus tous ses
+    # graphiques. On charte les recos ACTIVES où la lecture a de la valeur
+    # (proche stop/cible, mouvement notable) : cours + plan (entrée/cible/
+    # stop) + MM50 + RSI. Clés « track_<SYM> » → CID « chart_track_<SYM> ».
+    if not chart_imgs:
+        try:
+            _track_imgs = charts.charts_for_tracked_recos(
+                payload.get("active_recommendations_tracking") or [], limit=2)
+            chart_imgs.update({f"track_{s}": p for s, p in _track_imgs.items()})
+        except Exception as _tcexc:  # noqa: BLE001
+            logger.info("Graphiques de suivi ignorés : %s", _tcexc)
+    # v27 (AF6) — jauge visuelle Fear & Greed (sentiment en un regard).
+    try:
+        _fg_val = (payload.get("macro_context") or {}).get("fear_greed")
+        if _fg_val is not None:
+            _fg_png = charts.gauge_png(
+                _fg_val, vmin=0, vmax=100, label="Fear & Greed",
+                value_label=str(int(_fg_val)),
+                zones=[(0, 25, "#A32D2D"), (25, 45, "#BA7517"),
+                       (45, 55, "#8a8880"), (55, 75, "#3B6D11"),
+                       (75, 100, "#0E6B5E")])
+            if _fg_png:
+                chart_imgs["fng_gauge"] = _fg_png
+    except Exception as _gexc:  # noqa: BLE001
+        logger.info("Jauge F&G ignorée : %s", _gexc)
     html = _render(payload, "morning", charts=chart_imgs)
     # v20 (audit C1) \u2014 images attach\u00e9es en CID (cl\u00e9 \u00ab chart_<ASSET> \u00bb), Gmail-safe.
     inline = {f"chart_{sym}": png for sym, png in chart_imgs.items() if png}
@@ -3378,6 +4115,330 @@ def _build_evening_reco_bilan(
     return out
 
 
+def _split_evening_calendar(
+    consolidated: dict[str, Any], now_local: datetime
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Scinde le calendrier consolidé pour la checklist du soir (v16 + v26).
+
+    v16 : ``tomorrow_macro_events`` = événements ≤ 2 jours calendaires (le
+    weekly couvre la semaine), ``upcoming_macro_events`` = fenêtre 7 j.
+    v26 (E-A6/E-B6) : un événement du JOUR (J0) DÉJÀ TOMBÉ est exclu de la
+    checklist « demain matin » — l'audit v25 listait « aujourd'hui NFP » à
+    15h03 alors que le NFP était sorti à 13h30. Un événement J0 encore à venir
+    est gardé mais relabellisé (« ce soir » après 17h, sinon « encore
+    aujourd'hui ») avec son heure.
+    """
+    tomorrow: list[dict[str, Any]] = []
+    upcoming: list[dict[str, Any]] = []
+    if not isinstance(consolidated, dict) or not consolidated.get("available"):
+        return tomorrow, upcoming
+    for e in consolidated.get("events", []):
+        if not isinstance(e, dict):
+            continue
+        _entry = {
+            "label": e.get("label"),
+            "date": e.get("date"),
+            "when": e.get("when"),
+            "days_ahead": e.get("days_ahead"),
+            "source": e.get("source"),
+            "importance": e.get("importance"),
+            # v18 (E-A15) : libellé jour/date propre déjà calculé à la source
+            # (« mardi 16 juin ») → évite la triple redondance dans le rendu.
+            "weekday_label": e.get("weekday_label"),
+            "date_label": e.get("date_label"),
+            "time": e.get("time"),
+        }
+        upcoming.append(_entry)
+        _da = e.get("days_ahead")
+        if isinstance(_da, int) and _da <= 2:
+            if _da == 0:
+                _t = str(e.get("time") or "")
+                _passed = False
+                if ":" in _t:
+                    try:
+                        _hh, _mm = _t.split(":")[:2]
+                        _passed = ((now_local.hour, now_local.minute)
+                                   >= (int(_hh), int(_mm)))
+                    except (ValueError, TypeError):
+                        _passed = False
+                if _passed:
+                    continue  # déjà tombé → rien à surveiller demain matin
+                _entry = dict(_entry)
+                _entry["when"] = ("ce soir" if now_local.hour >= 17
+                                  else "encore aujourd'hui")
+            tomorrow.append(_entry)
+    return tomorrow, upcoming
+
+
+def _mark_published_events(
+    consolidated: dict[str, Any], now_local: datetime
+) -> dict[str, Any]:
+    """v26 (W-A2/W-B2) — marque les événements J0 DÉJÀ TOMBÉS du calendrier.
+
+    Le weekly v25, parti à 20h42, listait le NFP de 13h30 comme « aujourd'hui »
+    À VENIR — et tout le fil rouge / les scénarios / le plan d'action étaient
+    construits autour d'un catalyseur déjà connu. Chaque événement du jour dont
+    l'heure est passée reçoit ``already_published=True`` et un ``when`` honnête
+    (« déjà publié aujourd'hui (13h30) ») : le rendu le badge en gris et le
+    prompt doit le traiter comme un FAIT à analyser, plus comme une attente.
+
+    Returns:
+        Copie du calendrier consolidé, événements enrichis. Entrée non-dict ou
+        indisponible → retournée telle quelle.
+    """
+    if not isinstance(consolidated, dict) or not consolidated.get("available"):
+        return consolidated
+    out_events: list[dict[str, Any]] = []
+    for e in consolidated.get("events", []):
+        if not isinstance(e, dict):
+            continue
+        e = dict(e)
+        e.setdefault("already_published", False)
+        if e.get("days_ahead") == 0:
+            _t = str(e.get("time") or "")
+            if ":" in _t:
+                try:
+                    _hh, _mm = _t.split(":")[:2]
+                    if (now_local.hour, now_local.minute) >= (int(_hh), int(_mm)):
+                        e["already_published"] = True
+                        _t_fr = f"{int(_hh)}h{_mm}"
+                        e["when"] = f"déjà publié aujourd'hui ({_t_fr})"
+                except (ValueError, TypeError):
+                    pass
+        out_events.append(e)
+    return {**consolidated, "events": out_events}
+
+
+def _fmt_usd_short(v: Any) -> Optional[str]:
+    """« 61 949 $ » (milliers U+202F) / « 3.42 $ » — formatage compact FR."""
+    x = _parse_num(v)
+    if x is None:
+        return None
+    if abs(x) >= 1000:
+        return f"{x:,.0f}".replace(",", " ") + " $"
+    if abs(x) >= 100:
+        return f"{x:.0f} $"
+    return f"{x:.2f} $"
+
+
+def _pct_fr_signed(v: float, nd: int = 1) -> str:
+    """« +1,2% » / « −0,3% » — signe typographique + virgule décimale."""
+    return f"{'+' if v >= 0 else '−'}{abs(round(v, nd))}%".replace(".", ",")
+
+
+def _build_since_morning_facts(
+    morning_state: dict[str, Any], morning_is_today: bool,
+    evening_macro: dict[str, Any], polymarket: dict[str, Any],
+    morning_time_label: Optional[str],
+) -> Optional[dict[str, Any]]:
+    """v26 (E-B10) — deltas matin→soir 100 % Python (survivent à l'IA).
+
+    BTC, ETH, F&G, DXY, proba Fed dominante : chaque delta n'est émis que si
+    les DEUX bornes existent (baseline matin réelle, pas de faux delta).
+    """
+    if not morning_is_today:
+        return None
+    m_macro = (morning_state or {}).get("macro_context") or {}
+    if not isinstance(m_macro, dict):
+        return None
+    parts: list[str] = []
+
+    def _px_delta(label: str, m_v: Any, e_v: Any) -> None:
+        m_x, e_x = _parse_num(m_v), _parse_num(e_v)
+        if m_x and e_x and m_x > 0:
+            parts.append(
+                f"{label} {_fmt_usd_short(m_x)} → {_fmt_usd_short(e_x)}"
+                f" ({_pct_fr_signed((e_x / m_x - 1) * 100)})")
+
+    _px_delta("BTC", m_macro.get("btc_price"), evening_macro.get("btc_price"))
+    _px_delta("ETH", m_macro.get("eth_price"), evening_macro.get("eth_price"))
+    m_fng = _parse_num(m_macro.get("fear_greed"))
+    e_fng = _parse_num(evening_macro.get("fear_greed"))
+    if m_fng is not None and e_fng is not None:
+        _d = int(e_fng - m_fng)
+        _d_txt = ("stable" if _d == 0
+                  else ("+" if _d > 0 else "−") + str(abs(_d)) + " pts")
+        parts.append(f"F&G {int(m_fng)} → {int(e_fng)} ({_d_txt})")
+    m_dxy = _parse_num(m_macro.get("dxy"))
+    e_dxy = _parse_num(evening_macro.get("dxy"))
+    if m_dxy and e_dxy:
+        parts.append(f"DXY {m_dxy:.2f} → {e_dxy:.2f}"
+                     f" ({_pct_fr_signed((e_dxy / m_dxy - 1) * 100)})")
+    m_fed = (m_macro.get("polymarket_fed_bars") or {})
+    e_fed = ((polymarket or {}).get("fed_bars") or {})
+    m_dom, e_dom = m_fed.get("dominant"), e_fed.get("dominant")
+    m_pct = _parse_num(m_fed.get("dominant_pct"))
+    e_pct = _parse_num(e_fed.get("dominant_pct"))
+    if m_dom and e_dom and m_dom == e_dom and m_pct is not None and e_pct is not None:
+        _dp = round(e_pct - m_pct, 1)
+        parts.append(
+            f"Fed {e_dom} {str(m_pct).replace('.', ',')}% → "
+            f"{str(e_pct).replace('.', ',')}%"
+            f"{'' if _dp == 0 else ' (' + _pct_fr_signed(_dp).replace('%', ' pts') + ')'}")
+    if not parts:
+        return None
+    return {
+        "available": True,
+        "window_label": (f"depuis le matin ({morning_time_label})"
+                         if morning_time_label else "depuis le matin"),
+        "line": " · ".join(parts),
+    }
+
+
+def _build_evening_derivatives_line(
+    btc_deriv: Optional[dict[str, Any]], etf: Optional[dict[str, Any]]
+) -> Optional[str]:
+    """v26 (E-B9/E-A14) — ligne « Dérivés & flux » compacte (1 ligne, discrète).
+
+    Funding BTC + ratio L/S (Binance) et flux ETF BTC/ETH DATÉS (Farside ou
+    canal Telegram) : des faits collectés mais jamais affichés le soir en v25.
+    """
+    parts: list[str] = []
+    d = btc_deriv or {}
+    if d.get("available"):
+        f = _parse_num(d.get("funding_rate_pct"))
+        if f is not None:
+            parts.append(f"Funding BTC {_pct_fr_signed(f, 3)}")
+        ls = _parse_num(d.get("long_short_ratio"))
+        if ls is not None:
+            parts.append(f"L/S {str(round(ls, 2)).replace('.', ',')}")
+    e = etf or {}
+    if e.get("available"):
+        for sym in ("btc", "eth"):
+            entry = e.get(sym) or {}
+            flow = _parse_num(entry.get("total_flow_musd"))
+            if flow is None:
+                continue
+            _dt = _fr_ddmm(entry.get("date"))
+            parts.append(
+                f"ETF {sym.upper()} {'+' if flow >= 0 else '−'}"
+                f"${abs(flow):,.1f}M".replace(",", " ")
+                + (f" ({_dt})" if _dt else ""))
+    return " · ".join(parts) if parts else None
+
+
+def _apply_evening_degraded_fallbacks(
+    payload: dict[str, Any], *,
+    daily_pnl: dict[str, Any],
+    evening_macro: dict[str, Any],
+    polymarket: dict[str, Any],
+    computed_levels: dict[str, dict[str, Any]],
+    since_morning: Optional[dict[str, Any]],
+) -> None:
+    """v26 (E-A1/E-B2) — un 503 Gemini ne vide PLUS le mail du soir.
+
+    Reconstruit en Python les sections vitales que l'IA aurait produites :
+    « À retenir » (faits chiffrés), « Niveaux à surveiller » (calculés, cf.
+    key_levels) et la checklist scénario/invalidation (range ATR + supports).
+    L'audit v25 : 6 sections disparues d'un coup, mail coquille. Plus jamais.
+    """
+    from src.analytics import key_levels as _kl
+
+    # ── À retenir : puces factuelles (l'avertissement IA reste en tête) ──
+    bullets: list[dict[str, str]] = list(payload.get("delta_summary") or [])
+    fng = _parse_num(evening_macro.get("fear_greed"))
+    fng_label = evening_macro.get("fear_greed_label")
+    if fng is not None:
+        _warn = fng < 25 or fng > 75
+        bullets.append({
+            "icon": "⚠" if _warn else "✓",
+            "text": (f"Fear & Greed à {int(fng)} ({fng_label or 'n/d'}) — "
+                     + ("aversion au risque persistante, prudence sur toute "
+                        "prise de risque overnight." if fng < 25 else
+                        "euphorie de marché, attention aux excès." if fng > 75
+                        else "sentiment sans excès notable.")),
+        })
+    _pnl = _parse_num(daily_pnl.get("day_change_pct"))
+    movers = daily_pnl.get("top_movers") or []
+    if _pnl is not None:
+        _m0 = movers[0] if movers else None
+        _mover_txt = (f" — porté par {_m0['symbol']} "
+                      f"{_pct_fr_signed(_parse_num(_m0.get('change')) or 0)}"
+                      if _m0 else "")
+        bullets.append({
+            "icon": "✓" if _pnl >= 0 else "⚠",
+            "text": (f"P&L du portefeuille {_pct_fr_signed(_pnl, 2)} depuis le "
+                     f"matin{_mover_txt}."),
+        })
+    fed = (polymarket or {}).get("fed_bars") or {}
+    if fed.get("dominant") and _parse_num(fed.get("dominant_pct")) is not None:
+        bullets.append({
+            "icon": "⚠",
+            "text": (f"Polymarket price un {fed['dominant']} des taux Fed à "
+                     f"{str(fed['dominant_pct']).replace('.', ',')}% — cadre de "
+                     "liquidité inchangé pour la nuit."),
+        })
+    _vix = _parse_num(evening_macro.get("vix"))
+    _dxy = _parse_num(evening_macro.get("dxy"))
+    if _vix is not None or _dxy is not None:
+        _vix_txt = (f"VIX {str(round(_vix, 1)).replace('.', ',')} "
+                    f"({'stress' if _vix >= 25 else 'calme'})" if _vix is not None else "")
+        _dxy_txt = f"DXY {_dxy:.2f}" if _dxy is not None else ""
+        _sep = " · " if _vix_txt and _dxy_txt else ""
+        bullets.append({
+            "icon": "✗" if (_vix is not None and _vix >= 25) else "✓",
+            "text": (f"{_dxy_txt}{_sep}{_vix_txt} — "
+                     + ("stress actions élevé, risk-off possible sur la crypto."
+                        if _vix is not None and _vix >= 25 else
+                        "pas de signal de stress côté actions.")),
+        })
+    if bullets:
+        payload["delta_summary"] = bullets[:5]
+
+    # ── Niveaux à surveiller : calculés (pivots/MM/Fibo), plus jamais absents ──
+    rows: list[dict[str, Any]] = []
+    readouts: dict[str, str] = {}
+    for sym in ("BTC", "ETH", *[s for s in computed_levels if s not in ("BTC", "ETH")]):
+        comp = computed_levels.get(sym)
+        if not comp:
+            continue
+        rows.extend(_kl.levels_tonight_rows(comp))
+        if comp.get("readout_line"):
+            readouts[sym] = comp["readout_line"]
+    if rows and not payload.get("levels_tonight"):
+        payload["levels_tonight"] = rows
+    if readouts:
+        _existing_ro = payload.get("levels_readout")
+        payload["levels_readout"] = {**readouts, **(_existing_ro or {})}
+
+    # ── Checklist : scénario + invalidation templatés depuis l'ATR/les supports ──
+    _tc = payload.get("tomorrow_checklist")
+    if not isinstance(_tc, dict):
+        _tc = {}
+    btc = computed_levels.get("BTC") or {}
+    btc_rng = btc.get("expected_range") or {}
+    btc_sups = btc.get("supports") or []
+    if not _tc.get("scenario") and btc_rng.get("low_label"):
+        _hold = (f" tant que {btc_sups[0]['level_label']} tient"
+                 if btc_sups else "")
+        _tint = (" · biais prudent (peur extrême)"
+                 if fng is not None and fng < 25 else "")
+        _tc["scenario"] = (f"Nuit attendue dans le range "
+                           f"{btc_rng['low_label']}–{btc_rng['high_label']} "
+                           f"(±ATR){_hold}{_tint}.")
+    if not _tc.get("invalidation") and btc_sups:
+        _nxt = (f" → test de {btc_sups[1]['level_label']} probable"
+                if len(btc_sups) > 1 else "")
+        _tc["invalidation"] = (f"Clôture sous {btc_sups[0]['level_label']} "
+                               f"({btc_sups[0]['basis']}){_nxt}.")
+    if not _tc.get("checks"):
+        _chk = []
+        if btc_sups:
+            _chk.append(f"BTC tient {btc_sups[0]['level_label']} ?")
+        _m0 = (daily_pnl.get("top_movers") or [None])[0]
+        if _m0:
+            _chk.append(f"{_m0['symbol']} conserve son "
+                        f"{_pct_fr_signed(_parse_num(_m0.get('change')) or 0)} overnight ?")
+        if _chk:
+            _tc["checks"] = " · ".join(_chk)
+    if _tc:
+        payload["tomorrow_checklist"] = _tc
+
+    # ── Ligne « depuis le matin » : déjà déterministe, on s'assure qu'elle vit ──
+    if since_morning and not payload.get("since_morning_facts"):
+        payload["since_morning_facts"] = since_morning
+
+
 def run_evening() -> int:
     """Génère et envoie le rapport du soir (différentiel)."""
     from src.ai_brain.decision_engine import DecisionEngine
@@ -3387,7 +4448,13 @@ def run_evening() -> int:
     symbols = [s for s, i in portfolio.items() if i.get("role") != "cash_reserve"]
     market = coingecko.get_market_data(symbols)
     fng = fear_greed.get_fear_greed()
-    etf = etf_flows.get_etf_flows()
+    # v26 (E-A14) — flux ETF complétés par le canal Telegram (aperçu web t.me)
+    # quand Farside/CoinGlass sont KO — même logique que le matin. Le soir n'a
+    # pas de session Telethon : merge_with_telegram(None) retombe sur l'aperçu.
+    etf = etf_flows.merge_with_telegram(etf_flows.get_etf_flows(), None)
+    # v26 (E-B9) — funding + ratio long/short BTC (Binance) : collectés pour la
+    # ligne « Dérivés & flux » du soir (facts jamais affichés en v25).
+    btc_deriv = binance_futures.get_derivatives("BTC")
     news_global = newsapi.get_recent_news(None, hours=12)
     # Enrichissement RSS (12h, fort impact, crypto + macro) en dédupliquant.
     rss_evening = crypto_rss.get_news(hours=12, high_impact_only=True, limit=15, category="all")
@@ -3403,6 +4470,14 @@ def run_evening() -> int:
                     "published_at": rn.get("published_iso"),
                 })
                 seen_ev.add(key)
+    # v26 (E-A3/E-A5/E-B3) — pertinence crypto directe OU indirecte (macro qui
+    # meut la crypto) + titres nettoyés (« $$0.07308 »). Le repli v25 affichait
+    # 3 news tradfi sur 5 (distributions d'ETF obligataires, PR FedRAMP).
+    news_global = [
+        {**n, "title": news_relevance.sanitize_title(n.get("title"))}
+        for n in news_global
+        if news_relevance.is_crypto_relevant(n.get("title"))
+    ]
     macro = fred.get_macro()
     # v15 — Polymarket étendu (barres Fed + événements majeurs), comme le matin.
     polymarket = prediction_markets.get_key_markets()
@@ -3633,28 +4708,43 @@ def run_evening() -> int:
     # entrée garde son « when » réel (« demain », « dans 4j ») — plus jamais un
     # événement à J+4 présenté comme « demain ».
     from src.data_sources import macro_calendar as _mc
-    tomorrow_macro_events: list[dict[str, Any]] = []
-    upcoming_macro_events: list[dict[str, Any]] = []
     ev_upcoming = _mc.get_consolidated_calendar(horizon_days=7)
-    if ev_upcoming.get("available"):
-        for e in ev_upcoming.get("events", []):
-            _entry = {
-                "label": e.get("label"),
-                "date": e.get("date"),
-                "when": e.get("when"),
-                "days_ahead": e.get("days_ahead"),
-                "source": e.get("source"),
-                "importance": e.get("importance"),
-                # v18 (E-A15) : libellé jour/date propre déjà calculé à la source
-                # (« mardi 16 juin ») → permet d'éviter la triple redondance
-                # « Demain / 48h : dans 2j … (2026-06-16) » dans le rendu.
-                "weekday_label": e.get("weekday_label"),
-                "date_label": e.get("date_label"),
-            }
-            upcoming_macro_events.append(_entry)
-            _da = e.get("days_ahead")
-            if isinstance(_da, int) and _da <= 2:
-                tomorrow_macro_events.append(_entry)
+    tomorrow_macro_events, upcoming_macro_events = _split_evening_calendar(
+        ev_upcoming, now_local)
+
+    # v26 (E-B5) — niveaux S/R CALCULÉS (pivots/MM/Fibo/Bollinger/ronds) + readout
+    # technique complet pour BTC, ETH et les gros movers du jour. Injectés au
+    # prompt comme SOURCE DE VÉRITÉ (l'IA choisit, ne fabrique plus de ronds
+    # arbitraires) et rendus tels quels si l'IA tombe (mode dégradé).
+    from src.analytics import key_levels as _key_levels
+    from src.reporting import charts as _charts
+    computed_levels: dict[str, dict[str, Any]] = {}
+    _lvl_syms: list[str] = ["BTC", "ETH"]
+    for _bm in big_movers_day[:2]:
+        if _bm.get("symbol") and _bm["symbol"] not in _lvl_syms:
+            _lvl_syms.append(_bm["symbol"])
+    for _ls in _lvl_syms[:4]:
+        try:
+            _ser = _charts._load_series(_ls, days=180)
+            if not _ser:
+                continue
+            _px_live = (price_lookup.get(_ls)
+                        or (evening_macro.get("btc_price") if _ls == "BTC"
+                            else evening_macro.get("eth_price") if _ls == "ETH"
+                            else None))
+            _comp = _key_levels.compute_key_levels(
+                _ls, _ser.get("closes") or [], _ser.get("volumes"),
+                price=_px_live)
+            if _comp.get("available"):
+                computed_levels[_ls] = _comp
+        except Exception as _exc_lvl:  # noqa: BLE001
+            logger.info("Niveaux calculés indisponibles pour %s : %s", _ls, _exc_lvl)
+
+    # v26 (E-B10) — deltas matin→soir 100 % Python (BTC/ETH/F&G/DXY/Fed) :
+    # l'essence d'un « complément du matin », et il survit à une panne IA.
+    since_morning = _build_since_morning_facts(
+        morning_state, morning_is_today, evening_macro, polymarket,
+        morning_time_label)
 
     data = {
         "prices_now": price_lookup,
@@ -3678,6 +4768,19 @@ def run_evening() -> int:
             "fed_bars": polymarket.get("fed_bars"),
             "extra_markets": polymarket.get("extra_markets"),
         } if polymarket.get("available") else {},
+        # v26 (E-B5) — niveaux calculés : SOURCE DE VÉRITÉ des levels_tonight.
+        "computed_levels": {
+            s: {"price": c.get("price_label"),
+                "supports": c.get("supports"),
+                "resistances": c.get("resistances"),
+                "readout": c.get("readout_line"),
+                "expected_range": c.get("expected_range")}
+            for s, c in computed_levels.items()
+        },
+        # v26 (E-B10) — deltas matin→soir factuels (l'IA les cite, ne recalcule pas).
+        "since_morning_facts": since_morning,
+        # v26 (E-B9) — funding/L-S BTC pour le contexte dérivés du soir.
+        "btc_derivatives": btc_deriv if btc_deriv.get("available") else None,
     }
     engine = DecisionEngine()
     payload = engine.generate_evening(
@@ -3735,6 +4838,12 @@ def run_evening() -> int:
             else f"matin {morning_time_label} · soir {_ev_time} · "
                  f"{since_morning_label or ''}".rstrip(" · ")
         )
+        # v26 (E-A12/E-B14) — run hors-cycle SIGNALÉ : quand le soir suit le
+        # matin de < 4h, les sections « depuis ce matin » couvrent une fenêtre
+        # courte — on le dit dans le sous-titre au lieu de laisser croire à une
+        # journée pleine (audit v25 : soir à 15h03, matin 12h37, rien signalé).
+        if _degenerate_window:
+            header["timing_line"] += " · fenêtre courte"
     else:
         header["timing_line"] = f"rapport lancé à {_ev_time}"
     header["ptf_value_delta_since_morning"] = round(delta_morning, 2)
@@ -3761,6 +4870,20 @@ def run_evening() -> int:
             "fed_bars": polymarket.get("fed_bars"),
             "extra_markets": (polymarket.get("extra_markets") or [])[:4],
         }
+    # v26 (E-B10) — ligne « Depuis le matin » déterministe (bloc Marchés).
+    if since_morning:
+        payload["since_morning_facts"] = since_morning
+    # v26 (E-B9/E-A14) — ligne « Dérivés & flux » compacte (funding, L/S, ETF datés).
+    _dfl = _build_evening_derivatives_line(btc_deriv, etf)
+    if _dfl:
+        payload["derivatives_flows_line"] = _dfl
+    # v26 (E-B5) — readout technique par actif, AUSSI en mode nominal : la ligne
+    # grise sous chaque actif du bloc « Niveaux » (RSI/MACD/Bollinger/ATR).
+    _ro_nominal = {s: c["readout_line"] for s, c in computed_levels.items()
+                   if c.get("readout_line")}
+    if _ro_nominal:
+        payload["levels_readout"] = {
+            **_ro_nominal, **(payload.get("levels_readout") or {})}
     # BLOC 2 — score de risque. v18 (E-A1/E-A2/E-A6/E-B4) : le soir RECALCULE le
     # score sur données live, MAIS avec le sector_exposure recalculé en direct
     # (bug E-A1 : morning_state ne contient PAS 'sector_exposure' — clé jamais
@@ -3855,13 +4978,39 @@ def run_evening() -> int:
         payload["macro_source_status"] = ev_macro_source_status
     if tomorrow_macro_events:
         payload["tomorrow_macro_events"] = tomorrow_macro_events
-    # S6 : si Gemini n'a pas produit de résumé news intraday, on fournit les titres bruts.
+    # S6 : si Gemini n'a pas produit de résumé news intraday, on fournit les
+    # titres (déjà filtrés crypto + nettoyés). v26 (E-A4/E-B4) : horodatage
+    # « 14h58 » heure locale — plus jamais l'ISO brut « 2026-07-02T13:58:09+00:00 ».
     if not payload.get("intraday_news") and news_global:
         payload["intraday_news"] = [
             {"title": n.get("title"), "source": n.get("source"),
-             "timestamp": n.get("published_at")}
+             "timestamp": news_relevance.fmt_time_local(n.get("published_at"), TZ)}
             for n in news_global[:5]
         ]
+
+    # v26 (E-A1/E-B2) — MODE DÉGRADÉ DIGNE : si l'IA est tombée (503/quota),
+    # reconstruire en Python « À retenir », les niveaux calculés et la checklist
+    # scénario/invalidation. L'audit v25 : 6 sections perdues d'un coup.
+    if payload.get("_degraded"):
+        _apply_evening_degraded_fallbacks(
+            payload, daily_pnl=daily_pnl, evening_macro=evening_macro,
+            polymarket=polymarket, computed_levels=computed_levels,
+            since_morning=since_morning)
+
+    # v27 (ME1) — RÉGIME DE MARCHÉ aussi au soir (cohérence cross-mail : le
+    # lecteur voit le même « temps qu'il fait » matin, soir et weekly).
+    try:
+        from src.analytics import market_regime as _mre
+        _reg_closes_e = coingecko.get_dated_closes("BTC", 300)
+        if _reg_closes_e:
+            _reg_series_e = [_reg_closes_e[d] for d in sorted(_reg_closes_e)]
+            _reg_e = _mre.with_persistence(
+                _mre.classify_regime(_reg_series_e),
+                datetime.now(TZ).date().isoformat())
+            if _reg_e.get("available"):
+                payload["market_regime"] = _reg_e
+    except Exception as _regexc:  # noqa: BLE001
+        logger.info("Régime soir indisponible : %s", _regexc)
 
     payload.setdefault("footer", {})["next_report_at"] = _next_report_label("evening")
     mem.save_evening_report(payload)
@@ -3888,9 +5037,62 @@ def _is_core_asset(sym: str, info: dict[str, Any] | None) -> bool:
     return str(sym).upper() in CORE_ASSETS
 
 
+def _build_calls_review(
+    prev_calls: dict[str, Any], btc_price_now: Any,
+    fear_greed_now: Any, regime_now: dict[str, Any],
+) -> Optional[dict[str, Any]]:
+    """v27 (ME2/ME3) — verdict des appels du hebdo PRÉCÉDENT.
+
+    Compare ce qui avait été annoncé (scénario dominant, prix BTC, F&G,
+    régime) à ce qui s'est réellement passé, en une ligne honnête. None si
+    pas d'historique (premier hebdo).
+    """
+    if not isinstance(prev_calls, dict) or not prev_calls.get("dominant_scenario"):
+        return None
+    bits: list[str] = []
+    _prev_btc = _parse_num(prev_calls.get("btc_price"))
+    _now_btc = _parse_num(btc_price_now)
+    if _prev_btc and _now_btc and _prev_btc > 0:
+        _chg = (_now_btc / _prev_btc - 1) * 100
+        bits.append(f"BTC {_fmt_usd_short(_prev_btc)} → {_fmt_usd_short(_now_btc)} "
+                    f"({_pct_fr_signed(_chg)})")
+    _prev_reg = prev_calls.get("regime")
+    _now_reg = regime_now.get("regime")
+    if _prev_reg and _now_reg:
+        bits.append(f"régime {'inchangé' if _prev_reg == _now_reg else _prev_reg + ' → ' + _now_reg}")
+    _prev_fg = _parse_num(prev_calls.get("fear_greed"))
+    _now_fg = _parse_num(fear_greed_now)
+    if _prev_fg is not None and _now_fg is not None:
+        bits.append(f"F&G {int(_prev_fg)} → {int(_now_fg)}")
+    _scn = prev_calls.get("dominant_scenario")
+    _pct = prev_calls.get("dominant_pct")
+    # Verdict qualitatif : le scénario dominant annoncé s'est-il matérialisé ?
+    verdict = None
+    if _prev_btc and _now_btc and _scn:
+        _mv = (_now_btc / _prev_btc - 1) * 100
+        _sl = str(_scn).lower()
+        if any(k in _sl for k in ("baiss", "bear", "sous support")):
+            verdict = "conforme" if _mv < -2 else ("partiel" if _mv <= 2 else "démenti")
+        elif any(k in _sl for k in ("hauss", "bull", "rebond")):
+            verdict = "conforme" if _mv > 2 else ("partiel" if _mv >= -2 else "démenti")
+        else:  # range/neutre
+            verdict = "conforme" if abs(_mv) <= 5 else "démenti"
+    header_line = (f"Scénario dominant annoncé : {_scn}"
+                   + (f" ({_pct}%)" if _pct else "")
+                   + (f" — {verdict}" if verdict else ""))
+    return {
+        "available": True,
+        "prev_week_label": prev_calls.get("week_label"),
+        "header_line": header_line,
+        "verdict": verdict,
+        "summary_line": (header_line + (" · " + " · ".join(bits) if bits else "")),
+    }
+
+
 def _build_positions_review(
     long_term: Any, scoring_detail: Any,
-    portfolio: dict[str, Any], market: dict[str, Any]
+    portfolio: dict[str, Any], market: dict[str, Any],
+    ath_facts: Optional[dict[str, Any]] = None,
 ) -> list[dict[str, Any]]:
     """v23.x — FUSION (1 ligne/actif) des 2 anciens tableaux du weekly.
 
@@ -3922,6 +5124,8 @@ def _build_positions_review(
         if a not in lt_by:
             order.append(a)
 
+    from src.analytics import weekly_guards as _wg_pr
+
     out: list[dict[str, Any]] = []
     for a in order:
         lt = lt_by.get(a) or {}
@@ -3930,26 +5134,68 @@ def _build_positions_review(
         pru = pru_by.get(a)
         pru_pct = (round((price - pru) / pru * 100, 1)
                    if price and pru and pru > 0 else None)
-        target = _parse_num(lt.get("target_price"))
-        target_pct = (round((target - price) / price * 100)
-                      if target and price and price > 0 else None)
         h30 = None
         if isinstance(d, dict):
             h30 = {"reco": d.get("reco"),
                    "delta_pct": d.get("delta_pct"),
                    "status": d.get("status")}
+
+        # ── v26 (W-A4/B6) — FALLBACKS Python : un actif sous reco active sans
+        # thèse LT (RSR au v25) n'affiche plus « — / cible à définir / — ».
+        _fact = (ath_facts or {}).get(a) or {}
+        _from_ath = _parse_num(_fact.get("from_ath_pct"))
+        _ath_real = _parse_num(_fact.get("ath"))
+        _ath_suspect = _wg_pr.ath_is_suspect(_from_ath)
+        lt_status = lt.get("status")
+        if not lt_status and _from_ath is not None and not _ath_suspect:
+            # Phase de cycle déterministe depuis le drawdown ATH réel (mêmes
+            # seuils que la règle 7 du prompt).
+            _dd = abs(_from_ath)
+            lt_status = ("capitulation" if _dd > 75
+                         else "accumulation" if _dd >= 50 else "expansion")
+
+        # ── v26 (W-A7/B6) — COHÉRENCE action ↔ reco 30j ACTIVE : la reco
+        # d'achat en cours PRIME (fini le « RENFORCER +1.8% » à côté d'une
+        # action « Garder » sur la même ligne).
+        action = lt.get("action")
+        _reco30 = str((d or {}).get("reco") or "").upper()
+        _status30 = str((d or {}).get("status") or "")
+        _reco_active = _status30 in ("in_progress", "validated")
+        if _reco_active and _reco30.startswith(("RENFORCER", "BUY", "ACCUMULER")):
+            if str(action or "").lower() not in ("renforcer",):
+                action = "renforcer"
+        elif _reco_active and _reco30.startswith(("ALLÉGER", "ALLEGER", "SELL", "SORTIR")):
+            if str(action or "").lower() in ("renforcer", "", "none"):
+                action = "alléger"
+        elif not action:
+            action = "garder" if (h30 or lt) else None
+
+        # ── v26 (W-A16/B5) — CIBLE LT crédible : jamais > ATH réel, et une
+        # cible ≥ +250% est étiquetée « cycle » (reconquête ATH), pas « 6-12m ».
+        target = _parse_num(lt.get("target_price"))
+        if _ath_suspect:
+            target = None
+        elif target and _ath_real and target > _ath_real * 1.05:
+            target = _ath_real
+        target_pct = (round((target - price) / price * 100)
+                      if target and price and price > 0 else None)
+        target_kind = None
+        if target_pct is not None:
+            target_kind = "cycle" if target_pct >= 250 else "6-12m"
+
         out.append({
             "asset": a,
             "conviction": core_by.get(a, _is_core_asset(a, None)),
             "current_price": price,
             "pru_pct": pru_pct,
             "h30": h30,
-            "lt_status": lt.get("status"),
+            "lt_status": lt_status,
             "lt_target": target,
             "lt_target_pct": target_pct,
+            "lt_target_kind": target_kind,
             "analysis": (lt.get("analysis") or lt.get("thesis_short")
                          or lt.get("thesis")),
-            "action": lt.get("action"),
+            "action": action,
         })
     return out
 
@@ -3971,9 +5217,25 @@ def run_weekly() -> int:
     # événement porte sa source. + Polymarket ÉTENDU (barres Fed + marchés
     # majeurs) pour croiser calendrier × probabilités (demande forte Omar).
     from src.data_sources import macro_calendar as _mc_w
-    calendar = _mc_w.get_consolidated_calendar(horizon_days=8)
+    # v26 (W-B9) : horizon élargi 8 → 10 jours (le v25 s'arrêtait à J+1).
+    calendar = _mc_w.get_consolidated_calendar(horizon_days=10)
+    _now_wk = datetime.now(TZ)
+    # v26 (W-A2/W-B2) — les événements J0 déjà tombés sont MARQUÉS (« déjà
+    # publié aujourd'hui (13h30) ») : le prompt les traite en faits, le rendu
+    # les badge en gris. Fini le « aujourd'hui NFP » à 20h42.
+    calendar = _mark_published_events(calendar, _now_wk)
     polymarket = prediction_markets.get_key_markets()
-    etf = etf_flows.get_etf_flows()
+    # v26 (W-A14) — même repli Telegram (aperçu t.me) que matin/soir : le hebdo
+    # n'était PAS câblé sur merge_with_telegram et déclarait « ETF indispo »
+    # alors qu'un aperçu existait.
+    etf = etf_flows.merge_with_telegram(etf_flows.get_etf_flows(), None)
+    # v26 (W-B3) — F&G direct (valeur + historique 8j → évolution WoW),
+    # structure de marché (dominance BTC/ETH, mcap total) et % 7j RÉELS des
+    # indices actions/or/DXY (W-A9 : fini les « −16.13 points » ambigus).
+    fng_w = fear_greed.get_fear_greed()
+    _global_w = coingecko.get_global()
+    _macro_week_pct = market_prices.get_macro_week_pct()
+    _yq_w = market_prices.get_macro_quotes()
     tracker = PredictionTracker()
     price_lookup = {s: market.get(s, {}).get("price") for s in symbols}
     tracker.refresh_active(price_lookup)
@@ -4031,6 +5293,40 @@ def run_weekly() -> int:
             weekly_price_series[s] = series["prices"]
     weekly_positions = {s: (portfolio[s].get("value_usd") or 0) for s in significant}
     correlation = compute_correlation_analysis(weekly_price_series, weekly_positions)
+
+    # v26 (W-B3/W-A6) — NIVEAUX CALCULÉS (source de vérité, comme le soir) :
+    # S/R pivots/MM/Fibo/Bollinger/ronds + readout RSI/MACD/ATR pour BTC, ETH
+    # et les 2 plus gros movers 7j. Injectés au prompt (interdit d'inventer un
+    # niveau hors liste), ancrage du scaffold scénarios ET du graphique BTC.
+    from src.analytics import key_levels as _key_levels_w
+    from src.reporting import charts as _charts_w
+    computed_levels_w: dict[str, dict[str, Any]] = {}
+    _lvl_syms_w: list[str] = ["BTC", "ETH"]
+    for _s7 in sorted(
+            significant,
+            key=lambda s: abs(market.get(s, {}).get("change_7d") or 0),
+            reverse=True):
+        if _s7 not in _lvl_syms_w:
+            _lvl_syms_w.append(_s7)
+        if len(_lvl_syms_w) >= 4:
+            break
+    _btc_closes_w: list[float] = []
+    for _ls in _lvl_syms_w[:4]:
+        try:
+            _ser_w = _charts_w._load_series(_ls, days=180)
+            if not _ser_w:
+                continue
+            _comp_w = _key_levels_w.compute_key_levels(
+                _ls, _ser_w.get("closes") or [], _ser_w.get("volumes"),
+                price=price_lookup.get(_ls))
+            if _comp_w.get("available"):
+                computed_levels_w[_ls] = _comp_w
+                if _ls == "BTC":
+                    _btc_closes_w = _ser_w.get("closes") or []
+        except Exception as _exc_lvl_w:  # noqa: BLE001
+            logger.info("Niveaux calculés weekly indisponibles pour %s : %s",
+                        _ls, _exc_lvl_w)
+
     # v23.x — échafaudage déterministe des SCÉNARIOS de la semaine (rempli dans le
     # try ci-dessous quand les signaux sont prêts ; {} si indispo → repli LLM seul).
     _scenario_scaffold: dict[str, Any] = {}
@@ -4039,6 +5335,13 @@ def run_weekly() -> int:
     # la plus profonde) : liquidité M2, cycle DXY, spreads HY, saisonnalité,
     # régime de vol réalisée, structure de marché, biais de confirmation, MVRV.
     weekly_cross_signals = {"signals": {}, "readings": []}
+    # v26 — capturés hors du try (consommés par les faits déterministes plus
+    # bas, même si cross_signals échoue) : dérivés par actif, fraîcheur
+    # on-chain (W-A8), indice dollar élargi FRED (W-A11).
+    _derivs_w: dict[str, Any] = {}
+    _onchain_as_of_w: Optional[str] = None
+    _onchain_assets_w: dict[str, Any] = {}
+    _dxy_broad_w: Optional[float] = None
     try:
         from src.analytics import cross_signals as _xsig_w
         _macro_series_w = fred.get_macro_series(40)
@@ -4051,6 +5354,16 @@ def run_weekly() -> int:
         _btc_mvrv_w = (
             ((_onchain_w.get("assets") or {}).get("BTC") or {}).get("mvrv")
             if isinstance(_onchain_w, dict) else None
+        )
+        # v26 (W-A8) — fraîcheur on-chain AU POINT D'USAGE : le v25 citait
+        # « MVRV 1.14 » comme un fait courant alors que le miroir datait du
+        # 23/05 (40 jours). L'as_of est injecté au prompt + affiché.
+        _onchain_as_of_w = (
+            (((_onchain_w.get("assets") or {}).get("BTC") or {}).get("as_of")
+             if isinstance(_onchain_w, dict) else None)
+        )
+        _onchain_assets_w = (
+            (_onchain_w.get("assets") or {}) if isinstance(_onchain_w, dict) else {}
         )
         _recent_theses_w = (mem.load_recent_theses(limit=12)
                             if hasattr(mem, "load_recent_theses") else None)
@@ -4070,13 +5383,16 @@ def run_weekly() -> int:
             "fear_greed": (((mem.load_morning_report() or {}).get("macro_context") or {})
                            .get("fear_greed")),
         }
+        # v26 (W-A11) — indice dollar ÉLARGI (FRED, ~115-125), distinct du DXY
+        # ICE (~99-105) : les deux sont affichés côte à côte dans les repères.
+        _dxy_broad_w = _cur_macro_w.get("dxy")
         # #2 DVOL (move implicite) + #14 dérivés (funding) pour le weekly.
         _options_w = deribit.get_options_metrics()
         _btc_dvol_w = (
             ((_options_w.get("assets") or {}).get("BTC") or {}).get("dvol")
             if isinstance(_options_w, dict) else None
         )
-        _derivs_w: dict[str, Any] = {}
+        # (_derivs_w déclaré hors du try — v26, cf. plus haut.)
         for _s in significant[:6]:  # limite les appels (positions principales)
             try:
                 _d = binance_futures.get_derivatives(_s)
@@ -4116,6 +5432,13 @@ def run_weekly() -> int:
             _dxy_trend_w = "up" if _dxy_hist[-1] > _dxy_hist[-2] else (
                 "down" if _dxy_hist[-1] < _dxy_hist[-2] else None)
         _imp_w = ((weekly_cross_signals.get("signals") or {}).get("implied_move") or {})
+        # v26 (W-A6) — les S/R du scaffold viennent en PRIORITÉ des niveaux
+        # CALCULÉS (plus proches, horizon cohérent) ; TradingView n'est plus
+        # que le repli (son pivot long-horizon a produit le « 82 416 » recyclé
+        # en borne de range 7j au v25).
+        _btc_comp_w = computed_levels_w.get("BTC") or {}
+        _sup_comp_w = ((_btc_comp_w.get("supports") or [{}])[0]).get("level")
+        _res_comp_w = ((_btc_comp_w.get("resistances") or [{}])[0]).get("level")
         _scenario_scaffold = compute_scenario_scaffold(
             btc_price=_btc_mk.get("price"),
             implied_move_7d_pct=_imp_w.get("move_7d_pct"),
@@ -4124,8 +5447,8 @@ def run_weekly() -> int:
             dxy_trend=_dxy_trend_w,
             fear_greed=_cur_macro_w.get("fear_greed"),
             btc_funding_pct=(_derivs_w.get("BTC") or {}).get("funding_annualized_pct"),
-            btc_support=_btc_sr_w.get("support"),
-            btc_resistance=_btc_sr_w.get("resistance"),
+            btc_support=_sup_comp_w if _sup_comp_w else _btc_sr_w.get("support"),
+            btc_resistance=_res_comp_w if _res_comp_w else _btc_sr_w.get("resistance"),
             btc_trend_pct=_btc_ma_w.get("price_vs_sma50_pct"),
             btc_rsi=_btc_rsi_w,
             btc_change_7d=_btc_mk.get("change_7d"),
@@ -4133,6 +5456,33 @@ def run_weekly() -> int:
         )
     except Exception as _xexc_w:  # noqa: BLE001
         logger.info("cross_signals weekly ignoré : %s", _xexc_w)
+
+    # v26 (W-B7) — DIGEST NEWS DE LA SEMAINE : flux RSS crypto 7 jours, filtrés
+    # crypto-related (news_relevance, mêmes règles que le soir), titres nettoyés
+    # + horodatés. Best-effort : sans news, la section est simplement absente.
+    weekly_news_digest: list[dict[str, Any]] = []
+    try:
+        _rss_w = crypto_rss.get_news(hours=7 * 24, high_impact_only=True, limit=25)
+        for _n in (_rss_w.get("news") or []):
+            _title = str(_n.get("title") or "")
+            if not _title or not news_relevance.is_crypto_relevant(_title):
+                continue
+            _pub = str(_n.get("published") or "")
+            _d_lbl = None
+            try:
+                _pdt = datetime.fromisoformat(_pub.replace("Z", "+00:00")).astimezone(TZ)
+                _d_lbl = f"{_JOURS_FR[_pdt.weekday()][:3]} {_pdt.day:02d}/{_pdt.month:02d}"
+            except (ValueError, TypeError):
+                pass
+            weekly_news_digest.append({
+                "title": news_relevance.sanitize_title(_title),
+                "source": _n.get("source"),
+                "date_label": _d_lbl,
+            })
+            if len(weekly_news_digest) >= 5:
+                break
+    except Exception as _exc_news_w:  # noqa: BLE001
+        logger.info("Digest news hebdo indisponible : %s", _exc_news_w)
 
     # Valeur courante du PTF (positions + cash).
     current_value = sum(_position_value(portfolio[s], market.get(s)) for s in symbols)
@@ -4304,6 +5654,67 @@ def run_weekly() -> int:
             # v17 (T-TAO / W-A12) : postures fermes du dernier matin, pour que la
             # watchlist/SORTIE du weekly ne contredise pas le matin sans raison.
             "firm_postures": (mem.load_morning_report() or {}).get("firm_postures") or {}}
+    # ── v26 — profondeur d'analyse (B3) + sources de vérité chiffrées ──
+    # F&G : valeur unique + évolution 7j (W-A18 prompt / W-B3).
+    if fng_w.get("available"):
+        data["fear_greed"] = {
+            "value": fng_w.get("value"),
+            "classification": fng_w.get("classification"),
+            "value_7d_ago": fng_w.get("value_7d_ago"),
+            "delta_7d": fng_w.get("delta_7d"),
+        }
+    # Structure de marché : dominance BTC/ETH, mcap total, ratio ETH/BTC 7j.
+    if _global_w.get("available"):
+        _eth7_ms = (market.get("ETH") or {}).get("change_7d")
+        _btc7_ms = (market.get("BTC") or {}).get("change_7d")
+        _ethbtc_7d = None
+        if isinstance(_eth7_ms, (int, float)) and isinstance(_btc7_ms, (int, float)) \
+                and (1 + _btc7_ms / 100) != 0:
+            _ethbtc_7d = round(((1 + _eth7_ms / 100) / (1 + _btc7_ms / 100) - 1) * 100, 1)
+        _eth_px_ms = (market.get("ETH") or {}).get("price")
+        _btc_px_ms = (market.get("BTC") or {}).get("price")
+        data["market_structure"] = {
+            "btc_dominance_pct": _global_w.get("btc_dominance_pct"),
+            "eth_dominance_pct": _global_w.get("eth_dominance_pct"),
+            "total_market_cap_usd": _global_w.get("total_market_cap_usd"),
+            "market_cap_change_24h_pct": _global_w.get("market_cap_change_24h_pct"),
+            "eth_btc_ratio": (round(_eth_px_ms / _btc_px_ms, 5)
+                              if _eth_px_ms and _btc_px_ms else None),
+            "eth_btc_7d_pct": _ethbtc_7d,
+        }
+    # W-A9 : % 7j RÉELS des indices (S&P/Nasdaq/Stoxx/DAX/Nikkei/or/DXY ICE) —
+    # les indices se citent en % 7j, JAMAIS en points de séance.
+    if _macro_week_pct:
+        data["markets_week_pct"] = _macro_week_pct
+    # W-A11 : le DXY cité par le hebdo est le DXY ICE — valeur affichée pour
+    # que les niveaux (« casse 101.5 ») soient vérifiables par le lecteur.
+    if _yq_w.get("dxy_ice") is not None:
+        data["dxy_ice"] = _yq_w.get("dxy_ice")
+    if _dxy_broad_w is not None:
+        data["dxy_broad"] = _dxy_broad_w
+    # W-A6/W-B5 : niveaux CALCULÉS = source de vérité des scénarios.
+    if computed_levels_w:
+        data["computed_levels"] = computed_levels_w
+    # W-A8 : fraîcheur on-chain au point d'usage.
+    if _onchain_as_of_w:
+        data["onchain_as_of"] = _onchain_as_of_w
+    # W-B3 : dérivés par actif (funding annualisé, L/S, OI) déjà récupérés.
+    if _derivs_w:
+        data["derivatives"] = {
+            s: {"funding_annualized_pct": d.get("funding_annualized_pct"),
+                "long_short_ratio": d.get("long_short_ratio"),
+                "open_interest": d.get("open_interest")}
+            for s, d in _derivs_w.items()
+        }
+    # W-B7 : digest news 7j (le prompt explique les movers avec de VRAIES news).
+    if weekly_news_digest:
+        data["weekly_news"] = weekly_news_digest
+    # W-A5 : flag ATH suspect (listing illiquide) — le prompt ne cite pas de
+    # drawdown pour ces actifs (l'audit a vu « JASMY −99.9% sous ATH »).
+    from src.analytics import weekly_guards as _wg
+    for _s_ath, _f_ath in (data.get("ath_by_asset") or {}).items():
+        if isinstance(_f_ath, dict):
+            _f_ath["suspect"] = _wg.ath_is_suspect(_f_ath.get("from_ath_pct"))
     # A4/A6 — pré-calculs injectés dans le prompt (le rendu utilise aussi les
     # versions persistées dans le payload après génération).
     _wk_enriched_pre = {
@@ -4500,6 +5911,14 @@ def run_weekly() -> int:
     )
     header.setdefault("time_casablanca", _fr_date(_now_h))
     header.setdefault("date", _fr_date(_now_h, with_time=False))
+    # v26 (W-A15) — RUN HORS-CYCLE signalé : le v25 est parti un JEUDI 20h42
+    # en construisant une « semaine à venir » comme s'il était dimanche midi,
+    # sans le dire. Même honnêteté que le « · fenêtre courte » du soir.
+    if _now_h.weekday() != 6:  # weekday(): lundi=0 .. dimanche=6
+        header["offcycle_note"] = (
+            f"Run hors-cycle ({_JOURS_FR[_now_h.weekday()]}) — l'hebdo est "
+            f"planifié le dimanche 12:00 ; fenêtres 7 j glissantes."
+        )
     if win_rate.get("total", 0) == 0 and not scoring_detail:
         # 1re semaine sans historique : message clair
         payload.setdefault("predictions_scoring", {})
@@ -4551,8 +5970,42 @@ def run_weekly() -> int:
     # positionnement LT (LLM) + perf reco 30j (scoring_detail) + prix/PRU/
     # conviction (déterministe). Remplace les 2 anciens tableaux par-actif.
     payload["positions_review"] = _build_positions_review(
-        payload.get("long_term_positioning"), scoring_detail, portfolio, market
+        payload.get("long_term_positioning"), scoring_detail, portfolio, market,
+        ath_facts=data.get("ath_by_asset"),
     )
+
+    # ─────────────────────────────────────────────────────────────
+    # v26 — GARDES DÉTERMINISTES POST-GÉNÉRATION (weekly_guards).
+    # Le prompt seul n'a pas suffi au v25 : perf hebdo réinventée (+2.32% vs
+    # +3.8%), vs BTC ÷10, SORTIE sur un actif RENFORCÉ, drawdown ATH halluciné,
+    # « ETH 2.0 en cours », MVRV BTC recopié sur ETH, indices en « points ».
+    # Chaque garde corrige en Python et logge ce qu'elle a touché.
+    # ─────────────────────────────────────────────────────────────
+    _wg_fixes: list[str] = []
+    _fg_val_w = (fng_w.get("value") if fng_w.get("available") else
+                 (((mem.load_morning_report() or {}).get("macro_context") or {})
+                  .get("fear_greed")))
+    payload["weekly_summary"], _fx = _wg.enforce_summary_figures(
+        payload.get("weekly_summary"), payload.get("portfolio_snapshot"),
+        fear_greed_value=_fg_val_w)
+    _wg_fixes += _fx
+    payload["weekly_summary"], _fx = _wg.fix_equity_points_in_bullets(
+        payload.get("weekly_summary"), _macro_week_pct)
+    _wg_fixes += _fx
+    _wg_fixes += _wg.reconcile_recos(payload, scoring_detail)
+    _wg_fixes += _wg.scrub_stale_narratives(payload)
+    _wg_fixes += _wg.sanitize_ath_claims(
+        payload.get("positions_review"), data.get("ath_by_asset"))
+    _wg_fixes += _wg.sanitize_cross_asset_mvrv(
+        payload.get("positions_review"), _onchain_assets_w)
+    _held_w = {s.upper() for s in symbols}
+    for _k_held in ("losses_vs_recos", "my_errors"):
+        payload[_k_held], _fx = _wg.fix_held_opportunity_wording(
+            payload.get(_k_held), _held_w)
+        _wg_fixes += _fx
+    if _wg_fixes:
+        logger.info("Gardes weekly v26 : %d correction(s) — %s",
+                    len(_wg_fixes), " | ".join(_wg_fixes[:8]))
     # Drawdown depuis le dernier snapshot
     if last_snap.get("drawdown_ath_pct") is not None:
         payload.setdefault("portfolio_overview", {})["drawdown_pct"] = last_snap["drawdown_ath_pct"]
@@ -4566,14 +6019,26 @@ def run_weekly() -> int:
         _wk_cal_events = []
         for e in calendar.get("events", []):
             da = e.get("days_ahead")
+            # v26 (W-A2) — un J0 déjà tombé garde son libellé honnête
+            # (« déjà publié aujourd'hui (13h30) ») posé par
+            # _mark_published_events, au lieu d'un « aujourd'hui » à venir.
+            if e.get("already_published"):
+                _when = e.get("when") or "déjà publié aujourd'hui"
+            else:
+                _when = ("aujourd'hui" if da == 0 else "demain" if da == 1
+                         else f"dans {da}j")
             _wk_cal_events.append({
                 "label": e.get("label"), "date": e.get("date"),
-                "when": ("aujourd'hui" if da == 0 else "demain" if da == 1 else f"dans {da}j"),
+                "when": _when,
                 "days_ahead": da,
+                "already_published": bool(e.get("already_published")),
+                "time": e.get("time"),
             })
         payload["upcoming_calendar_facts"] = {"available": True, "events": _wk_cal_events}
-    if polymarket.get("available"):
-        payload["polymarket_facts"] = polymarket
+    # v26 (W-A13) — polymarket_facts est posé UNE fois, plus bas, dans un
+    # format complet {available, markets, fed_bars, extra_markets} : l'ancien
+    # double-set (dict complet ici, puis ÉCRASÉ par un dict sans `available`
+    # ni `markets`) rendait le bandeau déterministe invisible au template.
     if etf.get("available"):
         payload["etf_flows_facts"] = etf
     # H3 : tendance du win rate
@@ -4667,6 +6132,8 @@ def run_weekly() -> int:
             "importance": e.get("importance"), "source": e.get("source"),
             "weekday_label": e.get("weekday_label"),
             "date_label": e.get("date_label"),
+            # v26 (W-A2) — badge « déjà publié » au rendu.
+            "already_published": bool(e.get("already_published")),
         }
         if _fed_bars_w and "fomc" in (e.get("label") or "").lower():
             item["polymarket_note"] = (
@@ -4678,11 +6145,106 @@ def run_weekly() -> int:
         payload["week_ahead"] = _week_ahead
     if data.get("ath_by_asset"):
         payload["ath_facts"] = data["ath_by_asset"]
-    if _fed_bars_w:
+    if polymarket.get("available") or _fed_bars_w:
+        # v26 (W-A13) — format ALIGNÉ sur le template : `available` + `markets`
+        # (le bandeau du v25 était invisible car ces clés manquaient).
         payload["polymarket_facts"] = {
-            "fed_bars": _fed_bars_w,
+            "available": True,
+            "markets": (polymarket.get("markets") or [])[:3],
+            "fed_bars": _fed_bars_w or None,
             "extra_markets": polymarket.get("extra_markets") or [],
         }
+
+    # ─────────────────────────────────────────────────────────────
+    # v26 (W-A11/A13/B3/B9) — REPÈRES DÉTERMINISTES : lignes factuelles 100%
+    # Python (probas Fed, dollar ICE + élargi, flux ETF, F&G WoW, structure de
+    # marché, dérivés). Le lecteur peut VÉRIFIER les chiffres que la prose
+    # cite ; une panne d'une source fait juste sauter sa ligne.
+    # ─────────────────────────────────────────────────────────────
+    _facts_lines: list[str] = []
+    if _fed_bars_w:
+        _fl = (f"📊 Probas taux Fed (Polymarket) · {_fed_bars_w.get('dominant')} "
+               f"{_fed_bars_w.get('dominant_pct')}%")
+        if _fed_bars_w.get("cut_pct") is not None:
+            _fl += (f" (baisse {_fed_bars_w.get('cut_pct')}% · maintien "
+                    f"{_fed_bars_w.get('hold_pct')}% · hausse "
+                    f"{_fed_bars_w.get('hike_pct')}%)")
+        _facts_lines.append(_fl)
+    _dxy_ice_w = _yq_w.get("dxy_ice")
+    if _dxy_ice_w is not None or _dxy_broad_w is not None:
+        _parts_dxy = []
+        if _dxy_ice_w is not None:
+            _d7 = _macro_week_pct.get("dxy_ice") if _macro_week_pct else None
+            _parts_dxy.append(
+                f"DXY (ICE) {_dxy_ice_w:.2f}"
+                + (f" ({_pct_fr_signed(_d7)} 7j)" if isinstance(_d7, (int, float)) else ""))
+        if _dxy_broad_w is not None:
+            _parts_dxy.append(f"indice élargi (Fed) {_dxy_broad_w:.2f}")
+        _facts_lines.append("💵 Dollar · " + " · ".join(_parts_dxy))
+    if etf.get("available"):
+        _etf_parts = []
+        _etf_btc = etf.get("btc") or {}
+        _etf_eth = etf.get("eth") or {}
+        if _etf_btc.get("total_flow_musd") is not None:
+            _v = _etf_btc["total_flow_musd"]
+            _etf_parts.append(
+                f"BTC {'+' if _v >= 0 else '−'}${abs(_v):,.1f}M"
+                + (f" ({_etf_btc.get('date')})" if _etf_btc.get("date") else ""))
+        if _etf_eth.get("total_flow_musd") is not None:
+            _v = _etf_eth["total_flow_musd"]
+            _etf_parts.append(f"ETH {'+' if _v >= 0 else '−'}${abs(_v):,.1f}M")
+        if _etf_parts:
+            _facts_lines.append("🏦 Flux ETF · " + " · ".join(_etf_parts))
+    if fng_w.get("available"):
+        _fl_fg = f"😨 Fear & Greed · {fng_w.get('value')}"
+        if fng_w.get("classification"):
+            _fl_fg += f" ({fng_w.get('classification')})"
+        if fng_w.get("value_7d_ago") is not None:
+            _d7fg = fng_w.get("delta_7d") or 0
+            _fl_fg += (f" · il y a 7 j : {fng_w.get('value_7d_ago')} "
+                       f"({'+' if _d7fg >= 0 else '−'}{abs(_d7fg)} pts)")
+        _facts_lines.append(_fl_fg)
+    if _global_w.get("available"):
+        _ms = data.get("market_structure") or {}
+        _ms_parts = []
+        if _ms.get("btc_dominance_pct") is not None:
+            _ms_parts.append(f"dominance BTC {_ms['btc_dominance_pct']:.1f}%")
+        if _ms.get("eth_dominance_pct") is not None:
+            _ms_parts.append(f"ETH {_ms['eth_dominance_pct']:.1f}%")
+        if _ms.get("eth_btc_ratio") is not None:
+            _r = f"ETH/BTC {_ms['eth_btc_ratio']:.5f}"
+            if _ms.get("eth_btc_7d_pct") is not None:
+                _r += f" ({_pct_fr_signed(_ms['eth_btc_7d_pct'])} 7j)"
+            _ms_parts.append(_r)
+        if _ms.get("total_market_cap_usd"):
+            _t = _ms["total_market_cap_usd"] / 1e12
+            _mc = f"MCap ${_t:.2f}T"
+            if _ms.get("market_cap_change_24h_pct") is not None:
+                _mc += f" (24h {_pct_fr_signed(_ms['market_cap_change_24h_pct'])})"
+            _ms_parts.append(_mc)
+        if _ms_parts:
+            _facts_lines.append("🌐 Structure · " + " · ".join(_ms_parts))
+    if _derivs_w:
+        _dv_parts = []
+        _dv_btc = _derivs_w.get("BTC") or {}
+        if _dv_btc.get("funding_annualized_pct") is not None:
+            _dv_parts.append(
+                f"funding BTC {_pct_fr_signed(_dv_btc['funding_annualized_pct'], 2)}/an")
+        if _dv_btc.get("long_short_ratio") is not None:
+            _dv_parts.append(f"L/S {_dv_btc['long_short_ratio']}")
+        # Fundings EXTRÊMES des autres positions (|annualisé| ≥ 15%/an) :
+        # signal de positionnement (shorts/longs en excès).
+        for _s_dv, _d_dv in _derivs_w.items():
+            _f_dv = _d_dv.get("funding_annualized_pct")
+            if _s_dv != "BTC" and isinstance(_f_dv, (int, float)) and abs(_f_dv) >= 15:
+                _dv_parts.append(f"{_s_dv} {_pct_fr_signed(_f_dv, 1)}/an")
+        if _dv_parts:
+            _facts_lines.append("⚙️ Dérivés · " + " · ".join(_dv_parts))
+    if _facts_lines:
+        payload["weekly_facts_lines"] = _facts_lines
+    # v26 (W-B7) — digest news 7j (rendu + déjà injecté au prompt).
+    if weekly_news_digest:
+        payload["weekly_news_digest"] = weekly_news_digest
     # NOUVEAU #11 : bilan des angles morts récurrents (point 4 weekly : TOUJOURS
     # afficher, même message neutre si pas d'historique).
     blind_spots_weekly = mem.compute_blind_spots_weekly()
@@ -4917,15 +6479,17 @@ def run_weekly() -> int:
         # informatif reste affiché comme tuile, mais ne pénalise plus la note).
         _vsbtc = snap_w.get("vs_btc_7d_pct")
         _mom = max(0.0, min(10.0, 5.0 + (_vsbtc or 0) / 2.0))
+        # v26 (W-A19) — « % » (comme le KPI vs BTC 7j du header), plus « pts ».
         _q_axes.append({"label": "Momentum vs BTC", "score": round(_mom, 1),
-                        "detail": (f"{_vsbtc:+.1f} pts vs BTC 7j"
+                        "detail": (f"{_vsbtc:+.1f}% vs BTC 7j"
                                    if _vsbtc is not None
                                    else "aligné sur BTC (donnée 7j manquante)")})
         _ddq = snap_w.get("drawdown_ath_pct")
         _ddq_used = _ddq if _ddq is not None else -50
         _sol = max(0.0, min(10.0, 10.0 + _ddq_used / 9.5))
+        # v26 (W-A19) — 1 décimale (le bilan disait « −67.8% », l'axe « −68% »).
         _q_axes.append({"label": "Solidité (vs ATH)", "score": round(_sol, 1),
-                        "detail": (f"drawdown pondéré {_ddq:.0f}% vs ATH"
+                        "detail": (f"drawdown pondéré {_ddq:.1f}% vs ATH"
                                    if _ddq is not None
                                    else "drawdown vs ATH estimé (−50% par défaut)")})
         _q_score = round(sum(a["score"] for a in _q_axes) / len(_q_axes), 1)
@@ -4969,6 +6533,46 @@ def run_weekly() -> int:
                                    dxy=_snap_dxy)
     except Exception as _exc_q:  # noqa: BLE001 — le score ne doit jamais bloquer l'envoi
         logger.warning("Score qualité PTF indisponible : %s", _exc_q)
+
+    # ─────────────────────────────────────────────────────────────
+    # v26 (W-B9) — « DEPUIS LE HEBDO PRÉCÉDENT » : diff déterministe vs le
+    # snapshot de la semaine N-1 (valeur PTF, santé, F&G, DXY). Le bilan
+    # raconte une ÉVOLUTION, pas un instantané. Absent la 1re semaine.
+    # ─────────────────────────────────────────────────────────────
+    try:
+        _prev_wk = snapshots[-2] if len(snapshots) >= 2 else None
+        _wow_lines: list[str] = []
+        if _prev_wk:
+            _pv_w = _prev_wk.get("value_usd")
+            if isinstance(_pv_w, (int, float)) and _pv_w > 0:
+                _wow_lines.append(
+                    f"Valeur PTF {_fmt_usd_short(_pv_w)} → "
+                    f"{_fmt_usd_short(current_value)} "
+                    f"({_pct_fr_signed((current_value / _pv_w - 1) * 100)})")
+            _pq_w = _prev_wk.get("quality_score")
+            _q_now = (payload.get("ptf_quality_score") or {}).get("score")
+            if isinstance(_pq_w, (int, float)) and isinstance(_q_now, (int, float)):
+                _wow_lines.append(
+                    f"Santé {str(_pq_w).replace('.', ',')} → "
+                    f"{str(_q_now).replace('.', ',')}/10")
+            _pfg_w = _prev_wk.get("fear_greed")
+            _fg_now_w = (fng_w.get("value") if fng_w.get("available") else None)
+            if isinstance(_pfg_w, (int, float)) and isinstance(_fg_now_w, (int, float)):
+                _dfg_w = int(_fg_now_w) - int(_pfg_w)
+                _wow_lines.append(
+                    f"F&G {int(_pfg_w)} → {int(_fg_now_w)} "
+                    f"({'+' if _dfg_w >= 0 else '−'}{abs(_dfg_w)} pts)")
+            _pdxy_w = _prev_wk.get("dxy")
+            if (isinstance(_pdxy_w, (int, float)) and isinstance(_dxy_broad_w, (int, float))
+                    and _pdxy_w > 0):
+                _wow_lines.append(
+                    f"Indice dollar élargi {_pdxy_w:.1f} → {_dxy_broad_w:.1f} "
+                    f"({_pct_fr_signed((_dxy_broad_w / _pdxy_w - 1) * 100)})")
+        if _wow_lines:
+            payload["week_over_week"] = {"available": True, "lines": _wow_lines}
+    except Exception as _exc_wow:  # noqa: BLE001
+        logger.info("Bloc WoW indisponible : %s", _exc_wow)
+
     payload.setdefault("footer", {})["next_report_at"] = _next_report_label("weekly")
     # v14 — date du prochain hebdo calculée en Python (le cron weekly_report.yml
     # est dimanche 11h UTC = 12:00 Casablanca, UTC+1). Évite l'hallucination
@@ -4986,7 +6590,131 @@ def run_weekly() -> int:
     # v17 (E-A11) : heure du prochain matin HARMONISÉE (08h30 partout). Avant, le
     # weekly affichait « lundi 08:00 » (texte IA) ≠ « 08h30 » du soir. On force la
     # valeur Python canonique pour que les 3 mails soient cohérents.
-    payload["footer"]["next_morning"] = _next_report_label("weekly")
+    # v26 (W-A12) — format ABSOLU homogène avec la ligne hebdo (le v25 mêlait
+    # « demain 08h30 » relatif et « dimanche 5 juillet 2026, 12:00 » absolu).
+    _nm_day = _now_w if (_now_w.hour + _now_w.minute / 60.0) < 8.5 else _now_w + _td(days=1)
+    payload["footer"]["next_morning"] = (
+        f"{_JOURS_FR[_nm_day.weekday()]} {_nm_day.day} "
+        f"{_MOIS_FR[_nm_day.month - 1]}, 08:30"
+    )
+    # \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    # v27 \u2014 ANALYSE PROFONDE HEBDO : r\u00e9gime (ME1), Brier (ES4), auto-backtest
+    # (ES5), verdict des appels de la semaine pass\u00e9e (ME2/ME3), indice de
+    # confiance du mail (ME4), on-chain frais (SO4), zones de liquidation
+    # (SO2), positionnement options (SO3). Tout best-effort, jamais bloquant.
+    # \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    _btc_px_w = (market.get("BTC") or {}).get("price")
+    # ME1 \u2014 r\u00e9gime (s\u00e9rie BTC 300j pour la MM200).
+    try:
+        from src.analytics import market_regime as _mrw
+        _reg_closes = coingecko.get_dated_closes("BTC", 300)
+        if _reg_closes:
+            _reg_series = [_reg_closes[d] for d in sorted(_reg_closes)]
+            _reg_w = _mrw.with_persistence(
+                _mrw.classify_regime(_reg_series),
+                datetime.now(TZ).date().isoformat())
+            if _reg_w.get("available"):
+                payload["market_regime"] = _reg_w
+    except Exception as _rexc:  # noqa: BLE001
+        logger.info("R\u00e9gime hebdo indisponible : %s", _rexc)
+    # ES4 \u2014 Brier score.
+    _brier = tracker.compute_brier_score(90)
+    if _brier.get("available"):
+        payload["brier_score"] = _brier
+    # ES5 \u2014 auto-backtest \u00ab achat sous MM50 \u00bb (s\u00e9rie BTC 180j d\u00e9j\u00e0 charg\u00e9e).
+    try:
+        from src.analytics import strategy_backtest as _sbt
+        if _btc_closes_w:
+            _bt = _sbt.compute_dip_buy_stats(_btc_closes_w)
+            if _bt.get("available"):
+                payload["strategy_backtest"] = _bt
+    except Exception as _btexc:  # noqa: BLE001
+        logger.info("Auto-backtest indisponible : %s", _btexc)
+    # SO4 \u2014 on-chain BTC FRAIS (SOPR/NUPL/NVT), gratuit et sans cl\u00e9.
+    try:
+        from src.data_sources import bitcoin_data as _bd_w
+        _extras = _bd_w.get_btc_onchain_extras()
+        if _extras.get("available") and _extras.get("readings"):
+            payload["onchain_extras"] = _extras
+    except Exception as _oexc:  # noqa: BLE001
+        logger.info("On-chain extras indisponibles : %s", _oexc)
+    # SO2 \u2014 zones de liquidation ESTIM\u00c9ES (aimants de prix).
+    try:
+        from src.analytics import liquidation_zones as _lz
+        _lzw = _lz.compute_liquidation_zones(
+            _btc_px_w,
+            funding_annualized_pct=(_derivs_w.get("BTC") or {}).get("funding_annualized_pct"),
+            long_short_ratio=(_derivs_w.get("BTC") or {}).get("long_short_ratio"))
+        if _lzw.get("available"):
+            payload["liquidation_zones"] = _lzw
+    except Exception as _lzexc:  # noqa: BLE001
+        logger.info("Zones de liquidation indisponibles : %s", _lzexc)
+    # SO3 \u2014 positionnement options (max pain / put-call) \u2192 rep\u00e8re chiffr\u00e9.
+    try:
+        _opt_w = deribit.get_options_metrics()
+        _optb = (_opt_w.get("assets") or {}).get("BTC") if _opt_w.get("available") else None
+        if _optb:
+            _op_parts = []
+            if _optb.get("max_pain"):
+                _op_parts.append(
+                    f"max pain {_fmt_usd_short(_optb['max_pain'])}"
+                    + (f" ({_pct_fr_signed(_optb['max_pain_gap_pct'])})"
+                       if _optb.get("max_pain_gap_pct") is not None else ""))
+            if _optb.get("put_call_ratio") is not None:
+                _op_parts.append(f"put/call {_optb['put_call_ratio']}")
+            if _optb.get("dvol") is not None:
+                _op_parts.append(f"DVOL {_optb['dvol']}%")
+            if _op_parts:
+                payload.setdefault("weekly_facts_lines", []).append(
+                    "\ud83c\udfb2 Options BTC \u00b7 " + " \u00b7 ".join(_op_parts))
+    except Exception as _opexc:  # noqa: BLE001
+        logger.info("Options positioning indisponible : %s", _opexc)
+    # on-chain extras \u2192 aussi en rep\u00e8re chiffr\u00e9 (le lecteur voit la lecture).
+    if payload.get("onchain_extras", {}).get("readings"):
+        payload.setdefault("weekly_facts_lines", []).append(
+            "\u26d3 On-chain BTC \u00b7 " + " \u00b7 ".join(payload["onchain_extras"]["readings"]))
+    # ME2/ME3 \u2014 VERDICT des appels de la semaine pass\u00e9e + sauvegarde des appels
+    # de CETTE semaine (\u00e9valu\u00e9s au prochain hebdo).
+    try:
+        _prev_calls = mem.load_weekly_calls()
+        _dom_scn = max(
+            [s for s in (payload.get("scenarios") or []) if isinstance(s, dict)],
+            key=lambda s: _parse_num(s.get("probability_pct")) or 0, default=None)
+        _cur_calls = {
+            "week_label": header.get("period_covered"),
+            "dominant_scenario": (_dom_scn or {}).get("label"),
+            "dominant_pct": (_dom_scn or {}).get("probability_pct"),
+            "btc_price": _btc_px_w,
+            "regime": (payload.get("market_regime") or {}).get("regime"),
+            "fear_greed": (fng_w.get("value") if fng_w.get("available") else None),
+        }
+        _cr = _build_calls_review(_prev_calls, _btc_px_w,
+                                  (fng_w.get("value") if fng_w.get("available") else None),
+                                  (payload.get("market_regime") or {}))
+        if _cr:
+            payload["calls_review"] = _cr
+        mem.save_weekly_calls(_cur_calls)
+    except Exception as _crexc:  # noqa: BLE001
+        logger.info("Revue des appels indisponible : %s", _crexc)
+    # ME4 \u2014 INDICE DE CONFIANCE du mail (sources actives + fra\u00eecheur on-chain).
+    try:
+        _avg_src = ((payload.get("header") or {}).get("active_sources_count")
+                    or _wk_active_pre)
+        _tot_src = len(_ALL_SOURCES_LIST)
+        _conf_pct = round(min(100, (_avg_src / _tot_src * 100))) if _tot_src else None
+        if _conf_pct is not None:
+            _grade = ("\u00e9lev\u00e9e" if _conf_pct >= 70 else
+                      "correcte" if _conf_pct >= 50 else "partielle")
+            _onc_fresh = (payload.get("onchain_extras", {}).get("as_of")
+                          or data.get("onchain_as_of"))
+            payload["mail_confidence"] = {
+                "pct": _conf_pct, "grade": _grade,
+                "sources": f"{_avg_src}/{_tot_src}",
+                "onchain_as_of": _onc_fresh,
+            }
+    except Exception as _mcexc:  # noqa: BLE001
+        logger.info("Indice de confiance indisponible : %s", _mcexc)
+
     mem.save_weekly_report(payload)
     # v23 \u2014 courbe d'\u00c9VOLUTION PTF (aire + ligne, base 100 vs BTC si s\u00e9rie align\u00e9e)
     # en image CID, \u00e0 la place des barres grises. D\u00e9gradation gracieuse : si le PNG
@@ -4995,6 +6723,57 @@ def run_weekly() -> int:
     from src.reporting import charts as _charts
     _evo_png = _charts.portfolio_evolution_png(ptf_evolution, btc_points=_evo_btc)
     _wk_charts = {"ptf_evolution": _evo_png} if _evo_png else {}
+    # v26 (W-B4) — graphiques hebdo supplémentaires, tous best-effort (une
+    # panne matplotlib/donnée fait juste sauter l'image, jamais l'envoi) :
+    # donut d'allocation sectorielle, classement barres perf 7j, sparkline
+    # F&G 8j, BTC annoté des niveaux CALCULÉS (ancrage visuel des scénarios).
+    try:
+        _donut_png = _charts.sector_donut_png(payload.get("sector_exposure_cells") or [])
+        if _donut_png:
+            _wk_charts["sector_donut"] = _donut_png
+        _bars_png = _charts.weekly_perf_bars_png(
+            (payload.get("portfolio_heatmap_7d") or {}).get("cells") or [])
+        if _bars_png:
+            _wk_charts["perf_bars_7d"] = _bars_png
+        if fng_w.get("available"):
+            _fng_png = _charts.fng_sparkline_png(fng_w.get("history") or [])
+            if _fng_png:
+                _wk_charts["fng_sparkline"] = _fng_png
+        _btc_lv = computed_levels_w.get("BTC") or {}
+        if _btc_closes_w and _btc_lv:
+            _btc_png = _charts.btc_levels_png(
+                _btc_closes_w,
+                supports=[lv.get("level") for lv in (_btc_lv.get("supports") or [])],
+                resistances=[lv.get("level") for lv in (_btc_lv.get("resistances") or [])],
+                price=_btc_lv.get("price"))
+            if _btc_png:
+                _wk_charts["btc_levels"] = _btc_png
+    except Exception as _exc_wcharts:  # noqa: BLE001
+        logger.info("Graphiques hebdo v26 partiellement indisponibles : %s", _exc_wcharts)
+    # v27 (GR1/GR2/AF6) — heatmap de corrélation des positions, courbe de
+    # funding BTC (~14 j) + OI, jauge de santé PTF. Tous best-effort.
+    try:
+        _corr_png = _charts.correlation_heatmap_png(weekly_price_series, weekly_positions)
+        if _corr_png:
+            _wk_charts["corr_heatmap"] = _corr_png
+        _fh = binance_futures.get_funding_history("BTC", days=14)
+        if _fh.get("available"):
+            _oih = binance_futures.get_oi_history("BTC")
+            _oi_pts = ([p.get("oi") for p in _oih.get("points", [])]
+                       if _oih.get("available") else None)
+            _fund_png = _charts.funding_history_png(
+                _fh.get("annualized_series") or [], symbol="BTC", oi_points=_oi_pts)
+            if _fund_png:
+                _wk_charts["funding_hist"] = _fund_png
+        _q_sc = (payload.get("ptf_quality_score") or {}).get("score")
+        if _q_sc is not None:
+            _gauge_png = _charts.gauge_png(
+                _q_sc, vmin=0, vmax=10, label="Santé du portefeuille",
+                value_label=f"{_q_sc}/10")
+            if _gauge_png:
+                _wk_charts["health_gauge"] = _gauge_png
+    except Exception as _exc_v27ch:  # noqa: BLE001
+        logger.info("Graphiques hebdo v27 partiellement indisponibles : %s", _exc_v27ch)
     html = _render(payload, "weekly", charts=_wk_charts)
     _wk_inline = {f"chart_{k}": v for k, v in _wk_charts.items() if v}
     ok = send_email(f"\U0001f4ca Bilan hebdo crypto \u00b7 {datetime.now(TZ):%d/%m}",

@@ -41,7 +41,9 @@
       <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Portefeuille</p>
         <p style="font-size:16px;font-weight:500;margin:2px 0 0 0;">{% if portfolio_snapshot.value_usd %}{{ portfolio_snapshot.value_usd|fmt_price }}{% else %}—{% endif %}</p>
-        {% if (portfolio_snapshot.change_since_morning_pct|default(none)) is not none %}<p style="font-size:10px;color:{% if (portfolio_snapshot.change_since_morning_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ portfolio_snapshot.change_since_morning_pct|fmt_pct }} depuis matin</p>{% endif %}
+        {# v26 (E-A7/E-B7) — MÊME précision que le Bilan (2 décimales) : le header
+           disait « +2.1% » et le bilan « +2.15% » pour le MÊME chiffre. #}
+        {% if (portfolio_snapshot.change_since_morning_pct|default(none)) is not none %}{% set _csm = portfolio_snapshot.change_since_morning_pct|num(0) %}<p style="font-size:10px;color:{% if _csm >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ '+' if _csm >= 0 else '−' }}{{ '%.2f'|format(_csm|abs) }}% depuis matin</p>{% endif %}
         {# v23 — winrate 30j en tête (une fois, comme le matin). #}
         {% set _wr_parts_e = (header.win_rate_total or '0/0').split('/') %}
         {% set _wr_total_e = (_wr_parts_e[1]|num(0)) if (_wr_parts_e|length > 1) else 0 %}
@@ -51,6 +53,16 @@
     </tr>
   </table>
 </div>
+
+{# ── v27 (ME1) — RÉGIME DE MARCHÉ (cohérence cross-mail avec matin/weekly). ── #}
+{% if market_regime and market_regime.available %}
+{% set _rge = market_regime.regime %}
+{% set _rgebg = '#EAF3DE' if _rge == 'bull' else ('#FCEBEB' if _rge == 'bear' else ('#FAEEDA' if _rge == 'transition' else '#EEF2F7')) %}
+{% set _rgefg = '#27500A' if _rge == 'bull' else ('#791F1F' if _rge == 'bear' else ('#633806' if _rge == 'transition' else '#0C447C')) %}
+<div style="background:{{_rgebg}};border-radius:8px;padding:7px 14px;margin-bottom:1rem;">
+  <p style="margin:0;font-size:12px;color:{{_rgefg}};line-height:1.5;"><span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Régime : {{market_regime.label_fr}}</span>{% if market_regime.days_in_regime is not none %} <span style="color:#5a5852;">· depuis {{market_regime.days_in_regime}} j</span>{% endif %}{% if market_regime.changed and market_regime.previous_label_fr %} <span style="font-weight:700;">· ⚠️ {{market_regime.previous_label_fr}} → {{market_regime.label_fr}}</span>{% endif %}</p>
+</div>
+{% endif %}
 
 {# ════════ BLOC 2 · BILAN DU JOUR (4 KPIs + movers + mini-barre) ════════ #}
 {% if daily_pnl %}
@@ -115,9 +127,10 @@
     <div style="background:{% if (_pnl_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};border-radius:4px;height:6px;width:{{ '%.0f'|format(_w) }}%;"></div>
   </div>
   {% endif %}
-  {# Top mouvements (poussières <10$ déjà exclues côté Python). #}
+  {# Top mouvements (poussières <10$ déjà exclues côté Python). v26 (E-A11) :
+     fenêtre 24h explicitement distinguée du P&L « depuis matin » du bilan. #}
   {% if daily_pnl.top_movers %}
-  <p style="font-size:9px;color:#8a8880;margin:12px 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;border-top:0.5px solid #f0efe8;padding-top:10px;">Top mouvements · 24h glissant</p>
+  <p style="font-size:9px;color:#8a8880;margin:12px 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;border-top:0.5px solid #f0efe8;padding-top:10px;">Top mouvements · 24h glissant <span style="text-transform:none;letter-spacing:0;font-style:italic;">(fenêtre 24h ≠ P&amp;L depuis matin)</span></p>
   <p style="margin:0;font-size:12px;line-height:1.7;">
     {% for m in daily_pnl.top_movers %}<span style="display:inline-block;margin-right:14px;white-space:nowrap;"><strong>{{m.symbol}}</strong> <span style="color:{% if (m.change|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (m.change|num(0)) >= 0 else '' }}{{m.change}}%</span> <span style="color:#8a8880;font-size:11px;">({% set _pu = m.pnl_usd|num(0) %}{{ '+' if _pu >= 0 else '−' }}${{ '{:,.0f}'.format(_pu|abs) }})</span></span>{% endfor %}
   </p>
@@ -174,7 +187,8 @@
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">DXY</p>
         <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{% if (_em.dxy|num(none)) is not none %}{{ '%.2f'|format(_em.dxy|num(0)) }}{% else %}—{% endif %}{{ _mss_e.get('dxy_ice') | pastille }}{{ arrow24(_em.dxy, _em.dxy_delta) }}</p>
-        {% if (_em.dxy_broad|num(none)) is not none %}<p style="font-size:10px;color:#8a8880;margin:0;">large {{ '%.2f'|format(_em.dxy_broad|num(0)) }}</p>{% endif %}
+        {# v26 (E-A10/E-B12) — « large » était cryptique : libellé explicite. #}
+        {% if (_em.dxy_broad|num(none)) is not none %}<p style="font-size:10px;color:#8a8880;margin:0;">indice élargi {{ '%.2f'|format(_em.dxy_broad|num(0)) }}</p>{% endif %}
       </td>
       <td style="width:25%;vertical-align:top;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Or</p>
@@ -243,6 +257,15 @@
     </tr>
   </table>
   {% endif %}
+  {# v26 (E-B10) — deltas matin→soir DÉTERMINISTES (Python) : l'essence du
+     « complément du matin », toujours présents même si l'IA tombe. #}
+  {% if since_morning_facts and since_morning_facts.line %}
+  <p style="font-size:10px;color:#5a5852;margin:10px 0 0 0;border-top:0.5px solid #f0efe8;padding-top:8px;"><span style="font-weight:600;color:#1a1a18;">Depuis le matin :</span> {{ since_morning_facts.line }}</p>
+  {% endif %}
+  {# v26 (E-B9/E-A14) — dérivés & flux ETF datés, 1 ligne discrète. #}
+  {% if derivatives_flows_line %}
+  <p style="font-size:10px;color:#5a5852;margin:{% if since_morning_facts and since_morning_facts.line %}6px{% else %}10px{% endif %} 0 0 0;{% if not (since_morning_facts and since_morning_facts.line) %}border-top:0.5px solid #f0efe8;padding-top:8px;{% endif %}"><span style="font-weight:600;color:#1a1a18;">Dérivés &amp; flux :</span> {{ derivatives_flows_line }}</p>
+  {% endif %}
   {% if polymarket_facts and (polymarket_facts.fed_bars or polymarket_facts.extra_markets) %}
   {% if polymarket_facts.fed_bars %}
   {% set _pf = polymarket_facts.fed_bars %}
@@ -295,8 +318,14 @@
 {% endif %}
 
 {# ════════ BLOC 6 · RECOS DU MATIN · BILAN SOIR (Python, 1 ligne/actif) ════════ #}
-{# v19/W-B12 — espérance mathématique des recos (présente dans les 3 mails). #}
-<p style="font-size:11px;color:#5a5852;margin:1.5rem 0 0 0;">Espérance mathématique des recos : {% if expectancy and expectancy.available and (expectancy.expectancy_pct is not none) %}<strong style="color:{% if (expectancy.expectancy_pct|num(0)) > 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (expectancy.expectancy_pct|num(0)) >= 0 else '' }}{{expectancy.expectancy_pct}}% / reco</strong>{% else %}<span style="color:#8a8880;font-style:italic;">disponible après 5 recos clôturées</span>{% endif %}</p>
+{# v19/W-B12 — espérance mathématique des recos (présente dans les 3 mails).
+   v26 (E-A8/E-B11) — MASQUÉE quand il n'y a NI historique NI reco active : deux
+   placeholders vides qui se télescopaient (« disponible après 5 recos » juste
+   au-dessus de « Aucune reco active ») = bruit pur. #}
+{% set _exp_has_value = expectancy and expectancy.available and (expectancy.expectancy_pct is not none) %}
+{% if _exp_has_value or reco_bilan %}
+<p style="font-size:11px;color:#5a5852;margin:1.5rem 0 0 0;">Espérance mathématique des recos : {% if _exp_has_value %}<strong style="color:{% if (expectancy.expectancy_pct|num(0)) > 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (expectancy.expectancy_pct|num(0)) >= 0 else '' }}{{expectancy.expectancy_pct}}% / reco</strong>{% else %}<span style="color:#8a8880;font-style:italic;">disponible après 5 recos clôturées</span>{% endif %}</p>
+{% endif %}
 {% if reco_bilan %}
 {% set _st = {'on_track':['✓ on track','#EAF3DE','#27500A'],'under_pressure':['⚠ sous pression','#FAEEDA','#412402'],'invalidated':['✗ invalidé','#FCEBEB','#791F1F'],'pending':['• en cours','#f5f4ee','#8a8880']} %}
 <h2 style="margin:1.5rem 0 0.5rem 0;font-size:17px;font-weight:500;">Recos du matin · bilan soir</h2>
@@ -358,6 +387,11 @@
           <td style="padding:1px 0 {% if not loop.last %}5px{% else %}1px{% endif %} 0;color:#5a5852;line-height:1.4;">{{lv.trigger|md}}</td>
         </tr></table>
         {% endfor %}
+        {# v26 (E-B5) — readout technique calculé (RSI/MACD/Bollinger/ATR/volume)
+           sous les niveaux de l'actif : l'analyse profonde, sans blabla. #}
+        {% if levels_readout and levels_readout.get(_asset) %}
+        <p style="margin:4px 0 0 0;font-size:10px;color:#8a8880;line-height:1.4;">{{ levels_readout.get(_asset) }}</p>
+        {% endif %}
       </td>
     </tr>
     {% endfor %}
@@ -390,7 +424,9 @@
 {% if _tc.calendar or _tc.checks or _tc.scenario or _tc.invalidation or tomorrow_macro_events %}
 <div style="background:#1a1a18;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
   <p style="font-size:11px;color:#8a8880;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Demain matin · check list</p>
-  <p style="margin:0 0 7px 0;font-size:12px;line-height:1.55;color:#f5f4ee;">📅 <span style="color:#8a8880;">À l'agenda :</span> {% if tomorrow_macro_events %}{% for e in tomorrow_macro_events %}{% if e.when %}<span style="color:#e5b567;">{{e.when}}</span> {% endif %}{{e.label}}{% if e.date_label %} <span style="color:#8a8880;">· {{e.date_label}}</span>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}{% elif _tc.calendar %}{{_tc.calendar}}{% else %}Pas d'événement macro majeur dans les 48h.{% endif %}</p>
+  {# v26 (E-A6/E-B6) — les événements J0 déjà tombés sont exclus côté Python ;
+     un événement encore à venir aujourd'hui porte « ce soir » + son heure. #}
+  <p style="margin:0 0 7px 0;font-size:12px;line-height:1.55;color:#f5f4ee;">📅 <span style="color:#8a8880;">À l'agenda :</span> {% if tomorrow_macro_events %}{% for e in tomorrow_macro_events %}{% if e.when %}<span style="color:#e5b567;">{{e.when}}</span> {% endif %}{{e.label}}{% if e.time %} <span style="color:#8a8880;">{{e.time}}</span>{% endif %}{% if e.date_label %} <span style="color:#8a8880;">· {{e.date_label}}</span>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}{% elif _tc.calendar %}{{_tc.calendar}}{% else %}Pas d'événement macro majeur dans les 48h.{% endif %}</p>
   {% if _tc.checks %}<p style="margin:0 0 7px 0;font-size:12px;line-height:1.55;color:#f5f4ee;">📊 <span style="color:#8a8880;">À vérifier :</span> {{_tc.checks|md}}</p>{% endif %}
   {% if _tc.scenario %}<p style="margin:0 0 7px 0;font-size:12px;line-height:1.55;color:#f5f4ee;">🎯 <span style="color:#8a8880;">Scénario probable :</span> {{_tc.scenario|md}}</p>{% endif %}
   {% if _tc.invalidation %}<p style="margin:0;font-size:12px;line-height:1.55;color:#f5f4ee;">⚠ <span style="color:#8a8880;">Invalidation :</span> {{_tc.invalidation|md}}</p>{% endif %}
@@ -409,6 +445,8 @@
   {% endif %}
   <p style="font-size:11px;color:#8a8880;margin:0;">Prochain rapport · {{ footer.next_report_at or ("demain " ~ (footer.next_morning_time or '08h30')) }} · format complet</p>
   <p style="font-size:11px;color:#8a8880;margin:4px 0 0 0;">Bonne soirée.</p>
+  {# v27 (AF5) — légende unique des codes couleur (cohérente sur les 3 mails). #}
+  <p style="font-size:9px;color:#8a8880;margin:6px 0 0 0;"><span style="color:#3B6D11;">■</span> achat/haussier · <span style="color:#A32D2D;">■</span> vente/baissier · <span style="color:#BA7517;">■</span> prudence</p>
   <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · {{app_version or "v15"}}</p>
   <p style="font-size:9px;color:#b5b3ab;margin:2px 0 0 0;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
 </div>

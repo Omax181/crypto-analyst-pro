@@ -293,25 +293,70 @@ def compute_scenario_scaffold(
 
     pm = _polymarket_summary(polymarket)
 
+    # v26 (W-A6) — RANGE ATTENDU 7j DÉTERMINISTE : prix × (1 ± move implicite).
+    # C'est LUI le range du scénario neutre. L'audit v25 a vu la résistance
+    # long-horizon ($82,416, +34%) présentée comme borne d'un range hebdo
+    # « compatible ±5.6% » : les deux notions sont désormais séparées et
+    # étiquetées à la source.
+    _px = _num(btc_price)
+    expected_range_7d = None
+    if _px and move is not None:
+        expected_range_7d = {
+            "low": round(_px * (1 - move / 100), 0),
+            "high": round(_px * (1 + move / 100), 0),
+            "label": f"±{move:.1f}% (DVOL) sur 7j",
+        }
+
+    # v26 (W-A6) — HORIZON des niveaux techniques : un support/résistance à
+    # plus de max(1.5×move, 8%) du prix ne peut PAS borner un range 7j — il
+    # est étiqueté « long terme » pour que le LLM (et le lecteur) ne le
+    # confonde plus avec le range hebdo.
+    _far_pct = max((move or 0) * 1.5, 8.0)
+
+    def _lvl(value: Any) -> Optional[dict[str, Any]]:
+        v = _num(value)
+        if not v or not _px:
+            return {"value": round(v, 0)} if v else None
+        dist = (v - _px) / _px * 100
+        return {
+            "value": round(v, 0),
+            "distance_pct": round(dist, 1),
+            "horizon": "long terme" if abs(dist) > _far_pct else "hebdo",
+        }
+
+    _sup_lvl = _lvl(btc_support)
+    _res_lvl = _lvl(btc_resistance)
+
     # Drivers suggérés par scénario (le LLM les enrichit + cite la source).
     _neg = [t["note"] for t in tilts if t["tilt"] < -0.05]
     _pos = [t["note"] for t in tilts if t["tilt"] > 0.05]
     _evt = [f"{e['label']} (J+{e['days_ahead']})" for e in evr["events"]]
+
+    def _lvl_note(lvl: Optional[dict[str, Any]], kind: str) -> list[str]:
+        if not lvl:
+            return []
+        _h = f" ({lvl['horizon']}, {lvl['distance_pct']:+.1f}%)" if lvl.get("horizon") else ""
+        return [f"{kind} {lvl['value']:.0f}{_h}"]
+
     drivers = {
         "bearish": _neg + ([f"catalyseurs : {', '.join(_evt)}"] if _evt else [])
-        + ([f"cassure support {_num(btc_support):.0f}"] if _num(btc_support) else []),
+        + _lvl_note(_sup_lvl, "cassure support"),
         "neutral": ([f"Polymarket {pm.get('fed_dominant')} {pm.get('fed_dominant_pct')}%"]
                     if pm.get("fed_dominant") else [])
         + ([f"move implicite 7j ±{move:.1f}% (DVOL)"] if move is not None else [])
-        + ([f"range support {_num(btc_support):.0f}–résistance {_num(btc_resistance):.0f}"]
-           if (_num(btc_support) and _num(btc_resistance)) else []),
+        # v26 — le range NEUTRE est le range ATTENDU (DVOL), plus jamais
+        # l'écart support↔résistance technique (qui peut être ±30%).
+        + ([f"range attendu 7j {expected_range_7d['low']:.0f}–{expected_range_7d['high']:.0f} $ "
+            f"({expected_range_7d['label']})"] if expected_range_7d else []),
         "bullish": _pos
-        + ([f"franchissement résistance {_num(btc_resistance):.0f}"] if _num(btc_resistance) else []),
+        + _lvl_note(_res_lvl, "franchissement résistance"),
     }
 
     return {
         "available": True,
         "implied_move_7d_pct": round(move, 1) if move is not None else None,
+        # v26 (W-A6) — LE range du scénario neutre (déterministe, DVOL).
+        "expected_range_7d": expected_range_7d,
         "net_tilt": round(net_tilt, 2),
         "dispersion": dispersion,
         "factor_tilts": [
@@ -323,6 +368,10 @@ def compute_scenario_scaffold(
         "key_levels": {
             "support": round(_num(btc_support), 0) if _num(btc_support) else None,
             "resistance": round(_num(btc_resistance), 0) if _num(btc_resistance) else None,
+            # v26 — distance au prix + horizon (« hebdo » / « long terme ») pour
+            # que ces niveaux ne soient plus recyclés en bornes de range 7j.
+            "support_detail": _sup_lvl,
+            "resistance_detail": _res_lvl,
         },
         "prior": prior,
         "drivers": drivers,

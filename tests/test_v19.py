@@ -610,7 +610,9 @@ def test_v19_editorial_nuances_present_in_prompts():
     assert "ACTION SANS THÈSE MATIN" in es           # V18-E1
 
     ws = inspect.getsource(wp)
-    assert "CASH 0% = RISQUE OPÉRATIONNEL" in ws     # V18-W8
+    # v27 (RE1) — la règle W-B8 « cash 0% = risque opérationnel » est REMPLACÉE :
+    # le cash n'est plus une contrainte (Omar peut toujours injecter).
+    assert "LE CASH N'EST PAS UNE CONTRAINTE" in ws  # v27/RE1 (ex V18-W8)
     assert "ÉVOLUTION F&G" in ws                     # W-A18
     assert "BOUCLE D'APPRENTISSAGE" in ws            # W-B14
     assert "SANTÉ PTF" in ws                          # W-A19 (v23 : santé, plus risque)

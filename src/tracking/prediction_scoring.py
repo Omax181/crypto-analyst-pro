@@ -556,10 +556,26 @@ class PredictionTracker:
                 status, "#BA7517")
             _ct = reco.get("ct_target") or reco.get("target_price")
             _sl = reco.get("stop_loss")
-            # v18 (M-B18) — STATUT DE SANTÉ déterministe (Python), distinct du
-            # statut de validation. Mesure où en est la position vs sa cible et
-            # son stop :
-            #   ✅ Sur objectif   : progresse bien vers la cible (≥ +3% favorable)
+            # v26 (A12/B6) — PROGRESSION VERS LA CIBLE : % du chemin entrée →
+            # cible réellement parcouru (0% = à l'entrée, 100% = cible touchée).
+            # C'est LA mesure honnête du badge — « Sur objectif » à +3% quand la
+            # cible exige +8,5% était un mensonge d'affichage (audit A12).
+            _path_pct = None
+            _dist_to_target_pct = None
+            if _ct and entry and cur:
+                try:
+                    _e, _t, _c = float(entry), float(_ct), float(cur)
+                    if abs(_t - _e) > 1e-12:
+                        _path_pct = round((_c - _e) / (_t - _e) * 100, 0)
+                    if _c > 0:
+                        _dist_to_target_pct = round((_t - _c) / _c * 100, 1)
+                except (ValueError, TypeError, ZeroDivisionError):
+                    _path_pct = None
+            # v18 (M-B18) / v26 (A12) — STATUT DE SANTÉ déterministe, distinct
+            # du statut de validation :
+            #   ✅ Cible atteinte : la cible CT est touchée (chemin ≥ 100%)
+            #   🟢 En bonne voie  : ≥ 40% du chemin vers la cible (ou ≥ +3% si
+            #                       aucune cible connue — legacy sans ct_target)
             #   🔴 Stop approché  : proche du stop d'invalidation (≤ 30% de marge)
             #   ⚠️ Sous pression  : en territoire défavorable sans stop imminent
             #   ● Neutre          : proche de l'entrée, pas de signal franc
@@ -587,20 +603,61 @@ class PredictionTracker:
                 if _near_stop:
                     _health, _health_color = "🔴 Stop approché", "#A32D2D"
                     _comment = "Proche du seuil d'invalidation — surveiller de près."
+                elif _path_pct is not None and _path_pct >= 100:
+                    _health, _health_color = "✅ Cible atteinte", "#3B6D11"
+                    _comment = "Cible CT touchée — envisager prise de profit partielle."
+                elif _path_pct is not None:
+                    if _path_pct >= 40:
+                        _health, _health_color = "🟢 En bonne voie", "#3B6D11"
+                        _comment = f"{_path_pct:.0f}% du chemin vers la cible."
+                    elif progress <= -3:
+                        _health, _health_color = "⚠️ Sous pression", "#BA7517"
+                    else:
+                        _health, _health_color = "● Neutre", "#8a8880"
                 elif progress >= 3:
-                    _health, _health_color = "✅ Sur objectif", "#3B6D11"
-                    _comment = f"En bonne voie ({progress:+.1f}% depuis l'entrée)."
+                    # Legacy sans cible persistée : jamais « Sur objectif » —
+                    # on dit ce qu'on mesure vraiment (Δ favorable).
+                    _health, _health_color = "🟢 En bonne voie", "#3B6D11"
+                    _comment = f"{progress:+.1f}% depuis l'entrée (cible n/d)."
                 elif progress <= -3:
                     # v21 (M22) — PAS de commentaire boilerplate ici : le badge
-                    # « ⚠️ Sous pression » + le Δ% affiché disent déjà tout. La
-                    # phrase « En recul (X%) mais stop non menacé » se répétait à
-                    # l'identique sur 15+ lignes (zéro valeur ajoutée).
+                    # « ⚠️ Sous pression » + le Δ% affiché disent déjà tout.
                     _health, _health_color = "⚠️ Sous pression", "#BA7517"
                     _comment = None
                 else:
                     # v21 (M22) — idem : badge « ● Neutre » suffit, pas de phrase.
                     _health, _health_color = "● Neutre", "#8a8880"
                     _comment = None
+            # v27 (RE5) — FICHE DE VIE : âge de la reco + distance au stop en
+            # % du prix courant (le lecteur voit d'un coup d'œil si le stop
+            # respire ou s'il est menacé).
+            _days_open = None
+            if anchor is not None:
+                try:
+                    _days_open = max(
+                        (datetime.now(timezone.utc) - anchor).days, 0)
+                except (TypeError, ValueError):
+                    _days_open = None
+            _stop_dist_pct = None
+            if _sl and cur:
+                try:
+                    _cur_f = float(cur)
+                    if _cur_f > 0:
+                        _stop_dist_pct = round(
+                            (float(_sl) - _cur_f) / _cur_f * 100, 1)
+                except (ValueError, TypeError, ZeroDivisionError):
+                    _stop_dist_pct = None
+            _life_bits = []
+            if _days_open is not None:
+                _life_bits.append(
+                    "émise aujourd'hui" if _days_open == 0
+                    else f"il y a {_days_open} j")
+            if progress is not None:
+                _life_bits.append(f"{progress:+.1f}%")
+            if _path_pct is not None:
+                _life_bits.append(f"{max(min(_path_pct, 999), -999):.0f}% du chemin vers la cible")
+            if _stop_dist_pct is not None:
+                _life_bits.append(f"stop à {_stop_dist_pct:+.1f}%")
             best[asset] = {
                 "asset": asset,
                 "action": "ALLÉGER" if action == "ALLEGER" else action,
@@ -609,6 +666,15 @@ class PredictionTracker:
                 "progress_pct": progress,
                 "ct_target": _ct,
                 "stop_loss": _sl,
+                # v27 (RE5) — fiche de vie compacte.
+                "days_open": _days_open,
+                "stop_distance_pct": _stop_dist_pct,
+                "life_line": " · ".join(_life_bits) if _life_bits else None,
+                # v26 (B6) — progression vers la cible + distance restante,
+                # affichées dans le Tracking (fini le badge binaire).
+                "target_path_pct": _path_pct,
+                "dist_to_target_pct": _dist_to_target_pct,
+                "current_price": cur,
                 "status": {"validated": "✓ validée",
                            "invalidated": "✗ invalidée"}.get(status, "● en cours"),
                 "status_color": _color,
@@ -631,6 +697,64 @@ class PredictionTracker:
         )
         for r in out:
             r.pop("_anchor", None)
+        return out
+
+    def check_invalidations(
+        self, price_lookup: dict[str, float]
+    ) -> list[dict[str, Any]]:
+        """v27 (TH1) — invalidations FRANCHIES ou MENACÉES des recos actives.
+
+        Une thèse avec un niveau d'invalidation n'a de valeur que si le
+        franchissement est SIGNALÉ : ici, chaque reco active dont le prix a
+        franchi le stop (ou s'en approche à ≤ 2,5%) produit une alerte
+        structurée ``{asset, status, condition, implication}`` prête pour le
+        bloc « Ce que je surveille pour invalider mon scénario ».
+        """
+        def _fmt(v: float) -> str:
+            if abs(v) >= 1000:
+                return f"{v:,.0f}".replace(",", " ") + " $"
+            if abs(v) >= 1:
+                return f"{v:,.2f} $"
+            return f"{v:.4f} $"
+
+        active = mem.load_active_recommendations()
+        selected = latest_open_reco_by_asset(active)
+        out: list[dict[str, Any]] = []
+        for asset, reco in selected.items():
+            sl = reco.get("stop_loss")
+            cur = price_lookup.get(asset) or reco.get("current_price")
+            action = (reco.get("action") or "").upper()
+            try:
+                sl_f, cur_f = float(sl), float(cur)
+            except (TypeError, ValueError):
+                continue
+            if sl_f <= 0 or cur_f <= 0:
+                continue
+            # Pour une reco d'achat, l'invalidation est SOUS le prix ; pour un
+            # allègement/short, elle est AU-DESSUS.
+            bearish_exit = action in ("ALLEGER", "ALLÉGER", "SORTIR", "SELL")
+            breached = cur_f >= sl_f if bearish_exit else cur_f <= sl_f
+            dist_pct = (sl_f - cur_f) / cur_f * 100
+            if breached:
+                out.append({
+                    "asset": asset, "status": "franchi",
+                    "level": sl_f, "current": cur_f,
+                    "condition": (f"{asset} : invalidation {_fmt(sl_f)} "
+                                  f"FRANCHIE (prix {_fmt(cur_f)})"),
+                    "implication": ("thèse caduque — statuer (sortie ou "
+                                    "réduction), ne pas laisser dériver"),
+                })
+            elif abs(dist_pct) <= 2.5:
+                out.append({
+                    "asset": asset, "status": "menacé",
+                    "level": sl_f, "current": cur_f,
+                    "condition": (f"{asset} : à "
+                                  f"{abs(dist_pct):.1f}% de l'invalidation "
+                                  f"{_fmt(sl_f)}"),
+                    "implication": "zone de décision imminente — surveiller la clôture",
+                })
+        # Franchissements d'abord (les plus urgents).
+        out.sort(key=lambda r: 0 if r["status"] == "franchi" else 1)
         return out
 
     def extract_lesson(self, period_days: int = 7) -> str:
@@ -728,6 +852,54 @@ class PredictionTracker:
                 "sont cohérents avec les résultats observés."
             )
         return {"available": True, "buckets": buckets_data, "reading": reading}
+
+    def compute_brier_score(self, period_days: int = 90) -> dict[str, Any]:
+        """v27 (ES4) — score de Brier des recos clôturées (calibration fine).
+
+        Brier = moyenne des (confiance/100 − issue)², issue = 1 si validée,
+        0 si invalidée. Plus bas = mieux : 0.25 = pile-ou-face annoncé à 50%,
+        ≤ 0.18 = bien calibré, ≥ 0.30 = les probas annoncées desservent.
+        Complète le win rate : il mesure la QUALITÉ des probabilités
+        annoncées, pas seulement le taux de réussite.
+
+        Returns:
+            ``{available, brier, n, grade, reading}`` — ``available=False``
+            si < 5 recos clôturées AVEC confiance (pas de stat sur 2 cas).
+        """
+        history = mem.load_prediction_history()
+        cutoff = datetime.now(timezone.utc) - timedelta(days=period_days)
+        sq_errors: list[float] = []
+        for p in history:
+            created = _parse(p.get("created_at"))
+            if created is None or created < cutoff:
+                continue
+            conf = p.get("confidence")
+            status = p.get("status")
+            if conf is None or status not in ("validated", "invalidated"):
+                continue
+            try:
+                f = float(conf) / 100.0
+            except (TypeError, ValueError):
+                continue
+            outcome = 1.0 if status == "validated" else 0.0
+            sq_errors.append((f - outcome) ** 2)
+        if len(sq_errors) < 5:
+            return {"available": False,
+                    "reason": (f"{len(sq_errors)}/5 recos clôturées avec "
+                               "confiance — Brier disponible dès 5")}
+        brier = round(sum(sq_errors) / len(sq_errors), 3)
+        if brier <= 0.18:
+            grade, reading = "bien calibré", (
+                "les probabilités annoncées reflètent fidèlement la réalité")
+        elif brier <= 0.25:
+            grade, reading = "acceptable", (
+                "calibration proche du hasard informé — resserrer les % annoncés")
+        else:
+            grade, reading = "mal calibré", (
+                "les % de confiance annoncés desservent la décision — "
+                "les revoir à la baisse")
+        return {"available": True, "brier": brier, "n": len(sq_errors),
+                "grade": grade, "reading": reading}
 
     def compute_per_asset_performance(self, period_days: int = 90) -> dict[str, Any]:
         """Performance par actif + erreurs récentes (boucle de feedback V10).

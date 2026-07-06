@@ -7,6 +7,8 @@ quand même avec les données brutes).
 
 from __future__ import annotations
 
+import os
+import time
 from typing import Any
 
 import yaml
@@ -18,6 +20,112 @@ from src.ai_brain.prompts.weekly_prompt import build_weekly_prompt
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# v26 (E-A2/E-B1) — MODÈLE DE REPLI par défaut. L'audit evening v25 a montré
+# qu'un 503 « high demand » sur le SEUL modèle primaire vidait tout le rapport :
+# la capacité de repli existait dans GeminiClient mais n'était jamais câblée
+# ici. GEMINI_FALLBACK_MODEL="" (vide) désactive explicitement le repli.
+_DEFAULT_FALLBACK_MODEL = "gemini-2.5-flash"
+
+# v26 (E-B1) — ULTIME TENTATIVE DIFFÉRÉE. La panne Gemini du 02/07 a duré plus
+# de 4 minutes : les retries « rapides » (2 tentatives × 4 essais internes)
+# tombaient tous DANS la fenêtre de panne. Avant de dégrader, on attend
+# longuement (10 min par défaut) puis on retente UNE fois — un mail complet à
+# +10 min vaut infiniment mieux qu'une coquille dégradée à l'heure pile.
+_LAST_CHANCE_PAUSE_DEFAULT_S = 600
+
+
+def _fallback_model_from_env() -> str | None:
+    """Modèle de repli : env GEMINI_FALLBACK_MODEL, défaut gemini-2.5-flash."""
+    raw = os.environ.get("GEMINI_FALLBACK_MODEL")
+    if raw is None:
+        return _DEFAULT_FALLBACK_MODEL
+    raw = raw.strip()
+    return raw or None  # chaîne vide = repli désactivé volontairement
+
+
+def _last_chance_pause_s() -> int:
+    """Durée (s) de la pause avant l'ultime tentative (0 = désactivée)."""
+    raw = os.environ.get("GEMINI_LAST_CHANCE_PAUSE_S", "").strip()
+    try:
+        return max(0, int(raw)) if raw else _LAST_CHANCE_PAUSE_DEFAULT_S
+    except ValueError:
+        return _LAST_CHANCE_PAUSE_DEFAULT_S
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# v27.1 — ROUTAGE AUTOMATIQUE DU MODÈLE PAR NATURE DE TÂCHE.
+#
+# Objectif d'Omar : « mettre le pro À DISPOSITION » et laisser le système
+# l'utiliser tout seul là où c'est STRATÉGIQUE, sans avoir à assigner un modèle
+# à chaque mail. On classe donc chaque tâche en deux niveaux (le code SAIT
+# lesquelles sont profondes) :
+#   • DEEP = analyse/stratégie (matin : thèses + recos ; hebdo : scénarios +
+#     positionnement LT) → utilise le modèle PRO s'il est mis à disposition.
+#   • FAST = point rapide / classification (soir : P&L + niveaux ; passe 1
+#     régime macro) → reste sur le modèle rapide.
+#
+# Palier GRATUIT (défaut) : AUCUNE de ces variables n'est requise — les défauts
+# $0 ci-dessous (gemini-3.5-flash en profond, gemini-2.5-flash en rapide)
+# s'appliquent seuls. Palier PAYANT (optionnel) : poser GEMINI_MODEL_DEEP=
+# gemini-2.5-pro « active » le pro pour les tâches profondes, sans changer le
+# code. Des overrides EXPLICITES par mail restent possibles (avancé) mais ne
+# sont JAMAIS nécessaires.
+# Le BOT Telegram est indépendant (GEMINI_BOT_MODEL / GEMINI_BOT_FALLBACK,
+# cf. telegram_bot/assistant.py) et ne passe PAS par ce moteur.
+# ───────────────────────────────────────────────────────────────────────────
+_TASK_TIER = {
+    "morning": "deep",       # thèses + recos + plan → stratégique
+    "weekly": "deep",        # scénarios + positionnement LT → stratégique
+    "evening": "fast",       # complément du matin (P&L, niveaux) → rapide
+    "macro_regime": "fast",  # classification de régime → rapide
+}
+
+# Override EXPLICITE optionnel par mail (échappatoire avancée, prime sur l'auto).
+_MODEL_ENV_BY_KIND = {
+    "morning": "GEMINI_MODEL_MORNING",
+    "evening": "GEMINI_MODEL_EVENING",
+    "weekly": "GEMINI_MODEL_WEEKLY",
+}
+
+# Défauts $0 (palier GRATUIT). Le meilleur flash GRATUIT — gemini-3.5-flash
+# (mai 2026, plafond ~20 requêtes/jour) — est RÉSERVÉ aux tâches PROFONDES
+# (analyse matin + hebdo, ~2 appels/jour) où la qualité compte le plus. Les
+# tâches RAPIDES (soir, classification de régime) restent sur gemini-2.5-flash,
+# au plafond journalier bien plus large : on préserve ainsi le quota serré du
+# 3.5-flash pour l'analyse. Le PRO n'existe pas en gratuit (0/0) → jamais visé
+# par défaut ; poser GEMINI_MODEL_DEEP=gemini-2.5-pro (facturation) le
+# réactiverait pour les tâches profondes, sans toucher au code.
+_DEFAULT_DEEP_MODEL = "gemini-3.5-flash"
+_DEFAULT_FAST_MODEL = "gemini-2.5-flash"
+
+
+def _env_model(name: str) -> str | None:
+    """Lit un nom de modèle depuis l'env (None si absent/vide)."""
+    return (os.environ.get(name) or "").strip() or None
+
+
+def _model_for_kind(kind: str) -> str | None:
+    """Modèle à utiliser pour cette tâche — CHOIX AUTOMATIQUE par tier.
+
+    Priorité :
+      1. override explicite du mail (GEMINI_MODEL_MORNING/EVENING/WEEKLY) — rare ;
+      2. modèle par tier posé en secret : DEEP → GEMINI_MODEL_DEEP,
+                                          FAST → GEMINI_MODEL_FAST ;
+      3. base commune GEMINI_MODEL (pin manuel global) ;
+      4. défaut $0 du projet : DEEP → gemini-3.5-flash, FAST → gemini-2.5-flash.
+    Ne renvoie JAMAIS None ni chaîne vide : un modèle valide est TOUJOURS choisi,
+    même sans aucun secret. Le repli de PANNE (GEMINI_FALLBACK_MODEL) est géré
+    séparément par le client et reste actif quel que soit ce choix."""
+    override = _MODEL_ENV_BY_KIND.get(kind)
+    if override:
+        explicit = _env_model(override)
+        if explicit:
+            return explicit
+    base = _env_model("GEMINI_MODEL")
+    if _TASK_TIER.get(kind, "fast") == "deep":
+        return _env_model("GEMINI_MODEL_DEEP") or base or _DEFAULT_DEEP_MODEL
+    return _env_model("GEMINI_MODEL_FAST") or base or _DEFAULT_FAST_MODEL
 
 
 class DecisionEngine:
@@ -32,11 +140,17 @@ class DecisionEngine:
         # secours). C'est le comportement attendu par le cahier des charges :
         # une IA indisponible dégrade le rapport, elle ne le bloque jamais.
         self._init_error: str | None = None
+        # v26 (E-B1c) — sleep injectable : les tests remplacent time.sleep pour
+        # vérifier l'ultime tentative différée sans attendre 10 minutes.
+        self._sleep = time.sleep
         if client is not None:
             self.client = client
         else:
             try:
-                self.client = GeminiClient()
+                # v26 (E-A2/E-B1a) — repli de modèle ENFIN câblé : un 503 sur le
+                # modèle primaire bascule automatiquement sur le repli au lieu
+                # de vider le rapport (audit evening v25 : 503 → mail coquille).
+                self.client = GeminiClient(fallback_model=_fallback_model_from_env())
             except Exception as exc:  # noqa: BLE001
                 self.client = None
                 self._init_error = str(exc)
@@ -97,7 +211,10 @@ class DecisionEngine:
             )
 
             prompt = build_macro_regime_prompt(timestamp=timestamp, data=data)
-            result = self.client.generate_json(prompt)
+            # v27.1 — passe 1 = classification légère → modèle RAPIDE (flash),
+            # même quand le rapport complet tourne en pro.
+            result = self.client.generate_json(
+                prompt, model=_model_for_kind("macro_regime"))
             if isinstance(result, dict) and result:
                 logger.info(
                     "Passe 1 régime macro : %s (conf. %s%%)",
@@ -145,10 +262,14 @@ class DecisionEngine:
             return self._degraded(
                 kind, data, self._init_error or "Client IA non initialisé."
             )
+        # v27.1 — MODÈLE ROUTÉ PAR TÂCHE (pro/flash selon le type de rapport).
+        # Le repli automatique du client (GEMINI_FALLBACK_MODEL) reste actif
+        # quel que soit le modèle primaire choisi ici.
+        task_model = _model_for_kind(kind)
         last_reason = "Génération IA indisponible."
         for attempt in range(1, attempts + 1):
             try:
-                result = self.client.generate_json(prompt)
+                result = self.client.generate_json(prompt, model=task_model)
                 if result:
                     return result
                 last_reason = "Réponse IA vide."
@@ -164,8 +285,37 @@ class DecisionEngine:
                 logger.exception(
                     "Échec Gemini (%s) tentative %d/%d : %s", kind, attempt, attempts, exc
                 )
+        # v26 (E-B1c) — ULTIME TENTATIVE DIFFÉRÉE avant de dégrader. Les pannes
+        # 503 « high demand » durent typiquement quelques minutes (celle du
+        # 02/07 a couvert TOUTE la fenêtre de retry rapide, 14:03→14:07). On
+        # attend longuement (GEMINI_LAST_CHANCE_PAUSE_S, défaut 10 min) puis on
+        # retente une dernière fois : un rapport complet en retard bat toujours
+        # une coquille dégradée à l'heure.
+        pause_s = _last_chance_pause_s()
+        if pause_s > 0:
+            logger.warning(
+                "Gemini (%s) : %d tentatives épuisées — pause %ds puis ultime "
+                "tentative avant dégradation.", kind, attempts, pause_s,
+            )
+            self._sleep(pause_s)
+            try:
+                result = self.client.generate_json(prompt, model=task_model)
+                if result:
+                    logger.info(
+                        "Gemini (%s) : ultime tentative RÉUSSIE après pause.", kind
+                    )
+                    return result
+                last_reason = "Réponse IA vide."
+            except GeminiQuotaError:
+                logger.error("Quota Gemini épuisé : payload dégradé (%s).", kind)
+                return self._degraded(kind, data, "Quota IA épuisé.")
+            except Exception as exc:  # noqa: BLE001
+                last_reason = "Génération IA indisponible."
+                logger.exception(
+                    "Échec Gemini (%s) ultime tentative : %s", kind, exc
+                )
         logger.error(
-            "Gemini (%s) : %d tentatives épuisées → payload dégradé.", kind, attempts
+            "Gemini (%s) : tentatives épuisées → payload dégradé.", kind
         )
         return self._degraded(kind, data, last_reason)
 
@@ -182,7 +332,11 @@ class DecisionEngine:
             base["all_positions_summary"] = data.get("all_positions_summary", [])
             base["win_rate"] = data.get("win_rate", {})
         elif kind == "evening":
-            base["delta_of_the_day"] = [f"⚠️ {reason}"]
+            # v26 (E-A13) — la clé historique ``delta_of_the_day`` n'était lue
+            # par AUCUN template (clé morte) : même l'avertissement du mode
+            # secours n'apparaissait pas. Le template lit ``delta_summary``
+            # (objets {icon, text}) — on émet donc le bon format au bon endroit.
+            base["delta_summary"] = [{"icon": "⚠", "text": reason}]
         elif kind == "weekly":
             base["weekly_narrative"] = reason
             base["weekly_predictions_scoring"] = data.get("win_rate", {})

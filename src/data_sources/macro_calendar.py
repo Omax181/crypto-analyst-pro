@@ -70,11 +70,33 @@ def _recurring_estimates(today: date, horizon_days: int) -> list[dict[str, Any]]
     out: list[dict[str, Any]] = []
     end = today + timedelta(days=horizon_days)
     cur = date(today.year, today.month, 1)
+
+    def _us_market_holiday(d: date) -> bool:
+        """Fériés US affectant les publications BLS du vendredi (cas connus).
+
+        v26 (A10) : 4 juillet (Independence Day), 3 juillet OBSERVÉ quand le 4
+        tombe un samedi, 1er janvier. Le BLS avance alors l'Emploi US au jeudi
+        — sans ce décalage, le filet « estimé » redonnerait silencieusement la
+        MAUVAISE date quand ForexFactory est down (audit v25 : le vrai NFP de
+        juillet 2026 tombait le JEUDI 2, pas le « 1er vendredi »).
+        """
+        if d.month == 7 and d.day == 4:
+            return True
+        if d.month == 7 and d.day == 3 and (d + timedelta(days=1)).weekday() == 5:
+            return True  # 4 juillet un samedi → férié observé le vendredi 3
+        if d.month == 1 and d.day == 1:
+            return True
+        return False
+
     while cur <= end:
-        # NFP : premier vendredi du mois, 14h30 (Casablanca).
+        # NFP : premier vendredi du mois, 14h30 (Casablanca) — reculé d'un jour
+        # ouvré tant qu'il tombe sur un férié US (v26/A10).
         first_friday = cur + timedelta(days=(4 - cur.weekday()) % 7)
-        if today <= first_friday <= end:
-            out.append({"label": "Emploi US (NFP)", "date": first_friday.isoformat(),
+        nfp_day = first_friday
+        while _us_market_holiday(nfp_day) or nfp_day.weekday() >= 5:
+            nfp_day -= timedelta(days=1)
+        if today <= nfp_day <= end:
+            out.append({"label": "Emploi US (NFP)", "date": nfp_day.isoformat(),
                         "importance": "high", "source": "récurrence",
                         "estimated": True})
         # CPI : typiquement entre le 10 et le 15 — on pose le 1er jour ouvré

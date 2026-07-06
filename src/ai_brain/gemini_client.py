@@ -54,10 +54,14 @@ def _classify(exc: Exception) -> Exception:
     return exc
 
 
+# v26 (E-B1b) — fenêtre de retry ÉLARGIE : la panne 503 du 02/07 (>4 min) a
+# épuisé l'ancienne fenêtre (4 essais, waits 2/4/8 s ≈ 15 s). 5 essais avec
+# waits 2/4/8/16 s couvrent ~30 s par appel ; la vraie protection longue durée
+# est l'ultime tentative différée du DecisionEngine (pause 10 min).
 _RETRY_KWARGS = dict(
     retry=retry_if_exception_type(_GeminiTransientError),
-    stop=stop_after_attempt(4),
-    wait=wait_exponential(multiplier=2, min=2, max=16),
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=2, min=2, max=30),
     before_sleep=before_sleep_log(logger, 30),  # log avant chaque retry (WARNING)
     reraise=True,
 )
@@ -73,32 +77,43 @@ class GeminiClient:
         api_key = os.environ.get("GEMINI_API_KEY", "").strip()
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY manquante.")
-        self.model_name = model or os.environ.get("GEMINI_MODEL", _DEFAULT_MODEL)
-        # Repli optionnel : si le modèle primaire est indisponible/saturé (ex. le
-        # bot vise gemini-2.5-pro mais son palier gratuit est momentanément plein),
-        # on bascule AUTOMATIQUEMENT sur ce modèle. Une erreur de quota n'étant
+        # « vide-safe » : un secret GEMINI_MODEL supprimé est transmis en chaîne
+        # VIDE "" par GitHub Actions (la clé existe → os.environ.get renvoie ""
+        # et NON le défaut) ; on retombe donc explicitement sur _DEFAULT_MODEL.
+        self.model_name = (
+            model or (os.environ.get("GEMINI_MODEL") or "").strip() or _DEFAULT_MODEL
+        )
+        # Repli optionnel : si le modèle primaire est indisponible/saturé (ex. un
+        # flash momentanément throttlé sur le palier gratuit), on bascule
+        # AUTOMATIQUEMENT sur ce modèle. Une erreur de quota n'étant
         # jamais facturée, ce repli garantit « meilleure qualité quand dispo,
         # jamais de panne » sans coût. None = pas de repli (comportement v18).
         self.fallback_model = fallback_model
         from google import genai
         self._client = genai.Client(api_key=api_key)
         logger.info(
-            "GeminiClient V2 initialisé (modèle %s%s) — retry 4x sur transitoire.",
+            "GeminiClient V2 initialisé (modèle %s%s) — retry 5x sur transitoire.",
             self.model_name,
             f", repli {self.fallback_model}" if self.fallback_model else "")
 
-    def _with_fallback(self, call: Any) -> Any:
-        """Exécute ``call(model)`` sur le modèle primaire ; en cas d'échec (quota,
-        transitoire épuisé, modèle indisponible…), réessaie UNE fois sur le modèle
-        de repli s'il est défini et différent. ``call`` reçoit le nom du modèle et
-        peut lever GeminiQuotaError / _GeminiTransientError / toute autre erreur."""
+    def _with_fallback(self, call: Any, primary: Optional[str] = None) -> Any:
+        """Exécute ``call(model)`` sur le modèle PRIMAIRE (``primary`` si fourni,
+        sinon ``self.model_name``) ; en cas d'échec (quota, transitoire épuisé,
+        modèle indisponible…), réessaie UNE fois sur le modèle de repli s'il est
+        défini et différent. ``call`` reçoit le nom du modèle et peut lever
+        GeminiQuotaError / _GeminiTransientError / toute autre erreur.
+
+        v27.1 — ``primary`` permet un ROUTAGE PAR TÂCHE (ex. pro pour l'analyse
+        du matin/hebdo, flash pour le soir/bot) sans reconstruire le client :
+        le filet de sécurité (repli) reste garanti quel que soit le primaire."""
+        model_used = primary or self.model_name
         try:
-            return call(self.model_name)
+            return call(model_used)
         except Exception as exc:  # noqa: BLE001
-            if self.fallback_model and self.fallback_model != self.model_name:
+            if self.fallback_model and self.fallback_model != model_used:
                 logger.warning(
                     "Modèle %s indisponible (%s) → repli sur %s.",
-                    self.model_name, type(exc).__name__, self.fallback_model)
+                    model_used, type(exc).__name__, self.fallback_model)
                 return call(self.fallback_model)
             raise
 
@@ -125,19 +140,24 @@ class GeminiClient:
         except Exception as exc:
             raise _classify(exc) from exc
 
-    def generate(self, prompt: str, *, temperature: float = 0.6) -> str:
+    def generate(self, prompt: str, *, temperature: float = 0.6,
+                 model: Optional[str] = None) -> str:
         return self._with_fallback(
-            lambda m: self._call_text(prompt, temperature, m))
+            lambda m: self._call_text(prompt, temperature, m), primary=model)
 
-    def generate_json(self, prompt: str, *, temperature: float = 0.4) -> dict[str, Any]:
+    def generate_json(self, prompt: str, *, temperature: float = 0.4,
+                      model: Optional[str] = None) -> dict[str, Any]:
+        """v27.1 — ``model`` route la tâche vers un modèle précis (ex. pro pour
+        l'analyse), sans toucher au repli. None = modèle primaire du client."""
         try:
             return self._parse_json(self._with_fallback(
-                lambda m: self._call_json(prompt, temperature, m)))
+                lambda m: self._call_json(prompt, temperature, m), primary=model))
         except GeminiQuotaError:
             raise
         except Exception as exc:
             logger.warning("generate_json fallback texte : %s", exc)
-            return self._parse_json(self.generate(prompt, temperature=temperature))
+            return self._parse_json(
+                self.generate(prompt, temperature=temperature, model=model))
 
     def generate_with_search(self, prompt: str) -> tuple[str, list[str]]:
         from google.genai import types

@@ -424,7 +424,7 @@ def test_defillama():
 
 @test("DeFiLlama (unlocks v14.1)", None)
 def test_defillama_unlocks():
-    """v25 — ALIGNÉ sur le pipeline réel (token_unlocks.py) : l'endpoint
+    """v26 — ALIGNÉ sur le pipeline réel (token_unlocks.py) : l'endpoint
     /emissions est PAYANT depuis v21 (402, corps parfois vide → JSONDecodeError).
     Le pipeline ne l'appelle PAS par défaut (gate DEFILLAMA_PAID) et dégrade
     proprement. Le diagnostic reflète ce comportement au lieu de crasher en ❌
@@ -581,7 +581,7 @@ def test_gmail():
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main() -> int:
-    print("\n═══ Diagnostic Crypto Analyst Pro · v25 ═══\n")
+    print("\n═══ Diagnostic Crypto Analyst Pro · v26 ═══\n")
     sections = [
         ("Cœur — prix & marché", [test_coingecko, test_coinmarketcap,
                                   test_fear_greed, test_yahoo,

@@ -40,7 +40,20 @@ jobs:
       - name: Run morning report
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # v26 — palier GRATUIT : le code choisit seul le meilleur flash gratuit
+          # (gemini-3.5-flash pour l'analyse profonde, gemini-2.5-flash pour le
+          # reste). GEMINI_MODEL = pin manuel OPTIONNEL (vide = défauts $0 du code).
+          # GEMINI_MODEL_DEEP = escape PAYANT : le poser à gemini-2.5-pro bascule
+          # l'analyse sur le pro (nécessite la facturation API activée), sinon vide.
           GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_MODEL_DEEP: ${{ secrets.GEMINI_MODEL_DEEP }}
+          # v26 (audit final) — boutons OPTIONNELS, vides = défauts du code :
+          # LEARNING_ENABLED=0 coupe le calibrateur de confiance (OB24) ;
+          # GEMINI_LAST_CHANCE_PAUSE_S règle la pause de l'ultime tentative
+          # (défaut 600 s, 0 = désactivée). Sans passthrough ici, poser ces
+          # secrets serait INERTE (l'env n'atteindrait jamais le job).
+          LEARNING_ENABLED: ${{ secrets.LEARNING_ENABLED }}
+          GEMINI_LAST_CHANCE_PAUSE_S: ${{ secrets.GEMINI_LAST_CHANCE_PAUSE_S }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
           COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
           COINMARKETCAL_API_KEY: ${{ secrets.COINMARKETCAL_API_KEY }}

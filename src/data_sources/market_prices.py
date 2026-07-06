@@ -322,6 +322,47 @@ def get_equity_dated_closes(days: int = 95) -> dict[str, dict[str, float]]:
         return {}
 
 
+def get_macro_week_pct() -> dict[str, float]:
+    """Perf ~7 jours (en %) des actifs macro : indices actions, or, DXY ICE.
+
+    v26 (W-A9) : le bilan hebdo citait les indices en « points » de variation
+    de séance (« S&P −16.13 points ») — illisible et fenêtre ambiguë. Cette
+    fonction fournit le VRAI % sur 7 jours calendaires (dernière clôture vs
+    clôture ≥ 7 jours avant), pour que le mail parle en % 7j, comme le reste
+    du bilan.
+
+    Returns:
+        Dict ``{nom_interne: change_7d_pct}`` (ex. ``{"sp500": -0.8}``). Les
+        actifs sans historique suffisant sont omis ; vide si Yahoo est
+        injoignable. Caché 1h.
+    """
+    from datetime import datetime as _dt, timedelta as _td
+
+    def _fetch() -> dict[str, float]:
+        out: dict[str, float] = {}
+        for name, ysym in _MACRO_TICKERS.items():
+            url = _CHART.format(symbol=ysym)
+            data = get_json(url, headers=_HEADERS,
+                            params={"interval": "1d", "range": "1mo"})
+            dated = _extract_dated_closes(data)
+            if len(dated) < 2:
+                continue
+            dates = sorted(dated)
+            last_d = dates[-1]
+            cutoff = (_dt.fromisoformat(last_d) - _td(days=7)).date().isoformat()
+            base_d = next((d for d in reversed(dates) if d <= cutoff), dates[0])
+            base, last = dated.get(base_d), dated.get(last_d)
+            if base and last and base != 0:
+                out[name] = round((last - base) / base * 100, 2)
+        return out
+
+    try:
+        return CACHE.get_or_compute("yahoo_macro_week_pct", 3600, _fetch) or {}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Yahoo macro week pct indisponible : %s", exc)
+        return {}
+
+
 def get_crypto_quotes() -> dict[str, float]:
     """Prix crypto (USD) depuis Yahoo pour cross-check. Dict {TICKER: prix}.
 

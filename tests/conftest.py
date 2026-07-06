@@ -7,8 +7,14 @@ réseau s'exécutent dans l'environnement GitHub Actions avec les vraies libs.
 
 from __future__ import annotations
 
+import os
 import sys
 import types
+
+# v26 (E-B1c) — l'ultime tentative Gemini différée attend 10 min en prod avant
+# de dégrader. En test, cette pause est désactivée par défaut (les tests qui la
+# vérifient la réactivent explicitement via monkeypatch + sleep injecté).
+os.environ.setdefault("GEMINI_LAST_CHANCE_PAUSE_S", "0")
 
 _STUBS = [
     "google", "google.generativeai", "tradingview_ta", "fredapi",

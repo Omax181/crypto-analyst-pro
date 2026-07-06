@@ -19,6 +19,7 @@ pratiques Deribit.
 
 from __future__ import annotations
 
+import math
 import time
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -77,8 +78,117 @@ def _max_pain(options: list[tuple[float, str, float]]) -> Optional[float]:
     return best_strike
 
 
+def _f(value: Any) -> Optional[float]:
+    """Cast float sûr (None si non convertible)."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _norm_cdf(x: float) -> float:
+    """Fonction de répartition de la loi normale centrée réduite (via erf)."""
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def _bs_delta(opt: str, spot: float, strike: float, iv: float, t_years: float,
+              rate: float = 0.0) -> Optional[float]:
+    """Delta Black-Scholes (call ∈ ]0,1[, put ∈ ]-1,0[). ``iv`` en DÉCIMAL (0.48)."""
+    if spot <= 0 or strike <= 0 or iv <= 0 or t_years <= 0:
+        return None
+    d1 = (math.log(spot / strike) + (rate + 0.5 * iv * iv) * t_years) / (
+        iv * math.sqrt(t_years))
+    call_delta = _norm_cdf(d1)
+    return call_delta if opt == "C" else call_delta - 1.0
+
+
+# OB26 — SKEW des options (risk reversal 25Δ). Signal directionnel du
+# positionnement options : un put 25Δ plus cher (en vol implicite) que le call
+# 25Δ (RR < 0) = le marché paie la protection à la baisse (prudence/couverture) ;
+# l'inverse (RR > 0) = appétit haussier (calls). Calculé sur l'échéance la plus
+# proche de ~30 jours (tenor de référence), 100 % depuis le book summary déjà
+# récupéré (AUCUN appel réseau supplémentaire). Dégradation gracieuse : {} si
+# données insuffisantes (jamais d'exception, jamais de champ inventé).
+_SKEW_MIN_DAYS = 5.0
+_SKEW_TARGET_DAYS = 30.0
+_SKEW_MIN_QUOTES = 6
+_SKEW_THRESHOLD = 1.5  # points de vol pour qualifier haussier/baissier
+
+
+def _compute_skew(
+    opts: list[tuple[datetime, float, str, Optional[float], Optional[float]]],
+    now: datetime,
+) -> dict[str, Any]:
+    """Risk reversal 25Δ + ATM IV sur l'échéance ≈30 j. ``{}`` si insuffisant.
+
+    ``opts`` : liste ``(expiry, strike, opt, mark_iv_pts, underlying)``.
+    """
+    by_exp: dict[datetime, list[tuple[float, str, float, float]]] = {}
+    for expiry, strike, opt, iv, u in opts:
+        if iv is None or iv <= 0 or u is None or u <= 0 or expiry <= now:
+            continue
+        by_exp.setdefault(expiry, []).append((strike, opt, iv, u))
+    best = None  # (dist_to_target, days, quotes)
+    for expiry, quotes in by_exp.items():
+        days = (expiry - now).total_seconds() / 86400.0
+        if days < _SKEW_MIN_DAYS or len(quotes) < _SKEW_MIN_QUOTES:
+            continue
+        dist = abs(days - _SKEW_TARGET_DAYS)
+        if best is None or dist < best[0]:
+            best = (dist, days, quotes)
+    if best is None:
+        return {}
+    _, days, quotes = best
+    t_years = days / 365.0
+    spot = sorted(u for _s, _o, _iv, u in quotes)[len(quotes) // 2]  # médiane
+    best_call = best_put = best_atm = None
+    for strike, opt, iv, _u in quotes:
+        delta = _bs_delta(opt, spot, strike, iv / 100.0, t_years)
+        if delta is None:
+            continue
+        if opt == "C":
+            dc = abs(delta - 0.25)
+            if best_call is None or dc < best_call[0]:
+                best_call = (dc, iv)
+            da = abs(delta - 0.5)
+            if best_atm is None or da < best_atm[0]:
+                best_atm = (da, iv)
+        else:
+            dp = abs(delta + 0.25)
+            if best_put is None or dp < best_put[0]:
+                best_put = (dp, iv)
+            da = abs(delta + 0.5)
+            if best_atm is None or da < best_atm[0]:
+                best_atm = (da, iv)
+    if best_call is None or best_put is None:
+        return {}
+    call_iv, put_iv = best_call[1], best_put[1]
+    rr = call_iv - put_iv
+    out: dict[str, Any] = {
+        "iv_skew_25d": round(rr, 1),
+        "call_iv_25d": round(call_iv, 1),
+        "put_iv_25d": round(put_iv, 1),
+        "skew_tenor_days": int(round(days)),
+    }
+    if best_atm is not None:
+        out["atm_iv"] = round(best_atm[1], 1)
+    if rr <= -_SKEW_THRESHOLD:
+        out["skew_reading"] = (
+            f"Skew baissier ({rr:+.1f} pts de vol) — le marché paie cher la "
+            "protection à la baisse (couverture/prudence)")
+    elif rr >= _SKEW_THRESHOLD:
+        out["skew_reading"] = (
+            f"Skew haussier ({rr:+.1f} pts de vol) — appétit pour les calls "
+            "(optimisme/spéculation à la hausse)")
+    else:
+        out["skew_reading"] = (
+            f"Skew neutre ({rr:+.1f} pts de vol) — positionnement options "
+            "équilibré")
+    return out
+
+
 def _fetch_options_summary(currency: str) -> dict[str, Any]:
-    """Put/call ratio (OI global) + max pain (expiration la plus proche)."""
+    """Put/call ratio (OI global) + max pain + skew 25Δ (OB26)."""
     raw = get_json(
         f"{_BASE}/get_book_summary_by_currency",
         params={"currency": currency, "kind": "option"},
@@ -91,6 +201,7 @@ def _fetch_options_summary(currency: str) -> dict[str, Any]:
     call_oi = put_oi = 0.0
     # OI par expiration pour isoler la prochaine échéance (max pain).
     by_expiry: dict[datetime, list[tuple[float, str, float]]] = {}
+    iv_opts: list[tuple[datetime, float, str, Optional[float], Optional[float]]] = []
     underlying: Optional[float] = None
 
     for inst in result:
@@ -113,6 +224,8 @@ def _fetch_options_summary(currency: str) -> dict[str, Any]:
             underlying = float(inst["underlying_price"])
         if expiry > now:
             by_expiry.setdefault(expiry, []).append((strike, opt, oi))
+            iv_opts.append((expiry, strike, opt,
+                            _f(inst.get("mark_iv")), _f(inst.get("underlying_price"))))
 
     out: dict[str, Any] = {}
     if call_oi > 0:
@@ -129,6 +242,11 @@ def _fetch_options_summary(currency: str) -> dict[str, Any]:
             out["max_pain_expiry"] = nearest.strftime("%d %b %Y")
             if underlying:
                 out["max_pain_gap_pct"] = round((mp - underlying) / underlying * 100, 1)
+
+    # OB26 — skew 25Δ sur l'échéance ≈30 j (best-effort, réutilise le même fetch).
+    skew = _compute_skew(iv_opts, now)
+    if skew:
+        out.update(skew)
     return out
 
 

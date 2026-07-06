@@ -277,7 +277,7 @@ def get_key_markets() -> dict[str, Any]:
                 vol = float(m.get("volumeNum") or m.get("volume") or 0)
             except (ValueError, TypeError):
                 vol = 0.0
-            scored.append((tier, {
+            entry = {
                 "question": q if len(q) <= 90 else q[:87] + "…",
                 # v18 (M-A13) : proba ENTIÈRE pour les marchés extra. La tuile
                 # affichait « 21% » et le texte « 21.3% » pour le MÊME marché.
@@ -286,7 +286,15 @@ def get_key_markets() -> dict[str, Any]:
                 "probability_pct": round(prob * 100),
                 "volume_usd": round(vol),
                 "end_date": m.get("endDate"),
-            }))
+            }
+            # v26 (A15) — issue mesurée EXPLICITE quand le marché n'est pas un
+            # simple Yes/No : « Bitcoin Up or Down? 92% » ne dit pas ce que
+            # mesure le 92%. On attache le libellé de la 1re issue (celle dont
+            # la proba est affichée) pour lever l'ambiguïté au rendu.
+            _outcome = _first_outcome_label(m)
+            if _outcome:
+                entry["outcome"] = _outcome
+            scored.append((tier, entry))
         # v23.x : tri CRYPTO-FIRST (tier croissant) puis volume décroissant.
         scored.sort(key=lambda e: (e[0], -e[1]["volume_usd"]))
         # Probas extrêmes (>97% ou <3%) = quasi acquis, peu informatif → dépriorisé.
@@ -295,8 +303,13 @@ def get_key_markets() -> dict[str, Any]:
         # v23.x : crypto + macro priment ; le géopolitique (tier 3) n'est qu'un
         # COMPLÉMENT plafonné à 1 marché (sinon des paris « guerre » lointains
         # à 5-14% noyaient les marchés crypto vraiment actionnables).
+        # v26 (E-B8/E-A9) : un marché géopolitique n'apparaît QUE s'il est un
+        # vrai signal de risque (proba ≥ 25%). « U.S. invade Iran? 14% » trônait
+        # chaque jour dans les mails sans aucune valeur de décision — un pari
+        # lointain à faible proba est du bruit, pas un signal risk-off.
         crypto_macro = [e[1] for e in ranked if e[0] <= 2]
-        geo = [e[1] for e in ranked if e[0] == 3]
+        geo = [e[1] for e in ranked
+               if e[0] == 3 and e[1]["probability_pct"] >= 25]
         extra = (crypto_macro + geo[:1])[:5]
 
     return {
@@ -306,6 +319,28 @@ def get_key_markets() -> dict[str, Any]:
         "markets": fed_markets,  # alias rétro-compat (prompts/consommateurs v14)
         "extra_markets": extra,
     }
+
+
+def _first_outcome_label(market: dict[str, Any]) -> str | None:
+    """v26 (A15) — libellé de la 1re issue si le marché n'est PAS un Yes/No.
+
+    ``outcomePrices[0]`` (la proba affichée) correspond à ``outcomes[0]`` :
+    pour « Bitcoin Up or Down on July 2? », outcomes = ["Up","Down"] → on
+    renvoie « Up » pour que « 92% » soit lisible. Pour un marché Yes/No
+    classique, None (pas de bruit).
+    """
+    outcomes = market.get("outcomes")
+    try:
+        if isinstance(outcomes, str):
+            import json
+            outcomes = json.loads(outcomes)
+        if isinstance(outcomes, list) and outcomes:
+            first = str(outcomes[0]).strip()
+            if first and first.lower() not in ("yes", "no"):
+                return first[:20]
+    except (ValueError, TypeError):
+        pass
+    return None
 
 
 def _extract_yes_probability(market: dict[str, Any]) -> float | None:

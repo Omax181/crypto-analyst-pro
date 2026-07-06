@@ -68,6 +68,38 @@ def _load_closes(symbol: str, *, days: int = 90) -> Optional[list[float]]:
     return series["closes"]
 
 
+def _load_series(symbol: str, *, days: int = 90) -> Optional[dict[str, list[float]]]:
+    """v26 (C1) — clôtures ET volumes (le volume confirme cassures/rebonds)."""
+    series = coingecko.get_price_volume_series(symbol, days=days)
+    if not series or len(series.get("closes", [])) < 20:
+        return None
+    return {"closes": series["closes"], "volumes": series.get("volumes") or []}
+
+
+def _draw_volume_underlay(ax, volumes: list[float], n_shown: int) -> None:
+    """v26 (C1) — barres de volume DISCRÈTES sous le panneau prix.
+
+    Axe secondaire borné à 4× le max → les barres occupent le quart bas du
+    panneau sans écraser la courbe de prix. N'ajoute RIEN si la série est
+    incomplète (jamais de volume inventé).
+    """
+    if not volumes or len(volumes) < n_shown:
+        return
+    vols = volumes[-n_shown:]
+    if not any(v and v > 0 for v in vols):
+        return
+    try:
+        axv = ax.twinx()
+        axv.bar(range(len(vols)), [v or 0 for v in vols],
+                color="#94a3b8", alpha=0.22, width=1.0, zorder=1)
+        axv.set_ylim(0, max(v or 0 for v in vols) * 4)
+        axv.set_yticks([])
+        for spine in axv.spines.values():
+            spine.set_visible(False)
+    except Exception:  # noqa: BLE001 — le volume est un bonus, jamais bloquant
+        pass
+
+
 def _style_axis(ax) -> None:
     """Applique le style maison (ticks discrets, pas d'axe X, spines clairs)."""
     ax.tick_params(labelsize=6, colors=_C_TICK)
@@ -220,7 +252,8 @@ def _select_analysis(thesis: dict[str, Any]) -> str:
 # Renderer d'analyse adaptatif (price + overlays choisis + RSI)
 # --------------------------------------------------------------------------- #
 def _render_analysis(plt, symbol: str, closes_full: list[float], mode: str,
-                     levels: Optional[dict[str, Any]]) -> bytes:
+                     levels: Optional[dict[str, Any]],
+                     volumes_full: Optional[list[float]] = None) -> bytes:
     """Rend le graphique d'analyse pour le ``mode`` choisi (price + RSI + overlays)."""
     cfg = _MODES.get(mode, _MODES["trend"])
     display_days = cfg["days"]
@@ -244,6 +277,9 @@ def _render_analysis(plt, symbol: str, closes_full: list[float], mode: str,
 
     # ── Panneau prix ──
     ax.plot(x, cl, color=_C_PRICE, linewidth=1.6, zorder=6, label="cours")
+    # v26 (C1) — volume en sous-couche discrète (confirme cassures/rebonds).
+    if volumes_full:
+        _draw_volume_underlay(ax, volumes_full, len(cl))
     has_legend = False
 
     for p in cfg["ma"]:
@@ -458,6 +494,319 @@ def portfolio_evolution_png(points: list[dict[str, Any]],
 
 
 # --------------------------------------------------------------------------- #
+# Graphiques du rapport HEBDO (v26 · W-B4)
+# --------------------------------------------------------------------------- #
+def sector_donut_png(cells: list[dict[str, Any]]) -> Optional[bytes]:
+    """Donut de l'allocation sectorielle du PTF (poids % par secteur).
+
+    Complète les cases sectorielles (qui portent les perfs 24h/7j/30j) par une
+    vue proportionnelle immédiate. ``cells`` = payload ``sector_exposure_cells``
+    (``{sector, ptf_pct}``). None si < 2 secteurs ou matplotlib absent.
+    """
+    data = [(str(c.get("sector", "")), float(c.get("ptf_pct") or 0))
+            for c in (cells or [])
+            if isinstance(c, dict) and isinstance(c.get("ptf_pct"), (int, float))
+            and (c.get("ptf_pct") or 0) > 0]
+    if len(data) < 2:
+        return None
+    plt = _import_plt()
+    if plt is None:
+        return None
+    try:
+        labels = [d[0] for d in data]
+        sizes = [d[1] for d in data]
+        palette = ["#534AB7", "#0C447C", "#3B6D11", "#BA7517", "#8A5A12",
+                   "#0E6B5E", "#A32D2D", "#5a5852"]
+        fig, ax = plt.subplots(figsize=(4.6, 2.6), dpi=140)
+        wedges, _ = ax.pie(
+            sizes, startangle=90, counterclock=False,
+            colors=[palette[i % len(palette)] for i in range(len(sizes))],
+            wedgeprops={"width": 0.42, "edgecolor": "white", "linewidth": 1.2})
+        ax.legend(wedges, [f"{l} · {s:.1f}%" for l, s in zip(labels, sizes)],
+                  loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=6.5,
+                  frameon=False)
+        ax.set_title("Allocation sectorielle du PTF", fontsize=8, color="#334155")
+        return _save(fig, plt)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Donut sectoriel échoué : %s", exc)
+        return None
+
+
+def weekly_perf_bars_png(cells: list[dict[str, Any]], *,
+                         limit: int = 12) -> Optional[bytes]:
+    """Barres horizontales des perfs 7j par position (classement visuel).
+
+    Complète la heatmap : le classement gagnants→perdants saute aux yeux.
+    ``cells`` = ``portfolio_heatmap_7d.cells`` (``{symbol, change_24h}`` — le
+    champ porte la perf de la fenêtre du heatmap, 7j au weekly). None si < 3
+    positions.
+    """
+    rows = [(str(c.get("symbol", "")), float(c.get("change_24h")))
+            for c in (cells or [])
+            if isinstance(c, dict) and isinstance(c.get("change_24h"), (int, float))
+            and not c.get("is_extra")]
+    if len(rows) < 3:
+        return None
+    rows = sorted(rows, key=lambda r: r[1])
+    if len(rows) > limit:
+        # Audit final v26 — un CLASSEMENT tronqué garde les DEUX extrêmes
+        # (pires perdants ET meilleurs gagnants) : l'ancien « [-limit:] »
+        # coupait silencieusement les pires positions (biais optimiste visuel).
+        half = limit // 2
+        rows = rows[:half] + rows[-(limit - half):]
+    plt = _import_plt()
+    if plt is None:
+        return None
+    try:
+        syms = [r[0] for r in rows]
+        vals = [r[1] for r in rows]
+        fig, ax = plt.subplots(figsize=(5.6, 0.24 * len(rows) + 0.9), dpi=140)
+        colors = [_C_SUP if v >= 0 else _C_RES for v in vals]
+        ax.barh(range(len(rows)), vals, color=colors, height=0.62)
+        ax.set_yticks(range(len(rows)))
+        ax.set_yticklabels(syms, fontsize=6.5, color="#334155")
+        ax.axvline(0, color=_C_AXIS, linewidth=0.8)
+        for i, v in enumerate(vals):
+            ax.text(v + (0.3 if v >= 0 else -0.3), i, f"{v:+.1f}%",
+                    va="center", ha="left" if v >= 0 else "right",
+                    fontsize=6, color="#334155")
+        ax.set_title("Performance 7j par position", fontsize=8, color="#334155")
+        ax.tick_params(axis="x", labelsize=6, colors=_C_TICK)
+        for spine in ("top", "right", "left"):
+            ax.spines[spine].set_visible(False)
+        ax.spines["bottom"].set_color(_C_AXIS)
+        ax.margins(x=0.14)
+        return _save(fig, plt)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Barres perf 7j échouées : %s", exc)
+        return None
+
+
+def fng_sparkline_png(history: list[Any]) -> Optional[bytes]:
+    """Sparkline du Fear & Greed sur ~8 jours (évolution du sentiment).
+
+    ``history`` = valeurs chronologiques (ancien → récent). None si < 3 points.
+    """
+    vals = [float(v) for v in (history or []) if isinstance(v, (int, float))]
+    if len(vals) < 3:
+        return None
+    plt = _import_plt()
+    if plt is None:
+        return None
+    try:
+        fig, ax = plt.subplots(figsize=(3.4, 1.15), dpi=140)
+        x = range(len(vals))
+        ax.plot(x, vals, color=_C_PTF, linewidth=1.6)
+        ax.fill_between(x, vals, min(min(vals), 0), color=_C_PTF, alpha=0.10)
+        # Zones de sentiment (peur < 25 / avidité > 75) en repères discrets.
+        ax.axhline(25, color=_C_RES, linewidth=0.6, linestyle="--", alpha=0.5)
+        ax.axhline(75, color=_C_SUP, linewidth=0.6, linestyle="--", alpha=0.5)
+        ax.annotate(f"{vals[-1]:.0f}", (len(vals) - 1, vals[-1]),
+                    textcoords="offset points", xytext=(2, 4),
+                    fontsize=7, color="#334155", fontweight="bold")
+        ax.set_ylim(0, 100)
+        ax.set_title("Fear & Greed · 8 derniers jours", fontsize=7.5, color="#334155")
+        _style_axis(ax)
+        return _save(fig, plt)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Sparkline F&G échouée : %s", exc)
+        return None
+
+
+def btc_levels_png(closes: list[float], *,
+                   supports: Optional[list[float]] = None,
+                   resistances: Optional[list[float]] = None,
+                   price: Optional[float] = None,
+                   days: int = 60) -> Optional[bytes]:
+    """BTC ~60j avec supports/résistances CALCULÉS annotés (ancrage scénarios).
+
+    Les niveaux viennent de ``compute_key_levels`` (source de vérité v26) :
+    le lecteur voit exactement les bornes citées par les scénarios. None si
+    données insuffisantes.
+    """
+    vals = [float(c) for c in (closes or []) if isinstance(c, (int, float))]
+    if len(vals) < 10:
+        return None
+    plt = _import_plt()
+    if plt is None:
+        return None
+    try:
+        shown = vals[-days:]
+        fig, ax = plt.subplots(figsize=(6.4, 2.4), dpi=140)
+        ax.plot(range(len(shown)), shown, color=_C_PRICE, linewidth=1.3)
+        if isinstance(price, (int, float)):
+            ax.plot([len(shown) - 1], [price], "o", color=_C_PRICE, markersize=3)
+        for lv in (supports or [])[:3]:
+            if isinstance(lv, (int, float)):
+                ax.axhline(lv, color=_C_SUP, linewidth=0.9, linestyle="--", alpha=0.8)
+                ax.text(0, lv, f" S {_fmt_level(lv)}", fontsize=6, color=_C_SUP,
+                        va="bottom", bbox=_LBL_BBOX)
+        for lv in (resistances or [])[:3]:
+            if isinstance(lv, (int, float)):
+                ax.axhline(lv, color=_C_RES, linewidth=0.9, linestyle="--", alpha=0.8)
+                ax.text(0, lv, f" R {_fmt_level(lv)}", fontsize=6, color=_C_RES,
+                        va="bottom", bbox=_LBL_BBOX)
+        ax.set_title(f"BTC · {min(days, len(shown))} jours · niveaux calculés",
+                     fontsize=8, color="#334155")
+        _style_axis(ax)
+        return _save(fig, plt)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Graphique BTC niveaux échoué : %s", exc)
+        return None
+
+
+# --------------------------------------------------------------------------- #
+# Graphiques v27 (GR1 corrélations · GR2 funding/OI · AF6 gauges)
+# --------------------------------------------------------------------------- #
+def correlation_heatmap_png(
+    price_series: dict[str, list[float]],
+    weights: Optional[dict[str, float]] = None,
+    *, limit: int = 10,
+) -> Optional[bytes]:
+    """v27 (GR1) — heatmap de corrélation entre les positions du PTF.
+
+    Les clusters de risque (positions qui bougent ensemble) se voient d'un
+    coup d'œil. Corrélations de Pearson sur les rendements quotidiens,
+    séries alignées par la fin. ``limit`` plus grosses positions (par poids).
+    None si < 3 séries exploitables.
+    """
+    plt = _import_plt()
+    if plt is None:
+        return None
+    try:
+        import numpy as np
+        usable = {
+            s: [float(x) for x in v if isinstance(x, (int, float))]
+            for s, v in (price_series or {}).items()
+            if isinstance(v, list) and len(v) >= 15
+        }
+        if len(usable) < 3:
+            return None
+        syms = sorted(usable, key=lambda s: (weights or {}).get(s, 0),
+                      reverse=True)[:limit]
+        n_days = min(len(usable[s]) for s in syms)
+        rets = []
+        for s in syms:
+            closes = usable[s][-n_days:]
+            rets.append(np.diff(np.array(closes)) / np.array(closes[:-1]))
+        mat = np.corrcoef(np.vstack(rets))
+        fig, ax = plt.subplots(
+            figsize=(0.52 * len(syms) + 1.6, 0.52 * len(syms) + 1.2), dpi=140)
+        im = ax.imshow(mat, cmap="RdYlGn_r", vmin=-1, vmax=1)
+        ax.set_xticks(range(len(syms)))
+        ax.set_yticks(range(len(syms)))
+        ax.set_xticklabels(syms, fontsize=6, rotation=45, ha="right")
+        ax.set_yticklabels(syms, fontsize=6)
+        for i in range(len(syms)):
+            for j in range(len(syms)):
+                ax.text(j, i, f"{mat[i, j]:.2f}", ha="center", va="center",
+                        fontsize=5.2,
+                        color="white" if abs(mat[i, j]) > 0.75 else "#1a1a18")
+        ax.set_title("Corrélation des positions (rendements quotidiens)",
+                     fontsize=7.5, color="#334155")
+        fig.colorbar(im, ax=ax, shrink=0.75).ax.tick_params(labelsize=5.5)
+        return _save(fig, plt)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Heatmap corrélation échouée : %s", exc)
+        return None
+
+
+def funding_history_png(
+    annualized_series: list[float], *, symbol: str = "BTC",
+    oi_points: Optional[list[float]] = None,
+) -> Optional[bytes]:
+    """v27 (GR2) — funding annualisé dans le temps (+ OI en axe droit si dispo).
+
+    Un positionnement extrême qui se CONSTRUIT (funding qui dérive vers ±15%/an)
+    se lit sur la pente, pas sur le dernier point. None si < 6 points.
+    """
+    vals = [float(v) for v in (annualized_series or [])
+            if isinstance(v, (int, float))]
+    if len(vals) < 6:
+        return None
+    plt = _import_plt()
+    if plt is None:
+        return None
+    try:
+        fig, ax = plt.subplots(figsize=(5.8, 1.9), dpi=140)
+        x = range(len(vals))
+        colors = [_C_SUP if v >= 0 else _C_RES for v in vals]
+        ax.bar(x, vals, color=colors, width=0.8)
+        ax.axhline(0, color=_C_AXIS, linewidth=0.8)
+        for thr in (15, -15):
+            ax.axhline(thr, color="#BA7517", linewidth=0.6, linestyle="--",
+                       alpha=0.6)
+        ax.set_title(f"{symbol} · funding annualisé (~14 j, 3 points/jour)",
+                     fontsize=7.5, color="#334155")
+        ax.tick_params(labelsize=6, colors=_C_TICK)
+        ax.set_xticks([])
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+        _oi = [float(v) for v in (oi_points or [])
+               if isinstance(v, (int, float))]
+        if len(_oi) >= 6:
+            ax2 = ax.twinx()
+            xs = [i * (len(vals) - 1) / (len(_oi) - 1) for i in range(len(_oi))]
+            ax2.plot(xs, _oi, color=_C_PTF, linewidth=1.2, alpha=0.85,
+                     label="OI")
+            ax2.tick_params(labelsize=5.5, colors=_C_PTF)
+            ax2.spines["top"].set_visible(False)
+            ax2.legend(loc="upper left", fontsize=5.5, frameon=False)
+        return _save(fig, plt)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Graphique funding échoué : %s", exc)
+        return None
+
+
+def gauge_png(value: Any, *, vmin: float = 0, vmax: float = 100,
+              label: str = "", zones: Optional[list[tuple[float, float, str]]] = None,
+              value_label: Optional[str] = None) -> Optional[bytes]:
+    """v27 (AF6) — jauge demi-cercle (F&G, santé PTF…), lisible en un regard.
+
+    ``zones`` = [(de, à, couleur)] dans l'unité de la valeur ; défaut : tiers
+    rouge/ambre/vert. None si valeur non numérique.
+    """
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    plt = _import_plt()
+    if plt is None:
+        return None
+    try:
+        import numpy as np
+        v = max(vmin, min(vmax, v))
+        span = vmax - vmin
+        if not zones:
+            zones = [(vmin, vmin + span / 3, "#A32D2D"),
+                     (vmin + span / 3, vmin + 2 * span / 3, "#BA7517"),
+                     (vmin + 2 * span / 3, vmax, "#3B6D11")]
+        fig, ax = plt.subplots(figsize=(2.9, 1.75), dpi=140,
+                               subplot_kw={"projection": "polar"})
+        ax.set_theta_zero_location("W")
+        ax.set_theta_direction(-1)
+        ax.set_thetamin(0)
+        ax.set_thetamax(180)
+        for lo, hi, color in zones:
+            th = np.linspace((lo - vmin) / span * np.pi,
+                             (hi - vmin) / span * np.pi, 30)
+            ax.fill_between(th, 0.72, 1.0, color=color, alpha=0.85)
+        needle = (v - vmin) / span * np.pi
+        ax.plot([needle, needle], [0, 0.9], color="#1a1a18", linewidth=2.2)
+        ax.plot([needle], [0], "o", color="#1a1a18", markersize=4)
+        ax.set_rticks([])
+        ax.set_xticks([])
+        ax.spines["polar"].set_visible(False)
+        ax.set_title(label, fontsize=7.5, color="#334155", pad=2)
+        ax.text(np.pi / 2, 0.38, value_label or f"{v:.0f}", ha="center",
+                fontsize=13, fontweight="bold", color="#1a1a18")
+        return _save(fig, plt)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Gauge échouée : %s", exc)
+        return None
+
+
+# --------------------------------------------------------------------------- #
 # API publique
 # --------------------------------------------------------------------------- #
 def chart_for_thesis(thesis: dict[str, Any]) -> Optional[bytes]:
@@ -472,15 +821,165 @@ def chart_for_thesis(thesis: dict[str, Any]) -> Optional[bytes]:
     plt = _import_plt()
     if plt is None:
         return None
-    closes = _load_closes(sym, days=365)
-    if not closes:
+    series = _load_series(sym, days=365)
+    if not series:
         return None
     try:
         mode = _select_analysis(thesis)
-        return _render_analysis(plt, sym, closes, mode, thesis.get("support_resistance"))
+        return _render_analysis(plt, sym, series["closes"], mode,
+                                thesis.get("support_resistance"),
+                                volumes_full=series.get("volumes"))
     except Exception as exc:  # noqa: BLE001
         logger.warning("Graphique %s échoué : %s", sym, exc)
         return None
+
+
+# --------------------------------------------------------------------------- #
+# v26 (B8/A20) — graphiques de SUIVI pour les jours sans nouvelle reco
+# --------------------------------------------------------------------------- #
+def _render_tracking(plt, symbol: str, closes_full: list[float],
+                     reco: dict[str, Any],
+                     volumes_full: Optional[list[float]] = None) -> bytes:
+    """Cours + MM50 + niveaux du PLAN (entrée/cible/stop) + RSI.
+
+    La lecture qui compte pour une reco EN COURS : où est le prix par rapport
+    au plan de trade. Chaque niveau est tracé et CHIFFRÉ.
+    """
+    display_days = 120
+    ma50 = _sma(closes_full, 50)
+    rsis = _rsi(closes_full, 14)
+    n = len(closes_full)
+    start = max(0, n - display_days)
+    cl = closes_full[start:]
+    x = list(range(len(cl)))
+    last_i = len(cl) - 1
+    cur = cl[-1]
+    rs = rsis[start:]
+
+    fig, (ax, axr) = plt.subplots(
+        2, 1, figsize=(6.6, 3.9), dpi=140, height_ratios=[3, 1],
+        gridspec_kw={"hspace": 0.12},
+    )
+    ax.plot(x, cl, color=_C_PRICE, linewidth=1.6, zorder=6, label="cours")
+    if volumes_full:
+        _draw_volume_underlay(ax, volumes_full, len(cl))
+    series50 = ma50[start:]
+    xs = [i for i, v in enumerate(series50) if v is not None]
+    if len(xs) >= 2:
+        ax.plot(xs, [series50[i] for i in xs], color=_C_MA50, linewidth=1.0,
+                alpha=0.9, label="MM50", zorder=4)
+
+    def _level(value: Any, color: str, label: str, style: str = "--") -> None:
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            return
+        if v <= 0:
+            return
+        ax.axhline(v, color=color, linewidth=1.1, linestyle=style, alpha=0.85,
+                   zorder=3)
+        ax.text(0, v, f"{label} {_fmt_level(v)}", fontsize=6, color=color,
+                va="bottom", ha="left", bbox=_LBL_BBOX, zorder=8)
+
+    _level(reco.get("entry_price"), "#2563eb", "entrée", style=":")
+    _level(reco.get("ct_target"), _C_SUP, "cible")
+    _level(reco.get("stop_loss"), _C_RES, "stop")
+
+    ax.scatter([last_i], [cur], color=_C_PRICE, s=12, zorder=7)
+    ax.text(last_i, cur, f" {_fmt_level(cur)}", fontsize=6.5, color=_C_PRICE,
+            va="center", ha="left", fontweight="bold", zorder=8, bbox=_LBL_BBOX)
+    action = str(reco.get("action") or "").upper() or "SUIVI"
+    ax.set_title(f"{symbol} · {len(cl)}j · suivi reco {action} — plan vs prix",
+                 fontsize=8.5, color="#334155")
+    ax.legend(loc="upper left", fontsize=5.5, ncol=2, frameon=True,
+              facecolor="white", framealpha=0.7, edgecolor="none",
+              handlelength=1.3, columnspacing=1.0, borderpad=0.3)
+    _style_axis(ax)
+    ax.margins(x=0.02)
+
+    xr = [i for i, v in enumerate(rs) if v is not None]
+    axr.axhspan(70, 100, color=_C_RES, alpha=0.06)
+    axr.axhspan(0, 30, color=_C_SUP, alpha=0.06)
+    if xr:
+        axr.plot(xr, [rs[i] for i in xr], color=_C_RSI, linewidth=1.1)
+    axr.axhline(70, color=_C_RES, linewidth=0.6, linestyle=":", alpha=0.7)
+    axr.axhline(30, color=_C_SUP, linewidth=0.6, linestyle=":", alpha=0.7)
+    axr.set_ylim(0, 100)
+    axr.set_yticks([30, 70])
+    cur_rsi = next((rs[i] for i in range(len(rs) - 1, -1, -1)
+                    if rs[i] is not None), None)
+    if cur_rsi is not None:
+        axr.text(last_i, cur_rsi, f"RSI {cur_rsi:.0f}", fontsize=6, color=_C_RSI,
+                 va="center", ha="right", fontweight="bold", bbox=_LBL_BBOX)
+    _style_axis(axr)
+    axr.margins(x=0.02)
+    return _save(fig, plt)
+
+
+def _tracking_chart_is_useful(reco: dict[str, Any]) -> bool:
+    """B8 — un graphique de suivi n'est généré QUE s'il apporte une lecture :
+    position proche du stop ou de la cible, ou mouvement notable depuis
+    l'entrée. Pas de graphique décoratif."""
+    if not isinstance(reco, dict) or not reco.get("asset"):
+        return False
+    has_plan = bool(reco.get("entry_price")) and (
+        bool(reco.get("ct_target")) or bool(reco.get("stop_loss")))
+    if not has_plan:
+        return False
+    path = reco.get("target_path_pct")
+    prog = reco.get("progress_pct")
+    health = str(reco.get("health_status") or "")
+    if "Stop approché" in health or "Cible atteinte" in health:
+        return True
+    if isinstance(path, (int, float)) and (path >= 35 or path <= -30):
+        return True
+    if isinstance(prog, (int, float)) and abs(prog) >= 4:
+        return True
+    return False
+
+
+def charts_for_tracked_recos(
+    recos: list[dict[str, Any]], *, limit: int = 2
+) -> dict[str, bytes]:
+    """v26 (B8) — graphiques « plan vs prix » pour les recos actives UTILES.
+
+    Sélection « quand utile » : proche du stop/de la cible ou mouvement
+    notable. FILET : si aucune reco ne passe le filtre mais qu'au moins une
+    porte un plan complet, on charte la plus avancée — un jour sans nouvelle
+    reco ne doit plus être un mail sans AUCUN graphique (défaut v25/A20),
+    et un graphe « plan vs prix » a une valeur intrinsèque pour une reco
+    en cours.
+
+    Returns:
+        Dict ``{symbol: png_bytes}`` (peut être vide). Clés CID côté mail :
+        ``chart_track_<SYMBOL>``.
+    """
+    plt = _import_plt()
+    if plt is None:
+        return {}
+    out: dict[str, bytes] = {}
+    candidates = [r for r in (recos or []) if _tracking_chart_is_useful(r)]
+    if not candidates:
+        with_plan = [
+            r for r in (recos or [])
+            if isinstance(r, dict) and r.get("asset") and r.get("entry_price")
+            and (r.get("ct_target") or r.get("stop_loss"))
+        ]
+        with_plan.sort(key=lambda r: abs(r.get("progress_pct") or 0), reverse=True)
+        candidates = with_plan[:1]
+    candidates.sort(
+        key=lambda r: abs(r.get("progress_pct") or 0), reverse=True)
+    for reco in candidates[:limit]:
+        sym = reco.get("asset")
+        series = _load_series(sym, days=180)
+        if not series:
+            continue
+        try:
+            out[sym] = _render_tracking(plt, sym, series["closes"], reco,
+                                        volumes_full=series.get("volumes"))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Graphique suivi %s échoué : %s", sym, exc)
+    return out
 
 
 def price_bollinger_png(symbol: str, *, days: int = 90) -> Optional[bytes]:

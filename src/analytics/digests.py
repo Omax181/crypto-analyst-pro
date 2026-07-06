@@ -178,9 +178,25 @@ def options_line(opt: dict[str, Any]) -> str:
             )
         if d.get("dvol") is not None:
             seg.append(f"DVOL {d['dvol']}")
+        # OB26 — skew 25Δ (risk reversal) : signal directionnel du positionnement
+        # options, désormais alimenté (avant : demandé au LLM mais jamais fourni).
+        if d.get("iv_skew_25d") is not None:
+            rr = d["iv_skew_25d"]
+            sbias = ("protection baissière chère" if rr <= -1.5
+                     else "appétit calls" if rr >= 1.5 else "neutre")
+            seg.append(f"skew 25Δ {rr:+} ({sbias})")
         if seg:
             bits.append(f"{sym}: " + ", ".join(seg))
     return " | ".join(bits)
+
+
+def narratives_line(hot: dict[str, Any]) -> str:
+    """OB6 — ligne compacte des narratifs qui chauffent/refroidissent (CoinGecko).
+
+    ``hot`` = sortie de ``narratives.detect_hot_narratives``. Vide si indisponible.
+    """
+    reading = (hot or {}).get("reading") or ""
+    return f"Narratifs 24h — {reading}" if (hot or {}).get("available") and reading else ""
 
 
 def macro_correlation_line(corr: dict[str, Any]) -> str:

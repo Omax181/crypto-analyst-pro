@@ -251,3 +251,111 @@ def get_derivatives(symbol: str) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Binance Futures échoué pour %s : %s", symbol, exc)
         return {"available": False, "reason": str(exc)}
+
+
+def get_funding_history(symbol: str, *, days: int = 14) -> dict[str, Any]:
+    """v27 (GR2) — HISTORIQUE du funding : la courbe montre un positionnement
+    extrême qui se CONSTRUIT, invisible sur le seul dernier point.
+
+    OKX en PREMIER (non géo-restreint sur Actions, même logique que
+    ``get_derivatives``), Binance en repli hors Actions. 3 règlements/jour.
+
+    Returns:
+        ``{available, symbol, source, points: [{ts_ms, rate_pct}],
+        annualized_series: [pct], last_annualized_pct, avg_annualized_pct}``.
+    """
+    sym = symbol.upper()
+
+    def _fetch() -> dict[str, Any]:
+        rows: list[tuple[int, float]] = []
+        source = None
+        inst = _okx_inst(sym)
+        if inst:
+            raw = get_json(f"{_OKX_BASE}/funding-rate-history",
+                           params={"instId": inst,
+                                   "limit": min(days * _FUNDINGS_PER_DAY, 100)})
+            data = (raw or {}).get("data") if isinstance(raw, dict) else None
+            if data:
+                for r in data:
+                    try:
+                        rows.append((int(r.get("fundingTime")),
+                                     float(r.get("fundingRate")) * 100.0))
+                    except (TypeError, ValueError):
+                        continue
+                source = "OKX"
+        if not rows and os.environ.get(
+                "GITHUB_ACTIONS", "").strip().lower() != "true":
+            perp = _perp_symbol(sym)
+            if perp:
+                raw = get_json(f"{_BASE}/fundingRate",
+                               params={"symbol": perp,
+                                       "limit": min(days * _FUNDINGS_PER_DAY, 100)})
+                if isinstance(raw, list):
+                    for r in raw:
+                        try:
+                            rows.append((int(r.get("fundingTime")),
+                                         float(r.get("fundingRate")) * 100.0))
+                        except (TypeError, ValueError):
+                            continue
+                    source = "Binance"
+        if not rows:
+            return {"available": False, "symbol": sym}
+        rows.sort(key=lambda t: t[0])
+        points = [{"ts_ms": ts, "rate_pct": round(rate, 4)} for ts, rate in rows]
+        annualized = [round(p["rate_pct"] * _FUNDINGS_PER_DAY * 365, 1)
+                      for p in points]
+        return {
+            "available": True, "symbol": sym, "source": source,
+            "points": points, "annualized_series": annualized,
+            "last_annualized_pct": annualized[-1],
+            "avg_annualized_pct": round(sum(annualized) / len(annualized), 1),
+        }
+
+    try:
+        return CACHE.get_or_compute(f"funding_hist:{sym}:{days}", 1800, _fetch)
+    except Exception as exc:  # noqa: BLE001
+        logger.info("Funding history indisponible pour %s : %s", symbol, exc)
+        return {"available": False, "symbol": sym}
+
+
+def get_oi_history(symbol: str, *, period: str = "4h",
+                   limit: int = 84) -> dict[str, Any]:
+    """v27 (GR2) — historique de l'open interest (~14 j en 4 h), best-effort.
+
+    Binance uniquement (endpoint ``futures/data/openInterestHist``), donc
+    ÉVITÉ sur GitHub Actions (451 garanti) : le graphique OI n'apparaît que
+    quand la donnée existe — dégradation silencieuse sinon.
+    """
+    sym = symbol.upper()
+
+    def _fetch() -> dict[str, Any]:
+        if os.environ.get("GITHUB_ACTIONS", "").strip().lower() == "true":
+            return {"available": False, "symbol": sym,
+                    "reason": "openInterestHist géo-bloqué sur Actions"}
+        perp = _perp_symbol(sym)
+        if not perp:
+            return {"available": False, "symbol": sym}
+        raw = get_json("https://fapi.binance.com/futures/data/openInterestHist",
+                       params={"symbol": perp, "period": period, "limit": limit})
+        if not isinstance(raw, list) or len(raw) < 2:
+            return {"available": False, "symbol": sym}
+        points: list[dict[str, Any]] = []
+        for row in raw:
+            try:
+                points.append({"ts_ms": int(row.get("timestamp")),
+                               "oi": float(row.get("sumOpenInterest"))})
+            except (TypeError, ValueError):
+                continue
+        if len(points) < 2:
+            return {"available": False, "symbol": sym}
+        points.sort(key=lambda p: p["ts_ms"])
+        first, last = points[0]["oi"], points[-1]["oi"]
+        return {"available": True, "symbol": sym, "points": points,
+                "change_pct": (round((last - first) / first * 100, 1)
+                               if first else None)}
+
+    try:
+        return CACHE.get_or_compute(f"oi_hist:{sym}:{period}", 1800, _fetch)
+    except Exception as exc:  # noqa: BLE001
+        logger.info("OI history indisponible pour %s : %s", symbol, exc)
+        return {"available": False, "symbol": sym}

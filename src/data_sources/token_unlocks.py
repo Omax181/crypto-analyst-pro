@@ -101,7 +101,69 @@ def _num(value: Any) -> Optional[float]:
         return None
 
 
-def get_upcoming_unlocks(days_ahead: int = 30) -> dict[str, Any]:
+def unlocks_from_coinmarketcal(
+    crypto_events: Optional[dict[str, Any]], days_ahead: int = 30
+) -> dict[str, Any]:
+    """v26 (C2) — unlocks dérivés des événements CoinMarketCal (clé déjà posée).
+
+    ``api.llama.fi/emissions`` est passé payant (402) et aucune API d'unlocks
+    gratuite fiable n'existe : la source « Token Unlocks » était structurellement
+    morte. CoinMarketCal (clé GRATUITE, déjà dans les secrets Actions) liste les
+    événements datés par coin — dont les déblocages (« unlock », « vesting »).
+    On filtre ces événements pour reconstituer un calendrier d'unlocks HONNÊTE :
+    symbol + date + titre. Ni montant ni % supply (CoinMarketCal ne les fournit
+    pas de façon fiable) → champs None, jamais inventés.
+
+    Args:
+        crypto_events: sortie de ``coinmarketcal.get_events`` (déjà récupérée
+            par le run — zéro appel réseau supplémentaire).
+        days_ahead: fenêtre de retenue.
+
+    Returns:
+        Même schéma que ``get_upcoming_unlocks``.
+    """
+    events = (crypto_events or {}).get("events") if isinstance(crypto_events, dict) else None
+    if not isinstance(events, list) or not events:
+        return {"available": False, "unlocks": [], "count": 0,
+                "reason": "CoinMarketCal indisponible"}
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(days=days_ahead)
+    kw = ("unlock", "déblocage", "vesting", "cliff")
+    unlocks: list[dict[str, Any]] = []
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        title = str(ev.get("title") or "")
+        cat = str(ev.get("category") or "")
+        if not any(k in (title + " " + cat).lower() for k in kw):
+            continue
+        dt = _parse_when(ev.get("date"))
+        if dt is None or not (now - timedelta(days=1) <= dt <= cutoff):
+            continue
+        for sym in (ev.get("coins") or []):
+            s = str(sym or "").strip().upper()
+            if s == "RNDR":
+                s = "RENDER"
+            if not s:
+                continue
+            unlocks.append({
+                "symbol": s,
+                "date": dt.strftime("%Y-%m-%d"),
+                "amount_usd": None,
+                "pct_supply": None,
+                "title": title[:90],
+            })
+    unlocks.sort(key=lambda u: u["date"])
+    if not unlocks:
+        return {"available": False, "unlocks": [], "count": 0,
+                "reason": "aucun unlock CoinMarketCal dans la fenêtre"}
+    return {"available": True, "unlocks": unlocks, "count": len(unlocks),
+            "source": "CoinMarketCal"}
+
+
+def get_upcoming_unlocks(
+    days_ahead: int = 30, crypto_events: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """Unlocks à venir (fenêtre ``days_ahead``) sur les positions concernées.
 
     Returns:
@@ -111,9 +173,14 @@ def get_upcoming_unlocks(days_ahead: int = 30) -> dict[str, Any]:
     """
 
     # v21 (Logs#5) — endpoint payant (402) : on n'appelle pas par défaut.
+    # v26 (C2) — repli CoinMarketCal (événements déjà récupérés par le run).
     if os.environ.get("DEFILLAMA_PAID", "").strip().lower() not in ("1", "true", "yes"):
+        cmc = unlocks_from_coinmarketcal(crypto_events, days_ahead)
+        if cmc.get("available"):
+            return cmc
         return {"available": False, "unlocks": [], "count": 0,
-                "reason": "DefiLlama emissions payant (402)"}
+                "reason": "DefiLlama emissions payant (402) · "
+                          + str(cmc.get("reason") or "CoinMarketCal sans unlock")}
 
     def _fetch() -> dict[str, Any]:
         try:

@@ -48,7 +48,11 @@ def get_social_metrics(symbol: str) -> dict[str, Any]:
 
 def get_trending_coins() -> dict[str, Any]:
     if not _enabled():
-        return {"available": False, "trending": []}
+        # v26 (C2) — repli GRATUIT : la source « Social trending » ne meurt plus
+        # avec le paywall LunarCrush. CoinGecko /search/trending (sans clé,
+        # probé OK depuis datacenter) donne les coins les plus recherchés —
+        # proxy honnête de l'attention sociale du jour, libellé comme tel.
+        return _coingecko_trending_fallback()
     def _fetch() -> dict[str, Any]:
         try:
             data = get_json(f"{_BASE}/coins/list/v2",
@@ -60,4 +64,39 @@ def get_trending_coins() -> dict[str, Any]:
         except Exception as exc:
             logger.warning("LunarCrush trending : %s", exc)
             return {"available": False, "trending": []}
-    return CACHE.get_or_compute("lunarcrush:trending", 3600, _fetch)
+    result = CACHE.get_or_compute("lunarcrush:trending", 3600, _fetch)
+    if not result.get("available"):
+        return _coingecko_trending_fallback()
+    return result
+
+
+def _coingecko_trending_fallback() -> dict[str, Any]:
+    """v26 (C2) — tendances sociales via CoinGecko trending (gratuit, sans clé).
+
+    Schéma identique à LunarCrush (``{available, trending, source}``) : les
+    consommateurs (prompt, bot) n'ont rien à changer. ``galaxy_score`` absent
+    (propriétaire LunarCrush) — jamais inventé.
+    """
+    def _fetch() -> dict[str, Any]:
+        try:
+            data = get_json("https://api.coingecko.com/api/v3/search/trending",
+                            timeout=15)
+            coins = (data or {}).get("coins") or []
+            trending = []
+            for c in coins[:10]:
+                item = c.get("item") if isinstance(c, dict) else None
+                if not isinstance(item, dict) or not item.get("symbol"):
+                    continue
+                trending.append({
+                    "symbol": str(item.get("symbol")).upper(),
+                    "name": item.get("name"),
+                    "market_cap_rank": item.get("market_cap_rank"),
+                })
+            if not trending:
+                return {"available": False, "trending": []}
+            return {"available": True, "trending": trending,
+                    "source": "CoinGecko Trending (recherches)"}
+        except Exception as exc:  # noqa: BLE001
+            logger.info("CoinGecko trending indisponible : %s", exc)
+            return {"available": False, "trending": []}
+    return CACHE.get_or_compute("coingecko:trending_social", 3600, _fetch)

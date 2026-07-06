@@ -125,16 +125,19 @@ def test_polymarket_extra_filters_themes(monkeypatch):
 # --------------------------------------------------------------------------- #
 # Tracker — la dernière reco prime
 # --------------------------------------------------------------------------- #
-def _mem_with_store():
+def _mem_with_store(monkeypatch):
+    # Audit v26 final — monkeypatch (auto-restauré) au lieu d'une assignation
+    # directe qui écrasait le vrai I/O pour TOUS les tests suivants (fuite).
     import src.state.report_memory as rm
     store: dict = {}
-    rm._read = lambda f, default: store.get(f, default if default is not None else [])
-    rm._write = lambda f, data: store.__setitem__(f, data)
+    monkeypatch.setattr(rm, "_read",
+                        lambda f, default: store.get(f, default if default is not None else []))
+    monkeypatch.setattr(rm, "_write", lambda f, data: store.__setitem__(f, data))
     return rm, store
 
 
-def test_tracker_reissue_updates_content_keeps_anchor():
-    rm, _ = _mem_with_store()
+def test_tracker_reissue_updates_content_keeps_anchor(monkeypatch):
+    rm, _ = _mem_with_store(monkeypatch)
     rm.add_recommendation({"id": "BTC-1", "asset": "BTC", "action": "RENFORCER",
                            "entry_price": 60000, "confidence": 55,
                            "rationale": "v1"})
@@ -151,8 +154,8 @@ def test_tracker_reissue_updates_content_keeps_anchor():
     assert r.get("last_issued_at")
 
 
-def test_weekly_source_stats_avg():
-    rm, store = _mem_with_store()
+def test_weekly_source_stats_avg(monkeypatch):
+    rm, store = _mem_with_store(monkeypatch)
     now = dt.datetime.now(dt.timezone.utc)
     logs = [
         {"date": (now - dt.timedelta(days=1)).isoformat(), "down": ["A"]},        # 24
@@ -170,10 +173,9 @@ def test_weekly_source_stats_avg():
 # --------------------------------------------------------------------------- #
 # Détail de scoring Python (weekly)
 # --------------------------------------------------------------------------- #
-def test_build_scoring_detail_dedup_and_fields():
-    import src.state.report_memory as rm
+def test_build_scoring_detail_dedup_and_fields(monkeypatch):
     from src.tracking.prediction_scoring import PredictionTracker
-    rm, store = _mem_with_store()
+    rm, store = _mem_with_store(monkeypatch)
     now = dt.datetime.now(dt.timezone.utc)
     old = (now - dt.timedelta(days=3)).isoformat()
     newer = (now - dt.timedelta(days=1)).isoformat()
@@ -437,14 +439,15 @@ def test_render_morning_v15_blocks():
     assert "1 nouvelle reco · 9 en suivi" in html
     assert "EN BREF" in html and "1 renforcement BTC" in html
     assert "maintien" in html and "99.2%" in html
-    # v19/V18-M4 : la 2e valeur DXY est désormais « Fed large · 120.08 » (discrète).
-    assert "Fed large · 120.08" in html
+    # v19/V18-M4 : 2e valeur DXY discrète. v26 (E-B12) : libellé explicite
+    # « indice élargi » — « Fed large » était cryptique pour le lecteur.
+    assert "indice élargi · 120.08" in html
     assert "+12 autres" in html and "moy." in html  # v16 : case agrégée %PTF
     assert "12.9% du PTF" in html                    # v16 : poids agrégat
     assert "réseau sain" in html                     # v16 : grille on-chain horizontale
     assert "Bilan on-chain : neutre" in html         # v16 : verdict-first
     assert "DXY &gt; 101" in html or "DXY > 101" in html
-    assert "Crypto Analyst Pro · v25" in html
+    assert "Crypto Analyst Pro · v26" in html
     # Ordre : invalidation AVANT auto-critique.
     assert html.index("invalider mon scénario") < html.index("Auto-critique de l'analyse")
 
@@ -473,7 +476,7 @@ def test_render_evening_v15_blocks():
     assert "Actions à poser ce soir" in html and "ordre limite BTC" in html
     assert "International · Europe" in html and "Nikkei 225" in html
     assert "maintien" in html and "99.2%" in html
-    assert "Crypto Analyst Pro · v25" in html
+    assert "Crypto Analyst Pro · v26" in html
 
 
 def test_render_weekly_v15_blocks():
@@ -563,6 +566,6 @@ def test_render_weekly_v15_blocks():
     assert "Renforcer" in html and "Alléger" in html
     assert "Stratégie de la semaine" in html
     assert "1\u202f773" in html or "1,773" in html or "1 773" in html  # fenêtre P&L
-    assert "Crypto Analyst Pro · v25" in html
+    assert "Crypto Analyst Pro · v26" in html
     # Ordre : la vue PTF arrive avant le fil rouge macro (P3-1).
     assert html.index("Portfolio · vue d'ensemble") < html.index("Fil rouge macro")

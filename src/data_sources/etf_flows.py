@@ -116,6 +116,175 @@ def _coinglass_latest_flow(url: str) -> Optional[dict[str, Any]]:
         return None
 
 
+# --------------------------------------------------------------------------- #
+# v26 (B5/A3) — flux ETF DÉTERMINISTES depuis le canal Telegram « ETF_Flows ».
+# --------------------------------------------------------------------------- #
+# Sur GitHub Actions, Farside est 403 et CoinGlass 404 : la SEULE voie fiable
+# était le canal Telegram ETF_Flows… mais ses chiffres n'étaient exploités que
+# par Gemini (news), pendant que le footer déclarait « ETF flows indisponibles »
+# — contradiction relevée à l'audit v25 (A3). On parse donc les messages du
+# canal EN PYTHON (format stable, vérifié en conditions réelles) :
+#   « 🟠 Bitcoin ETF Inflow : 2026-07-01 … 📊 Net Inflow : -$325.8M
+#     ⚡ 7-day Avg : -$360.5M »   (idem « ETH ETF Inflow », SOL, XRP…)
+# La source devient STRUCTURÉE (available=True, date, net, moyenne 7j) → le
+# drapeau de source, les tuiles et l'EN BREF citent le MÊME fait, daté.
+_TG_ASSET_HEAD = re.compile(
+    r"(bitcoin|btc|eth(?:ereum)?)\s+etf\s+inflow\s*:?\s*(\d{4}-\d{2}-\d{2})",
+    re.IGNORECASE,
+)
+_TG_NET = re.compile(
+    r"net\s+inflow\s*:?\s*(-?)\$?([\d,.]+)\s*([kmb])", re.IGNORECASE)
+_TG_AVG = re.compile(
+    r"7-day\s+avg\s*:?\s*(-?)\$?([\d,.]+)\s*([kmb])", re.IGNORECASE)
+# Récap quotidien multi-actifs : « BTC ETFs : -$325.8M » / « ETH ETFs : $14.8M ».
+_TG_SUMMARY_LINE = re.compile(
+    r"\b(btc|eth)\s+etfs\s*:?\s*(-?)\$?([\d,.]+)\s*([kmb])", re.IGNORECASE)
+
+_MULT = {"k": 0.001, "m": 1.0, "b": 1000.0}  # tout homogénéisé en M$
+
+
+def _tg_amount_musd(sign: str, num: str, unit: str) -> Optional[float]:
+    """Convertit « -, 325.8, M » en millions de dollars signés."""
+    try:
+        val = float(num.replace(",", "")) * _MULT[unit.lower()]
+    except (ValueError, KeyError):
+        return None
+    return round(-val if sign == "-" else val, 1)
+
+
+def parse_flows_from_telegram(
+    telegram: Optional[dict[str, Any]],
+) -> dict[str, Any]:
+    """Extrait les flux ETF BTC/ETH des messages Telegram (déterministe).
+
+    Args:
+        telegram: sortie de ``telegram_reader.get_telegram_news`` —
+            ``{available, messages: [{channel, text, timestamp}]}``.
+
+    Returns:
+        ``{available, btc, eth}`` au même schéma que ``get_etf_flows``
+        (+ ``avg_7d_musd`` quand le canal le fournit). ``available=False``
+        si aucun message exploitable.
+    """
+    out: dict[str, Any] = {"available": False, "btc": None, "eth": None}
+    msgs = (telegram or {}).get("messages") if isinstance(telegram, dict) else None
+    if not isinstance(msgs, list):
+        return out
+    # Les messages Telethon sont datés ISO : on parcourt du plus récent au plus
+    # ancien pour que le PREMIER match par actif soit le plus frais.
+    def _ts(m: dict[str, Any]) -> str:
+        return str(m.get("timestamp") or "")
+    ordered = [
+        m for m in sorted((x for x in msgs if isinstance(x, dict)),
+                          key=_ts, reverse=True)
+        if str(m.get("channel") or "").lower() in ("etf_flows", "etf flows")
+    ]
+    # PASSE 1 — messages PAR ACTIF (les plus riches : date + net + moyenne 7j).
+    # Le récap quotidien multi-actifs est posté APRÈS eux : sans les deux
+    # passes, il masquerait les messages détaillés (perte date/moyenne).
+    for m in ordered:
+        text = str(m.get("text") or "")
+        head = _TG_ASSET_HEAD.search(text)
+        if not head:
+            continue
+        sym = "btc" if head.group(1).lower().startswith(("bit", "btc")) else "eth"
+        if out.get(sym) is not None:
+            continue  # déjà couvert par un message plus récent
+        net = _TG_NET.search(text)
+        if not net:
+            continue
+        flow = _tg_amount_musd(*net.groups())
+        if flow is None:
+            continue
+        entry: dict[str, Any] = {
+            "date": head.group(2), "total_flow_musd": flow,
+            "source": "Telegram · ETF_Flows",
+        }
+        avg = _TG_AVG.search(text)
+        if avg:
+            avg_v = _tg_amount_musd(*avg.groups())
+            if avg_v is not None:
+                entry["avg_7d_musd"] = avg_v
+        out[sym] = entry
+    # PASSE 2 — récap multi-actifs (« BTC ETFs : -$325.8M ») : ne comble que
+    # les actifs encore vides (ex. message détaillé tronqué/absent).
+    for m in ordered:
+        if out.get("btc") is not None and out.get("eth") is not None:
+            break
+        text = str(m.get("text") or "")
+        if _TG_ASSET_HEAD.search(text) or "etf flows" not in text.lower():
+            continue
+        for sym_raw, sign, num, unit in _TG_SUMMARY_LINE.findall(text):
+            sym = sym_raw.lower()
+            if out.get(sym) is not None:
+                continue
+            flow = _tg_amount_musd(sign, num, unit)
+            if flow is None:
+                continue
+            out[sym] = {"date": None, "total_flow_musd": flow,
+                        "source": "Telegram · ETF_Flows"}
+    out["available"] = bool(out["btc"] or out["eth"])
+    return out
+
+
+# Repli #2 (sans Telethon) : aperçu web public du canal — https://t.me/s/…
+# répond sans clé ni session (probé). Best-effort : si Telegram bloque les IP
+# datacenter un jour donné, dégradation propre.
+_TME_PREVIEW = "https://t.me/s/ETF_Flows"
+
+
+def _flows_from_tme_preview() -> dict[str, Any]:
+    """Parse l'aperçu web t.me/s/ETF_Flows (repli sans session Telegram)."""
+    try:
+        html = get_text(_TME_PREVIEW, timeout=15, headers=_ETF_HEADERS)
+        if not html:
+            return {"available": False, "btc": None, "eth": None}
+        blocks = re.findall(
+            r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>',
+            html, re.S)
+        msgs = []
+        for i, b in enumerate(blocks):
+            clean = re.sub(r"<br/?>", "\n", b)
+            clean = re.sub(r"<[^>]+>", "", clean)
+            for a, c in (("&amp;", "&"), ("&#36;", "$"), ("&nbsp;", " "),
+                         ("&lt;", "<"), ("&gt;", ">"), ("&#39;", "'")):
+                clean = clean.replace(a, c)
+            # L'ordre du DOM est chronologique : on fabrique un pseudo-timestamp
+            # croissant pour que le tri « plus récent d'abord » du parseur tienne.
+            msgs.append({"channel": "etf_flows", "text": clean,
+                         "timestamp": f"{i:06d}"})
+        return parse_flows_from_telegram({"available": True, "messages": msgs})
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Aperçu t.me ETF_Flows échoué : %s", exc)
+        return {"available": False, "btc": None, "eth": None}
+
+
+def merge_with_telegram(
+    base: dict[str, Any], telegram: Optional[dict[str, Any]]
+) -> dict[str, Any]:
+    """Complète ``get_etf_flows`` avec le canal Telegram quand Farside est KO.
+
+    Priorité : Farside/CoinGlass (si dispo) > messages Telethon > aperçu t.me.
+    Ne touche jamais une entrée déjà remplie (pas d'écrasement d'une source
+    directe par un repli).
+    """
+    if isinstance(base, dict) and base.get("available") and base.get("btc") and base.get("eth"):
+        return base
+    out = dict(base) if isinstance(base, dict) else {"available": False, "btc": None, "eth": None}
+    tg = parse_flows_from_telegram(telegram)
+    if not tg.get("available"):
+        tg = _flows_from_tme_preview()
+    if not isinstance(tg, dict):  # défense : un repli cassé ne casse pas le run
+        tg = {"available": False, "btc": None, "eth": None}
+    for sym in ("btc", "eth"):
+        if not out.get(sym) and tg.get(sym):
+            out[sym] = tg[sym]
+    out["available"] = bool(out.get("btc") or out.get("eth"))
+    if out["available"]:
+        out.pop("reason", None)
+    return out
+
+
 def get_etf_flows() -> dict[str, Any]:
     """Récupère les flux ETF BTC et ETH du jour le plus récent.
 

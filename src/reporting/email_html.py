@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 # v15 — version produit UNIQUE, injectée dans les 3 footers (audit : « v13 »
 # en dur dans les templates). main.py la ré-exporte pour les logs.
-APP_VERSION = "v25"
+APP_VERSION = "v26"
 
 _COLORS = {
     "bg": "#fafaf6",
@@ -307,8 +307,8 @@ _SOURCE_NAME_MAP = {
     "morningreport": "Rapport matin",
     "evening_macro": "Yahoo Finance",
     "eveningmacro": "Yahoo Finance",
-    "etf_flows": "Farside Investors",
-    "etfflows": "Farside Investors",
+    "etf_flows": "ETF flows",
+    "etfflows": "ETF flows",
     "btc_network": "Blockchain.com",
     "btcnetwork": "Blockchain.com",
     "stablecoin_supply": "DeFiLlama",

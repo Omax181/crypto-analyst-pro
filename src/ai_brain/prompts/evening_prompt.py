@@ -183,6 +183,21 @@ INSTRUCTIONS :
    portefeuille) et qui a bougé mérite un niveau, MÊME sans reco active dessus —
    c'est du capital exposé qu'Omar doit pouvoir surveiller. Ne réserve pas les
    niveaux aux seuls actifs sous reco.
+   v26 (E-B5 — NIVEAUX CALCULÉS = SOURCE DE VÉRITÉ, IMPÉRATIF) :
+   data.computed_levels[SYM] fournit pour BTC/ETH (et les gros movers) les
+   supports/résistances CALCULÉS depuis la série de prix réelle (pivots de
+   swing, MM50/100/200, retracements Fibonacci, bandes de Bollinger, seuils
+   ronds), chacun avec sa base et sa distance au prix, PLUS un readout
+   technique (RSI, MACD, Bollinger, ATR, tendance, volume) et le range attendu
+   ±ATR (expected_range). RÈGLES : (a) tes levels_tonight pour ces actifs sont
+   CHOISIS PARMI ces niveaux — recopie les valeurs telles quelles ; (b)
+   INTERDIT d'inventer un niveau qui n'y figure pas (fini les ronds arbitraires
+   « 59 000 / 61 000 » sans ancrage) ; (c) enrichis le trigger avec le readout
+   quand il éclaire la décision (ex. « RSI 72 en surchauffe sous la résistance
+   62 126 $ → prise de profit partielle défendable ») ; (d) le scénario/
+   l'invalidation de la checklist s'appuient sur expected_range et le premier
+   support. Exception : DXY et actifs absents de computed_levels — analyse
+   classique depuis le contexte macro, prudence sur les chiffres.
 4bis. actions_tonight (v16.1) : 0 à 3 actions à POSER ce soir, objet structuré
    {{action, rationale, rebuy, horizon}}. C'est LA section qui découle de toute
    l'analyse — Omar s'en sert pour décider, donc elle doit être DENSE en chiffres
@@ -266,8 +281,11 @@ INSTRUCTIONS :
    aval) et rendu automatiquement, 1 ligne par actif. N'émets donc AUCUN champ
    reco_evolution / reco bilan dans ton JSON.
 8. RÈGLE CASH : le portefeuille est 100% crypto, ZÉRO USDC. N'écris jamais
-   « rester liquide en USDC », « renforcer USDC » ni « déployer du cash ». Pour
-   financer une entrée : alléger une position existante.
+   « rester liquide en USDC », « renforcer USDC » ni « déployer du cash ».
+   v27 (RE1) : le cash n'est JAMAIS une contrainte — Omar peut injecter des
+   fonds externes à tout moment. NE conditionne PAS une entrée à l'allègement
+   d'une autre position (« financer en vendant X » = interdit) ; un allègement
+   ne se propose que s'il est justifié par la thèse de l'actif allégé.
 9. NOMS DE SOURCES — libellé public TOUJOURS : « CoinGecko » (pas prices_now),
    « Fear & Greed Index » (pas fear_greed), « Yahoo Finance » (pas evening_macro),
    « Farside Investors » (pas etf_flows), « Rapport matin » (pas morning_report).

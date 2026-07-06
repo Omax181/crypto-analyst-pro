@@ -30,6 +30,8 @@
         <h1 style="margin:0;font-size:25px;font-weight:500;line-height:1.2;">Rapport hebdomadaire</h1>
         <p style="font-size:12px;color:#8a8880;margin:6px 0 0 0;">Bilan{% if header.period_covered %} {{header.period_covered}}{% else %} semaine passée{% endif %} · focus semaine à venir</p>
         {% if header.sources_week_label %}<p style="font-size:10px;color:#8a8880;margin:4px 0 0 0;">{{header.sources_week_label}}</p>{% endif %}
+        {# v26 (W-A15) — run hors-cycle signalé honnêtement (comme le « fenêtre courte » du soir). #}
+        {% if header.offcycle_note %}<p style="font-size:10px;color:#BA7517;margin:4px 0 0 0;">⏱ {{header.offcycle_note}}</p>{% endif %}
       </td>
       <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">PTF</p>
@@ -48,6 +50,24 @@
   </table>
 </div>
 
+{# ── v27 (ME1) — RÉGIME DE MARCHÉ en tête (le cadre de toute la semaine). ── #}
+{% if market_regime and market_regime.available %}
+{% set _rgw = market_regime.regime %}
+{% set _rgwbg = '#EAF3DE' if _rgw == 'bull' else ('#FCEBEB' if _rgw == 'bear' else ('#FAEEDA' if _rgw == 'transition' else '#EEF2F7')) %}
+{% set _rgwfg = '#27500A' if _rgw == 'bull' else ('#791F1F' if _rgw == 'bear' else ('#633806' if _rgw == 'transition' else '#0C447C')) %}
+<div style="background:{{_rgwbg}};border-radius:8px;padding:8px 14px;margin-bottom:1rem;">
+  <p style="margin:0;font-size:12px;color:{{_rgwfg}};line-height:1.5;"><span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Régime : {{market_regime.label_fr}}</span>{% if market_regime.days_in_regime is not none %} <span style="color:#5a5852;">· depuis {{market_regime.days_in_regime}} j</span>{% endif %}{% if market_regime.reasons %} <span style="color:#5a5852;">· {{ market_regime.reasons|join(' · ') }}</span>{% endif %}{% if market_regime.changed and market_regime.previous_label_fr %} <span style="font-weight:700;">· ⚠️ {{market_regime.previous_label_fr}} → {{market_regime.label_fr}}</span>{% endif %}</p>
+</div>
+{% endif %}
+
+{# ── v27 (ME2/ME3) — VERDICT des appels de la semaine passée (auto-évaluation). ── #}
+{% if calls_review and calls_review.available and calls_review.summary_line %}
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:8px;padding:10px 14px;margin-bottom:1rem;">
+  <p style="margin:0 0 3px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Mes appels de la semaine passée · verdict</p>
+  <p style="margin:0;font-size:12px;color:#33312e;line-height:1.55;">📏 {{calls_review.summary_line}}</p>
+</div>
+{% endif %}
+
 {# ── BILAN SEMAINE (v16 : bulletpoints explicatifs + gras sur termes clés) ── #}
 <h2 style="margin:0 0 0.75rem 0;font-size:17px;font-weight:500;">Bilan semaine{% if header.week_number %} {{header.week_number}}{% endif %} · ce qui s'est passé</h2>
 <div style="background:#f5f4ee;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
@@ -64,6 +84,15 @@
   <p style="margin:0;font-size:13px;line-height:1.7;">{{ weekly_summary|md if weekly_summary else "Synthèse de la semaine en cours de préparation." }}</p>
   {% endif %}
 </div>
+
+{# ── v26 (W-B9) — DEPUIS LE HEBDO PRÉCÉDENT : diff déterministe WoW (valeur,
+   santé, F&G, dollar). Absent la 1re semaine (pas de snapshot N-1). ── #}
+{% if week_over_week and week_over_week.available and week_over_week.lines %}
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:8px;padding:10px 14px;margin:-0.75rem 0 1.5rem 0;">
+  <p style="margin:0 0 4px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Depuis le hebdo précédent</p>
+  <p style="margin:0;font-size:12px;color:#33312e;line-height:1.6;">{{ week_over_week.lines|join(' · ') }}</p>
+</div>
+{% endif %}
 
 {# ── PORTFOLIO · VUE D'ENSEMBLE (table 4 col 25%, P&L semaine remplace
    drawdown — points 9+10) ── #}
@@ -167,6 +196,8 @@
       </tr>
     </table>
     {% if _q.improve %}<p style="font-size:11px;color:#1a1a18;margin:8px 0 0 0;"><span style="font-weight:600;">Pour l'améliorer :</span> {{_q.improve}}</p>{% endif %}
+    {# v27 (AF6) — jauge visuelle de la santé PTF. #}
+    {% if charts and charts.get('health_gauge') %}<div style="text-align:center;margin:6px 0 0 0;"><img src="cid:chart_health_gauge" alt="Santé du portefeuille" style="max-width:220px;width:55%;height:auto;display:inline-block;"></div>{% endif %}
     <p style="font-size:9px;color:#8a8880;margin:6px 0 0 0;font-style:italic;">Santé du portefeuille = santé structurelle (diversification, momentum vs BTC, solidité vs ATH), moyenne des 3 axes — même logique que la note Santé des mails matin/soir.</p>
   </div>
   {% endif %}
@@ -181,6 +212,11 @@
      reste. Fallback barres si absent. #}
   {% if sector_exposure_cells %}
   <p style="font-size:12px;color:#1a1a18;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Exposition sectorielle du portefeuille</p>
+  {# v26 (W-B4) — donut d'allocation : la proportion saute aux yeux ; les cases
+     dessous gardent le détail perfs 24h/7j/30j + composition. #}
+  {% if charts and charts.get('sector_donut') %}
+  <img src="cid:chart_sector_donut" alt="Allocation sectorielle" style="width:100%;max-width:480px;height:auto;display:block;margin:0 0 8px 0;border:0.5px solid #e5e4dc;border-radius:8px;">
+  {% endif %}
   <table role="presentation" cellpadding="0" cellspacing="4" border="0" style="width:100%;border-collapse:separate;table-layout:fixed;">
     {% for row in sector_exposure_cells|batch(3) %}
     <tr>
@@ -254,7 +290,10 @@
     <tr>
       {% for cell in row %}
       {% set ch = cell.change_24h|num(none) %}
-      {% set bg = '#e5e4dc' if ch is none else ('#C0DD97' if ch >= 5 else ('#EAF3DE' if ch >= 2 else ('#F4F8EC' if ch >= 0 else ('#F7C1C1' if ch <= -5 else ('#FCEBEB' if ch <= -2 else '#FDF1F1'))))) %}
+      {# v26 (W-A19) — seuils recalibrés pour une fenêtre 7 JOURS (±10/±3, au
+         lieu des ±5/±2 du heatmap 24h du matin) : sinon presque toutes les
+         cases ressortent « vert fort » et la nuance visuelle disparaît. #}
+      {% set bg = '#e5e4dc' if ch is none else ('#C0DD97' if ch >= 10 else ('#EAF3DE' if ch >= 3 else ('#F4F8EC' if ch >= 0 else ('#F7C1C1' if ch <= -10 else ('#FCEBEB' if ch <= -3 else '#FDF1F1'))))) %}
       <td style="background:{{bg}};border-radius:3px;padding:6px 3px;text-align:center;width:20%;height:46px;vertical-align:middle;{% if cell.is_extra %}border:1px dashed #b5b3ab;{% endif %}">
         <div style="font-size:{% if cell.is_extra %}9px{% else %}11px{% endif %};font-weight:700;color:#1a1a18;line-height:1.25;">{{cell.symbol}}</div>
         <div style="font-size:10px;color:#1a1a18;line-height:1.25;">{% if ch is not none %}{{ '+' if ch >= 0 else '−' }}{{ '%.1f'|format(ch|abs) }}%{% else %}—{% endif %}</div>
@@ -267,6 +306,15 @@
   </table>
   {% if portfolio_heatmap_7d.extra and portfolio_heatmap_7d.extra.count %}
   <p style="font-size:10px;font-style:italic;color:#8a8880;margin:6px 0 0 0;">Chaque case : actif · perf 7j · poids PTF. « +{{portfolio_heatmap_7d.extra.count}} autres » = {{ '%.1f'|format(portfolio_heatmap_7d.extra.ptf_pct|num(0)) }}% du PTF (${{ '%.0f'|format(portfolio_heatmap_7d.extra.value_usd|num(0)) }}), perf 7j moyenne pondérée.</p>
+  {% endif %}
+  {# v26 (W-B4) — classement en barres : complète la heatmap (l'ordre
+     gagnants → perdants se lit en un coup d'œil). #}
+  {% if charts and charts.get('perf_bars_7d') %}
+  <img src="cid:chart_perf_bars_7d" alt="Perf 7j par position" style="width:100%;max-width:560px;height:auto;display:block;margin:10px 0 0 0;border:0.5px solid #e5e4dc;border-radius:8px;">
+  {% endif %}
+  {# v27 (GR1) — heatmap de corrélation : les clusters de risque d'un coup d'œil. #}
+  {% if charts and charts.get('corr_heatmap') %}
+  <img src="cid:chart_corr_heatmap" alt="Corrélation des positions" style="width:100%;max-width:520px;height:auto;display:block;margin:10px 0 0 0;border:0.5px solid #e5e4dc;border-radius:8px;">
   {% endif %}
 </div>
 {% endif %}
@@ -380,6 +428,22 @@
 </div>
 {# anchor-weekly-scoring-card-end #}
 
+{# ── v27 (ES4/ES5) — CALIBRATION FINE (Brier) + AUTO-BACKTEST de la stratégie
+   maison. Deux thermomètres honnêtes de la qualité du process. ── #}
+{% if (brier_score and brier_score.available) or (strategy_backtest and strategy_backtest.available) %}
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.75rem 1.25rem;margin-bottom:1.5rem;">
+  {% if brier_score and brier_score.available %}
+  <p style="margin:0 0 4px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;">Calibration fine · score de Brier</p>
+  <p style="margin:0 0 8px 0;font-size:12px;color:#33312e;line-height:1.55;"><span style="font-size:16px;font-weight:700;color:{% if (brier_score.brier|num(1)) <= 0.18 %}#3B6D11{% elif (brier_score.brier|num(1)) <= 0.25 %}#BA7517{% else %}#A32D2D{% endif %};">{{brier_score.brier}}</span> <span style="color:#8a8880;">({{brier_score.grade}}, n={{brier_score.n}})</span> — {{brier_score.reading}}</p>
+  {% endif %}
+  {% if strategy_backtest and strategy_backtest.available %}
+  <p style="margin:{% if brier_score and brier_score.available %}8px{% else %}0{% endif %} 0 4px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;">Auto-backtest · « accumuler sous MM{{strategy_backtest.ma_period}} » (BTC)</p>
+  <p style="margin:0;font-size:12px;color:#33312e;line-height:1.55;">{% for h, s in strategy_backtest.horizons.items() %}<strong>{{h}}j</strong> : {{s.hit_rate_pct}}% de hausse, retour médian {{ '%+.1f'|format(s.median_ret_pct|num(0)) }}% (n={{s.n}}){% if not loop.last %} · {% endif %}{% endfor %}</p>
+  <p style="margin:4px 0 0 0;font-size:10px;color:#8a8880;font-style:italic;">{{strategy_backtest.note}}</p>
+  {% endif %}
+</div>
+{% endif %}
+
 {# ── POST-MORTEM DE LA SEMAINE (fusion v24) — les 3 blocs qui parlaient de la
    même chose (pertes↔recos + coût des erreurs + mon erreur) regroupés en UNE
    seule carte, sous-titres + couleurs sémantiques conservées, séparateurs légers.
@@ -458,8 +522,15 @@
   {% if _cal_facts %}
   {% for ev in _cal_facts %}
   <div style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}font-size:13px;">
+    {# v26 (W-A2) — un événement du jour DÉJÀ TOMBÉ est badgé gris « déjà
+       publié » : ce n'est plus un catalyseur à venir, c'est un fait. #}
+    {% if ev.already_published %}
+    <span style="background:#e5e4dc;color:#8a8880;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;">✓ {{ev.when or "déjà publié"}}</span>
+    <span style="font-weight:500;margin-left:6px;color:#8a8880;">{{ev.label}}</span>
+    {% else %}
     <span style="background:{% if ev.importance == 'high' %}#FCEBEB{% else %}#F1EFE8{% endif %};color:{% if ev.importance == 'high' %}#791F1F{% else %}#5a5852{% endif %};font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;">{{ev.when}}</span>
     <span style="font-weight:500;margin-left:6px;">{{ev.label}}</span>
+    {% endif %}
     <span style="color:#8a8880;font-size:11px;"> · {{ev.date_label or ev.date}}</span>
     {% if ev.polymarket_note %}<br><span style="display:inline-block;margin:4px 0 0 0;background:#E6F1FB;color:#0C447C;font-size:10px;padding:2px 7px;border-radius:4px;">{{ev.polymarket_note}}</span>{% endif %}
   </div>
@@ -508,16 +579,65 @@
 </div>
 {% endif %}
 
-{# ── SIGNAUX TAUX (Polymarket) & FLUX ETF (P3-A5) — données factuelles ── #}
-{% if polymarket_facts and polymarket_facts.available or etf_flows_facts and etf_flows_facts.available %}
+{# ── v26 (W-A13/A11/B3) — REPÈRES DÉTERMINISTES : lignes factuelles 100%
+   Python (probas Fed, dollar ICE + élargi, flux ETF, F&G WoW, structure de
+   marché, dérivés). Le lecteur VÉRIFIE ici les chiffres cités par la prose.
+   Repli : l'ancien couple Polymarket/ETF si les lignes ne sont pas fournies. ── #}
+{% if weekly_facts_lines %}
 <div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:11px;color:#5a5852;line-height:1.7;">
-  {% if polymarket_facts and polymarket_facts.available %}
+  <p style="margin:0 0 4px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Repères chiffrés · calculés, pas générés</p>
+  {% for fl in weekly_facts_lines %}
+  <p style="margin:0;">{{ fl }}</p>
+  {% endfor %}
+  {% if charts and charts.get('fng_sparkline') %}
+  <img src="cid:chart_fng_sparkline" alt="Fear &amp; Greed 8 jours" style="width:100%;max-width:300px;height:auto;display:block;margin:8px 0 0 0;border:0.5px solid #e5e4dc;border-radius:6px;">
+  {% endif %}
+</div>
+{% elif polymarket_facts and polymarket_facts.available or etf_flows_facts and etf_flows_facts.available %}
+<div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:11px;color:#5a5852;line-height:1.7;">
+  {% if polymarket_facts and polymarket_facts.available and polymarket_facts.markets %}
   <p style="margin:0;"><span style="font-weight:600;color:#1a1a18;">📊 Probas taux Fed (Polymarket) ·</span> {% for mk in polymarket_facts.markets[:3] %}{{mk.question}} {{mk.probability_pct}}%{% if not loop.last %} · {% endif %}{% endfor %}</p>
   {% endif %}
   {% if etf_flows_facts and etf_flows_facts.available %}
   <p style="margin:0;"><span style="font-weight:600;color:#1a1a18;">💵 Flux ETF ·</span> {% if etf_flows_facts.btc %}BTC {{etf_flows_facts.btc.total_flow_musd if etf_flows_facts.btc.total_flow_musd is defined else etf_flows_facts.btc}}M$ ({{etf_flows_facts.btc.date if etf_flows_facts.btc.date is defined else ''}}){% endif %}{% if etf_flows_facts.eth %} · ETH {{etf_flows_facts.eth.total_flow_musd if etf_flows_facts.eth.total_flow_musd is defined else etf_flows_facts.eth}}M${% endif %}</p>
   {% endif %}
 </div>
+{% endif %}
+
+{# ── v26 (W-B7) — CE QUI A MARQUÉ LA SEMAINE : vraies news crypto 7j,
+   filtrées + horodatées (mêmes règles de pertinence que le mail du soir). ── #}
+{% if weekly_news_digest %}
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.75rem 1.25rem;margin-bottom:1.25rem;">
+  <p style="font-size:12px;color:#1a1a18;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Ce qui a marqué la semaine <span style="font-size:9px;color:#8a8880;text-transform:none;font-weight:400;">· flux crypto filtrés, 7 jours</span></p>
+  {% for n in weekly_news_digest %}
+  <p style="margin:0;padding:4px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;color:#33312e;">{{n.title}}{% if n.date_label or n.source %} <span style="color:#8a8880;font-size:10px;">· {% if n.date_label %}{{n.date_label}}{% endif %}{% if n.source %} · {{n.source}}{% endif %}</span>{% endif %}</p>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── v26 (W-B4) — BTC annoté des NIVEAUX CALCULÉS : l'ancrage visuel des
+   scénarios (les bornes citées se voient sur le graphe). ── #}
+{% if charts and charts.get('btc_levels') %}
+<img src="cid:chart_btc_levels" alt="BTC niveaux calculés" style="width:100%;max-width:660px;height:auto;display:block;margin:0 0 1.25rem 0;border:0.5px solid #e5e4dc;border-radius:8px;">
+{% endif %}
+
+{# ── v27 (SO2) — ZONES DE LIQUIDATION ESTIMÉES : aimants de prix (les mèches
+   vont les chercher). Étiquetées ESTIMATION partout. ── #}
+{% if liquidation_zones and liquidation_zones.available %}
+{% set _lz = liquidation_zones %}
+<div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:11px;color:#5a5852;line-height:1.6;">
+  <p style="margin:0 0 4px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Zones de liquidation BTC · estimées</p>
+  <p style="margin:0;">🔺 Au-dessus (shorts) : {% for z in _lz.short_zones[:3] %}{{z.level_label}} (×{{z.leverage}}){% if not loop.last %} · {% endif %}{% endfor %}</p>
+  <p style="margin:2px 0 0 0;">🔻 En dessous (longs) : {% for z in _lz.long_zones[:3] %}{{z.level_label}} (×{{z.leverage}}){% if not loop.last %} · {% endif %}{% endfor %}</p>
+  {% if _lz.bias_note %}<p style="margin:4px 0 0 0;color:#8A5A12;">⚠️ {{_lz.bias_note}}</p>{% endif %}
+  <p style="margin:4px 0 0 0;font-size:9px;font-style:italic;color:#8a8880;">{{_lz.method_note}}</p>
+</div>
+{% endif %}
+
+{# ── v27 (GR2) — funding BTC dans le temps : un positionnement extrême qui se
+   construit se voit sur la pente. ── #}
+{% if charts and charts.get('funding_hist') %}
+<img src="cid:chart_funding_hist" alt="Funding BTC dans le temps" style="width:100%;max-width:600px;height:auto;display:block;margin:0 0 1.25rem 0;border:0.5px solid #e5e4dc;border-radius:8px;">
 {% endif %}
 
 {# ── SCÉNARIOS POUR LA SEMAINE (titre split + badge proba + bannière action
@@ -641,13 +761,15 @@
       <td style="padding:6px 6px;vertical-align:top;"><span style="font-size:12px;font-weight:700;color:#1a1a18;">{{r.asset}}</span>{% if r.conviction %}<br><span style="font-size:8px;color:#27500A;text-transform:uppercase;letter-spacing:0.3px;">★ cœur</span>{% else %}<br><span style="font-size:8px;color:#8a8880;text-transform:uppercase;letter-spacing:0.3px;">satellite</span>{% endif %}</td>
       <td style="padding:6px 6px;text-align:right;vertical-align:top;white-space:nowrap;"><span style="font-weight:600;color:#1a1a18;">{{ r.current_price|fmt_price }}</span>{% if r.pru_pct is not none %}<br><span style="font-size:10px;color:{% if (r.pru_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ r.pru_pct|fmt_pct }} <span style="color:#8a8880;">/PRU</span></span>{% endif %}</td>
       <td style="padding:6px 6px;vertical-align:top;">{% if r.h30 and r.h30.reco %}{% set _hs = _h30map.get(r.h30.status, ['—','#8a8880']) %}<span style="background:{% if r.h30.reco in ['RENFORCER','BUY'] %}#EAF3DE{% elif r.h30.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] %}#FCEBEB{% else %}#E6F1FB{% endif %};color:{% if r.h30.reco in ['RENFORCER','BUY'] %}#27500A{% elif r.h30.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] %}#791F1F{% else %}#0C447C{% endif %};font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">{{r.h30.reco}}</span><br><span style="font-size:10px;color:{{_hs[1]}};">{% if r.h30.delta_pct is not none %}{{ r.h30.delta_pct|fmt_pct }} · {% endif %}{{_hs[0]}}</span>{% else %}<span style="font-size:10px;color:#b5b3ab;">pas de reco active</span>{% endif %}</td>
-      <td style="padding:6px 6px;vertical-align:top;"><span style="display:inline-block;padding:1px 7px;border-radius:10px;background:{{_ph[2]}};color:{{_ph[1]}};font-weight:600;font-size:9px;">{{_ph[0]}}</span>{% if r.lt_target %}<br><span style="font-size:10px;color:#5a5852;">cible {{ r.lt_target|fmt_price }}{% set _ltp = r.lt_target_pct|num(none) %}{% if _ltp is not none %} <span style="color:{% if _ltp >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">({{ '+' if _ltp >= 0 else '' }}{{_ltp|int}}%)</span>{% endif %}</span>{% else %}<br><span style="font-size:10px;color:#b5b3ab;">cible à définir</span>{% endif %}</td>
+      {# v26 (W-A16) — une cible ≥ +250% est une CIBLE DE CYCLE (reconquête
+         ATH), pas un objectif 6-12 mois : le libellé le dit. #}
+      <td style="padding:6px 6px;vertical-align:top;"><span style="display:inline-block;padding:1px 7px;border-radius:10px;background:{{_ph[2]}};color:{{_ph[1]}};font-weight:600;font-size:9px;">{{_ph[0]}}</span>{% if r.lt_target %}<br><span style="font-size:10px;color:#5a5852;">{% if r.lt_target_kind == 'cycle' %}cible cycle{% else %}cible{% endif %} {{ r.lt_target|fmt_price }}{% set _ltp = r.lt_target_pct|num(none) %}{% if _ltp is not none %} <span style="color:{% if _ltp >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">({{ '+' if _ltp >= 0 else '' }}{{_ltp|int}}%)</span>{% endif %}</span>{% else %}<br><span style="font-size:10px;color:#b5b3ab;">cible à définir</span>{% endif %}</td>
       <td style="padding:6px 6px;text-align:center;vertical-align:top;"><span style="display:inline-block;padding:2px 8px;border-radius:6px;background:{{_ac[2]}};color:{{_ac[1]}};font-weight:700;font-size:10px;white-space:nowrap;">{{_ac[0]}}</span></td>
     </tr>
     {% if r.analysis %}<tr><td colspan="5" style="padding:0 6px 6px 6px;color:#8a8880;font-size:10px;line-height:1.35;">⚙ {{ r.analysis }}</td></tr>{% endif %}
     {% endfor %}
   </table>
-  <p style="font-size:9px;color:#a8a6a0;margin:8px 6px 0 6px;font-style:italic;">Horizon 30j = perf de la reco en cours (Δ depuis l'entrée) · Long terme = phase de cycle + cible 6-12m · ★ cœur = conviction (vs satellite à offloader sur force).</p>
+  <p style="font-size:9px;color:#a8a6a0;margin:8px 6px 0 6px;font-style:italic;">Horizon 30j = perf de la reco en cours (Δ depuis l'entrée) · Long terme = phase de cycle + cible 6-12m — « cible cycle » = reconquête de l'ATH, horizon &gt; 12m · ★ cœur = conviction (vs satellite à offloader sur force).</p>
 </div>
 {% endif %}
 
@@ -682,8 +804,15 @@
   {% if _degraded or footer.note %}
   <p style="font-size:11px;color:#BA7517;margin:0 0 6px 0;font-weight:600;">⚠️ {{ footer.note or "Rapport généré en mode dégradé." }}</p>
   {% endif %}
-  <p style="font-size:10px;color:#8a8880;margin:0;">Prochain rapport · {{footer.next_morning or footer.next_report_at or 'demain 08h30'}}</p>
-  <p style="font-size:10px;color:#8a8880;margin:4px 0 0 0;">Prochain rapport hebdo · {{footer.next_weekly or 'dimanche prochain 12:00'}}</p>
+  {# v26 (W-A12) — UNE seule ligne, formats absolus homogènes (le v25 mêlait
+     « demain 08h30 » relatif et « dimanche 5 juillet 2026, 12:00 » absolu). #}
+  <p style="font-size:10px;color:#8a8880;margin:0;">Prochain rapport · {{footer.next_morning or footer.next_report_at or 'demain 08:30'}} · Prochain hebdo · {{footer.next_weekly or 'dimanche prochain 12:00'}}</p>
+  {# v27 (ME4) — indice de confiance du mail (sources actives + fraîcheur). #}
+  {% if mail_confidence and mail_confidence.pct is not none %}
+  <p style="font-size:9px;color:#8a8880;margin:8px 0 0 0;">Confiance du rapport · <strong style="color:{% if (mail_confidence.pct|num(0)) >= 70 %}#3B6D11{% elif (mail_confidence.pct|num(0)) >= 50 %}#BA7517{% else %}#A32D2D{% endif %};">{{mail_confidence.pct}}% ({{mail_confidence.grade}})</strong> · {{mail_confidence.sources}} sources{% if mail_confidence.onchain_as_of %} · on-chain au {{mail_confidence.onchain_as_of}}{% endif %}</p>
+  {% endif %}
+  {# v27 (AF5) — légende unique des codes couleur (cohérence de lecture). #}
+  <p style="font-size:9px;color:#8a8880;margin:6px 0 0 0;">Légende · <span style="color:#3B6D11;">■</span> achat/haussier · <span style="color:#A32D2D;">■</span> vente/baissier · <span style="color:#BA7517;">■</span> prudence · 🔴 invalidation franchie</p>
   <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · {{app_version or "v15"}}</p>
   <p style="font-size:9px;color:#8a8880;margin:8px 0 0 0;font-style:italic;">{{ disclaimer or "Analyse informative, pas un conseil en investissement. Fais tes propres recherches avant toute décision." }}</p>
 </div>

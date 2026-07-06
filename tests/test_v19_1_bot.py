@@ -98,8 +98,10 @@ def test_no_fallback_when_identical_or_absent() -> None:
     assert raised["n"] == 1  # une seule tentative, pas de repli inutile
 
 
-def test_answer_targets_pro_with_flash_fallback(monkeypatch) -> None:
-    """answer() construit le client en VISANT pro avec repli flash."""
+def test_answer_targets_free_flash_with_lite_fallback(monkeypatch) -> None:
+    """v25 palier GRATUIT : answer() construit le client sur le flash gratuit
+    (le pro=0/0 en gratuit → jamais visé) avec repli flash-lite (bucket
+    distinct)."""
     captured: dict = {}
 
     class _Fake:
@@ -117,8 +119,8 @@ def test_answer_targets_pro_with_flash_fallback(monkeypatch) -> None:
     monkeypatch.setattr(gc, "GeminiClient", _factory)
     # Question pédagogique → chemin plain (peu importe, on inspecte la construction).
     assistant.answer("explique-moi le MVRV", {}, [])
-    assert captured.get("model") == "gemini-2.5-pro"
-    assert captured.get("fallback_model") == "gemini-2.5-flash"
+    assert captured.get("model") == "gemini-2.5-flash"
+    assert captured.get("fallback_model") == "gemini-2.5-flash-lite"
 
 
 # --------------------------------------------------------------------------- #

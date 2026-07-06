@@ -345,16 +345,44 @@ def test_run_from_relay_empty_queue_is_noop(monkeypatch):
 # Notifications push
 # --------------------------------------------------------------------------- #
 def test_notify_summary_line_morning():
+    # v27 (TG4) — _summary_line remplacé par _build_digest (digest multi-lignes,
+    # en-tête type+date + essentiel : régime, chiffres, LA action, risque).
     from src.telegram_bot import notify
 
-    line = notify._summary_line(
-        {"portfolio_snapshot": {"value_usd": 2626},
-         "thesis_of_the_day": [1, 2], "risk_score": {"score": 3}},
+    digest = notify._build_digest(
+        {"header": {"time_casablanca": "jeudi 3 juillet, 08:30"},
+         "portfolio_snapshot": {"value_usd": 2626, "change_24h_pct": 1.2},
+         "market_regime": {"available": True, "label_fr": "RANGE",
+                           "days_in_regime": 5},
+         "macro_context": {"fear_greed": 19},
+         "top_action": {"line": "RENFORCER TAO · +2% du PTF"},
+         "risk_score": {"score": 3}},
         "morning",
     )
-    assert "2,626" in line
-    assert "2 thèse" in line
-    assert "risque 3/10" in line
+    assert "MATIN" in digest and "jeudi 3 juillet" in digest
+    assert "Régime : RANGE" in digest
+    assert "F&G 19" in digest
+    assert "RENFORCER TAO" in digest
+    assert "Risque PTF 3/10" in digest
+
+
+def test_notify_digest_evening_and_weekly():
+    """v27 (TG4) — digests soir & hebdo : en-tête typé + essentiel dédié."""
+    from src.telegram_bot import notify
+
+    ev = notify._build_digest(
+        {"header": {"time_casablanca": "jeudi 3 juillet, 20:00"},
+         "daily_pnl": {"day_change_pct": -1.4, "day_change_usd": -37}},
+        "evening")
+    assert "SOIR" in ev and "P&L jour -1.40%" in ev
+
+    wk = notify._build_digest(
+        {"header": {"time_casablanca": "dimanche 6 juillet, 12:00"},
+         "portfolio_snapshot": {"weekly_pnl_pct": 3.8, "vs_btc_7d_pct": 0.3},
+         "scenarios": [{"label": "range", "probability_pct": 55}],
+         "ptf_quality_score": {"score": 3.3}},
+        "weekly")
+    assert "HEBDO" in wk and "Semaine +3.8%" in wk and "RANGE (55%)" in wk
 
 
 def test_notify_not_configured_returns_false(monkeypatch):
