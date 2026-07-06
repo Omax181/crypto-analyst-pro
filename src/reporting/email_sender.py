@@ -15,6 +15,7 @@ from email.mime.text import MIMEText
 from typing import Optional
 
 from src.utils.logger import get_logger
+from src.utils.text_sanitize import strip_surrogates
 
 logger = get_logger(__name__)
 
@@ -49,6 +50,38 @@ def send_email(
         logger.error("GMAIL_USER / GMAIL_APP_PASSWORD manquants : email non envoyé.")
         return False
 
+    # v27 — TOUT le corps (sanitisation, wrapping, construction MIME, SMTP) est
+    # sous try : le contrat « ne lève pas » était violé (MIMEText a levé
+    # UnicodeEncodeError HORS du try le 06/07 #28 et a tué tout le run weekly).
+    # Désormais toute erreur → False, jamais raise.
+    try:
+        # Filet anti-surrogates AU POINT D'ENVOI : un surrogate Unicode isolé
+        # résiduel (sortie LLM échappée « \ud83c » décodée par json.loads,
+        # source non couverte…) ferait lever MIMEText à l'encodage UTF-8
+        # (« surrogates not allowed »). Le mail est le LIVRABLE : on neutralise
+        # ici quoi qu'il arrive en amont.
+        subject = strip_surrogates(subject)
+        html_body = strip_surrogates(html_body)
+        return _build_and_send(subject, html_body, inline_images,
+                               user, password, recipient)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Échec d'envoi email : %s", exc)
+        return False
+
+
+def _build_and_send(
+    subject: str,
+    html_body: str,
+    inline_images: Optional[dict[str, bytes]],
+    user: str,
+    password: str,
+    recipient: str,
+) -> bool:
+    """Construit le message (wrapper HTML + MIME) et l'envoie via SMTP.
+
+    Séparé de ``send_email`` pour que le try/except de cette dernière couvre
+    STRUCTURELLEMENT tout le chemin (aucune ligne faillible hors filet).
+    """
     # Wrapper HTML complet pour maximum de compat (Outlook desktop est strict).
     # Si le corps contient déjà <html, on ne wrappe pas.
     if "<html" not in html_body.lower()[:200]:
@@ -110,13 +143,9 @@ def send_email(
     msg["From"] = user
     msg["To"] = recipient
 
-    try:
-        with smtplib.SMTP(_SMTP_HOST, _SMTP_PORT, timeout=30) as server:
-            server.starttls()
-            server.login(user, password)
-            server.sendmail(user, [recipient], msg.as_string())
-        logger.info("Email envoyé à %s : %s", recipient, subject)
-        return True
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Échec d'envoi email : %s", exc)
-        return False
+    with smtplib.SMTP(_SMTP_HOST, _SMTP_PORT, timeout=30) as server:
+        server.starttls()
+        server.login(user, password)
+        server.sendmail(user, [recipient], msg.as_string())
+    logger.info("Email envoyé à %s : %s", recipient, subject)
+    return True

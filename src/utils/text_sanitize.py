@@ -19,17 +19,29 @@ import re
 # En mémoire, un str Python est une suite de code points : TOUT surrogate y est
 # « isolé » (jamais apparié comme en UTF-16). On les cible donc tous.
 _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
+# Paire VALIDE adjacente : high (D800-DBFF) suivi de low (DC00-DFFF).
+_PAIR_RE = re.compile(r"[\ud800-\udbff][\udc00-\udfff]")
 
 # U+FFFD « REPLACEMENT CHARACTER » (échappé → source ASCII, sans dépendance
 # d'encodage du fichier).
 _REPLACEMENT = "�"
 
 
+def _join_pair(m: "re.Match[str]") -> str:
+    """Recombine une paire high+low en son caractère astral (arithmétique
+    UTF-16 exacte, vérifiée sur les bornes U+10000 et U+10FFFF)."""
+    hi, lo = m.group(0)
+    return chr(0x10000 + ((ord(hi) - 0xD800) << 10) + (ord(lo) - 0xDC00))
+
+
 def strip_surrogates(text: str, replacement: str = _REPLACEMENT) -> str:
     """Rend ``text`` sûr pour un encodage UTF-8 strict.
 
-    1. Tente de RECOMBINER les paires valides (high+low adjacents) en leur
-       caractère astral d'origine — récupère l'emoji au lieu de le détruire.
+    1. RECOMBINE chaque paire valide (high+low adjacents) en son caractère
+       astral d'origine — récupère l'emoji au lieu de le détruire. Par PAIRE
+       (regex), pas par aller-retour UTF-16 global : un orphelin ailleurs dans
+       le texte ne condamne plus les paires récupérables (l'ancien roundtrip
+       échouait en bloc sur un texte mixte paire+orphelin).
     2. Remplace tout surrogate resté ORPHELIN par ``replacement`` (U+FFFD par
        défaut, le « caractère de remplacement » Unicode).
 
@@ -37,16 +49,34 @@ def strip_surrogates(text: str, replacement: str = _REPLACEMENT) -> str:
     """
     if not text or not isinstance(text, str):
         return text
-    # 1. Recombinaison des paires (le cas prod : un emoji splitté en 2 moitiés).
-    #    surrogatepass laisse passer les surrogates à l'encodage UTF-16 ; le
-    #    décodage UTF-16 standard réassemble les paires valides. Un orphelin
-    #    isolé fait lever UnicodeError → on garde le texte et on strippe en 2.
-    if _SURROGATE_RE.search(text):
-        try:
-            text = text.encode("utf-16", "surrogatepass").decode("utf-16")
-        except UnicodeError:
-            pass
-    # 2. Strip des orphelins restants (impairs, non recombinables).
+    if not _SURROGATE_RE.search(text):
+        return text
+    text = _PAIR_RE.sub(_join_pair, text)
     if _SURROGATE_RE.search(text):
         text = _SURROGATE_RE.sub(replacement, text)
     return text
+
+
+def strip_surrogates_deep(obj: object) -> object:
+    """Applique ``strip_surrogates`` RÉCURSIVEMENT (dict / list / tuple / str).
+
+    Indispensable pour la sortie JSON d'un LLM : un surrogate peut y être
+    ÉCHAPPÉ en ASCII pur (``\\ud83c`` sur 6 caractères) — invisible pour la
+    sanitisation du texte brut — puis DÉCODÉ par ``json.loads`` en véritable
+    surrogate isolé dans les VALEURS du dict (crash weekly du 06/07, run #28 :
+    le payload passait la sanitisation source mais empoisonnait le mail).
+    Les clés de dict sont nettoyées aussi. Types non-conteneurs → inchangés.
+    """
+    if isinstance(obj, str):
+        return strip_surrogates(obj)
+    if isinstance(obj, dict):
+        return {
+            (strip_surrogates(k) if isinstance(k, str) else k):
+                strip_surrogates_deep(v)
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [strip_surrogates_deep(v) for v in obj]
+    if isinstance(obj, tuple):
+        return tuple(strip_surrogates_deep(v) for v in obj)
+    return obj

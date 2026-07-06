@@ -42,6 +42,11 @@ jobs:
           # v26 (audit final) — pause de l'ultime tentative Gemini, optionnelle
           # (vide = défaut 600 s du code, 0 = désactivée).
           GEMINI_LAST_CHANCE_PAUSE_S: ${{ secrets.GEMINI_LAST_CHANCE_PAUSE_S }}
+          # v27 — notification push Telegram après le mail (best-effort). Sans ce
+          # passthrough, push_report_notification était INERTE en prod (« bot non
+          # configuré ») alors que le code l'appelle après chaque rapport.
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
           COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
           COINMARKETCAL_API_KEY: ${{ secrets.COINMARKETCAL_API_KEY }}

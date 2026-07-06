@@ -21,7 +21,7 @@ from tenacity import (
 )
 
 from src.utils.logger import get_logger
-from src.utils.text_sanitize import strip_surrogates
+from src.utils.text_sanitize import strip_surrogates, strip_surrogates_deep
 logger = get_logger(__name__)
 _DEFAULT_MODEL = "gemini-2.5-flash"
 
@@ -37,6 +37,17 @@ class _GeminiTransientError(RuntimeError):
 _TRANSIENT_MARKERS = (
     "503", "500", "502", "504", "deadline", "unavailable",
     "overload", "high demand", "timeout", "internal error",
+    # v27 — coupures RÉSEAU en cours de réponse (httpx/httpcore). Le weekly du
+    # 06/07 a reçu un RemoteProtocolError dont le MESSAGE ne contenait aucun
+    # marqueur : non classé transitoire → zéro retry sur le modèle deep, repli
+    # immédiat sur le modèle fast (analyse dégradée sans nécessité). On matche
+    # donc AUSSI le NOM DU TYPE (cf. _classify). Retries bornés (5) → sûr.
+    # (taxonomie httpx : ConnectError, ReadError, WriteError, CloseError,
+    #  RemoteProtocolError ; les timeouts matchent déjà « timeout » ;
+    #  LocalProtocolError = bug CLIENT, délibérément non retryé.)
+    "remoteprotocol", "connecterror", "connectionerror", "readerror",
+    "writeerror", "closeerror", "connectionreset", "brokenpipe",
+    "server disconnected", "peer closed", "incomplete chunked read",
 )
 _QUOTA_MARKERS = ("quota", "429", "resource_exhausted")
 
@@ -46,8 +57,10 @@ def _classify(exc: Exception) -> Exception:
 
     Renvoie l'exception à lever (GeminiQuotaError / _GeminiTransientError /
     exception originale). Le caller doit faire ``raise _classify(exc) from exc``.
+    v27 — le NOM DU TYPE participe au matching : les erreurs réseau httpx
+    (RemoteProtocolError, ConnectError…) ont souvent un message sans marqueur.
     """
-    msg = str(exc).lower()
+    msg = f"{type(exc).__name__} {exc}".lower()
     if any(k in msg for k in _QUOTA_MARKERS):
         return GeminiQuotaError("Quota Gemini épuisé.")
     if any(k in msg for k in _TRANSIENT_MARKERS):
@@ -183,16 +196,21 @@ class GeminiClient:
 
     @staticmethod
     def _parse_json(text: str) -> dict[str, Any]:
+        # v27 — sanitisation APRÈS parse obligatoire : un surrogate peut être
+        # ÉCHAPPÉ en ASCII (« \ud83c » sur 6 caractères) dans le JSON brut —
+        # invisible pour strip_surrogates(texte) — puis DÉCODÉ par json.loads
+        # en vrai surrogate isolé dans les valeurs (crash weekly 06/07 #28 :
+        # MIMEText « surrogates not allowed » alors que la source était saine).
         cleaned = text.strip().strip("`")
         if cleaned.lower().startswith("json"):
             cleaned = cleaned[4:].strip()
         try:
-            return json.loads(cleaned)
+            return strip_surrogates_deep(json.loads(cleaned))
         except json.JSONDecodeError:
             s, e = cleaned.find("{"), cleaned.rfind("}")
             if s != -1 and e > s:
                 try:
-                    return json.loads(cleaned[s:e + 1])
+                    return strip_surrogates_deep(json.loads(cleaned[s:e + 1]))
                 except json.JSONDecodeError:
                     pass
         logger.error("Impossible de parser le JSON Gemini.")

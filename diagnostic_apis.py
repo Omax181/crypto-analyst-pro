@@ -581,7 +581,7 @@ def test_gmail():
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main() -> int:
-    print("\n═══ Diagnostic Crypto Analyst Pro · v26 ═══\n")
+    print("\n═══ Diagnostic Crypto Analyst Pro · v27 ═══\n")
     sections = [
         ("Cœur — prix & marché", [test_coingecko, test_coinmarketcap,
                                   test_fear_greed, test_yahoo,

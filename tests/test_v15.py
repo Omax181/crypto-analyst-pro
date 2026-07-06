@@ -447,7 +447,7 @@ def test_render_morning_v15_blocks():
     assert "réseau sain" in html                     # v16 : grille on-chain horizontale
     assert "Bilan on-chain : neutre" in html         # v16 : verdict-first
     assert "DXY &gt; 101" in html or "DXY > 101" in html
-    assert "Crypto Analyst Pro · v26" in html
+    assert "Crypto Analyst Pro · v27" in html
     # Ordre : invalidation AVANT auto-critique.
     assert html.index("invalider mon scénario") < html.index("Auto-critique de l'analyse")
 
@@ -476,7 +476,7 @@ def test_render_evening_v15_blocks():
     assert "Actions à poser ce soir" in html and "ordre limite BTC" in html
     assert "International · Europe" in html and "Nikkei 225" in html
     assert "maintien" in html and "99.2%" in html
-    assert "Crypto Analyst Pro · v26" in html
+    assert "Crypto Analyst Pro · v27" in html
 
 
 def test_render_weekly_v15_blocks():
@@ -566,6 +566,6 @@ def test_render_weekly_v15_blocks():
     assert "Renforcer" in html and "Alléger" in html
     assert "Stratégie de la semaine" in html
     assert "1\u202f773" in html or "1,773" in html or "1 773" in html  # fenêtre P&L
-    assert "Crypto Analyst Pro · v26" in html
+    assert "Crypto Analyst Pro · v27" in html
     # Ordre : la vue PTF arrive avant le fil rouge macro (P3-1).
     assert html.index("Portfolio · vue d'ensemble") < html.index("Fil rouge macro")

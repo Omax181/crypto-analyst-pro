@@ -249,7 +249,7 @@ def test_evening_render_8_blocs():
     html = render(_enriched_evening_payload(), "evening")
     assert not re.search(r"\{\{|\{%", html)          # pas de Jinja non rendu
     assert "rendu simplifié" not in html             # pas de fallback
-    assert "Crypto Analyst Pro · v26" in html        # versioning
+    assert "Crypto Analyst Pro · v27" in html        # versioning
     # blocs présents
     assert "Bilan du jour" in html
     assert "Marchés · mi-séance" in html
@@ -342,7 +342,7 @@ def test_morning_arrows_and_plural_and_polymarket():
     assert "▼" in html                              # flèche down (Nasdaq)
     assert "données partielles" in html             # pluriel
     assert "maintien" in html and "99.8%" in html    # Polymarket reframé
-    assert "Crypto Analyst Pro · v26" in html
+    assert "Crypto Analyst Pro · v27" in html
 
 
 # ─────────────────── v14 AUDIT HARDENING TESTS ─────────────────── #
