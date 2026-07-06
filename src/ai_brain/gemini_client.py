@@ -21,6 +21,7 @@ from tenacity import (
 )
 
 from src.utils.logger import get_logger
+from src.utils.text_sanitize import strip_surrogates
 logger = get_logger(__name__)
 _DEFAULT_MODEL = "gemini-2.5-flash"
 
@@ -124,7 +125,7 @@ class GeminiClient:
             resp = self._client.models.generate_content(
                 model=model, contents=prompt,
                 config=types.GenerateContentConfig(temperature=temperature))
-            return resp.text or ""
+            return strip_surrogates(resp.text or "")
         except Exception as exc:
             raise _classify(exc) from exc
 
@@ -136,7 +137,7 @@ class GeminiClient:
                 model=model, contents=prompt,
                 config=types.GenerateContentConfig(
                     temperature=temperature, response_mime_type="application/json"))
-            return resp.text or "{}"
+            return strip_surrogates(resp.text or "{}")
         except Exception as exc:
             raise _classify(exc) from exc
 
@@ -168,7 +169,7 @@ class GeminiClient:
                     model=model, contents=prompt,
                     config=types.GenerateContentConfig(
                         tools=[types.Tool(google_search=types.GoogleSearch())]))
-                return resp.text or ""
+                return strip_surrogates(resp.text or "")
             except Exception as exc:
                 raise _classify(exc) from exc
 

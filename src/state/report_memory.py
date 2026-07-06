@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from src.utils.logger import get_logger
+from src.utils.text_sanitize import strip_surrogates
 
 logger = get_logger(__name__)
 
@@ -133,6 +134,12 @@ def _write(name: str, data: Any) -> None:
     _STATE_DIR.mkdir(parents=True, exist_ok=True)
     try:
         payload = json.dumps(data, ensure_ascii=False, indent=2, default=str)
+        # Filet ULTIME anti-crash : une sortie LLM peut contenir un surrogate
+        # Unicode isolé (moitié d'emoji tronquée) qui fait lever fh.write en
+        # UTF-8 (« surrogates not allowed »). save_*_report tournant AVANT
+        # l'envoi du mail, un tel crash bloquait TOUT le rapport (prod 06/07,
+        # weekly). Neutralisé ici même si la source amont l'a laissé passer.
+        payload = strip_surrogates(payload)
         # Fichier temporaire dans le MÊME dossier (pour que os.replace soit atomique).
         fd, tmp_path = tempfile.mkstemp(
             dir=str(_STATE_DIR), prefix=f".{name}.", suffix=".tmp"
@@ -150,7 +157,12 @@ def _write(name: str, data: Any) -> None:
             except OSError:
                 pass
             raise
-    except OSError as exc:
+    except Exception as exc:  # noqa: BLE001
+        # La persistance du state est BEST-EFFORT : elle s'exécute AVANT l'envoi
+        # du mail, donc un échec (OSError, sérialisation, encodage…) ne doit
+        # JAMAIS bloquer la livraison. On logue et on continue (au pire, le
+        # prochain rapport repart de l'ancien état). KeyboardInterrupt/SystemExit
+        # (BaseException, non Exception) restent propagés.
         logger.error("Échec écriture state %s : %s", name, exc)
 
 
