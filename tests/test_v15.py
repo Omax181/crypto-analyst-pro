@@ -297,15 +297,15 @@ def test_heatmap_extra_weighted_avg():
     enriched["X1"] = {"value_usd": 300, "change_24h": 10.0}
     enriched["X2"] = {"value_usd": 100, "change_24h": -2.0}
     out = _portfolio_heatmap(enriched)
-    # v23.x — 25 positions > 20 → 19 cases pleines + 1 case « +N autres ».
-    assert len(out["cells"]) == 19
+    # v28 (M-A11) — 25 positions → 15 cases pleines (tri par IMPACT) + agrégat.
+    assert len(out["cells"]) == 15
     ex = out["extra"]
-    # tri par |variation 24h| DÉCROISSANTE : X1(|10|) puis X2(|2|) puis 23×A(|1|).
-    # Top 19 = X1 + X2 + 17×A. Restants = 6×A (+1.0), valeur 600.
-    assert ex["count"] == 6
-    # Moyenne pondérée des 6 A restants : (100·1)·6 / 600 = 1.0.
+    # tri par impact (poids×|perf|) : X1 puis X2 (gros poids/mouvement) puis
+    # les A. Top 15 = X1 + X2 + 13×A. Restants = 10×A (+1.0), valeur 1000.
+    assert ex["count"] == 10
+    # Moyenne pondérée des 10 A restants : (100·1)·10 / 1000 = 1.0.
     assert ex["avg_change_24h"] == 1.0
-    assert ex["value_usd"] == 600
+    assert ex["value_usd"] == 1000
     # Les 2 plus gros mouvements sont en tête.
     assert out["cells"][0]["symbol"] == "X1"
     assert out["cells"][1]["symbol"] == "X2"
@@ -439,15 +439,16 @@ def test_render_morning_v15_blocks():
     assert "1 nouvelle reco · 9 en suivi" in html
     assert "EN BREF" in html and "1 renforcement BTC" in html
     assert "maintien" in html and "99.2%" in html
-    # v19/V18-M4 : 2e valeur DXY discrète. v26 (E-B12) : libellé explicite
-    # « indice élargi » — « Fed large » était cryptique pour le lecteur.
-    assert "indice élargi · 120.08" in html
+    # v19/V18-M4 : 2e valeur DXY discrète. v28 (M-A20) : « DXY (ICE) » sur la
+    # tuile + « indice élargi (Fed) » — les deux indices nommés sans note ².
+    assert "indice élargi (Fed) · 120.08" in html
+    assert "DXY (ICE)" in html
     assert "+12 autres" in html and "moy." in html  # v16 : case agrégée %PTF
     assert "12.9% du PTF" in html                    # v16 : poids agrégat
     assert "réseau sain" in html                     # v16 : grille on-chain horizontale
     assert "Bilan on-chain : neutre" in html         # v16 : verdict-first
     assert "DXY &gt; 101" in html or "DXY > 101" in html
-    assert "Crypto Analyst Pro · v27" in html
+    assert "Crypto Analyst Pro · v28" in html
     # Ordre : invalidation AVANT auto-critique.
     assert html.index("invalider mon scénario") < html.index("Auto-critique de l'analyse")
 
@@ -476,7 +477,7 @@ def test_render_evening_v15_blocks():
     assert "Actions à poser ce soir" in html and "ordre limite BTC" in html
     assert "International · Europe" in html and "Nikkei 225" in html
     assert "maintien" in html and "99.2%" in html
-    assert "Crypto Analyst Pro · v27" in html
+    assert "Crypto Analyst Pro · v28" in html
 
 
 def test_render_weekly_v15_blocks():
@@ -566,6 +567,6 @@ def test_render_weekly_v15_blocks():
     assert "Renforcer" in html and "Alléger" in html
     assert "Stratégie de la semaine" in html
     assert "1\u202f773" in html or "1,773" in html or "1 773" in html  # fenêtre P&L
-    assert "Crypto Analyst Pro · v27" in html
+    assert "Crypto Analyst Pro · v28" in html
     # Ordre : la vue PTF arrive avant le fil rouge macro (P3-1).
     assert html.index("Portfolio · vue d'ensemble") < html.index("Fil rouge macro")

@@ -345,44 +345,50 @@ def test_run_from_relay_empty_queue_is_noop(monkeypatch):
 # Notifications push
 # --------------------------------------------------------------------------- #
 def test_notify_summary_line_morning():
-    # v27 (TG4) — _summary_line remplacé par _build_digest (digest multi-lignes,
-    # en-tête type+date + essentiel : régime, chiffres, LA action, risque).
+    # v28 (TG-refonte) — _build_digest = digest à 2 zones : 📌 EN BREF (⚡ verdict
+    # + 📊 marché + 💼) puis détail (🌍 marché, 🎯 actions, 📈 positions, ⚠️).
     from src.telegram_bot import notify
 
     digest = notify._build_digest(
         {"header": {"time_casablanca": "jeudi 3 juillet, 08:30"},
          "portfolio_snapshot": {"value_usd": 2626, "change_24h_pct": 1.2},
-         "market_regime": {"available": True, "label_fr": "RANGE",
+         "market_regime": {"available": True, "label_fr": "range",
                            "days_in_regime": 5},
-         "macro_context": {"fear_greed": 19},
+         "macro_context": {"fear_greed": 19, "fear_greed_label": "peur extrême"},
          "top_action": {"line": "RENFORCER TAO · +2% du PTF"},
-         "risk_score": {"score": 3}},
+         "thesis_of_the_day": [{"asset": "TAO", "action": "RENFORCER",
+                                "confidence": 74}]},
         "morning",
     )
     assert "MATIN" in digest and "jeudi 3 juillet" in digest
-    assert "Régime : RANGE" in digest
-    assert "F&G 19" in digest
-    assert "RENFORCER TAO" in digest
-    assert "Risque PTF 3/10" in digest
+    assert "📌 EN BREF" in digest
+    assert "⚡" in digest and "RENFORCER TAO" in digest      # verdict adaptatif
+    assert "Fond range" in digest                            # état marché
+    assert "/pourquoi TAO" in digest                         # commandes perso
+    # Éléments RETIRÉS de l'ancien format.
+    assert "Risque PTF" not in digest
+    assert "Réponds ici pour creuser" not in digest
 
 
 def test_notify_digest_evening_and_weekly():
-    """v27 (TG4) — digests soir & hebdo : en-tête typé + essentiel dédié."""
+    """v28 (TG-refonte) — digests soir & hebdo : EN BREF + détail, FR (virgule)."""
     from src.telegram_bot import notify
 
     ev = notify._build_digest(
         {"header": {"time_casablanca": "jeudi 3 juillet, 20:00"},
          "daily_pnl": {"day_change_pct": -1.4, "day_change_usd": -37}},
         "evening")
-    assert "SOIR" in ev and "P&L jour -1.40%" in ev
+    assert "SOIR" in ev and "📌 EN BREF" in ev
+    assert "−1,40%" in ev and "(−37 $)" in ev
 
     wk = notify._build_digest(
         {"header": {"time_casablanca": "dimanche 6 juillet, 12:00"},
+         "market_regime": {"available": True, "label_fr": "baissier"},
          "portfolio_snapshot": {"weekly_pnl_pct": 3.8, "vs_btc_7d_pct": 0.3},
          "scenarios": [{"label": "range", "probability_pct": 55}],
-         "ptf_quality_score": {"score": 3.3}},
+         "weekly_action_plan": [{"action": "Renforcer BTC si cassure 60k"}]},
         "weekly")
-    assert "HEBDO" in wk and "Semaine +3.8%" in wk and "RANGE (55%)" in wk
+    assert "HEBDO" in wk and "Semaine +3,8%" in wk and "RANGE (55%)" in wk
 
 
 def test_notify_not_configured_returns_false(monkeypatch):

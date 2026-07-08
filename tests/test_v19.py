@@ -155,16 +155,17 @@ def test_ws11_no_override_when_calm():
 # WS7 / v23.x — Heatmap plafonnée à 4 lignes (M-B17)
 # --------------------------------------------------------------------------- #
 def test_ws7_heatmap_capped_to_four_rows():
-    """v23.x : >20 positions → 19 plus gros mouvements + 1 « +N autres » = 20 (5×4)."""
+    """v28 (M-A11) : >15 positions visibles → 15 plus gros IMPACTS + 1
+    « +N autres » = 16 max (les poussières < 0.5% PTF vont à l'agrégat)."""
     from src.main import _portfolio_heatmap
 
     enriched = {f"A{i}": {"value_usd": 100 - i, "change_24h": (i % 7) - 3}
                 for i in range(26)}
     hm = _portfolio_heatmap(enriched)
-    assert len(hm["cells"]) == 19
-    assert hm["extra"] is not None and hm["extra"]["count"] == 7  # 26 − 19
+    assert len(hm["cells"]) == 15
+    assert hm["extra"] is not None and hm["extra"]["count"] == 11  # 26 − 15
     total_cells = len(hm["cells"]) + (1 if hm["extra"] else 0)
-    assert total_cells <= 20  # 4 lignes de 5 maximum
+    assert total_cells <= 16  # 3 lignes de 5 + agrégat
 
 
 def test_ws7_heatmap_small_ptf_no_extra():

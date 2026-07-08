@@ -54,6 +54,8 @@ def evaluate_thesis_eligibility(
     *,
     tier: int,
     mvrv: Optional[float] = None,
+    mvrv_stale: bool = False,
+    mvrv_as_of: Optional[str] = None,
     pru_gap_pct: Optional[float] = None,
     drawdown_from_ath_pct: Optional[float] = None,
     upcoming_catalyst_days: Optional[int] = None,
@@ -71,6 +73,11 @@ def evaluate_thesis_eligibility(
             ``tech_advanced`` avec rsi/macd/bollinger/structure, etc.).
         tier: tier de l'actif (0 = cœur BTC/ETH … 4 = poussière).
         mvrv: ratio MVRV (si dispo, BTC/ETH surtout).
+        mvrv_stale: v28 (M-A7) — True si la donnée MVRV est PÉRIMÉE (> 7 j) :
+            son poids est alors halvé (3 → 2) et le libellé porte la date.
+            Le 07/07, un MVRV ETH du 23/05 (6 semaines) était le signal n°1
+            (+3) de la reco ETH — un signal daté ne peut pas piloter la thèse.
+        mvrv_as_of: date (« AAAA-MM-JJ » ou « JJ/MM ») de la donnée MVRV.
         pru_gap_pct: écart au PRU en % (négatif = sous le PRU). None si pas de PRU.
         drawdown_from_ath_pct: distance à l'ATH en % (négatif).
         upcoming_catalyst_days: jours avant un catalyseur calendrier (None si aucun).
@@ -106,8 +113,18 @@ def evaluate_thesis_eligibility(
 
     # ----- Fondamentaux LT (poids 3) -----
     if _is_num(mvrv) and mvrv < 1.0:
-        _sig(f"MVRV {mvrv:.2f} < 1 (sous-évaluation historique)",
-             "fundamental_lt", _W_FUNDAMENTAL_LT)
+        # v28 (M-A7) — MVRV PÉRIMÉ (> 7 j) : poids halvé (3 → 2) et libellé
+        # daté. Le 07/07, un MVRV ETH du 23/05 pesait +3 en signal n°1 de la
+        # reco : une donnée de 6 semaines ne pilote plus une thèse à plein poids.
+        _w_mvrv = _W_FUNDAMENTAL_LT
+        _lbl_mvrv = f"MVRV {mvrv:.2f} < 1 (sous-évaluation historique)"
+        if mvrv_stale:
+            _w_mvrv = max(1, _W_FUNDAMENTAL_LT - 1)
+            _d_mvrv = (f"{mvrv_as_of[8:10]}/{mvrv_as_of[5:7]}"
+                       if isinstance(mvrv_as_of, str) and len(mvrv_as_of) >= 10
+                       else None)
+            _lbl_mvrv += f" · au {_d_mvrv}" if _d_mvrv else " · donnée datée"
+        _sig(_lbl_mvrv, "fundamental_lt", _w_mvrv)
     if _is_num(pru_gap_pct) and pru_gap_pct <= -10:
         _sig(f"position sous PRU de {abs(pru_gap_pct):.0f}% (opportunité de moyenner)",
              "fundamental_lt", _W_FUNDAMENTAL_LT)

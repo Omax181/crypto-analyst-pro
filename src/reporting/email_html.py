@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 # v15 — version produit UNIQUE, injectée dans les 3 footers (audit : « v13 »
 # en dur dans les templates). main.py la ré-exporte pour les logs.
-APP_VERSION = "v27"
+APP_VERSION = "v28"
 
 _COLORS = {
     "bg": "#fafaf6",

@@ -79,12 +79,13 @@ def test_mdify_converts_bold_globally():
 # WS-G (#72 / v23.x) — heatmap 5×4 = 19 cellules + 1 agrégat = 20 cases
 # --------------------------------------------------------------------------- #
 def test_heatmap_20_cells():
+    # v28 (M-A11) : 15 cases max triées par IMPACT + agrégat « +N autres ».
     from src.main import _portfolio_heatmap
     enriched = {f"C{i}": {"value_usd": 100 + i, "change_24h": (i % 9) - 4.0}
                 for i in range(28)}
     hm = _portfolio_heatmap(enriched)
-    assert len(hm["cells"]) == 19            # 19 cases pleines (4 lignes × 5 − 1)
-    assert hm["extra"]["count"] == 9         # 28 − 19 = 9 → « +9 autres »
+    assert len(hm["cells"]) == 15            # 15 cases pleines (3 lignes × 5)
+    assert hm["extra"]["count"] == 13        # 28 − 15 = 13 → « +13 autres »
 
 
 # --------------------------------------------------------------------------- #

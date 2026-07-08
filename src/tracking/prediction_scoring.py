@@ -518,7 +518,8 @@ class PredictionTracker:
         return out
 
     def active_for_display(
-        self, price_lookup: dict[str, float]
+        self, price_lookup: dict[str, float],
+        target_fallbacks: Optional[dict[str, float]] = None,
     ) -> list[dict[str, Any]]:
         """v17 (T-DEDUP / M-A2) — recos actives DÉDUPLIQUÉES pour le rendu matin.
 
@@ -555,6 +556,15 @@ class PredictionTracker:
             _color = {"validated": "#3B6D11", "invalidated": "#A32D2D"}.get(
                 status, "#BA7517")
             _ct = reco.get("ct_target") or reco.get("target_price")
+            # v28 (M-A13) — reco legacy SANS cible persistée (INJ « cible n/d »
+            # le 07/07) : repli sur la cible 30 j du PLAN DU JOUR, étiquetée
+            # comme telle (le rendu dit « cible act. » et non une cible d'époque).
+            _ct_fallback = False
+            if not _ct and target_fallbacks:
+                _fb = target_fallbacks.get(asset)
+                if isinstance(_fb, (int, float)) and _fb > 0:
+                    _ct = _fb
+                    _ct_fallback = True
             _sl = reco.get("stop_loss")
             # v26 (A12/B6) — PROGRESSION VERS LA CIBLE : % du chemin entrée →
             # cible réellement parcouru (0% = à l'entrée, 100% = cible touchée).
@@ -665,6 +675,8 @@ class PredictionTracker:
                 "entry_price": entry,
                 "progress_pct": progress,
                 "ct_target": _ct,
+                # v28 (M-A13) — True si la cible vient du plan du jour (repli).
+                "ct_target_fallback": _ct_fallback,
                 "stop_loss": _sl,
                 # v27 (RE5) — fiche de vie compacte.
                 "days_open": _days_open,

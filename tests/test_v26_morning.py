@@ -27,7 +27,7 @@ from src.reporting.email_html import APP_VERSION, render
 # ─────────────────────────────────────────────────────────────────────────────
 def test_app_version_v26():
     # Nommage final : le livrable est étiqueté v26 (décision Omar, 2026-07-05).
-    assert APP_VERSION == "v27"
+    assert APP_VERSION == "v28"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -62,6 +62,7 @@ def enforce_summary_figures(
     bullets: Any,
     snapshot: Optional[dict[str, Any]],
     fear_greed_value: Any = None,
+    fear_greed_7d_ago: Any = None,
 ) -> tuple[Any, list[str]]:
     """Force la perf hebdo / vs BTC / F&G du bilan sur les valeurs Python.
 
@@ -69,6 +70,12 @@ def enforce_summary_figures(
     déterministe dit +3.8% : tout pourcentage identifié comme perf hebdo du
     PTF (ou « vs BTC », ou valeur F&G) divergeant de la source de vérité est
     RÉÉCRIT avec la valeur exacte. Fenêtre de tolérance 0,15 pt (arrondis).
+
+    v28 (W-A1) — l'ÉVOLUTION F&G est aussi verrouillée sur la série API :
+    « F&G X → Y » (les DEUX bornes) et « rebondi de N points » sont réécrits
+    depuis ``fear_greed_7d_ago``/``fear_greed_value``. Le 07/07, le hebdo
+    citait 24, 23 ET 15 pour « il y a 7 j » selon la section — la série 8 j
+    d'alternative.me (15) est la seule source de vérité.
 
     Returns:
         (bullets corrigés, liste des corrections pour le log).
@@ -89,7 +96,17 @@ def enforce_summary_figures(
     _asset_near = re.compile(
         r"(?i)\b(BTC|ETH|bitcoin|ethereum|solana|S\s?&\s?P|nasdaq|dax|nikkei|"
         r"gold|dominance)\b")
-    _fg_re = re.compile(r"(?i)((?:F\s?&\s?G|Fear\s*(?:&|and)\s*Greed)[^0-9%]{0,20})(\d{1,3})\b")
+    _fg_prefix = r"(?:F\s?&\s?G|Fear\s*(?:&|and)\s*Greed)"
+    # v28 — le lookahead négatif épargne la 1re borne d'une évolution « X → Y »
+    # (sinon la garde v26 aurait cassé « F&G 15 → 27 » en « 27 → 27 »).
+    _fg_re = re.compile(
+        rf"(?i)({_fg_prefix}[^0-9%]{{0,20}})(\d{{1,3}})\b(?!\s*(?:→|->|—>)\s*\d)")
+    _fg_evo_re = re.compile(
+        rf"(?i)({_fg_prefix}[^0-9%]{{0,20}})(\d{{1,3}})(\s*(?:→|->|—>)\s*)(\d{{1,3}})\b")
+    _fg_pts_re = re.compile(
+        r"(?i)(rebondi|remonté|gagné|repris|progressé|bondi|grimpé|perdu|chuté|"
+        r"cédé|reculé)\s+de\s+(\d{1,3})\s*(points?|pts)")
+    _fg_ctx = re.compile(r"(?i)F\s?&\s?G|fear|greed|sentiment|peur|avidité")
 
     out: list[Any] = []
     for b in bullets:
@@ -98,6 +115,27 @@ def enforce_summary_figures(
             out.append(b)
             continue
         new = text
+        # v28 (W-A1) — évolution « F&G X → Y » : les deux bornes verrouillées.
+        if isinstance(fear_greed_value, (int, float)):
+            def _fg_evo_fix(m: re.Match) -> str:
+                start = _to_float(m.group(2))
+                end = _to_float(m.group(4))
+                want_start = (int(fear_greed_7d_ago)
+                              if isinstance(fear_greed_7d_ago, (int, float))
+                              else (int(start) if start is not None else None))
+                changed = False
+                if end is not None and int(end) != int(fear_greed_value):
+                    changed = True
+                if (want_start is not None and start is not None
+                        and int(start) != want_start):
+                    changed = True
+                if changed and want_start is not None:
+                    fixes.append(
+                        f"évolution F&G {m.group(2)}→{m.group(4)} "
+                        f"→ {want_start}→{int(fear_greed_value)}")
+                    return f"{m.group(1)}{want_start}{m.group(3)}{int(fear_greed_value)}"
+                return m.group(0)
+            new = _fg_evo_re.sub(_fg_evo_fix, new)
         # F&G : une seule valeur autorisée (celle de data.fear_greed).
         if isinstance(fear_greed_value, (int, float)):
             def _fg_fix(m: re.Match) -> str:
@@ -107,6 +145,27 @@ def enforce_summary_figures(
                     return f"{m.group(1)}{int(fear_greed_value)}"
                 return m.group(0)
             new = _fg_re.sub(_fg_fix, new)
+        # v28 (W-A1) — « rebondi de N points » (contexte sentiment) : N et le
+        # verbe verrouillés sur delta_7d = value − value_7d_ago de la série.
+        if (isinstance(fear_greed_value, (int, float))
+                and isinstance(fear_greed_7d_ago, (int, float))
+                and _fg_ctx.search(new)):
+            _delta_fg = int(fear_greed_value) - int(fear_greed_7d_ago)
+
+            def _fg_pts_fix(m: re.Match) -> str:
+                cited = _to_float(m.group(2))
+                verb_up = m.group(1).lower() in (
+                    "rebondi", "remonté", "gagné", "repris", "progressé",
+                    "bondi", "grimpé")
+                if cited is None:
+                    return m.group(0)
+                if int(cited) == abs(_delta_fg) and verb_up == (_delta_fg >= 0):
+                    return m.group(0)
+                verb = "rebondi" if _delta_fg >= 0 else "reculé"
+                fixes.append(
+                    f"F&G « {m.group(0)} » → « {verb} de {abs(_delta_fg)} points »")
+                return f"{verb} de {abs(_delta_fg)} {m.group(3)}"
+            new = _fg_pts_re.sub(_fg_pts_fix, new)
         # Perf hebdo PTF + vs BTC : remplacement token par token, en contexte.
         if isinstance(true_pnl, (int, float)) or isinstance(true_vsbtc, (int, float)):
             result: list[str] = []
@@ -443,3 +502,168 @@ def fix_held_opportunity_wording(
         return m.group(0)
 
     return pat.sub(_fix, text), fixes
+
+
+# ── v28 (W-A3) — le MOT directionnel vs BTC doit suivre le SIGNE corrigé ──
+
+_UNDERPERF_RE = re.compile(r"(?i)sous[- ]perform")
+_OVERPERF_RE = re.compile(r"(?i)sur[- ]?perform")
+
+
+def fix_vsbtc_direction_wording(
+    bullets: Any, true_vsbtc: Any
+) -> tuple[Any, list[str]]:
+    """Réaligne « sous-performant / surperformant (le Bitcoin) » sur le signe réel.
+
+    Le 07/07, la garde v26 a corrigé le CHIFFRE (−0,43% → +0,04% vs BTC) mais
+    le MOT est resté : « sous-performant légèrement le Bitcoin (+0.04%) » —
+    contradiction visible avec la tuile « outperform » calculée du chiffre.
+    Ne touche que les puces parlant du PORTEFEUILLE face à BTC (jamais d'un
+    actif tiers), et préserve la casse/flexion (participe, indicatif, nom).
+    """
+    fixes: list[str] = []
+    if not isinstance(bullets, list) or not isinstance(true_vsbtc, (int, float)):
+        return bullets, fixes
+    _ptf_ctx = re.compile(r"(?i)portefeuille|\bPTF\b")
+    _btc_ctx = re.compile(r"(?i)\bBTC\b|bitcoin")
+
+    def _swap(text: str) -> str:
+        if true_vsbtc >= 0:
+            # sous-performant → surperformant (toutes flexions, tiret absorbé).
+            return re.sub(r"(?i)sous[- ]perform", "surperform", text)
+        return re.sub(r"(?i)sur[- ]?perform", "sous-perform", text)
+
+    out: list[Any] = []
+    for b in bullets:
+        text = _bullet_text(b)
+        if text is None or not (_ptf_ctx.search(text) and _btc_ctx.search(text)):
+            out.append(b)
+            continue
+        wrong = (_UNDERPERF_RE.search(text) if true_vsbtc >= 0
+                 else _OVERPERF_RE.search(text))
+        if not wrong:
+            out.append(b)
+            continue
+        new = _swap(text)
+        fixes.append(
+            f"wording vs BTC réaligné sur {'+' if true_vsbtc >= 0 else '−'}"
+            f"{abs(true_vsbtc)}% (« {wrong.group(0)}… » corrigé)")
+        out.append(_set_bullet_text(b, new))
+    return out, fixes
+
+
+# ── v28 (W-A5) — dédup des segments répétés dans les lignes ⚙ d'analyse ──
+
+def _dedupe_segments(text: str) -> str:
+    """« A, A (détail), B » → « A (détail), B » (le segment le PLUS LONG gagne).
+
+    Le 07/07, la neutralisation ATH (garde v26) a produit « ATH de référence
+    peu significatif, ATH de référence peu significatif (listing illiquide) » :
+    le LLM avait déjà écrit la mention que la garde a réinjectée. On compare
+    les segments normalisés (casse/espaces) : doublon exact OU préfixe l'un de
+    l'autre → une seule occurrence, la plus informative, à la 1re position.
+    """
+    parts = [p.strip() for p in text.split(",")]
+    if len(parts) < 2:
+        return text
+    kept: list[str] = []
+    for p in parts:
+        if not p:
+            continue
+        p_norm = p.lower()
+        dup_idx = None
+        for i, k in enumerate(kept):
+            k_norm = k.lower()
+            if (p_norm == k_norm or p_norm.startswith(k_norm)
+                    or k_norm.startswith(p_norm)):
+                dup_idx = i
+                break
+        if dup_idx is None:
+            kept.append(p)
+        elif len(p) > len(kept[dup_idx]):
+            kept[dup_idx] = p  # garde la variante la plus détaillée
+    return ", ".join(kept)
+
+
+def dedupe_analysis_segments(entries: Any) -> list[str]:
+    """Applique la dédup de segments aux champs ``analysis`` (mutation in-place)."""
+    fixes: list[str] = []
+    if not isinstance(entries, list):
+        return fixes
+    for e in entries:
+        if not isinstance(e, dict) or not isinstance(e.get("analysis"), str):
+            continue
+        new = _dedupe_segments(e["analysis"])
+        if new != e["analysis"]:
+            fixes.append(
+                f"{str(e.get('asset') or '?').upper()} : segment dupliqué retiré")
+            e["analysis"] = new
+    return fixes
+
+
+# ── v28 (W-A5) — « SYM (−99.9% ATH) » dans les TEXTES LIBRES (exit plan…) ──
+
+_ATH_PAREN = re.compile(
+    r"\b([A-Z0-9]{2,10})\s*\(\s*[−\-–]?\s*(\d{1,3}(?:[.,]\d+)?)\s*%\s*"
+    r"(?:sous\s+|vs\s+)?(?:l['’])?ATH\s*\)")
+
+
+def sanitize_ath_text(
+    text: Any, ath_facts: Optional[dict[str, Any]]
+) -> tuple[Any, list[str]]:
+    """Réaligne « JASMY (-99.9% ATH) » cité dans un paragraphe libre.
+
+    ``sanitize_ath_claims`` ne couvrait que les fiches positions (« −X% sous
+    ATH ») : la section poussières du 07/07 affichait encore le drawdown
+    suspect neutralisé ailleurs. Même règles : ATH suspect → mention honnête ;
+    écart > 3 pts avec CoinGecko → chiffre réécrit.
+    """
+    fixes: list[str] = []
+    if not isinstance(text, str) or not isinstance(ath_facts, dict):
+        return text, fixes
+
+    def _fix(m: re.Match) -> str:
+        asset = m.group(1).upper()
+        fact = ath_facts.get(asset) or {}
+        real = fact.get("from_ath_pct")
+        claim = _to_float(m.group(2))
+        if not isinstance(real, (int, float)) or claim is None:
+            return m.group(0)
+        if ath_is_suspect(real):
+            fixes.append(f"{asset} : drawdown ATH suspect ({real}%) → neutralisé (texte libre)")
+            return f"{asset} (ATH de référence peu significatif)"
+        if abs(claim - abs(real)) > 3.0:
+            fixes.append(f"{asset} : ({m.group(2)}% ATH) → {real}% (texte libre)")
+            _fmt = str(round(real, 1)).replace(".", ",").replace("-", "−")
+            return f"{asset} ({_fmt}% vs ATH)"
+        return m.group(0)
+
+    new = _ATH_PAREN.sub(_fix, text)
+    return (new if new != text else text), fixes
+
+
+def sanitize_ath_in_payload_texts(
+    payload: dict[str, Any], ath_facts: Optional[dict[str, Any]],
+    keys: tuple[str, ...] = ("exit_plan", "losses_vs_recos", "my_errors",
+                             "cost_of_errors"),
+) -> list[str]:
+    """Applique ``sanitize_ath_text`` récursivement aux sections texte libres."""
+    fixes: list[str] = []
+    if not isinstance(payload, dict) or not isinstance(ath_facts, dict):
+        return fixes
+
+    def _walk(node: Any) -> Any:
+        if isinstance(node, str):
+            new, fx = sanitize_ath_text(node, ath_facts)
+            fixes.extend(fx)
+            return new
+        if isinstance(node, list):
+            return [_walk(x) for x in node]
+        if isinstance(node, dict):
+            return {k: _walk(v) for k, v in node.items()}
+        return node
+
+    for key in keys:
+        if key in payload:
+            payload[key] = _walk(payload[key])
+    return fixes

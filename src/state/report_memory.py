@@ -524,6 +524,22 @@ def record_weekly_snapshot(
 
 
 # --------------------------- santé des sources (angles morts) --------------- #
+
+# v28 (W-A8) — ALIAS de sources renommées entre versions. Le 07/07, le hebdo
+# listait « ETF flows (Farside) indispo 6 j/7 » ET « ETF flows indispo 2 j/7 » :
+# la MÊME source comptée deux fois car l'historique 30 j mélange l'ancien et le
+# nouveau libellé. Normalisation appliquée à l'ÉCRITURE (nouveaux logs) et à la
+# LECTURE (l'historique existant reste fusionné sans migration de fichier).
+_SOURCE_ALIASES = {
+    "ETF flows (Farside)": "ETF flows",
+}
+
+
+def _canon_source(name: Any) -> str:
+    """Nom canonique d'une source (fusionne les libellés historiques)."""
+    return _SOURCE_ALIASES.get(str(name), str(name))
+
+
 def record_source_health(all_sources: list[str], active_sources: list[str]) -> None:
     """Enregistre quelles sources étaient actives/indisponibles lors d'un run.
 
@@ -533,7 +549,9 @@ def record_source_health(all_sources: list[str], active_sources: list[str]) -> N
     import datetime as _dt
 
     logs = _read(SOURCE_HEALTH_FILE, [])
-    down = [s for s in all_sources if s not in active_sources]
+    _active_canon = {_canon_source(s) for s in active_sources}
+    down = [_canon_source(s) for s in all_sources
+            if _canon_source(s) not in _active_canon]
     logs.append({"date": now_iso(), "down": down})
     # Garde 30 jours.
     cutoff = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=30)
@@ -625,7 +643,9 @@ def compute_blind_spots_weekly() -> dict[str, Any]:
             if start <= when < end:
                 day_key = when.strftime("%Y-%m-%d")
                 for src in entry.get("down", []):
-                    counts.setdefault(src, set()).add(day_key)
+                    # v28 (W-A8) — libellés historiques fusionnés (alias) : plus
+                    # jamais « ETF flows (Farside) » ET « ETF flows » côte à côte.
+                    counts.setdefault(_canon_source(src), set()).add(day_key)
         return {src: len(days) for src, days in counts.items()}
 
     this_week = _count_down(week1_start, now)
@@ -650,6 +670,24 @@ def compute_blind_spots_weekly() -> dict[str, Any]:
     if not this_week:
         return {"available": False}
 
+    # v28 (W-A9) — une lacune RÉCURRENTE peut être rétablie AU MOMENT du build :
+    # le 07/07, « Calendrier macro indispo 6 j/7 » s'affichait sous… un
+    # calendrier rempli (l'historique 7 j portait encore les runs pré-correctif).
+    # Le log le plus récent du JOUR dit si la source est revenue — on l'annote
+    # pour lever la contradiction sans réécrire l'historique.
+    today_key = now.strftime("%Y-%m-%d")
+    latest_down = None
+    for entry in reversed(logs):
+        try:
+            when = _dt.datetime.fromisoformat(entry.get("date", ""))
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=_dt.timezone.utc)
+        except (ValueError, TypeError):
+            continue
+        if when.strftime("%Y-%m-%d") == today_key:
+            latest_down = {_canon_source(s) for s in entry.get("down", [])}
+        break  # seul le log le plus récent compte (aujourd'hui ou pas)
+
     items = []
     for src, days in sorted(this_week.items(), key=lambda x: -x[1]):
         if days < 2:  # on ne signale que les indispos récurrentes (≥2 jours)
@@ -658,6 +696,8 @@ def compute_blind_spots_weekly() -> dict[str, Any]:
         note = None
         if prev is not None and days > prev:
             note = "dégradation vs semaine précédente"
+        if latest_down is not None and src not in latest_down:
+            note = (f"{note} · " if note else "") + "rétablie ce jour"
         items.append(
             {"source": src, "days_down": days, "prev_days_down": prev, "note": note}
         )

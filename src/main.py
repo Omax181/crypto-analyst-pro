@@ -12,6 +12,7 @@ win rate ; le coherence_checker valide le JSON avant envoi.
 
 from __future__ import annotations
 
+import re
 import sys
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -192,6 +193,11 @@ def _next_report_label(mode: str) -> str:
         # Après l'envoi du matin, le prochain rapport est celui du soir.
         return evening_slot
     if mode == "evening":
+        # v28 (E-A1) — un soir lancé HORS créneau (rattrapage 09h46 le 07/07)
+        # annonçait « demain 08h30 » en ignorant le VRAI prochain créneau :
+        # 20h00 le jour même. Prochain rapport = le plus proche des deux.
+        if 8.5 <= h < 20.0:
+            return evening_slot
         return morning_slot
     if mode == "weekly":
         # Le hebdo part le dimanche : prochain rapport = matin suivant.
@@ -741,7 +747,13 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
             _fng_val = fng.get("value") if isinstance(fng, dict) and fng.get("available") else None
             _thesis_eval = _tsc.evaluate_thesis_eligibility(
                 asset, tier=tier,
-                mvrv=_mvrv_sym, pru_gap_pct=_pru_gap,
+                mvrv=_mvrv_sym,
+                # v28 (M-A7) — fraîcheur transmise : un MVRV périmé (miroir
+                # 23/05 le 07/07) pèse moins et porte sa date dans le signal.
+                mvrv_stale=bool(_cm_sym.get("stale")
+                                or _cm_sym.get("mvrv_live_estimate")),
+                mvrv_as_of=_cm_sym.get("as_of"),
+                pru_gap_pct=_pru_gap,
                 drawdown_from_ath_pct=asset.get("ath_distance_pct"),
                 upcoming_catalyst_days=_cat_days,
                 token_unlock_soon=bool(asset.get("token_unlock_soon")),
@@ -1048,7 +1060,15 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     # v17 (T-DEDUP / M-A2) : version dédupliquée + enrichie pour le rendu matin
     # (1 ligne/actif, entry/Δ/cible) — le brut active_recos garde les doublons
     # legacy et sert aux calculs internes (_positions_summary, etc.).
-    active_recos_display = tracker.active_for_display(price_lookup)
+    # v28 (M-A13) — cibles de REPLI pour les recos legacy sans cible persistée
+    # (INJ « cible n/d » le 07/07) : la cible 30 j du plan déterministe du jour.
+    _target_fallbacks = {}
+    for _s_fb, _e_fb in enriched.items():
+        _t30 = ((_e_fb.get("asset_plan") or {}).get("target_30d") or {})
+        if isinstance(_t30.get("level"), (int, float)):
+            _target_fallbacks[_s_fb.upper()] = _t30["level"]
+    active_recos_display = tracker.active_for_display(
+        price_lookup, target_fallbacks=_target_fallbacks)
     win_rate = tracker.compute_win_rate(30)
     # V10 — boucle de feedback : performance par actif + erreurs récentes
     # (réinjectées dans le prompt pour que l'IA apprenne de ses échecs).
@@ -1082,6 +1102,20 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         mem.record_source_health(_ALL_SOURCES, active_sources)
     except Exception as exc:  # noqa: BLE001
         logger.info("record_source_health ignoré : %s", exc)
+
+    # v28 (M-A6) — étiquette de fraîcheur HONNÊTE des ETF flows : la donnée est
+    # structurellement J-1 (Farside/Telegram publient la veille au soir US). Le
+    # 07/07, le footer listait « ⚠ Indisponibles · ETF flows » pendant que le
+    # mail citait +254,7 M$ au 06/07 — contradiction visible. Le libellé
+    # « ETF flows (J-1) » réconcilie les deux. Appliqué APRÈS
+    # record_source_health : le nom CANONIQUE reste stocké dans l'historique
+    # santé (sinon le suffixe créerait un faux « down » dans les lacunes hebdo).
+    active_sources_display = list(active_sources)
+    if "ETF flows" in active_sources_display:
+        _etf_lbl = _etf_freshness_label(etf, datetime.now(TZ).date())
+        if _etf_lbl:
+            active_sources_display[
+                active_sources_display.index("ETF flows")] = _etf_lbl
 
     # Portfolio snapshot calculé côté Python (Gemini n'a pas à l'inventer).
     snapshot = _portfolio_snapshot(portfolio, enriched)
@@ -1289,6 +1323,10 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         "hot_narratives": hot_narratives,        # OB6 — narratifs qui chauffent
         "social_trending": social_trending, "token_unlocks": unlocks,
         "sector_rotation": rotation, "news_counts": news_counts,
+        # v28 (M-A9) — la MÊME sélection de tuiles que le rendu, pour que le
+        # narratif LLM commente les secteurs AFFICHÉS (pas L1/L2/DeFi absents).
+        "sector_rotation_display": _select_rotation_tiles(
+            (rotation or {}).get("sectors") or {}),
         "news_24h_global": news_global_items[:12],
         "macro_news": macro_news_items[:12],
         "boursorama_calendar": boursorama_cal,
@@ -1309,7 +1347,9 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         ),
         "portfolio_risk": portfolio_risk,        # v22 (P1) — risque PTF consolidé
         "exit_signals": exit_signals,            # OB1 — radar de sortie/allègement
-        "active_sources": active_sources,
+        # v28 (M-A6) — liste AFFICHÉE (« ETF flows (J-1) ») ; le nom canonique
+        # vit dans active_sources (compteurs, down_sources, santé hebdo).
+        "active_sources": active_sources_display,
         "eligible_theses": eligible, "active_recommendations": active_recos,
         "active_recommendations_display": active_recos_display,
         "reco_changes": reco_changes,
@@ -1529,24 +1569,25 @@ def _portfolio_heatmap(
     # v16 — % PTF par position (poids), pour la 3e info de chaque case.
     for c in cells:
         c["ptf_pct"] = round(c["value_usd"] / _total_val * 100, 1)
-    # v18 (M-B17) : tri par |variation 24h| DÉCROISSANTE (les plus gros mouvements
-    # d'abord). Une position sans change connu est traitée comme mouvement nul
-    # (donc reléguée vers l'agrégat). À |variation| égale, le poids départage
-    # (ordre stable).
-    def _mv(c: dict[str, Any]) -> float:
+    # v28 (M-A11) — tri par IMPACT RÉEL (poids × |variation|), plus par la seule
+    # amplitude : le 07/07, la heatmap ouvrait sur « SXT −3.4% · 0.0% PTF » (du
+    # bruit) pendant que BTC (42% du PTF) était noyé au milieu. Ce qui compte
+    # pour le lecteur = ce qui bouge SON portefeuille.
+    def _impact(c: dict[str, Any]) -> float:
         ch = c.get("change_24h")
-        return abs(ch) if isinstance(ch, (int, float)) else 0.0
-    cells.sort(key=lambda c: (_mv(c), c["value_usd"]), reverse=True)
-    # v23.x : grille 5 colonnes × 4 lignes = 20 cases. Le rendu mail (template)
-    # affiche 5 cases par ligne et ajoute lui-même la case « +N autres » quand
-    # ``extra`` est présent. ≤ 20 positions → tout afficher (pas d'agrégat) ;
-    # > 20 → 19 plus gros mouvements + 1 case agrégée = 20 cases.
-    if total <= 20:
-        top = cells[:20]
-        rest: list[dict[str, Any]] = []
-    else:
-        top = cells[:19]
-        rest = cells[19:]
+        mv = abs(ch) if isinstance(ch, (int, float)) else 0.0
+        return mv * (c.get("ptf_pct") or 0.0)
+    cells.sort(key=lambda c: (_impact(c), c["value_usd"]), reverse=True)
+    # v28 (M-A11) — les POUSSIÈRES (< 0.5% du PTF) rejoignent l'agrégat « +N
+    # autres » : 20 tuiles dont « 0.0% PTF » diluaient l'information. Grille
+    # plafonnée à 15 cases visibles (3 lignes de 5) + agrégat.
+    visible = [c for c in cells if (c.get("ptf_pct") or 0.0) >= 0.5]
+    dust = [c for c in cells if (c.get("ptf_pct") or 0.0) < 0.5]
+    if len(visible) > 15:
+        dust = visible[15:] + dust
+        visible = visible[:15]
+    top = visible
+    rest = dust
     extra = None
     if rest:
         _w = sum(c["value_usd"] for c in rest)
@@ -2362,7 +2403,10 @@ def _macro_context(
         "polymarket_fed_bars": fed_bars,
         # v16.1 — autres marchés Polymarket (récession, géopo, crypto) pour la
         # ligne « autres marchés » et l'intégration au fil des news.
-        "polymarket_extra_markets": (polymarket.get("extra_markets") or [])[:4],
+        # v28 (1.B) — MAX 2, dédupliqués par thème : le 07/07, 3 des 4 lignes
+        # étaient des variantes « BTC au-dessus de X $ » de la même journée.
+        "polymarket_extra_markets": _dedupe_extra_markets(
+            polymarket.get("extra_markets") or [], cap=2),
         # Taux & volatilité (Yahoo prioritaire sur VIX et 10Y).
         "vix": _vm("vix", _pref("vix", vix)),
         "vix_delta": _delta_pref("vix", vix),
@@ -2407,6 +2451,108 @@ def _macro_context(
         # Provenance (pour transparence / debug ; non affiché par défaut).
         "_price_source": "yahoo+fred" if yq else "fred",
     }
+
+
+def _dedupe_extra_markets(markets: list[Any], cap: int = 2) -> list[Any]:
+    """v28 (1.B) — « Autres marchés Polymarket » : 2 lignes max, UN par thème.
+
+    Le 07/07, 4 lignes dont 3 variantes de « Will the price of Bitcoin be
+    above $X on July 7? » (78% / 18% / 93%) : même question à seuil différent.
+    Deux questions qui ne diffèrent que par leurs NOMBRES comptent pour une.
+    """
+    out: list[Any] = []
+    seen: set[str] = set()
+    for m in markets:
+        q = str((m or {}).get("question") or "").lower()
+        theme = re.sub(r"\$?\d[\d,.]*", "", q)
+        theme = re.sub(r"\s+", " ", theme).strip()
+        if not q or theme in seen:
+            continue
+        seen.add(theme)
+        out.append(m)
+        if len(out) >= cap:
+            break
+    return out
+
+
+def _select_rotation_tiles(sec: dict[str, Any]) -> list[dict[str, Any]]:
+    """Sélection des TUILES de rotation sectorielle (source unique tuiles/LLM).
+
+    v18 (M-A23) : tri par AMPLEUR ABSOLUE de variation (|change|) décroissante
+    — un secteur à −20% passe avant un secteur à +15%, car son mouvement est
+    plus significatif. Au MAX 5 cases : les 4 plus gros mouvements + une 5e
+    case « Autres secteurs » = moyenne PONDÉRÉE (par nb de membres, proxy de
+    la taille) des secteurs restants.
+
+    v28 (M-A9) — extrait en fonction : la MÊME liste alimente désormais le
+    prompt (data.sector_rotation_display) ET le rendu. Le 07/07, le narratif
+    commentait L1/L2/DeFi/AI pendant que les tuiles montraient Data/Interop/
+    Infra — le lecteur ne pouvait pas relier le texte aux chiffres affichés.
+    """
+    rot_list: list[dict[str, Any]] = []
+    for name, sd in sec.items():
+        rot_list.append({
+            "sector": name,
+            "change_24h": round(sd.get("avg_change_24h") or 0, 2),
+            "change_7d": sd.get("avg_change_7d"),
+            "change_30d": sd.get("avg_change_30d"),
+            "your_holdings": sd.get("members", []),
+            "_weight": len(sd.get("members", []) or []) or 1,
+        })
+    rot_list.sort(key=lambda r: abs(r["change_24h"]), reverse=True)
+    _MAX_INDIVIDUAL = 4
+    if len(rot_list) > _MAX_INDIVIDUAL + 1:
+        top = rot_list[:_MAX_INDIVIDUAL]
+        rest = rot_list[_MAX_INDIVIDUAL:]
+        _tot_w = sum(r["_weight"] for r in rest) or 1
+        _avg = sum(r["change_24h"] * r["_weight"] for r in rest) / _tot_w
+        # 7j/30j pondérés sur les secteurs restants qui les ont.
+        _r7 = [r for r in rest if isinstance(r.get("change_7d"), (int, float))]
+        _r30 = [r for r in rest if isinstance(r.get("change_30d"), (int, float))]
+        _avg7 = (sum(r["change_7d"] * r["_weight"] for r in _r7)
+                 / (sum(r["_weight"] for r in _r7) or 1)) if _r7 else None
+        _avg30 = (sum(r["change_30d"] * r["_weight"] for r in _r30)
+                  / (sum(r["_weight"] for r in _r30) or 1)) if _r30 else None
+        top.append({
+            "sector": f"Autres secteurs ({len(rest)})",
+            "change_24h": round(_avg, 2),
+            "change_7d": round(_avg7, 2) if _avg7 is not None else None,
+            "change_30d": round(_avg30, 2) if _avg30 is not None else None,
+            "your_holdings": [],
+            "is_aggregate": True,
+        })
+        rot_list = top
+    for r in rot_list:
+        r.pop("_weight", None)
+    return rot_list
+
+
+def _etf_freshness_label(etf: Any, today: Any) -> Optional[str]:
+    """v28 (M-A6) — libellé d'affichage daté des ETF flows.
+
+    « ETF flows (J-1) » quand la donnée date de la veille (cas nominal :
+    Farside/Telegram publient après la clôture US), « ETF flows (au JJ/MM) »
+    au-delà, ``None`` si la date est du jour ou illisible (libellé nu conservé).
+    """
+    date_str = None
+    for leg in ("btc", "eth"):
+        d = ((etf or {}).get(leg) or {}).get("date")
+        if d:
+            date_str = str(d)
+            break
+    try:
+        day = (datetime.strptime(date_str[:10], "%Y-%m-%d").date()
+               if date_str else None)
+    except (ValueError, TypeError):
+        return None
+    if day is None:
+        return None
+    age = (today - day).days
+    if age == 1:
+        return "ETF flows (J-1)"
+    if age > 1:
+        return f"ETF flows (au {day:%d/%m})"
+    return None
 
 
 def _active_sources(**flags: Any) -> list[str]:
@@ -2701,12 +2847,20 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
     if wh.get("available"):
         n = wh.get("large_inflows_count")
         thr = int(_parse_num(wh.get("threshold_eth")) or 200)
+        # v28 (M-A14) — SEUIL DE SIGNIFICATIVITÉ : le 07/07, « 200 ETH ·
+        # 1 dépôt » (~355 k$, du bruit) était présenté comme « pression
+        # vendeuse possible ». Sous 1 000 ETH agrégés/24h : flux négligeable,
+        # AUCUNE interprétation directionnelle.
+        _WH_SIGNIFICANT = 1000
         if isinstance(n, int) and n > 0:
             total_in = _parse_num(wh.get("total_eth_in")) or 0
+            _wh_small = total_in < _WH_SIGNIFICANT
             tiles.append({"label": "Dépôts whales ETH · 24h",
                           "value": f"{total_in:,.0f} ETH".replace(",", " "),
-                          "color": _AMBER,
-                          "short": f"{n} dépôt{'s' if n > 1 else ''} ≥{thr} ETH · pression vendeuse possible"})
+                          "color": _INK if _wh_small else _AMBER,
+                          "short": (f"{n} dépôt{'s' if n > 1 else ''} ≥{thr} ETH · "
+                                    + ("flux négligeable (<1 000 ETH)" if _wh_small
+                                       else "pression vendeuse possible"))})
         elif n == 0:
             tiles.append({"label": "Dépôts whales ETH · 24h",
                           "value": f"aucun ≥{thr} ETH",
@@ -2748,7 +2902,16 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
         ls = _parse_num(der.get("long_short_ratio"))
         if ls is not None:
             short += f" · L/S {ls:.2f}"
-        tiles.append({"label": "Funding BTC", "value": f"{fr_pct:+.3f}%",
+        # v28 (W-A11) — UNITÉ UNIQUE cross-mail : annualisé + « /an », comme le
+        # hebdo. Le 07/07, « +0.007% » (taux 8h, matin) côtoyait « +6,06%/an »
+        # (hebdo) pour la MÊME réalité — illisible. Repli 8h si l'annualisé
+        # manque, alors étiqueté « /8h » explicitement.
+        fr_ann = _parse_num(der.get("funding_annualized_pct"))
+        if fr_ann is not None:
+            _fr_val = f"{fr_ann:+.1f}%/an"
+        else:
+            _fr_val = f"{fr_pct:+.3f}%/8h"
+        tiles.append({"label": "Funding BTC", "value": _fr_val,
                       "color": color, "short": short})
 
     # ── DVOL (volatilité implicite) ──
@@ -2878,16 +3041,26 @@ def _compute_top_action(payload: dict[str, Any]) -> None:
     """v27 (RE4) — « Si tu ne fais qu'UNE chose » : meilleure thèse ferme.
 
     Classe les thèses fermes par (R:R × EV positif), et expose la n°1 en une
-    ligne actionnable. Déterministe : survit à une panne IA. Rien si aucune
-    thèse ferme exploitable.
+    ligne actionnable. Déterministe : survit à une panne IA.
+
+    v28 (M-A1) — seuls les gestes EXÉCUTABLES concourent (sizing > 0, EV ≥ 0,
+    R:R suffisant pour un tactique) : le 07/07, le « one thing » poussait
+    « RENFORCER TAO » avec « renfort non suggéré, concentration » dans la même
+    ligne. Aucun candidat → « Ne rien faire aujourd'hui » est affiché (décision
+    honnête plutôt qu'un geste incohérent ou un bloc absent).
     """
+    from src.analytics.reco_gate import NOTHING_TO_DO_LINE, executable_for_top_action
+
     best = None
     best_score = 0.0
+    had_firm = False
     for t in (payload.get("thesis_of_the_day") or []):
         if not isinstance(t, dict):
             continue
-        if not any(k in (t.get("action") or "").upper()
-                   for k in ("RENFORC", "ALLÉG", "ALLEG")):
+        if any(k in (t.get("action") or "").upper()
+               for k in ("RENFORC", "ALLÉG", "ALLEG")):
+            had_firm = True
+        if not executable_for_top_action(t):
             continue
         plan = t.get("asset_plan") or {}
         rr = plan.get("rr_30d")
@@ -2912,6 +3085,10 @@ def _compute_top_action(payload: dict[str, Any]) -> None:
             }
     if best:
         payload["top_action"] = best
+    elif had_firm or (payload.get("thesis_of_the_day") or []):
+        # Des thèses existent mais aucune n'est exécutable → le dire.
+        # (« is_nothing » et non « none » : mot-clé Jinja, inaccessible en template.)
+        payload["top_action"] = {"is_nothing": True, "line": NOTHING_TO_DO_LINE}
 
 
 def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp: str) -> dict[str, Any]:
@@ -3065,47 +3242,7 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
     # Rotation sectorielle : on injecte directement les chiffres réels
     sec = (data.get("sector_rotation") or {}).get("sectors", {})
     if sec:
-        rot_list = []
-        for name, sd in sec.items():
-            rot_list.append({
-                "sector": name,
-                "change_24h": round(sd.get("avg_change_24h") or 0, 2),
-                "change_7d": sd.get("avg_change_7d"),
-                "change_30d": sd.get("avg_change_30d"),
-                "your_holdings": sd.get("members", []),
-                "_weight": len(sd.get("members", []) or []) or 1,
-            })
-        # v18 (M-A23) : tri par AMPLEUR ABSOLUE de variation (|change|) décroissante
-        # — un secteur à −20% passe avant un secteur à +15%, car son mouvement est
-        # plus significatif. On affiche au MAX 5 cases : les 4 plus gros mouvements
-        # + une 5e case « Autres secteurs » = moyenne PONDÉRÉE (par nb de membres,
-        # proxy de la taille) des secteurs restants. Vue synthétique sur 1 ligne.
-        rot_list.sort(key=lambda r: abs(r["change_24h"]), reverse=True)
-        _MAX_INDIVIDUAL = 4
-        if len(rot_list) > _MAX_INDIVIDUAL + 1:
-            top = rot_list[:_MAX_INDIVIDUAL]
-            rest = rot_list[_MAX_INDIVIDUAL:]
-            _tot_w = sum(r["_weight"] for r in rest) or 1
-            _avg = sum(r["change_24h"] * r["_weight"] for r in rest) / _tot_w
-            # 7j/30j pondérés sur les secteurs restants qui les ont.
-            _r7 = [r for r in rest if isinstance(r.get("change_7d"), (int, float))]
-            _r30 = [r for r in rest if isinstance(r.get("change_30d"), (int, float))]
-            _avg7 = (sum(r["change_7d"] * r["_weight"] for r in _r7)
-                     / (sum(r["_weight"] for r in _r7) or 1)) if _r7 else None
-            _avg30 = (sum(r["change_30d"] * r["_weight"] for r in _r30)
-                      / (sum(r["_weight"] for r in _r30) or 1)) if _r30 else None
-            top.append({
-                "sector": f"Autres secteurs ({len(rest)})",
-                "change_24h": round(_avg, 2),
-                "change_7d": round(_avg7, 2) if _avg7 is not None else None,
-                "change_30d": round(_avg30, 2) if _avg30 is not None else None,
-                "your_holdings": [],
-                "is_aggregate": True,
-            })
-            rot_list = top
-        for r in rot_list:
-            r.pop("_weight", None)
-        payload["sector_rotation"] = rot_list
+        payload["sector_rotation"] = _select_rotation_tiles(sec)
 
     # all_positions_summary : on garde ce que Python a calculé (37 actifs)
     if data.get("all_positions_summary"):
@@ -3683,6 +3820,11 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         payload["exit_signals"] = _exs
     try:
         _apply_asset_plans_to_theses(payload, data)
+        # v28 (M-A1/A2/A3/A4) — GATE DE COHÉRENCE (décision Omar 07/07) : les
+        # actions affichées doivent suivre leurs propres preuves (sizing,
+        # EV 30j, R:R) AVANT le choix du « one thing ».
+        from src.analytics.reco_gate import apply_reco_gate
+        apply_reco_gate(payload)
         _compute_top_action(payload)
     except Exception as _apexc:  # noqa: BLE001 — jamais bloquant
         logger.info("Application des plans v27 ignorée : %s", _apexc)
@@ -3935,20 +4077,9 @@ def run_morning() -> int:
             chart_imgs.update({f"track_{s}": p for s, p in _track_imgs.items()})
         except Exception as _tcexc:  # noqa: BLE001
             logger.info("Graphiques de suivi ignorés : %s", _tcexc)
-    # v27 (AF6) — jauge visuelle Fear & Greed (sentiment en un regard).
-    try:
-        _fg_val = (payload.get("macro_context") or {}).get("fear_greed")
-        if _fg_val is not None:
-            _fg_png = charts.gauge_png(
-                _fg_val, vmin=0, vmax=100, label="Fear & Greed",
-                value_label=str(int(_fg_val)),
-                zones=[(0, 25, "#A32D2D"), (25, 45, "#BA7517"),
-                       (45, 55, "#8a8880"), (55, 75, "#3B6D11"),
-                       (75, 100, "#0E6B5E")])
-            if _fg_png:
-                chart_imgs["fng_gauge"] = _fg_png
-    except Exception as _gexc:  # noqa: BLE001
-        logger.info("Jauge F&G ignorée : %s", _gexc)
+    # v28 (1.B, décision Omar 07/07) — la jauge graphique Fear & Greed est
+    # SUPPRIMÉE : elle répétait en grand la valeur déjà affichée en texte dans
+    # la grille CRYPTO & SENTIMENT (une donnée = un seul affichage).
     html = _render(payload, "morning", charts=chart_imgs)
     # v20 (audit C1) \u2014 images attach\u00e9es en CID (cl\u00e9 \u00ab chart_<ASSET> \u00bb), Gmail-safe.
     inline = {f"chart_{sym}": png for sym, png in chart_imgs.items() if png}
@@ -4027,6 +4158,49 @@ def _first_take_profit(action_plan: Any) -> Optional[float]:
     return _parse_num(tp)
 
 
+_EQUITY_ITEM_RE = re.compile(
+    r"(?i)\b(AMD|TSM|NVDA|COIN|MARA|MSTR|INTC|AAPL|MSFT|TSLA|"
+    r"S\s?&\s?P|Nasdaq|Dow|semi-conducteur|actions?\s+US)\b")
+
+
+def _filter_equity_catalysts_when_closed(
+    market_changes: list[Any],
+) -> list[Any]:
+    """v28 (E-A2/E-A3, 2.B) — séance US FERMÉE : retire les « NOUVEAU » équities.
+
+    Le 07/07 (rattrapage 09h46 Casa = 04h46 New York), le soir listait 4
+    « ↑ NOUVEAU CATALYSEUR » sur AMD/TSM/COIN/MARA « en séance » — des chiffres
+    de la session de la VEILLE présentés comme du neuf. Hors séance : ces items
+    sont remplacés par UNE ligne honnête, et toute mention « en séance »
+    restante est requalifiée « à la clôture de la dernière séance US ».
+    """
+    kept: list[Any] = []
+    dropped = 0
+    for c in market_changes:
+        if not isinstance(c, dict):
+            kept.append(c)
+            continue
+        txt = str(c.get("description") or "")
+        if str(c.get("status") or "") == "new" and _EQUITY_ITEM_RE.search(txt):
+            dropped += 1
+            continue
+        if "en séance" in txt.lower():
+            c = dict(c)
+            c["description"] = re.sub(
+                r"(?i)en séance", "à la clôture de la dernière séance US", txt)
+        kept.append(c)
+    if dropped:
+        kept.append({
+            "status": "unchanged", "tag": "Info",
+            "description": ("Marchés US fermés à l'heure du rapport : chiffres "
+                            "actions = clôture de la dernière séance — rien de "
+                            "neuf depuis ce matin."),
+        })
+        logger.info("Evening : %d catalyseur(s) équities « en séance » "
+                    "retirés (marché US fermé).", dropped)
+    return kept
+
+
 def _reco_bilan_status(
     action: str, entry: Optional[float], cur: Optional[float], sl: Optional[float]
 ) -> tuple[str, str]:
@@ -4043,18 +4217,26 @@ def _reco_bilan_status(
     if not (entry and cur and entry > 0):
         return "pending", "prix d'entrée ou cours indisponible"
     sl_txt = _fmt_money(sl) if sl else None
-    inval = (f"invalidé {'au-dessus de' if bearish else 'sous'} {sl_txt}"
-             if sl_txt else "pas de niveau d'invalidation défini")
     # Stop franchi : la thèse est cassée.
     if sl and ((not bearish and cur < sl) or (bearish and cur > sl)):
         return "invalidated", (f"stop {sl_txt} franchi" if sl_txt else "stop franchi")
     delta = (cur - entry) / entry * 100
-    on_track = (not bearish and delta >= 0) or (bearish and delta <= 0)
-    if on_track:
+    # v28 (E-A5/E-A6) — SEUILS ANTI-BRUIT : le 07/07, 68 minutes après le
+    # matin, 6 recos sur 7 étaient « ⚠ sous pression » pour des −0,2 à −0,8%
+    # (du bruit), et INJ à +0,0% était « au-dessus de l'entrée ». Désormais :
+    # favorable ≥ +0,5% → on track · défavorable ≤ −1,5% → sous pression ·
+    # entre les deux → stable (proche de l'entrée). Raison raccourcie :
+    # une seule mention d'invalidation, plus de « repli sous l'entrée ·
+    # invalidé sous $X » répété à chaque ligne.
+    signed = -delta if bearish else delta  # favorable = positif
+    inval_short = f"invalidation {sl_txt}" if sl_txt else "pas de niveau d'invalidation"
+    if signed >= 0.5:
         good = "baisse conforme à la thèse" if bearish else "au-dessus de l'entrée"
-        return "on_track", f"{good} · {inval}"
-    bad = "rebond contre la thèse" if bearish else "repli sous l'entrée"
-    return "under_pressure", f"{bad} · {inval}"
+        return "on_track", f"{good} · {inval_short}"
+    if signed <= -1.5:
+        bad = "rebond contre la thèse" if bearish else "repli sous l'entrée"
+        return "under_pressure", f"{bad} · {inval_short}"
+    return "stable", f"proche de l'entrée (bruit court terme) · {inval_short}"
 
 
 def _build_evening_reco_bilan(
@@ -4296,9 +4478,14 @@ def _build_evening_derivatives_line(
     parts: list[str] = []
     d = btc_deriv or {}
     if d.get("available"):
+        # v28 (W-A11) — UNITÉ UNIQUE cross-mail : annualisé « /an » (comme le
+        # matin et le hebdo). Repli 8h explicitement étiqueté si l'annualisé manque.
+        f_ann = _parse_num(d.get("funding_annualized_pct"))
         f = _parse_num(d.get("funding_rate_pct"))
-        if f is not None:
-            parts.append(f"Funding BTC {_pct_fr_signed(f, 3)}")
+        if f_ann is not None:
+            parts.append(f"Funding BTC {_pct_fr_signed(f_ann, 1)}/an")
+        elif f is not None:
+            parts.append(f"Funding BTC {_pct_fr_signed(f, 3)}/8h")
         ls = _parse_num(d.get("long_short_ratio"))
         if ls is not None:
             parts.append(f"L/S {str(round(ls, 2)).replace('.', ',')}")
@@ -4846,6 +5033,36 @@ def run_evening() -> int:
             header["timing_line"] += " · fenêtre courte"
     else:
         header["timing_line"] = f"rapport lancé à {_ev_time}"
+
+    # v28 (E-A1) — LIBELLÉS PILOTÉS PAR L'HEURE RÉELLE : le rattrapage du 07/07
+    # (09h46) écrivait « Bonne soirée. », « Niveaux à surveiller cette nuit »
+    # et « DEMAIN MATIN · CHECK LIST » en pleine matinée. Le template lit ces
+    # libellés calculés ; le vrai run de 20h garde son décor nocturne.
+    _h_ev = now_local.hour + now_local.minute / 60.0
+    _is_evening_slot = _h_ev >= 17.0 or _h_ev < 4.0
+    header["is_evening_slot"] = _is_evening_slot
+    header["closing_greeting"] = ("Bonne soirée." if _is_evening_slot
+                                  else "Bonne journée.")
+    header["levels_window_label"] = ("Niveaux à surveiller cette nuit"
+                                     if _is_evening_slot
+                                     else "Niveaux à surveiller")
+    header["checklist_title"] = ("Demain matin · check list" if _is_evening_slot
+                                 else "Prochain rapport · check list")
+    # v28 (E-A2) — MARCHÉ US : lun-ven ~13:30-20:00 UTC (9h30-16h New York).
+    # Fermé → le template titre « instantané (séance US fermée) » au lieu de
+    # « mi-séance », et la garde ci-dessous requalifie les items équities.
+    _now_utc_ev = datetime.now(timezone.utc)
+    header["us_market_open"] = (
+        _now_utc_ev.weekday() < 5
+        and (13, 30) <= (_now_utc_ev.hour, _now_utc_ev.minute) < (20, 0))
+
+    # v28 (E-A2/E-A3, 2.B) — MARCHÉ US FERMÉ : plus de « NOUVEAU CATALYSEUR »
+    # actions « en séance » fabriqué depuis la session de la VEILLE (le 07/07 :
+    # « AMD +6.61% en séance » à 04h46 heure de New York).
+    if not header["us_market_open"] and isinstance(
+            payload.get("market_changes"), list):
+        payload["market_changes"] = _filter_equity_catalysts_when_closed(
+            payload["market_changes"])
     header["ptf_value_delta_since_morning"] = round(delta_morning, 2)
     if morning_snap.get("value_usd"):
         header["ptf_value_pct_since_morning"] = round(
@@ -5040,12 +5257,17 @@ def _is_core_asset(sym: str, info: dict[str, Any] | None) -> bool:
 def _build_calls_review(
     prev_calls: dict[str, Any], btc_price_now: Any,
     fear_greed_now: Any, regime_now: dict[str, Any],
+    fear_greed_7d_ago: Any = None,
 ) -> Optional[dict[str, Any]]:
     """v27 (ME2/ME3) — verdict des appels du hebdo PRÉCÉDENT.
 
     Compare ce qui avait été annoncé (scénario dominant, prix BTC, F&G,
     régime) à ce qui s'est réellement passé, en une ligne honnête. None si
     pas d'historique (premier hebdo).
+
+    v28 (W-A1) — ``fear_greed_7d_ago`` (série API 8 j) est la référence : si
+    la valeur STOCKÉE au hebdo précédent la contredit (> 3 pts — le 07/07 :
+    24 stocké vs 15 en série), la série gagne. Une seule vérité par mail.
     """
     if not isinstance(prev_calls, dict) or not prev_calls.get("dominant_scenario"):
         return None
@@ -5062,6 +5284,14 @@ def _build_calls_review(
         bits.append(f"régime {'inchangé' if _prev_reg == _now_reg else _prev_reg + ' → ' + _now_reg}")
     _prev_fg = _parse_num(prev_calls.get("fear_greed"))
     _now_fg = _parse_num(fear_greed_now)
+    _fg_series = _parse_num(fear_greed_7d_ago)
+    if (_fg_series is not None and _prev_fg is not None
+            and abs(_prev_fg - _fg_series) > 3):
+        logger.info("Calls review F&G : stocké %s contredit la série 8j (%s) — "
+                    "série retenue.", _prev_fg, _fg_series)
+        _prev_fg = _fg_series
+    elif _prev_fg is None:
+        _prev_fg = _fg_series
     if _prev_fg is not None and _now_fg is not None:
         bits.append(f"F&G {int(_prev_fg)} → {int(_now_fg)}")
     _scn = prev_calls.get("dominant_scenario")
@@ -5093,6 +5323,7 @@ def _build_positions_review(
     long_term: Any, scoring_detail: Any,
     portfolio: dict[str, Any], market: dict[str, Any],
     ath_facts: Optional[dict[str, Any]] = None,
+    asset_plans: Optional[dict[str, Any]] = None,
 ) -> list[dict[str, Any]]:
     """v23.x — FUSION (1 ligne/actif) des 2 anciens tableaux du weekly.
 
@@ -5170,18 +5401,34 @@ def _build_positions_review(
         elif not action:
             action = "garder" if (h30 or lt) else None
 
-        # ── v26 (W-A16/B5) — CIBLE LT crédible : jamais > ATH réel, et une
-        # cible ≥ +250% est étiquetée « cycle » (reconquête ATH), pas « 6-12m ».
-        target = _parse_num(lt.get("target_price"))
-        if _ath_suspect:
-            target = None
-        elif target and _ath_real and target > _ath_real * 1.05:
-            target = _ath_real
-        target_pct = (round((target - price) / price * 100)
-                      if target and price and price > 0 else None)
+        # ── v28 (W-A11) — CIBLE LT = SOURCE UNIQUE cross-mail : la fourchette
+        # déterministe asset_plan.target_cycle (fib 0.618 → ATH réel), la MÊME
+        # que les fiches du matin. Le 07/07, l'hebdo (LLM) disait ETH 3 500 $
+        # quand le matin affichait 3 736–4 946 $. La cible LLM ne sert plus que
+        # de repli quand aucun plan n'est calculable (série de prix absente).
+        target = None
+        target_low = target_high = None
+        target_pct = None
         target_kind = None
-        if target_pct is not None:
-            target_kind = "cycle" if target_pct >= 250 else "6-12m"
+        _plan_a = (asset_plans or {}).get(a) or {}
+        _cyc_a = _plan_a.get("target_cycle")
+        if isinstance(_cyc_a, dict) and _parse_num(_cyc_a.get("high")):
+            target_low = _parse_num(_cyc_a.get("low"))
+            target_high = _parse_num(_cyc_a.get("high"))
+            target_pct = _parse_num(_cyc_a.get("upside_pct"))
+            target_kind = _cyc_a.get("kind") or "cycle"
+        else:
+            # ── v26 (W-A16/B5) — repli LLM : cible crédible, jamais > ATH réel,
+            # et une cible ≥ +250% est étiquetée « cycle » (reconquête ATH).
+            target = _parse_num(lt.get("target_price"))
+            if _ath_suspect:
+                target = None
+            elif target and _ath_real and target > _ath_real * 1.05:
+                target = _ath_real
+            target_pct = (round((target - price) / price * 100)
+                          if target and price and price > 0 else None)
+            if target_pct is not None:
+                target_kind = "cycle" if target_pct >= 250 else "6-12m"
 
         out.append({
             "asset": a,
@@ -5191,6 +5438,8 @@ def _build_positions_review(
             "h30": h30,
             "lt_status": lt_status,
             "lt_target": target,
+            "lt_target_low": target_low,
+            "lt_target_high": target_high,
             "lt_target_pct": target_pct,
             "lt_target_kind": target_kind,
             "analysis": (lt.get("analysis") or lt.get("thesis_short")
@@ -5966,12 +6215,37 @@ def run_weekly() -> int:
         _sc["winrate_gate_label"] = (
             f"Recos clôturées : {len(_closed)}/5 minimum pour calibration"
         )
+    # v28 (W-A11) — CIBLES LT UNIQUES : plans déterministes par actif (même
+    # moteur que le matin : asset_plan.target_cycle, fib 0.618 → ATH réel) pour
+    # que le tableau positions n'affiche plus une cible LLM divergente
+    # (ETH 3 500 $ hebdo vs 3 736–4 946 $ matin le 07/07). Best-effort : sans
+    # série de prix (positions < 5 $ / API muette), le repli LLM v26 s'applique.
+    _lt_plans_w: dict[str, Any] = {}
+    try:
+        from src.analytics import asset_plan as _aplan_w
+        for _s_lt, _closes_lt in (weekly_price_series or {}).items():
+            if len(_closes_lt or []) < 30:
+                continue
+            _fact_lt = (data.get("ath_by_asset") or {}).get(_s_lt.upper()) or {}
+            _plan_lt = _aplan_w.compute_asset_plan(
+                _s_lt, _closes_lt,
+                price=_parse_num((market.get(_s_lt) or {}).get("price")),
+                ath=_fact_lt.get("ath"),
+                ath_suspect=_wg.ath_is_suspect(
+                    _parse_num(_fact_lt.get("from_ath_pct"))),
+            )
+            if _plan_lt.get("available"):
+                _lt_plans_w[_s_lt.upper()] = _plan_lt
+    except Exception as _exc_lt:  # noqa: BLE001
+        logger.info("Plans LT weekly indisponibles : %s", _exc_lt)
+
     # v23.x — TABLEAU UNIFIÉ « Positions · 30j & long terme » : fusion du
     # positionnement LT (LLM) + perf reco 30j (scoring_detail) + prix/PRU/
     # conviction (déterministe). Remplace les 2 anciens tableaux par-actif.
     payload["positions_review"] = _build_positions_review(
         payload.get("long_term_positioning"), scoring_detail, portfolio, market,
         ath_facts=data.get("ath_by_asset"),
+        asset_plans=_lt_plans_w,
     )
 
     # ─────────────────────────────────────────────────────────────
@@ -5987,7 +6261,16 @@ def run_weekly() -> int:
                   .get("fear_greed")))
     payload["weekly_summary"], _fx = _wg.enforce_summary_figures(
         payload.get("weekly_summary"), payload.get("portfolio_snapshot"),
-        fear_greed_value=_fg_val_w)
+        fear_greed_value=_fg_val_w,
+        # v28 (W-A1) — la série 8 j est la SEULE référence « il y a 7 j » :
+        # le 07/07, verdict/WoW/LLM citaient 24, 23 et 15 pour la même chose.
+        fear_greed_7d_ago=(fng_w.get("value_7d_ago") if fng_w.get("available")
+                           else None))
+    _wg_fixes += _fx
+    # v28 (W-A3) — le MOT sous-/surperformant suit le SIGNE vs BTC corrigé.
+    payload["weekly_summary"], _fx = _wg.fix_vsbtc_direction_wording(
+        payload.get("weekly_summary"),
+        (payload.get("portfolio_snapshot") or {}).get("vs_btc_7d_pct"))
     _wg_fixes += _fx
     payload["weekly_summary"], _fx = _wg.fix_equity_points_in_bullets(
         payload.get("weekly_summary"), _macro_week_pct)
@@ -5998,6 +6281,13 @@ def run_weekly() -> int:
         payload.get("positions_review"), data.get("ath_by_asset"))
     _wg_fixes += _wg.sanitize_cross_asset_mvrv(
         payload.get("positions_review"), _onchain_assets_w)
+    # v28 (W-A5) — plus de « ATH peu significatif, ATH peu significatif (…) » :
+    # dédup des segments des lignes ⚙ APRÈS toutes les réécritures.
+    _wg_fixes += _wg.dedupe_analysis_segments(payload.get("positions_review"))
+    # v28 (W-A5) — la neutralisation ATH couvre AUSSI les textes libres
+    # (exit plan / poussières citaient encore « JASMY (-99.9% ATH) »).
+    _wg_fixes += _wg.sanitize_ath_in_payload_texts(
+        payload, data.get("ath_by_asset"))
     _held_w = {s.upper() for s in symbols}
     for _k_held in ("losses_vs_recos", "my_errors"):
         payload[_k_held], _fx = _wg.fix_held_opportunity_wording(
@@ -6244,6 +6534,18 @@ def run_weekly() -> int:
         payload["weekly_facts_lines"] = _facts_lines
     # v26 (W-B7) — digest news 7j (rendu + déjà injecté au prompt).
     if weekly_news_digest:
+        # v28 (W-A7) — MERGE des titres FR fournis par l'IA (weekly_news_fr,
+        # même ordre) sur le digest ; repli EN si absent/incomplet. Le rendu
+        # préfère title_fr. Robuste : une traduction manquante garde l'anglais.
+        _fr_titles = payload.get("weekly_news_fr")
+        if isinstance(_fr_titles, list):
+            for _i_n, _item_n in enumerate(weekly_news_digest):
+                if _i_n < len(_fr_titles):
+                    _tfr = _fr_titles[_i_n]
+                    _tfr = (_tfr.get("titre_fr") or _tfr.get("title_fr")
+                            if isinstance(_tfr, dict) else _tfr)
+                    if isinstance(_tfr, str) and _tfr.strip():
+                        _item_n["title_fr"] = _tfr.strip()
         payload["weekly_news_digest"] = weekly_news_digest
     # NOUVEAU #11 : bilan des angles morts récurrents (point 4 weekly : TOUJOURS
     # afficher, même message neutre si pas d'historique).
@@ -6557,6 +6859,21 @@ def run_weekly() -> int:
                     f"{str(_q_now).replace('.', ',')}/10")
             _pfg_w = _prev_wk.get("fear_greed")
             _fg_now_w = (fng_w.get("value") if fng_w.get("available") else None)
+            # v28 (W-A1) — le snapshot stockait le F&G du RAPPORT DU MATIN du
+            # jour du hebdo précédent (instantané divergent : le 07/07, 23
+            # affiché ici contre 15 dans la série et 24 dans le verdict). Si la
+            # valeur stockée contredit la série 8 j (> 3 pts), la série gagne.
+            _fg_7d_series = (fng_w.get("value_7d_ago") if fng_w.get("available")
+                             else None)
+            if (isinstance(_fg_7d_series, (int, float))
+                    and isinstance(_pfg_w, (int, float))
+                    and abs(int(_pfg_w) - int(_fg_7d_series)) > 3):
+                logger.info(
+                    "WoW F&G : valeur stockée %s contredit la série 8j (%s) — "
+                    "série retenue.", _pfg_w, _fg_7d_series)
+                _pfg_w = _fg_7d_series
+            elif _pfg_w is None:
+                _pfg_w = _fg_7d_series
             if isinstance(_pfg_w, (int, float)) and isinstance(_fg_now_w, (int, float)):
                 _dfg_w = int(_fg_now_w) - int(_pfg_w)
                 _wow_lines.append(
@@ -6569,7 +6886,23 @@ def run_weekly() -> int:
                     f"Indice dollar élargi {_pdxy_w:.1f} → {_dxy_broad_w:.1f} "
                     f"({_pct_fr_signed((_dxy_broad_w / _pdxy_w - 1) * 100)})")
         if _wow_lines:
-            payload["week_over_week"] = {"available": True, "lines": _wow_lines}
+            # v28 (W-A16) — DATER le point de comparaison : le 07/07, « +0,4%
+            # depuis hebdo précédent » côtoyait « +6,1% sem » (fenêtre 7 j
+            # glissante) sans dire de QUAND datait le hebdo précédent. On
+            # affiche la date du snapshot N-1 pour lever l'ambiguïté des 2 bases.
+            _prev_date_lbl = None
+            for _k_d in ("date", "iso_week", "ts"):
+                _dv = (_prev_wk or {}).get(_k_d)
+                if _dv:
+                    try:
+                        _prev_date_lbl = datetime.fromisoformat(
+                            str(_dv).replace("Z", "+00:00")).strftime("%d/%m")
+                    except (ValueError, TypeError):
+                        _prev_date_lbl = str(_dv)[:10]
+                    break
+            payload["week_over_week"] = {
+                "available": True, "lines": _wow_lines,
+                "prev_date_label": _prev_date_lbl}
     except Exception as _exc_wow:  # noqa: BLE001
         logger.info("Bloc WoW indisponible : %s", _exc_wow)
 
@@ -6615,6 +6948,33 @@ def run_weekly() -> int:
                 datetime.now(TZ).date().isoformat())
             if _reg_w.get("available"):
                 payload["market_regime"] = _reg_w
+                # v28 (W-A6) \u2014 R\u00c9CONCILIATION r\u00e9gime technique \u2194 sc\u00e9narios : le
+                # 07/07, \u00ab R\u00c9GIME : BAISSIER \u00bb tr\u00f4nait au-dessus de sc\u00e9narios \u00e0
+                # 85% non-baissiers. Quand le sc\u00e9nario dominant contredit le
+                # r\u00e9gime technique, on l'explique en une phrase d\u00e9terministe.
+                try:
+                    _scn_w = [s for s in (payload.get("scenarios") or [])
+                              if isinstance(s, dict)]
+                    _dom_w = max(_scn_w,
+                                 key=lambda s: _parse_num(s.get("probability_pct")) or 0,
+                                 default=None)
+                    _dom_type = str((_dom_w or {}).get("type") or "").lower()
+                    _reg_kind = str(_reg_w.get("regime") or "").lower()
+                    if (_reg_kind == "bear" and _dom_w
+                            and _dom_type not in ("bearish", "bear")):
+                        payload["regime_reconciliation_note"] = (
+                            "Le r\u00e9gime TECHNIQUE BTC reste baissier (prix sous "
+                            "les moyennes longues) ; les sc\u00e9narios de la semaine "
+                            "refl\u00e8tent les catalyseurs \u00e0 court terme \u2014 les deux "
+                            "lectures coexistent sans se contredire.")
+                    elif (_reg_kind == "bull" and _dom_w
+                            and _dom_type in ("bearish", "bear")):
+                        payload["regime_reconciliation_note"] = (
+                            "Le r\u00e9gime TECHNIQUE BTC reste haussier ; le sc\u00e9nario "
+                            "dominant de la semaine est prudent \u00e0 court terme \u2014 "
+                            "les deux lectures coexistent sans se contredire.")
+                except Exception:  # noqa: BLE001
+                    pass
     except Exception as _rexc:  # noqa: BLE001
         logger.info("R\u00e9gime hebdo indisponible : %s", _rexc)
     # ES4 \u2014 Brier score.
@@ -6690,7 +7050,9 @@ def run_weekly() -> int:
         }
         _cr = _build_calls_review(_prev_calls, _btc_px_w,
                                   (fng_w.get("value") if fng_w.get("available") else None),
-                                  (payload.get("market_regime") or {}))
+                                  (payload.get("market_regime") or {}),
+                                  fear_greed_7d_ago=(fng_w.get("value_7d_ago")
+                                                     if fng_w.get("available") else None))
         if _cr:
             payload["calls_review"] = _cr
         mem.save_weekly_calls(_cur_calls)
@@ -6723,57 +7085,47 @@ def run_weekly() -> int:
     from src.reporting import charts as _charts
     _evo_png = _charts.portfolio_evolution_png(ptf_evolution, btc_points=_evo_btc)
     _wk_charts = {"ptf_evolution": _evo_png} if _evo_png else {}
-    # v26 (W-B4) — graphiques hebdo supplémentaires, tous best-effort (une
-    # panne matplotlib/donnée fait juste sauter l'image, jamais l'envoi) :
-    # donut d'allocation sectorielle, classement barres perf 7j, sparkline
-    # F&G 8j, BTC annoté des niveaux CALCULÉS (ancrage visuel des scénarios).
+    # v28 (3.B, décision Omar 07/07) — TEMPLATE V25 STRICT : UN SEUL graphique,
+    # la courbe de valeur du portefeuille (retravaillée pixel-perfect dans
+    # charts.py). Les ajouts v26/v27 — donut secteurs, barres perf 7j (doublon
+    # de la heatmap), sparkline F&G, BTC niveaux, matrice de corrélation,
+    # funding 14 j, jauge santé — sont SUPPRIMÉS : ils répétaient des chiffres
+    # déjà affichés et rendaient le mail « moche et dégradé » (audit 07/07).
+
+    # v28 (W-A15) — la matrice de corrélation (mur de rouge 10×10) devient UNE
+    # phrase : corrélation moyenne intra-PTF, pondérée par rien de plus que la
+    # moyenne des paires (lecture directe, actionnable).
     try:
-        _donut_png = _charts.sector_donut_png(payload.get("sector_exposure_cells") or [])
-        if _donut_png:
-            _wk_charts["sector_donut"] = _donut_png
-        _bars_png = _charts.weekly_perf_bars_png(
-            (payload.get("portfolio_heatmap_7d") or {}).get("cells") or [])
-        if _bars_png:
-            _wk_charts["perf_bars_7d"] = _bars_png
-        if fng_w.get("available"):
-            _fng_png = _charts.fng_sparkline_png(fng_w.get("history") or [])
-            if _fng_png:
-                _wk_charts["fng_sparkline"] = _fng_png
-        _btc_lv = computed_levels_w.get("BTC") or {}
-        if _btc_closes_w and _btc_lv:
-            _btc_png = _charts.btc_levels_png(
-                _btc_closes_w,
-                supports=[lv.get("level") for lv in (_btc_lv.get("supports") or [])],
-                resistances=[lv.get("level") for lv in (_btc_lv.get("resistances") or [])],
-                price=_btc_lv.get("price"))
-            if _btc_png:
-                _wk_charts["btc_levels"] = _btc_png
-    except Exception as _exc_wcharts:  # noqa: BLE001
-        logger.info("Graphiques hebdo v26 partiellement indisponibles : %s", _exc_wcharts)
-    # v27 (GR1/GR2/AF6) — heatmap de corrélation des positions, courbe de
-    # funding BTC (~14 j) + OI, jauge de santé PTF. Tous best-effort.
-    try:
-        _corr_png = _charts.correlation_heatmap_png(weekly_price_series, weekly_positions)
-        if _corr_png:
-            _wk_charts["corr_heatmap"] = _corr_png
-        _fh = binance_futures.get_funding_history("BTC", days=14)
-        if _fh.get("available"):
-            _oih = binance_futures.get_oi_history("BTC")
-            _oi_pts = ([p.get("oi") for p in _oih.get("points", [])]
-                       if _oih.get("available") else None)
-            _fund_png = _charts.funding_history_png(
-                _fh.get("annualized_series") or [], symbol="BTC", oi_points=_oi_pts)
-            if _fund_png:
-                _wk_charts["funding_hist"] = _fund_png
-        _q_sc = (payload.get("ptf_quality_score") or {}).get("score")
-        if _q_sc is not None:
-            _gauge_png = _charts.gauge_png(
-                _q_sc, vmin=0, vmax=10, label="Santé du portefeuille",
-                value_label=f"{_q_sc}/10")
-            if _gauge_png:
-                _wk_charts["health_gauge"] = _gauge_png
-    except Exception as _exc_v27ch:  # noqa: BLE001
-        logger.info("Graphiques hebdo v27 partiellement indisponibles : %s", _exc_v27ch)
+        import numpy as _np
+        _rets_c: dict[str, Any] = {}
+        for _s_c, _cl_c in (weekly_price_series or {}).items():
+            if len(_cl_c or []) >= 8:
+                _a_c = _np.asarray(_cl_c, dtype=float)
+                if (_a_c[:-1] != 0).all():
+                    _rets_c[_s_c] = _np.diff(_a_c) / _a_c[:-1]
+        _syms_c = list(_rets_c)
+        _pairs_c: list[float] = []
+        for _i_c in range(len(_syms_c)):
+            for _j_c in range(_i_c + 1, len(_syms_c)):
+                _x_c, _y_c = _rets_c[_syms_c[_i_c]], _rets_c[_syms_c[_j_c]]
+                _n_c = min(len(_x_c), len(_y_c))
+                if _n_c >= 7:
+                    _cv = float(_np.corrcoef(_x_c[-_n_c:], _y_c[-_n_c:])[0, 1])
+                    if _cv == _cv:  # NaN out
+                        _pairs_c.append(_cv)
+        if _pairs_c:
+            _avg_corr = sum(_pairs_c) / len(_pairs_c)
+            _lvl_corr = (
+                "très élevée — le portefeuille bouge en bloc"
+                if _avg_corr >= 0.7 else
+                "élevée — diversification limitée" if _avg_corr >= 0.5 else
+                "modérée" if _avg_corr >= 0.3 else
+                "faible — bonne indépendance des positions")
+            payload["correlation_summary_line"] = (
+                f"Corrélation moyenne entre positions (30 j) : "
+                f"{_avg_corr:.2f} — {_lvl_corr}.")
+    except Exception as _exc_corr28:  # noqa: BLE001
+        logger.info("Phrase corrélation indisponible : %s", _exc_corr28)
     html = _render(payload, "weekly", charts=_wk_charts)
     _wk_inline = {f"chart_{k}": v for k, v in _wk_charts.items() if v}
     ok = send_email(f"\U0001f4ca Bilan hebdo crypto \u00b7 {datetime.now(TZ):%d/%m}",

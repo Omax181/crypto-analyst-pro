@@ -753,14 +753,20 @@ def test_btc_levels_png(_mpl):
 
 
 def test_render_weekly_chart_cids():
-    """Les blocs images n'apparaissent QUE si le chart correspondant existe."""
+    """v28 (3.B) — template V25 STRICT : UN seul chart (courbe valeur PTF).
+    Les charts ajoutés v26/v27 (donut, barres perf, sparkline F&G, BTC niveaux,
+    matrice corr, funding, jauge santé) sont SUPPRIMÉS du rendu."""
     payload = dict(_MINIMAL)
     payload["sector_exposure_cells"] = [{"sector": "L1", "ptf_pct": 66.7}]
-    html_no = _render(payload)
-    assert "cid:chart_sector_donut" not in html_no
-    assert "cid:chart_btc_levels" not in html_no
-    html_yes = _render_charts(payload, {
-        "sector_donut": b"x", "btc_levels": b"x", "perf_bars_7d": b"x",
-        "fng_sparkline": b"x"})
-    assert "cid:chart_sector_donut" in html_yes
-    assert "cid:chart_btc_levels" in html_yes
+    payload["portfolio_heatmap_7d"] = {"cells": [{"symbol": "BTC",
+                                        "change_24h": 6.0, "ptf_pct": 42.0}]}
+    # Même en FOURNISSANT tous les anciens charts, ils ne sont plus rendus.
+    html = _render_charts(payload, {
+        "ptf_evolution": b"x", "sector_donut": b"x", "btc_levels": b"x",
+        "perf_bars_7d": b"x", "fng_sparkline": b"x", "corr_heatmap": b"x",
+        "funding_hist": b"x", "health_gauge": b"x"})
+    assert "cid:chart_ptf_evolution" in html          # le seul conservé
+    for _dead in ("sector_donut", "btc_levels", "perf_bars_7d",
+                  "fng_sparkline", "corr_heatmap", "funding_hist",
+                  "health_gauge"):
+        assert f"cid:chart_{_dead}" not in html, _dead

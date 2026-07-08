@@ -24,6 +24,7 @@ _WEEKLY_SCHEMA = """
     "lesson": "string (PROSE : leçon de la semaine + action correctrice). v15 — les compteurs (issued/validated/invalidated/win_rate) et le tableau detail sont CALCULÉS CÔTÉ PYTHON depuis data.scoring_detail : NE LES GÉNÈRE PAS. Ta seule contribution ici est la leçon, fondée sur data.scoring_detail."
   },
   "predictions_empty_reason": "string (REQUIS si data.scoring_detail vide : ex. 'Première semaine, pas encore d historique')",
+  "weekly_news_fr": "v28 (W-A7) — liste des titres de data.weekly_news TRADUITS en français, dans le MÊME ORDRE : [{titre_fr}]. Le 07/07, les titres RSS s'affichaient en anglais (« Bitcoin needs trillions to go parabolic… ») alors que le matin traduit tout en FR. Traduis FIDÈLEMENT (pas de reformulation, pas d'ajout), garde les tickers/chiffres. Même nombre d'éléments que data.weekly_news, ordre identique.",
   "sector_exposure": [{"sector","ptf_pct","market_pct","color (hex)"}],
   "concentration_reading": "string (PROSE : lecture concentration + recommandation structurelle)",
   "upcoming_calendar": [{"day (ex. 'Mer 18h')","day_bg (hex)","day_color (hex)","title","impact_label (Impact élevé/moyen/Catalyseur crypto)","detail (PROSE)"}],
@@ -159,6 +160,10 @@ INSTRUCTIONS :
        un niveau qui n'y figure pas (ni dans .key_levels du scaffold). Croise
        aussi data.market_structure (dominance BTC/ETH, ratio ETH/BTC 7j, mcap
        totale) et data.derivatives (funding/an, L/S par actif) dans l'analyse.
+       v28 (W-A11) — UNITÉ OBLIGATOIRE : tout funding cité est ANNUALISÉ et
+       suffixé « /an » (ex. « funding −3,9%/an »), même dans les lignes ⚙ des
+       positions — c'est l'unité du matin et des repères chiffrés, un chiffre
+       sans unité est incomparable d'un mail à l'autre.
      • .event_risk.events = catalyseurs macro DATÉS ≤7j ; .polymarket = dominant Fed
        (+ %) + marchés extra ; .drivers = pistes par scénario (enrichis-les, source).
    CHAQUE scénario intègre EXPLICITEMENT, chiffres à l'appui : (1) MACRO (régime
@@ -170,13 +175,15 @@ INSTRUCTIONS :
    CE PTF (positions NOMMÉES + action). Le NEUTRE = range support↔résistance + move
    implicite ; BEAR/BULL = franchissement de niveau + DÉCLENCHEUR daté (« FOMC mer. :
    si surprise hawkish → cassure 58k »).
-   v24 — FORMAT OBLIGATOIRE de chaque scénario (LISIBILITÉ, demande d'Omar) :
-   distribue ce contenu en (a) `triggers` = 2-4 CONDITIONS courtes et testables
-   (le « si X et Y et Z » qui active le scénario, avec seuils chiffrés) ; (b)
-   `points` = 3-5 BULLETS courts, 1 idée/ligne, structurant l'analyse (macro,
-   niveaux BTC, DVOL/dérivés, sentiment, implication PTF). N'écris PLUS un pavé de
-   prose : MÊME profondeur, MÊMES chiffres, juste DÉCOUPÉE en points. `description`
-   (prose) = repli seulement si tu ne remplis pas `points`.
+   v28 (W-A10) — FORMAT SERRÉ OBLIGATOIRE (le 07/07, 3 scénarios × ~9 puces
+   répétaient leurs propres déclencheurs — ~27 lignes illisibles ; le rendu
+   TRONQUE désormais au-delà) : (a) `triggers` = EXACTEMENT 1 à 2 CONDITIONS
+   courtes et testables (le « si X » qui active le scénario, seuils chiffrés) ;
+   (b) `points` = EXACTEMENT 1 à 2 BULLETS : le 1er = l'ANALYSE clé (macro/
+   technique/dérivés, SANS répéter les triggers — un chiffre déjà cité dans
+   les triggers n'est JAMAIS recopié ici), le 2e = l'IMPLICATION PTF (positions
+   nommées). MÊME profondeur, ZÉRO redite. `description` (prose) = repli
+   seulement si tu ne remplis pas `points`.
    Le plus probable est COHÉRENT avec
    .net_tilt ET le dominant Polymarket. Si .available=false (données insuffisantes),
    construis les % à la main MAIS cite quand même Polymarket + calendrier + technique.

@@ -108,6 +108,10 @@ def test_coinmetrics_falls_back_to_core_metrics(monkeypatch) -> None:
     monkeypatch.setattr(coinmetrics, "get_json", fake_get_json)
     if hasattr(coinmetrics.CACHE, "_store"):
         coinmetrics.CACHE._store.clear()
+    # v28 — lignes synthétiques anciennes → stale=True : neutralise la
+    # surcouche bitcoin-data.com (réseau) pour rester déterministe.
+    from src.data_sources import bitcoin_data
+    monkeypatch.setattr(bitcoin_data, "get_btc_mvrv", lambda: {"available": False})
     out = coinmetrics.get_onchain_metrics()
     assert out["available"] is True
     assert "BTC" in out["assets"]

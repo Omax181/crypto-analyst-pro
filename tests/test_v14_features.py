@@ -97,8 +97,8 @@ def test_reco_bilan_statuses():
     assert bilan["ADA"]["status"] == "invalidated"     # sous le SL 0.155
     assert "LINK" not in bilan                          # v23.x : SURVEILLER filtré
     assert bilan["BTC"]["delta_pct"] == 0.66
-    # v23.x : le statut porte une raison utile + le niveau d'invalidation.
-    assert "invalidé sous" in bilan["ETH"]["reason"]
+    # v28 (E-A5) : raison RACCOURCIE — une seule mention « invalidation $X ».
+    assert "invalidation" in bilan["ETH"]["reason"]
     assert "$1,500" in bilan["ETH"]["reason"]
 
 
@@ -127,8 +127,8 @@ def test_reco_bilan_firm_postures_enrichis():
     assert row["asset"] == "ETH"
     assert row["target"] == 1800
     assert row["confidence"] == 78.0
-    assert row["status"] == "on_track"           # 1650 > entrée 1600
-    assert "invalidé sous" in row["reason"]
+    assert row["status"] == "on_track"           # 1650 > entrée 1600 (+3,1%)
+    assert "invalidation" in row["reason"]       # v28 : mention raccourcie
 
 
 def test_reco_bilan_empty_renders_ras():
@@ -218,7 +218,10 @@ def test_fred_gold_series_removed():
 def _enriched_evening_payload():
     return {
         "header": {"time_casablanca": "lundi · 20:00", "morning_time_label": "08h32",
-                   "since_morning_label": "il y a 11h"},
+                   "since_morning_label": "il y a 11h",
+                   # v28 (E-A1/E-A2) — run du soir nominal : séance US ouverte
+                   # à 20h Casa (19h UTC hiver) et décor nocturne conservé.
+                   "us_market_open": True, "is_evening_slot": True},
         "portfolio_snapshot": {"value_usd": 1734, "change_since_morning_pct": 0.6},
         "daily_pnl": {"value_usd": 1734, "day_change_usd": 10, "day_change_pct": 0.6,
                       "top_movers": [{"symbol": "IMX", "change": 11.9, "pnl_usd": 2}]},
@@ -249,7 +252,7 @@ def test_evening_render_8_blocs():
     html = render(_enriched_evening_payload(), "evening")
     assert not re.search(r"\{\{|\{%", html)          # pas de Jinja non rendu
     assert "rendu simplifié" not in html             # pas de fallback
-    assert "Crypto Analyst Pro · v27" in html        # versioning
+    assert "Crypto Analyst Pro · v28" in html        # versioning
     # blocs présents
     assert "Bilan du jour" in html
     assert "Marchés · mi-séance" in html
@@ -342,7 +345,7 @@ def test_morning_arrows_and_plural_and_polymarket():
     assert "▼" in html                              # flèche down (Nasdaq)
     assert "données partielles" in html             # pluriel
     assert "maintien" in html and "99.8%" in html    # Polymarket reframé
-    assert "Crypto Analyst Pro · v27" in html
+    assert "Crypto Analyst Pro · v28" in html
 
 
 # ─────────────────── v14 AUDIT HARDENING TESTS ─────────────────── #

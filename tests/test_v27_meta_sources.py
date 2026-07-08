@@ -148,9 +148,15 @@ def test_main_wiring_v27():
     wk = inspect.getsource(m.run_weekly)
     for needle in ("compute_brier_score", "compute_dip_buy_stats",
                    "get_btc_onchain_extras", "compute_liquidation_zones",
-                   "_build_calls_review", "market_regime", "mail_confidence",
-                   "correlation_heatmap_png", "get_funding_history"):
+                   "_build_calls_review", "market_regime", "mail_confidence"):
         assert needle in wk, f"weekly wiring manquant : {needle}"
+    # v28 (3.B) — template V25 STRICT : le graphe unique reste la courbe PTF ;
+    # la corrélation devient UNE phrase (plus de correlation_heatmap_png), et le
+    # chart funding 14 j est retiré (plus de get_funding_history dans le hebdo).
+    assert "portfolio_evolution_png" in wk
+    assert "correlation_summary_line" in wk
+    assert "correlation_heatmap_png" not in wk
+    assert "funding_history_png" not in wk
     ev = inspect.getsource(m.run_evening)
     assert "market_regime" in ev
 

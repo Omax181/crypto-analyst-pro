@@ -34,6 +34,14 @@ _DEFAULT_FALLBACK_MODEL = "gemini-2.5-flash"
 # +10 min vaut infiniment mieux qu'une coquille dégradée à l'heure pile.
 _LAST_CHANCE_PAUSE_DEFAULT_S = 600
 
+# v28 (4.2) — INSISTANCE SUR LE MODÈLE PROFOND (hebdo). Le 07/07, un 503
+# persistant sur gemini-3.5-flash a fait rédiger l'hebdo — le rapport le plus
+# stratégique — par le modèle de repli, SILENCIEUSEMENT. Décision d'Omar :
+# différer (~10-12 min) en réessayant le profond SANS repli, et n'accepter le
+# repli qu'ensuite, avec un bandeau « mode dégradé » visible dans le mail.
+# 4 vagues : immédiate puis pauses 120/210/300 s (≈ 10,5 min + retries internes).
+_INSIST_PRIMARY_PAUSES_S: tuple[int, ...] = (0, 120, 210, 300)
+
 
 def _fallback_model_from_env() -> str | None:
     """Modèle de repli : env GEMINI_FALLBACK_MODEL, défaut gemini-2.5-flash."""
@@ -238,14 +246,54 @@ class DecisionEngine:
     def generate_weekly(
         self, *, timestamp: str, data: dict[str, Any], week_state: dict[str, Any],
     ) -> dict[str, Any]:
-        """Génère le rapport hebdomadaire."""
+        """Génère le rapport hebdomadaire.
+
+        v28 (4.2) — ``insist_primary=True`` : l'hebdo INSISTE sur le modèle
+        profond (vagues différées ~10,5 min sans repli) avant d'accepter le
+        modèle de repli, qui est alors signalé par un bandeau dans le mail.
+        """
         prompt = build_weekly_prompt(
             timestamp=timestamp, data=data, week_state=week_state
         )
-        return self._safe_json(prompt, data, kind="weekly")
+        return self._safe_json(prompt, data, kind="weekly", insist_primary=True)
+
+    def _insist_on_primary(self, prompt: str, task_model: str, kind: str):
+        """v28 (4.2) — vagues différées sur le modèle PROFOND, repli désactivé.
+
+        Renvoie le résultat dès qu'une vague aboutit ; ``None`` si le profond
+        reste indisponible (l'appelant reprend alors le flux normal AVEC repli).
+        Un quota épuisé sur le profond interrompt immédiatement l'insistance
+        (différer n'y changerait rien) sans lever : le flux normal gère.
+        """
+        for pause_s in _INSIST_PRIMARY_PAUSES_S:
+            if pause_s:
+                logger.warning(
+                    "Gemini (%s) : modèle profond %s indisponible — pause %ds "
+                    "puis nouvel essai (sans repli).", kind, task_model, pause_s)
+                self._sleep(pause_s)
+            # getattr : robuste aux clients injectés (tests/stubs) sans l'attribut.
+            saved_fallback = getattr(self.client, "fallback_model", None)
+            self.client.fallback_model = None  # cette vague vise le profond SEUL
+            try:
+                result = self.client.generate_json(prompt, model=task_model)
+                if result:
+                    return result
+            except GeminiQuotaError:
+                logger.warning(
+                    "Gemini (%s) : quota du modèle profond épuisé — insistance "
+                    "abandonnée, flux normal (repli possible).", kind)
+                return None
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Gemini (%s) : vague profonde échouée (%s).",
+                    kind, type(exc).__name__)
+            finally:
+                self.client.fallback_model = saved_fallback
+        return None
 
     def _safe_json(
-        self, prompt: str, data: dict[str, Any], *, kind: str, attempts: int = 2
+        self, prompt: str, data: dict[str, Any], *, kind: str, attempts: int = 2,
+        insist_primary: bool = False,
     ) -> dict[str, Any]:
         """Appelle Gemini en JSON avec retry + payload dégradé.
 
@@ -266,12 +314,31 @@ class DecisionEngine:
         # Le repli automatique du client (GEMINI_FALLBACK_MODEL) reste actif
         # quel que soit le modèle primaire choisi ici.
         task_model = _model_for_kind(kind)
+
+        # v28 (4.2) — hebdo : vagues différées sur le profond AVANT tout repli.
+        if insist_primary:
+            result = self._insist_on_primary(prompt, task_model, kind)
+            if result:
+                return result
+
+        def _tag(result: dict[str, Any]) -> dict[str, Any]:
+            # v28 (4.2) — résultat produit par le modèle de REPLI ? Le rendu
+            # affichera un bandeau « mode dégradé » (décision Omar 07/07) au
+            # lieu de dégrader silencieusement le rapport stratégique.
+            used = getattr(self.client, "last_used_model", None)
+            if used and used != task_model:
+                result["_model_degraded"] = True
+                result["_model_degraded_note"] = (
+                    f"Modèle profond {task_model} indisponible — analyse "
+                    f"générée par le modèle de repli {used}.")
+            return result
+
         last_reason = "Génération IA indisponible."
         for attempt in range(1, attempts + 1):
             try:
                 result = self.client.generate_json(prompt, model=task_model)
                 if result:
-                    return result
+                    return _tag(result)
                 last_reason = "Réponse IA vide."
                 logger.warning(
                     "Gemini (%s) tentative %d/%d : réponse vide — nouvelle tentative.",
@@ -304,7 +371,7 @@ class DecisionEngine:
                     logger.info(
                         "Gemini (%s) : ultime tentative RÉUSSIE après pause.", kind
                     )
-                    return result
+                    return _tag(result)
                 last_reason = "Réponse IA vide."
             except GeminiQuotaError:
                 logger.error("Quota Gemini épuisé : payload dégradé (%s).", kind)

@@ -44,11 +44,22 @@
         {% set _wr_parts_w = (header.win_rate_total or '0/0').split('/') %}
         {% set _wr_total_w = (_wr_parts_w[1]|num(0)) if (_wr_parts_w|length > 1) else 0 %}
         {% set _wr_val_w = header.win_rate_30d|num(none) %}
-        <p style="font-size:10px;color:#8a8880;margin:8px 0 0 0;">Win rate 30j · <span style="font-weight:600;color:{% if _wr_total_w >= 5 and _wr_val_w is not none and _wr_val_w >= 50 %}#3B6D11{% elif _wr_total_w >= 5 and _wr_val_w is not none and _wr_val_w < 50 %}#A32D2D{% else %}#5a5852{% endif %};">{% if _wr_total_w < 1 or _wr_val_w is none %}— pas encore d'historique{% else %}{{ '%.0f'|format(_wr_val_w) }}%{% if _wr_total_w < 5 %} ({{header.win_rate_total}}){% endif %}{% endif %}</span></p>
+        {# v28 (M-A15) — < 5 clôtures : « en calibration (2/2) », plus de %
+           flatteur non calibré (aligné sur les headers matin/soir). #}
+        <p style="font-size:10px;color:#8a8880;margin:8px 0 0 0;">Win rate 30j · <span style="font-weight:600;color:{% if _wr_total_w >= 5 and _wr_val_w is not none and _wr_val_w >= 50 %}#3B6D11{% elif _wr_total_w >= 5 and _wr_val_w is not none and _wr_val_w < 50 %}#A32D2D{% else %}#5a5852{% endif %};">{% if _wr_total_w < 1 or _wr_val_w is none %}— pas encore d'historique{% elif _wr_total_w < 5 %}en calibration ({{header.win_rate_total}}){% else %}{{ '%.0f'|format(_wr_val_w) }}%{% endif %}</span></p>
       </td>
     </tr>
   </table>
 </div>
+
+{# ── v28 (4.2) — BANDEAU MODE DÉGRADÉ : l'hebdo a été rédigé par le modèle de
+   repli (profond indisponible malgré l'insistance différée). Signalé
+   honnêtement plutôt que de laisser passer une analyse au rabais pour normale. #}
+{% if _model_degraded %}
+<div style="background:#FCEBEB;border:0.5px solid #E5B9B9;border-radius:8px;padding:8px 14px;margin-bottom:1rem;">
+  <p style="margin:0;font-size:12px;color:#791F1F;line-height:1.5;"><span style="font-weight:700;">⚠ Analyse générée en mode dégradé</span> · {{ _model_degraded_note or "modèle profond indisponible — analyse rédigée par le modèle de repli." }}</p>
+</div>
+{% endif %}
 
 {# ── v27 (ME1) — RÉGIME DE MARCHÉ en tête (le cadre de toute la semaine). ── #}
 {% if market_regime and market_regime.available %}
@@ -56,7 +67,13 @@
 {% set _rgwbg = '#EAF3DE' if _rgw == 'bull' else ('#FCEBEB' if _rgw == 'bear' else ('#FAEEDA' if _rgw == 'transition' else '#EEF2F7')) %}
 {% set _rgwfg = '#27500A' if _rgw == 'bull' else ('#791F1F' if _rgw == 'bear' else ('#633806' if _rgw == 'transition' else '#0C447C')) %}
 <div style="background:{{_rgwbg}};border-radius:8px;padding:8px 14px;margin-bottom:1rem;">
-  <p style="margin:0;font-size:12px;color:{{_rgwfg}};line-height:1.5;"><span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Régime : {{market_regime.label_fr}}</span>{% if market_regime.days_in_regime is not none %} <span style="color:#5a5852;">· depuis {{market_regime.days_in_regime}} j</span>{% endif %}{% if market_regime.reasons %} <span style="color:#5a5852;">· {{ market_regime.reasons|join(' · ') }}</span>{% endif %}{% if market_regime.changed and market_regime.previous_label_fr %} <span style="font-weight:700;">· ⚠️ {{market_regime.previous_label_fr}} → {{market_regime.label_fr}}</span>{% endif %}</p>
+  {# v28 (M-A5/W-A6) — libellé « Régime BTC (technique) » : distinct du biais
+     directionnel des scénarios (le 07/07 : « BAISSIER » au-dessus de scénarios
+     85% non-baissiers semblait contradictoire — concepts différents). #}
+  <p style="margin:0;font-size:12px;color:{{_rgwfg}};line-height:1.5;"><span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Régime BTC (technique) : {{market_regime.label_fr}}</span>{% if market_regime.days_in_regime is not none %} <span style="color:#5a5852;">· depuis {{market_regime.days_in_regime}} j</span>{% endif %}{% if market_regime.reasons %} <span style="color:#5a5852;">· {{ market_regime.reasons|join(' · ') }}</span>{% endif %}{% if market_regime.changed and market_regime.previous_label_fr %} <span style="font-weight:700;">· ⚠️ {{market_regime.previous_label_fr}} → {{market_regime.label_fr}}</span>{% endif %}</p>
+  {# v28 (W-A6) — une phrase déterministe explique la coexistence régime
+     technique ↔ scénarios court terme quand ils semblent se contredire. #}
+  {% if regime_reconciliation_note %}<p style="margin:4px 0 0 0;font-size:10px;color:#5a5852;line-height:1.5;">{{regime_reconciliation_note}}</p>{% endif %}
 </div>
 {% endif %}
 
@@ -89,8 +106,11 @@
    santé, F&G, dollar). Absent la 1re semaine (pas de snapshot N-1). ── #}
 {% if week_over_week and week_over_week.available and week_over_week.lines %}
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:8px;padding:10px 14px;margin:-0.75rem 0 1.5rem 0;">
-  <p style="margin:0 0 4px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Depuis le hebdo précédent</p>
+  <p style="margin:0 0 4px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Depuis le hebdo précédent{% if week_over_week.prev_date_label %} <span style="text-transform:none;letter-spacing:0;font-weight:400;">(du {{week_over_week.prev_date_label}})</span>{% endif %}</p>
   <p style="margin:0;font-size:12px;color:#33312e;line-height:1.6;">{{ week_over_week.lines|join(' · ') }}</p>
+  {# v28 (W-A16) — lever la confusion des DEUX bases : « P&L semaine » = fenêtre
+     7 j glissante ; ce bloc = variation depuis le dernier hebdo daté. #}
+  <p style="margin:4px 0 0 0;font-size:9px;color:#a8a6a0;font-style:italic;">« P&L semaine » (en-tête) = 7 jours glissants ; ce bloc compare au dernier rapport hebdo.</p>
 </div>
 {% endif %}
 
@@ -107,7 +127,10 @@
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">vs BTC 7j</p>
         <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;color:{% if (portfolio_snapshot.vs_btc_7d_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{% if (portfolio_snapshot.vs_btc_7d_pct|default(none)) is not none %}{{ portfolio_snapshot.vs_btc_7d_pct|fmt_pct }}{% else %}—{% endif %}</p>
-        {% if (portfolio_snapshot.vs_btc_7d_pct|default(none)) is not none %}<p style="font-size:10px;color:#8a8880;margin:0;">{{ 'outperform' if (portfolio_snapshot.vs_btc_7d_pct|num(0)) >= 0 else 'underperform' }}</p>{% endif %}
+        {# v28 (W-A3) — écart négligeable (±0,05 pt) : « en ligne avec BTC »
+           plutôt qu'un « outperform » déroutant sous un +0.0% affiché. #}
+        {% set _vsb = portfolio_snapshot.vs_btc_7d_pct|num(0) %}
+        {% if (portfolio_snapshot.vs_btc_7d_pct|default(none)) is not none %}<p style="font-size:10px;color:#8a8880;margin:0;">{{ 'en ligne avec BTC' if (_vsb < 0.05 and _vsb > -0.05) else ('outperform' if _vsb >= 0 else 'underperform') }}</p>{% endif %}
       </td>
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">P&amp;L semaine</p>
@@ -196,8 +219,8 @@
       </tr>
     </table>
     {% if _q.improve %}<p style="font-size:11px;color:#1a1a18;margin:8px 0 0 0;"><span style="font-weight:600;">Pour l'améliorer :</span> {{_q.improve}}</p>{% endif %}
-    {# v27 (AF6) — jauge visuelle de la santé PTF. #}
-    {% if charts and charts.get('health_gauge') %}<div style="text-align:center;margin:6px 0 0 0;"><img src="cid:chart_health_gauge" alt="Santé du portefeuille" style="max-width:220px;width:55%;height:auto;display:inline-block;"></div>{% endif %}
+    {# v28 (3.B/W-A14) — jauge SUPPRIMÉE : le 3.2/10 + les 3 axes suffisent
+       (une donnée = un seul affichage, template v25 strict). #}
     <p style="font-size:9px;color:#8a8880;margin:6px 0 0 0;font-style:italic;">Santé du portefeuille = santé structurelle (diversification, momentum vs BTC, solidité vs ATH), moyenne des 3 axes — même logique que la note Santé des mails matin/soir.</p>
   </div>
   {% endif %}
@@ -212,11 +235,8 @@
      reste. Fallback barres si absent. #}
   {% if sector_exposure_cells %}
   <p style="font-size:12px;color:#1a1a18;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Exposition sectorielle du portefeuille</p>
-  {# v26 (W-B4) — donut d'allocation : la proportion saute aux yeux ; les cases
-     dessous gardent le détail perfs 24h/7j/30j + composition. #}
-  {% if charts and charts.get('sector_donut') %}
-  <img src="cid:chart_sector_donut" alt="Allocation sectorielle" style="width:100%;max-width:480px;height:auto;display:block;margin:0 0 8px 0;border:0.5px solid #e5e4dc;border-radius:8px;">
-  {% endif %}
+  {# v28 (3.B/W-A14) — donut SUPPRIMÉ : les cases ci-dessous portaient déjà les
+     mêmes % avec EN PLUS les perfs 24h/7j/30j (template v25 strict). #}
   <table role="presentation" cellpadding="0" cellspacing="4" border="0" style="width:100%;border-collapse:separate;table-layout:fixed;">
     {% for row in sector_exposure_cells|batch(3) %}
     <tr>
@@ -307,14 +327,12 @@
   {% if portfolio_heatmap_7d.extra and portfolio_heatmap_7d.extra.count %}
   <p style="font-size:10px;font-style:italic;color:#8a8880;margin:6px 0 0 0;">Chaque case : actif · perf 7j · poids PTF. « +{{portfolio_heatmap_7d.extra.count}} autres » = {{ '%.1f'|format(portfolio_heatmap_7d.extra.ptf_pct|num(0)) }}% du PTF (${{ '%.0f'|format(portfolio_heatmap_7d.extra.value_usd|num(0)) }}), perf 7j moyenne pondérée.</p>
   {% endif %}
-  {# v26 (W-B4) — classement en barres : complète la heatmap (l'ordre
-     gagnants → perdants se lit en un coup d'œil). #}
-  {% if charts and charts.get('perf_bars_7d') %}
-  <img src="cid:chart_perf_bars_7d" alt="Perf 7j par position" style="width:100%;max-width:560px;height:auto;display:block;margin:10px 0 0 0;border:0.5px solid #e5e4dc;border-radius:8px;">
-  {% endif %}
-  {# v27 (GR1) — heatmap de corrélation : les clusters de risque d'un coup d'œil. #}
-  {% if charts and charts.get('corr_heatmap') %}
-  <img src="cid:chart_corr_heatmap" alt="Corrélation des positions" style="width:100%;max-width:520px;height:auto;display:block;margin:10px 0 0 0;border:0.5px solid #e5e4dc;border-radius:8px;">
+  {# v28 (3.B/W-A4/W-A15) — barres perf 7j SUPPRIMÉES (mêmes chiffres que la
+     heatmap ci-dessus, et le bar chart du 07/07 omettait BTC, 42% du PTF !) ;
+     matrice de corrélation SUPPRIMÉE (mur de rouge illisible) et remplacée
+     par UNE phrase calculée, directement actionnable. #}
+  {% if correlation_summary_line %}
+  <p style="font-size:11px;color:#5a5852;margin:10px 0 0 0;">⚖ {{correlation_summary_line}}</p>
   {% endif %}
 </div>
 {% endif %}
@@ -394,12 +412,12 @@
     <p style="font-size:11px;color:#8a8880;font-style:italic;margin:0;">{{ (calibration and calibration.empty_reason) or "Disponible après 5 recos clôturées minimum." }}</p>
     {% endif %}
   </div>
-  {# v18 (W-B12) — espérance mathématique des recos (gain moyen × winrate −
-     perte moyenne × échec). Métrique de pilotage clé : une stratégie peut avoir
-     un win rate < 50% et rester gagnante si les gains > pertes. #}
+  {# v18 (W-B12) — espérance mathématique. v28 (W-A12) : une métrique VIDE ne
+     consomme plus une section entière — le 07/07, « disponible dès 5 recos »
+     occupait 2 blocs séparés sous une calibration déjà affichée. #}
+  {% if _exp_on %}
   <div style="margin:12px 0 0 0;padding-top:10px;border-top:0.5px solid #f0efe8;">
     <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Espérance mathématique · par reco</p>
-    {% if expectancy and expectancy.available %}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr>
       <td style="vertical-align:middle;white-space:nowrap;padding-right:14px;">
         <span style="font-size:20px;font-weight:700;color:{% if (expectancy.expectancy_pct|num(0)) > 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (expectancy.expectancy_pct|num(0)) >= 0 else '' }}{{expectancy.expectancy_pct}}%</span>
@@ -407,20 +425,19 @@
       </td>
       <td style="vertical-align:middle;font-size:11px;color:#5a5852;line-height:1.5;">{{expectancy.reading}}</td>
     </tr></table>
-    {% else %}
-    <p style="font-size:11px;color:#8a8880;font-style:italic;margin:0;">{{ (expectancy and expectancy.reason) or "Disponible après 5 recos clôturées avec niveaux." }}</p>
-    {% endif %}
   </div>
-  {# v18 (Chantier E #15) — calibration des CIBLES DE PRIX (auto-apprentissage) :
-     les cibles sont-elles atteintes ? Trop optimistes ? #}
+  {% endif %}
+  {% if _tgt_on %}
   <div style="margin:12px 0 0 0;padding-top:10px;border-top:0.5px solid #f0efe8;">
     <p style="font-size:10px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Calibration des cibles de prix</p>
-    {% if target_calibration and target_calibration.available %}
     <p style="margin:0;font-size:11px;color:#5a5852;line-height:1.5;"><span style="font-weight:600;color:{% if target_calibration.bias == 'calibrées' %}#3B6D11{% elif target_calibration.bias == 'légèrement optimistes' %}#BA7517{% else %}#A32D2D{% endif %};">{{target_calibration.hit_rate_pct}}% atteintes</span> · {{target_calibration.reading}}</p>
-    {% else %}
-    <p style="font-size:11px;color:#8a8880;font-style:italic;margin:0;">{{ (target_calibration and target_calibration.reason) or "Disponible après 5 recos clôturées avec cible et prix de sortie." }}</p>
-    {% endif %}
   </div>
+  {% endif %}
+  {% if not _exp_on or not _tgt_on %}
+  <div style="margin:12px 0 0 0;padding-top:10px;border-top:0.5px solid #f0efe8;">
+    <p style="font-size:11px;color:#8a8880;font-style:italic;margin:0;line-height:1.5;">{% if not _exp_on and not _tgt_on %}Espérance mathématique et calibration des cibles : disponibles dès 5 recos clôturées (avec niveaux et cibles).{% elif not _exp_on %}Espérance mathématique : disponible dès 5 recos clôturées avec niveaux.{% else %}Calibration des cibles : disponible dès 5 recos clôturées avec cible et prix de sortie.{% endif %}</p>
+  </div>
+  {% endif %}
   {% endif %}{# fin consolidation v21 (W8) #}
   {% else %}
   <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ predictions_empty_reason or "Première semaine, pas encore d'historique de prédictions à scorer." }}</p>
@@ -589,9 +606,8 @@
   {% for fl in weekly_facts_lines %}
   <p style="margin:0;">{{ fl }}</p>
   {% endfor %}
-  {% if charts and charts.get('fng_sparkline') %}
-  <img src="cid:chart_fng_sparkline" alt="Fear &amp; Greed 8 jours" style="width:100%;max-width:300px;height:auto;display:block;margin:8px 0 0 0;border:0.5px solid #e5e4dc;border-radius:6px;">
-  {% endif %}
+  {# v28 (3.B/W-A14) — sparkline F&G SUPPRIMÉE : la ligne « Fear & Greed »
+     ci-dessus porte déjà valeur + il y a 7 j + delta (v25 strict). #}
 </div>
 {% elif polymarket_facts and polymarket_facts.available or etf_flows_facts and etf_flows_facts.available %}
 <div style="background:#f5f4ee;border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:11px;color:#5a5852;line-height:1.7;">
@@ -609,17 +625,20 @@
 {% if weekly_news_digest %}
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.75rem 1.25rem;margin-bottom:1.25rem;">
   <p style="font-size:12px;color:#1a1a18;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Ce qui a marqué la semaine <span style="font-size:9px;color:#8a8880;text-transform:none;font-weight:400;">· flux crypto filtrés, 7 jours</span></p>
+  {# v28 (W-A7) — méta assemblée proprement : le 07/07, un date_label vide
+     produisait « · · CoinDesk » (double middot). On ne joint QUE les champs
+     réellement présents. Titre FR préféré (news_title_fr) si l'IA l'a fourni. #}
   {% for n in weekly_news_digest %}
-  <p style="margin:0;padding:4px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;color:#33312e;">{{n.title}}{% if n.date_label or n.source %} <span style="color:#8a8880;font-size:10px;">· {% if n.date_label %}{{n.date_label}}{% endif %}{% if n.source %} · {{n.source}}{% endif %}</span>{% endif %}</p>
+  {% set _meta = [] %}
+  {% if n.date_label %}{% set _ = _meta.append(n.date_label) %}{% endif %}
+  {% if n.source %}{% set _ = _meta.append(n.source) %}{% endif %}
+  <p style="margin:0;padding:4px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;color:#33312e;">{{ n.title_fr or n.title }}{% if _meta %} <span style="color:#8a8880;font-size:10px;">· {{ _meta|join(' · ') }}</span>{% endif %}</p>
   {% endfor %}
 </div>
 {% endif %}
 
-{# ── v26 (W-B4) — BTC annoté des NIVEAUX CALCULÉS : l'ancrage visuel des
-   scénarios (les bornes citées se voient sur le graphe). ── #}
-{% if charts and charts.get('btc_levels') %}
-<img src="cid:chart_btc_levels" alt="BTC niveaux calculés" style="width:100%;max-width:660px;height:auto;display:block;margin:0 0 1.25rem 0;border:0.5px solid #e5e4dc;border-radius:8px;">
-{% endif %}
+{# v28 (3.B) — graphe « BTC niveaux » SUPPRIMÉ (v25 strict : un seul chart,
+   la courbe PTF) ; les niveaux restent chiffrés dans les scénarios. #}
 
 {# ── v27 (SO2) — ZONES DE LIQUIDATION ESTIMÉES : aimants de prix (les mèches
    vont les chercher). Étiquetées ESTIMATION partout. ── #}
@@ -634,11 +653,8 @@
 </div>
 {% endif %}
 
-{# ── v27 (GR2) — funding BTC dans le temps : un positionnement extrême qui se
-   construit se voit sur la pente. ── #}
-{% if charts and charts.get('funding_hist') %}
-<img src="cid:chart_funding_hist" alt="Funding BTC dans le temps" style="width:100%;max-width:600px;height:auto;display:block;margin:0 0 1.25rem 0;border:0.5px solid #e5e4dc;border-radius:8px;">
-{% endif %}
+{# v28 (3.B/W-A16) — chart « funding annualisé 14 j » SUPPRIMÉ (donnée de
+   niche, v25 strict) : le funding /an vit dans les repères chiffrés. #}
 
 {# ── SCÉNARIOS POUR LA SEMAINE (titre split + badge proba + bannière action
    + repli détails, points 18-20+7) ── #}
@@ -664,18 +680,18 @@
     </table>
     {# v24 — DÉCLENCHEURS : conditions concrètes qui activent le scénario, en liste
        claire (le « si X et Y et Z »), pour qu'Omar les garde en tête sur la semaine. #}
+    {# v28 (W-A10) — GABARIT SERRÉ : le 07/07, 3 scénarios × ~9 puces (~27
+       lignes) répétaient leurs propres déclencheurs. Caps DURS au rendu :
+       2 déclencheurs + 2 points d'analyse max (l'action fait la 5e ligne). #}
     {% if s.triggers and s.triggers is iterable and s.triggers is not string %}
     <p style="margin:8px 0 2px 0;font-size:11px;color:{{scen_label}};font-weight:700;">🎯 Se déclenche si :</p>
     <ul style="margin:0;padding-left:18px;color:{{scen_text}};font-size:12px;line-height:1.5;">
-      {% for t in s.triggers %}<li style="margin:1px 0;">{{ t|md }}</li>{% endfor %}
+      {% for t in s.triggers[:2] %}<li style="margin:1px 0;">{{ t|md }}</li>{% endfor %}
     </ul>
     {% endif %}
-    {# v24 — ANALYSE EN BULLETS : mêmes idées/chiffres que l'ancienne prose dense,
-       découpées en points lisibles (1 idée/ligne). Repli sur la prose si l'IA n'a
-       pas fourni de points. v17 (W-A3) : pas de <details> (non supporté Gmail). #}
     {% if s.points and s.points is iterable and s.points is not string %}
     <ul style="margin:6px 0 0 0;padding-left:18px;color:{{scen_text}};font-size:12px;line-height:1.55;">
-      {% for p in s.points %}<li style="margin:2px 0;">{{ p|md }}</li>{% endfor %}
+      {% for p in s.points[:2] %}<li style="margin:2px 0;">{{ p|md }}</li>{% endfor %}
     </ul>
     {% elif s.description %}<p style="margin:6px 0 0 0;font-size:12px;line-height:1.55;color:{{scen_text}};">{{s.description|md}}</p>{% endif %}
     {# Action en mini-bannière en bas de carte (point 19). #}
@@ -751,8 +767,10 @@
       <th style="text-align:left;font-size:10px;text-transform:uppercase;font-weight:500;padding:6px 6px;letter-spacing:0.3px;">Actif</th>
       <th style="text-align:right;font-size:10px;text-transform:uppercase;font-weight:500;padding:6px 6px;letter-spacing:0.3px;">Prix · PRU</th>
       <th style="text-align:left;font-size:10px;text-transform:uppercase;font-weight:500;padding:6px 6px;letter-spacing:0.3px;">Horizon 30j</th>
+      {# v28 (W-A13) — colonne « Action » SUPPRIMÉE : elle répétait « Horizon
+         30j » ligne à ligne (RENFORCER=Renforcer, pas de reco=Sortir). Le
+         geste vit en fin de ligne ⚙, une seule fois. #}
       <th style="text-align:left;font-size:10px;text-transform:uppercase;font-weight:500;padding:6px 6px;letter-spacing:0.3px;">Long terme</th>
-      <th style="text-align:center;font-size:10px;text-transform:uppercase;font-weight:500;padding:6px 6px;letter-spacing:0.3px;">Action</th>
     </tr>
     {% for r in positions_review %}
     {% set _ph = _phasemap.get(r.lt_status, [r.lt_status or '—','#5a5852','#F1EFE8']) %}
@@ -762,11 +780,12 @@
       <td style="padding:6px 6px;text-align:right;vertical-align:top;white-space:nowrap;"><span style="font-weight:600;color:#1a1a18;">{{ r.current_price|fmt_price }}</span>{% if r.pru_pct is not none %}<br><span style="font-size:10px;color:{% if (r.pru_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ r.pru_pct|fmt_pct }} <span style="color:#8a8880;">/PRU</span></span>{% endif %}</td>
       <td style="padding:6px 6px;vertical-align:top;">{% if r.h30 and r.h30.reco %}{% set _hs = _h30map.get(r.h30.status, ['—','#8a8880']) %}<span style="background:{% if r.h30.reco in ['RENFORCER','BUY'] %}#EAF3DE{% elif r.h30.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] %}#FCEBEB{% else %}#E6F1FB{% endif %};color:{% if r.h30.reco in ['RENFORCER','BUY'] %}#27500A{% elif r.h30.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] %}#791F1F{% else %}#0C447C{% endif %};font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">{{r.h30.reco}}</span><br><span style="font-size:10px;color:{{_hs[1]}};">{% if r.h30.delta_pct is not none %}{{ r.h30.delta_pct|fmt_pct }} · {% endif %}{{_hs[0]}}</span>{% else %}<span style="font-size:10px;color:#b5b3ab;">pas de reco active</span>{% endif %}</td>
       {# v26 (W-A16) — une cible ≥ +250% est une CIBLE DE CYCLE (reconquête
-         ATH), pas un objectif 6-12 mois : le libellé le dit. #}
-      <td style="padding:6px 6px;vertical-align:top;"><span style="display:inline-block;padding:1px 7px;border-radius:10px;background:{{_ph[2]}};color:{{_ph[1]}};font-weight:600;font-size:9px;">{{_ph[0]}}</span>{% if r.lt_target %}<br><span style="font-size:10px;color:#5a5852;">{% if r.lt_target_kind == 'cycle' %}cible cycle{% else %}cible{% endif %} {{ r.lt_target|fmt_price }}{% set _ltp = r.lt_target_pct|num(none) %}{% if _ltp is not none %} <span style="color:{% if _ltp >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">({{ '+' if _ltp >= 0 else '' }}{{_ltp|int}}%)</span>{% endif %}</span>{% else %}<br><span style="font-size:10px;color:#b5b3ab;">cible à définir</span>{% endif %}</td>
-      <td style="padding:6px 6px;text-align:center;vertical-align:top;"><span style="display:inline-block;padding:2px 8px;border-radius:6px;background:{{_ac[2]}};color:{{_ac[1]}};font-weight:700;font-size:10px;white-space:nowrap;">{{_ac[0]}}</span></td>
+         ATH), pas un objectif 6-12 mois : le libellé le dit.
+         v28 (W-A11) — la FOURCHETTE déterministe (asset_plan.target_cycle,
+         identique aux fiches du matin) prime sur la cible LLM. #}
+      <td style="padding:6px 6px;vertical-align:top;"><span style="display:inline-block;padding:1px 7px;border-radius:10px;background:{{_ph[2]}};color:{{_ph[1]}};font-weight:600;font-size:9px;">{{_ph[0]}}</span>{% if r.lt_target_high %}<br><span style="font-size:10px;color:#5a5852;">{% if r.lt_target_kind == 'cycle' %}cible cycle{% else %}cible{% endif %} {{ r.lt_target_low|fmt_price }}–{{ r.lt_target_high|fmt_price }}{% set _ltp = r.lt_target_pct|num(none) %}{% if _ltp is not none %} <span style="color:{% if _ltp >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">({{ '+' if _ltp >= 0 else '' }}{{_ltp|int}}%)</span>{% endif %}</span>{% elif r.lt_target %}<br><span style="font-size:10px;color:#5a5852;">{% if r.lt_target_kind == 'cycle' %}cible cycle{% else %}cible{% endif %} {{ r.lt_target|fmt_price }}{% set _ltp = r.lt_target_pct|num(none) %}{% if _ltp is not none %} <span style="color:{% if _ltp >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">({{ '+' if _ltp >= 0 else '' }}{{_ltp|int}}%)</span>{% endif %}</span>{% else %}<br><span style="font-size:10px;color:#b5b3ab;">cible à définir</span>{% endif %}</td>
     </tr>
-    {% if r.analysis %}<tr><td colspan="5" style="padding:0 6px 6px 6px;color:#8a8880;font-size:10px;line-height:1.35;">⚙ {{ r.analysis }}</td></tr>{% endif %}
+    {% if r.analysis or _ac[0] != '—' %}<tr><td colspan="4" style="padding:0 6px 6px 6px;color:#8a8880;font-size:10px;line-height:1.35;">{% if r.analysis %}⚙ {{ r.analysis }}{% endif %}{% if _ac[0] != '—' %} <span style="color:{{_ac[1]}};font-weight:700;">→ {{_ac[0]}}</span>{% endif %}</td></tr>{% endif %}
     {% endfor %}
   </table>
   <p style="font-size:9px;color:#a8a6a0;margin:8px 6px 0 6px;font-style:italic;">Horizon 30j = perf de la reco en cours (Δ depuis l'entrée) · Long terme = phase de cycle + cible 6-12m — « cible cycle » = reconquête de l'ATH, horizon &gt; 12m · ★ cœur = conviction (vs satellite à offloader sur force).</p>

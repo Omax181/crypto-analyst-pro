@@ -3,14 +3,25 @@
 Fournit les métriques on-chain « de pro » absentes des sources gratuites
 basiques (blockchain.info / Etherscan) :
   - MVRV  (CapMVRVCur)   : ratio cap. marché / cap. réalisée → sur/sous-évaluation
-  - NVT   (NVTAdj)       : valorisation réseau / volume on-chain (P/E du réseau)
-  - Realized Price       : CapRealUSD / SplyCur (prix de revient moyen du marché)
+  - NVT   (NVTAdj)       : valorisation réseau / volume on-chain — CLÉ REQUISE
+  - Realized Price       : dérivé prix/MVRV (CapRealUSD non servi sans clé)
   - Active addresses     : AdrActCnt (adoption réseau)
 
 Endpoint communautaire : ``https://community-api.coinmetrics.io/v4/timeseries/asset-metrics``.
-Aucune authentification requise (cf. doc « Coin Metrics Community Data »).
 Rate limit communautaire : 10 req / 6 s par IP — on fait 1 seule requête (batch
 BTC+ETH) par run, donc large marge.
+
+v28 (4.3) — comportement RÉEL du tier keyless, PROBÉ le 07/07/2026 :
+  * le paramètre ``api_key`` DOIT être présent, même VIDE : sans lui l'API
+    renvoie 403 y compris pour des métriques servies (« api_key= » → 200) ;
+  * seul un sous-ensemble de métriques est servi sans clé : PriceUSD,
+    CapMVRVCur, AdrActCnt (et CapMrktCurUSD) → 200 avec données J-1 ;
+    TOUT batch contenant NVTAdj, CapRealUSD ou SplyCur → 403 GLOBAL.
+  C'est ce couple (paramètre absent + batch trop large) qui rendait l'API
+  « indisponible » et figeait l'on-chain ETH sur le miroir du 23/05 alors que
+  des données J-1 étaient accessibles. On demande donc le batch VALIDÉ, avec
+  ``api_key`` toujours transmis, et on tente l'API MÊME sur GitHub Actions
+  (coût : 1 requête) avant le repli miroir.
 
 Dégradation gracieuse totale : toute erreur réseau / métrique absente → la clé
 correspondante est simplement omise, jamais d'exception propagée.
@@ -59,10 +70,14 @@ def _cm_base_and_key() -> tuple[str, Optional[str]]:
         return _BASE_AUTH, key
     return _BASE_COMMUNITY, None
 
-# Métriques community (IDs validés, stables pour BTC/ETH).
-_METRICS = ["PriceUSD", "CapMVRVCur", "NVTAdj", "CapRealUSD", "SplyCur", "AdrActCnt"]
-# Sous-ensemble cœur garanti sur le tier community (utilisé en repli).
-_CORE_METRICS = ["PriceUSD", "CapMVRVCur", "CapRealUSD", "SplyCur"]
+# v28 — DEUX lots de métriques selon le tier (probes 07/07/2026) :
+#   * authentifié (clé) : lot complet, NVT/CapRealUSD inclus ;
+#   * keyless community : lot VALIDÉ 200 (tout ajout NVTAdj/CapRealUSD/SplyCur
+#     fait basculer TOUT le batch en 403). Realized price dérivé prix/MVRV.
+_METRICS_AUTH = ["PriceUSD", "CapMVRVCur", "NVTAdj", "CapRealUSD", "SplyCur", "AdrActCnt"]
+_METRICS_COMMUNITY = ["PriceUSD", "CapMVRVCur", "AdrActCnt"]
+# Sous-ensemble cœur garanti sur les deux tiers (utilisé en repli).
+_CORE_METRICS = ["PriceUSD", "CapMVRVCur"]
 
 # Mapping ticker PTF -> id Coin Metrics (minuscule).
 _CM_IDS = {"BTC": "btc", "ETH": "eth"}
@@ -384,15 +399,14 @@ def get_onchain_metrics() -> dict[str, Any]:
     """
 
     def _fetch() -> dict[str, Any]:
-        # v21 (Logs#1) — sur GitHub Actions SANS clé, l'API community renvoie un
-        # 403 GARANTI (IP datacenter) : l'appeler ne produit que 2 WARNING de
-        # bruit par run avant le repli. On va donc directement au miroir GitHub
-        # (la surcouche bitcoin-data.com rafraîchira le MVRV BTC ensuite). Avec
-        # une clé CoinMetrics, on tente l'API authentifiée normalement.
-        on_actions = os.environ.get("GITHUB_ACTIONS", "").strip().lower() == "true"
+        # v28 (4.3) — l'ancien raccourci « Actions sans clé → miroir direct »
+        # est SUPPRIMÉ : les runs du 07/07 ont figé l'on-chain ETH au 23/05
+        # alors que l'API keyless servait des données J-1 (MVRV ETH 0.90 réel
+        # vs 0.81 miroir). Probé le 07/07 : le 403 ne venait pas de l'IP mais
+        # (a) du paramètre ``api_key`` ABSENT et (b) du batch contenant des
+        # métriques non servies sans clé (NVTAdj/CapRealUSD/SplyCur). On tente
+        # donc TOUJOURS l'API (1 requête, dégradation gracieuse → miroir).
         has_key = bool(os.environ.get("COINMETRICS_API_KEY", "").strip())
-        if on_actions and not has_key:
-            return _mirror_fallback()
 
         start = (datetime.now(timezone.utc) - timedelta(days=12)).strftime(
             "%Y-%m-%dT00:00:00Z"
@@ -407,12 +421,13 @@ def get_onchain_metrics() -> dict[str, Any]:
                 "start_time": start,
                 "page_size": 1000,
                 "pretty": "false",
+                # v28 — TOUJOURS présent : « api_key= » vide → 200 sur le tier
+                # community ; paramètre absent → 403 (vérifié 07/07/2026).
+                "api_key": key or "",
             }
-            if key:
-                params["api_key"] = key
             return get_json(base, params=params)
 
-        raw = _query(_METRICS)
+        raw = _query(_METRICS_AUTH if has_key else _METRICS_COMMUNITY)
         # Résilience v12 : l'API community refuse parfois un lot complet si UNE
         # métrique n'est pas servie sur le tier gratuit → tout échoue. On réessaie
         # alors avec le sous-ensemble cœur GARANTI (prix + MVRV) pour ne jamais
@@ -471,12 +486,29 @@ def get_onchain_metrics() -> dict[str, Any]:
                 if price is not None and rp:
                     # > 1 : marché en profit latent ; < 1 : en perte latente.
                     entry["realized_price_ratio"] = round(price / rp, 2)
+            elif price is not None and mvrv:
+                # v28 — tier community : CapRealUSD non servi. MVRV = prix /
+                # realized price (même supply) ⇒ realized = prix / MVRV.
+                entry["realized_price"] = round(price / mvrv, 2)
+                entry["realized_price_ratio"] = round(mvrv, 2)
             if adr is not None:
                 entry["active_addresses"] = int(adr)
                 if adr_prev:
                     entry["active_addresses_trend_pct"] = round(
                         (adr - adr_prev) / adr_prev * 100, 1
                     )
+            # v28 — fraîcheur honnête aussi sur le chemin API : la donnée est
+            # J-1 en temps normal (stale False), mais si l'API traînait, les
+            # surcouches (bitcoin-data, prix live) sauraient la rafraîchir et
+            # le digest afficherait « au JJ/MM » au lieu de la présenter fraîche.
+            ts = str(last.get("time") or "")[:10]
+            if entry and ts:
+                entry["as_of"] = ts
+                try:
+                    d = datetime.strptime(ts, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    entry["stale"] = (datetime.now(timezone.utc) - d).days > _MIRROR_STALE_DAYS
+                except ValueError:
+                    pass
             if entry:
                 out_assets[sym] = entry
 

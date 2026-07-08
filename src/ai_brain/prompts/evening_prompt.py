@@ -74,6 +74,9 @@ INSTRUCTIONS :
    retenir AVEC sa conséquence concrète et chiffrée — pas un constat en l'air
    (« sentiment stable » seul ne sert à rien ; « F&G 12 inchangé → prudence
    maintenue malgré les actions en hausse » est utile). PAS de paragraphe.
+   v28 (E-A6) — ne RÉPÈTE PAS la valeur F&G dans une puce si elle est
+   inchangée depuis le matin (elle est déjà dans la grille marchés) : une puce
+   F&G n'est justifiée que si l'indice a bougé de plus de 3 points.
 2. market_changes (« Ce qui a évolué côté marché ») : 4 à 6 items MAX. Chaque
    item = un statut (invalidated ✗ / confirmed ✓ / unchanged → / new ↑) + un
    `tag` (Catalyseur/Risque/Macro/Géopo/Info, comme le matin) + une `importance`

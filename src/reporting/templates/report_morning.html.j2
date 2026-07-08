@@ -72,8 +72,18 @@
       </td>
       <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:12px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Win rate 30j</p>
-        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{{_wr_color}};">{% if _wr_total < 1 %}—{% elif _wr_val is not none %}{{ '%.0f'|format(_wr_val) }}%{% else %}—{% endif %}</p>
-        <p style="font-size:9px;color:#8a8880;margin:0;">{% if _wr_total < 1 %}pas encore d'historique{% elif _wr_total < 5 %}{{header.win_rate_total}} · 5 clôturées min pour calibration{% else %}{{header.win_rate_total}}{% endif %}</p>
+        {# v28 (M-A15) — < 5 clôtures : plus de « 100% » géant sur 2/2 (chiffre
+           flatteur non calibré). Mention discrète « en calibration (2/2) ». #}
+        {% if _wr_total >= 5 %}
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{{_wr_color}};">{% if _wr_val is not none %}{{ '%.0f'|format(_wr_val) }}%{% else %}—{% endif %}</p>
+        <p style="font-size:9px;color:#8a8880;margin:0;">{{header.win_rate_total}}</p>
+        {% elif _wr_total >= 1 %}
+        <p style="font-size:12px;font-weight:500;margin:4px 0 0 0;color:#8a8880;">en calibration ({{header.win_rate_total}})</p>
+        <p style="font-size:9px;color:#8a8880;margin:0;">affiché dès 5 recos clôturées</p>
+        {% else %}
+        <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:#5a5852;">—</p>
+        <p style="font-size:9px;color:#8a8880;margin:0;">pas encore d'historique</p>
+        {% endif %}
       </td>
     </tr>
   </table>
@@ -120,14 +130,25 @@
 {% set _rgbg = '#EAF3DE' if _rg == 'bull' else ('#FCEBEB' if _rg == 'bear' else ('#FAEEDA' if _rg == 'transition' else '#EEF2F7')) %}
 {% set _rgfg = '#27500A' if _rg == 'bull' else ('#791F1F' if _rg == 'bear' else ('#633806' if _rg == 'transition' else '#0C447C')) %}
 <div style="background:{{_rgbg}};border-radius:8px;padding:8px 14px;margin-bottom:1rem;">
-  <p style="margin:0;font-size:12px;color:{{_rgfg}};line-height:1.5;"><span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Régime : {{market_regime.label_fr}}</span>{% if market_regime.days_in_regime is not none %} <span style="color:#5a5852;">· depuis {{market_regime.days_in_regime}} j</span>{% endif %}{% if market_regime.reasons %} <span style="color:#5a5852;">· {{ market_regime.reasons|join(' · ') }}</span>{% endif %}</p>
+  {# v28 (M-A5) — « Régime BTC (technique) » : le 07/07, ce bandeau disait
+     « BAISSIER » pendant que le Contexte global disait « transition » — deux
+     CONCEPTS différents (technique BTC vs macro) qui semblaient se contredire.
+     Les libellés les distinguent désormais explicitement. #}
+  <p style="margin:0;font-size:12px;color:{{_rgfg}};line-height:1.5;"><span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Régime BTC (technique) : {{market_regime.label_fr}}</span>{% if market_regime.days_in_regime is not none %} <span style="color:#5a5852;">· depuis {{market_regime.days_in_regime}} j</span>{% endif %}{% if market_regime.reasons %} <span style="color:#5a5852;">· {{ market_regime.reasons|join(' · ') }}</span>{% endif %}</p>
   {% if market_regime.changed and market_regime.previous_label_fr %}<p style="margin:4px 0 0 0;font-size:12px;font-weight:700;color:{{_rgfg}};">⚠️ CHANGEMENT DE RÉGIME : {{market_regime.previous_label_fr}} → {{market_regime.label_fr}}</p>{% endif %}
 </div>
 {% endif %}
 
 {# ── v27 (RE4) — « Si tu ne fais qu'UNE chose aujourd'hui » : la meilleure
    thèse ferme (R:R × EV), déterministe. ── #}
-{% if top_action and top_action.line %}
+{# v28 (M-A1) — top_action.none : « Ne rien faire aujourd'hui » est une vraie
+   recommandation quand aucun geste n'est exécutable (plafonds / stats CT). #}
+{% if top_action and top_action.is_nothing and top_action.line %}
+<div style="background:#33312e;border-radius:10px;padding:12px 16px;margin-bottom:1.25rem;">
+  <p style="margin:0;font-size:10px;color:#c9c7c0;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Si tu ne fais qu'une chose aujourd'hui</p>
+  <p style="margin:3px 0 0 0;font-size:13px;color:#ffffff;font-weight:600;line-height:1.5;">⏸ {{top_action.line}}</p>
+</div>
+{% elif top_action and top_action.line %}
 <div style="background:#0C447C;border-radius:8px;padding:10px 14px;margin-bottom:1rem;">
   <p style="margin:0;font-size:10px;color:#AFD0EE;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Si tu ne fais qu'une chose aujourd'hui</p>
   <p style="margin:3px 0 0 0;font-size:13px;color:#ffffff;font-weight:600;line-height:1.5;">🎯 {{top_action.line}}</p>
@@ -246,10 +267,12 @@
    single-source (Fear&Greed, Polymarket). #}
 {% set _cps = crypto_price_status or {} %}
 {% set _mss = macro_source_status or {} %}
-<h2 style="margin:1.25rem 0 0.5rem 0;font-size:17px;font-weight:500;">Contexte global</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.7rem 1rem;margin-bottom:1rem;">
-  {# v27 (AF6) — jauge visuelle Fear & Greed (sentiment lisible en un regard). #}
-  {% if charts and charts.get('fng_gauge') %}<div style="text-align:center;margin-bottom:8px;"><img src="cid:chart_fng_gauge" alt="Fear & Greed" style="max-width:220px;width:60%;height:auto;display:inline-block;"></div>{% endif %}
+{# v28 (M-A19) — titre DANS la carte : le 07/07, « Contexte global » restait
+   orphelin en bas de page pendant que son contenu passait à la suivante.
+   v28 (1.B) — jauge F&G SUPPRIMÉE (décision Omar) : la valeur vit une seule
+   fois, en texte, dans la grille CRYPTO & SENTIMENT. #}
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.7rem 1rem;margin:1.25rem 0 1rem 0;">
+  <h2 style="margin:0 0 0.5rem 0;font-size:17px;font-weight:500;">Contexte global</h2>
   {# v23.x (Omar) — Contexte global : UN SEUL bloc « Régime » (fusion de l'ancien
      « Régime » + « Lecture macro passe 1 » qui se répétaient). Verdict déterministe
      (régime · confiance · biais crypto du garde-fou) en tête, puis la synthèse macro
@@ -257,7 +280,8 @@
   {% if macro_context.regime_synthesis or (macro_regime_readout and macro_regime_readout.regime) %}
   <div style="background:#f5f4ee;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.55;">
     {% if macro_regime_readout and macro_regime_readout.regime %}
-    <p style="margin:0{% if macro_context.regime_synthesis %} 0 4px 0{% endif %};"><span style="font-weight:600;">Régime : {{macro_regime_readout.regime}}</span>{% if (macro_regime_readout.confidence_pct|default(none)) is not none %} · confiance {{macro_regime_readout.confidence_pct}}%{% endif %}{% if macro_regime_readout.crypto_bias %} · <span style="color:#8A5A12;">biais crypto : {{macro_regime_readout.crypto_bias}}</span>{% endif %}</p>
+    {# v28 (M-A5) — « Régime macro » : concept distinct du bandeau technique BTC. #}
+    <p style="margin:0{% if macro_context.regime_synthesis %} 0 4px 0{% endif %};"><span style="font-weight:600;">Régime macro : {{macro_regime_readout.regime}}</span>{% if (macro_regime_readout.confidence_pct|default(none)) is not none %} · confiance {{macro_regime_readout.confidence_pct}}%{% endif %}{% if macro_regime_readout.crypto_bias %} · <span style="color:#8A5A12;">biais crypto : {{macro_regime_readout.crypto_bias}}</span>{% endif %}</p>
     {% if macro_context.regime_synthesis %}<p style="margin:0;color:#28415c;">{{macro_context.regime_synthesis}}</p>{% endif %}
     {% else %}
     <p style="margin:0;"><span style="font-weight:600;">Régime :</span> {{macro_context.regime_synthesis}}</p>
@@ -309,12 +333,14 @@
       {% endif %}
       {% if (macro_context.dxy|num(none)) is not none %}
       <td style="width:25%;vertical-align:top;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">DXY</p>
+        {# v28 (M-A20) — libellé « DXY (ICE) » directement sur la tuile : plus
+           besoin de la note ² pour distinguer l'indice ICE de l'élargi Fed. #}
+        <p style="font-size:10px;color:#8a8880;margin:0;">DXY (ICE)</p>
         <p style="font-size:14px;font-weight:500;margin:1px 0 0 0;">{{ '%.2f'|format(macro_context.dxy|num(0)) }}{{ _mss.get('dxy_ice') | pastille }}{% if data_contradictions and data_contradictions.has_any %}<sup style="font-size:9px;color:#8a8880;">²</sup>{% endif %}{{ arrow24(macro_context.dxy, macro_context.dxy_delta) }}</p>
         {# v19/V18-M4 : 2e valeur (indice large Fed) rendue DISCRÈTE, sans le
            « (échelle ≠) » bruyant — la tuile met en avant le DXY ICE standard. #}
         {# v26 (E-B12, cohérence cross-mail) — libellé cryptique → explicite. #}
-        <p style="font-size:9px;color:#b5b3ab;margin:0;">{% if (macro_context.dxy_broad|num(none)) is not none %}indice élargi · {{ '%.2f'|format(macro_context.dxy_broad|num(0)) }}{% elif macro_context.dxy_note %}{{macro_context.dxy_note}}{% endif %}</p>
+        <p style="font-size:9px;color:#b5b3ab;margin:0;">{% if (macro_context.dxy_broad|num(none)) is not none %}indice élargi (Fed) · {{ '%.2f'|format(macro_context.dxy_broad|num(0)) }}{% elif macro_context.dxy_note %}{{macro_context.dxy_note}}{% endif %}</p>
       </td>
       {% endif %}
     </tr>
@@ -696,8 +722,11 @@
 {# v23.x — le mail n'affiche QUE les recos FERMES ; les SURVEILLER restent en
    interne (bot/état) mais ne sont plus rendues. Liste dérivée de thesis_of_the_day
    pour rester robuste aux payloads de test qui ne passent pas firm_theses. #}
+{# v28 (M-A2) — MAINTENIR (plafond de concentration atteint) reste AFFICHÉ :
+   la thèse est utile, seule l'action a été honnêtement requalifiée (fini le
+   « RENFORCER · Taille +0.0% »). Les SURVEILLER restent internes. #}
 {% set _firm_theses = [] %}
-{% for t in (thesis_of_the_day or []) if t.action in ['RENFORCER','ALLÉGER','ALLEGER'] %}{% set _ = _firm_theses.append(t) %}{% endfor %}
+{% for t in (thesis_of_the_day or []) if t.action in ['RENFORCER','ALLÉGER','ALLEGER','MAINTENIR'] %}{% set _ = _firm_theses.append(t) %}{% endfor %}
 {% if _firm_theses %}
 {# v24 — caption DANS le bloc : ne l'affiche plus au-dessus d'un tableau vide
    (« ★ = conviction développée en détail plus bas » n'a pas de sens sans reco). #}
@@ -706,28 +735,28 @@
   <tr style="border-bottom:1px solid #e5e4dc;color:#8a8880;">
     <td style="padding:5px 3px;font-weight:600;">Actif</td>
     <td style="padding:5px 3px;font-weight:600;">Action</td>
+    {# v28 (M-A12) — colonne « Entrée » SUPPRIMÉE : elle répétait « Actuel »
+       sur toutes les lignes (l'entrée suggérée est le prix courant). #}
     <td style="padding:5px 3px;font-weight:600;text-align:right;">Actuel</td>
-    <td style="padding:5px 3px;font-weight:600;text-align:right;">Entrée</td>
     <td style="padding:5px 3px;font-weight:600;text-align:right;">Cible 30j</td>
     <td style="padding:5px 3px;font-weight:600;text-align:right;">Cible 6-12m</td>
     <td style="padding:5px 3px;font-weight:600;text-align:right;">Stop</td>
     <td style="padding:5px 3px;font-weight:600;text-align:right;">R:R</td>
   </tr>
   {% for t in _firm_theses %}
-  {% set _bg = '#EAF3DE' if t.action == 'RENFORCER' else '#FCEBEB' %}
-  {% set _fg = '#27500A' if t.action == 'RENFORCER' else '#791F1F' %}
+  {% set _bg = '#EAF3DE' if t.action == 'RENFORCER' else ('#F1EFE8' if t.action == 'MAINTENIR' else '#FCEBEB') %}
+  {% set _fg = '#27500A' if t.action == 'RENFORCER' else ('#5a5852' if t.action == 'MAINTENIR' else '#791F1F') %}
   <tr>
     <td style="padding:6px 3px 1px 3px;font-weight:700;color:#1a1a18;white-space:nowrap;vertical-align:top;">{{t.asset}}{% if t._expand %} <span style="color:#BA7517;">★</span>{% endif %}</td>
     <td style="padding:6px 3px 1px 3px;white-space:nowrap;vertical-align:top;"><span style="display:inline-block;background:{{_bg}};color:{{_fg}};font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;padding:1px 5px;border-radius:3px;">{{t.action}}</span>{% if t.confidence %} <span style="color:#8a8880;font-size:9px;">(C.{{t.confidence|int}}%)</span>{% endif %}</td>
     <td style="padding:6px 3px 1px 3px;text-align:right;color:#1a1a18;font-weight:600;white-space:nowrap;vertical-align:top;">{{ t.current_price|fmt_price }}</td>
-    <td style="padding:6px 3px 1px 3px;text-align:right;color:#5a5852;white-space:nowrap;vertical-align:top;">{% if t.action_plan and t.action_plan.entry %}{{t.action_plan.entry|fmt_price}}{% else %}—{% endif %}</td>
     <td style="padding:6px 3px 1px 3px;text-align:right;color:#27500A;white-space:nowrap;vertical-align:top;">{% if t.targets and t.targets.short_term_30d %}{{t.targets.short_term_30d|fmt_price}}{% else %}—{% endif %}</td>
     <td style="padding:6px 3px 1px 3px;text-align:right;color:#085041;white-space:nowrap;vertical-align:top;">{% if t.targets and t.targets.long_term_6_12m_low %}{{t.targets.long_term_6_12m_low|fmt_price}}{% if t.targets.long_term_6_12m_high %}–{{t.targets.long_term_6_12m_high|fmt_price|replace('$','')}}{% endif %}{% else %}—{% endif %}</td>
     <td style="padding:6px 3px 1px 3px;text-align:right;color:#791F1F;white-space:nowrap;vertical-align:top;">{% if t.action_plan and t.action_plan.stop_loss %}{{t.action_plan.stop_loss|fmt_price}}{% else %}—{% endif %}</td>
     <td style="padding:6px 3px 1px 3px;text-align:right;color:#5a5852;white-space:nowrap;vertical-align:top;">{% if t.rr_value %}{{t.rr_value}}:1{% else %}—{% endif %}</td>
   </tr>
   <tr style="border-bottom:0.5px solid #f0efe8;">
-    <td colspan="8" style="padding:0 3px 6px 3px;color:#8a8880;font-size:9px;line-height:1.35;">{% if t.thesis_scoring and t.thesis_scoring.signals %}⚙ {% for s in t.thesis_scoring.signals[:3] %}{{s.label}}{% if not loop.last %} · {% endif %}{% endfor %}{% endif %}</td>
+    <td colspan="7" style="padding:0 3px 6px 3px;color:#8a8880;font-size:9px;line-height:1.35;">{% if t.thesis_scoring and t.thesis_scoring.signals %}⚙ {% for s in t.thesis_scoring.signals[:3] %}{{s.label}}{% if not loop.last %} · {% endif %}{% endfor %}{% endif %}</td>
   </tr>
   {% endfor %}
 </table>
@@ -747,7 +776,8 @@
       </td>
       <td style="vertical-align:top;text-align:right;white-space:nowrap;padding-left:10px;">
         {% if t.priority == 'action' %}<span style="display:inline-block;background:#E24B4A;color:#fff;font-size:9px;padding:2px 7px;border-radius:4px;font-weight:700;margin-bottom:4px;">ACTION</span>{% elif t.priority == 'watch' %}<span style="display:inline-block;background:#E6F1FB;color:#0C447C;font-size:9px;padding:2px 7px;border-radius:4px;font-weight:700;margin-bottom:4px;">SUIVI</span>{% endif %}
-        <span style="background:{% if t.action_type == 'bullish' %}#EAF3DE{% elif t.action_type == 'bearish' %}#FCEBEB{% else %}#E6F1FB{% endif %};color:{% if t.action_type == 'bullish' %}#27500A{% elif t.action_type == 'bearish' %}#791F1F{% else %}#0C447C{% endif %};padding:4px 10px;border-radius:8px;font-size:11px;font-weight:600;display:inline-block;">{{t.action}}</span>
+        {# v28 (M-A2) — MAINTENIR : chip NEUTRE (gris), pas le vert bullish. #}
+        <span style="background:{% if t.action == 'MAINTENIR' %}#F1EFE8{% elif t.action_type == 'bullish' %}#EAF3DE{% elif t.action_type == 'bearish' %}#FCEBEB{% else %}#E6F1FB{% endif %};color:{% if t.action == 'MAINTENIR' %}#5a5852{% elif t.action_type == 'bullish' %}#27500A{% elif t.action_type == 'bearish' %}#791F1F{% else %}#0C447C{% endif %};padding:4px 10px;border-radius:8px;font-size:11px;font-weight:600;display:inline-block;">{{t.action}}</span>
         <p style="margin:4px 0 0 0;font-size:10px;color:#8a8880;">{% if t.confidence %}Confiance · {{t.confidence}}%{% if t.size_note %} → {{t.size_note}}{% endif %}{% endif %}</p>
         {% if t.reliability %}<p style="margin:3px 0 0 0;font-size:9px;color:{% if t.reliability == 'complète' %}#27500A{% else %}#BA7517{% endif %};">données {{ 'complètes' if t.reliability == 'complète' else 'partielles · détail en auto-critique' }}</p>{% endif %}
       </td>
@@ -755,6 +785,11 @@
   </table>
   {% if t.demoted_by_python %}
   <div style="background:#f5f4ee;border-radius:6px;padding:6px 10px;margin:0 0 10px 0;font-size:10px;color:#5a5852;line-height:1.45;">⛉ Garde-fou : reco ferme dégradée en SURVEILLER — {{t.demotion_reason}}.</div>
+  {% endif %}
+  {# v28 (M-A3) — conviction LT dont les stats CT sont défavorables : la
+     mention est FRONTALE (plus seulement enfouie dans l'auto-critique). #}
+  {% if t.ct_warning %}
+  <div style="background:#FBF0DA;border-radius:6px;padding:6px 10px;margin:0 0 10px 0;font-size:10px;color:#7A4E12;line-height:1.45;">{{t.ct_warning|md}}</div>
   {% endif %}
 
   {% if t.observation %}
@@ -779,7 +814,11 @@
 
   {% if t.reasoning_signals %}
   <div style="margin:12px 0;">
-    <p style="font-size:11px;color:#5a5852;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;">Le raisonnement · {{t.reasoning_signals|length}} signaux convergents</p>
+    {# v28 (M-A10) — le compteur « N signaux convergents » contredisait le
+       « N familles convergentes » du score (3 vs 2 le 07/07) : deux comptages
+       de choses différentes. Le titre reste sobre ; le compte de FAMILLES
+       (celui du score, seul défini) vit déjà dans l'en-tête de l'observation. #}
+    <p style="font-size:11px;color:#5a5852;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;">Le raisonnement</p>
     <div style="padding-left:4px;">
       {% for s in t.reasoning_signals %}
       <p style="margin:4px 0;font-size:12px;line-height:1.5;"><span style="display:inline-block;width:18px;height:18px;background:{% if t.action_type == 'bearish' %}#FCEBEB{% else %}#EAF3DE{% endif %};color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};border-radius:50%;text-align:center;font-size:10px;font-weight:500;line-height:18px;margin-right:8px;">{{loop.index}}</span>{{s|md}}</p>
@@ -848,6 +887,10 @@
       {% if t.action_plan.invalidation_conditions %}<span style="font-weight:700;">Invalidation :</span> {{t.action_plan.invalidation_conditions|md}}{% endif %}
     </p>
   </div>
+  {% elif t.action == 'MAINTENIR' and t.gate_note %}
+  {# v28 (M-A2) — plafond de concentration : le plan dit POURQUOI aucun renfort,
+     au lieu de l'ancien « Taille : +0.0% du portefeuille » incohérent. #}
+  <div style="background:#F1EFE8;border-radius:8px;padding:10px 12px;margin:12px 0;font-size:12px;line-height:1.5;color:#33312e;"><span style="font-weight:700;">Plan · MAINTENIR :</span> {{t.gate_note|md}}{% if t.action_plan and t.action_plan.invalidation_conditions %}<br><span style="font-weight:700;">Invalidation :</span> {{t.action_plan.invalidation_conditions|md}}{% endif %}</div>
   {% elif t.action in ['SURVEILLER','MAINTENIR'] and t.watch_trigger %}
   <div style="background:#E6F1FB;border-radius:8px;padding:8px 12px;margin:12px 0;font-size:12px;line-height:1.5;color:#0C447C;"><span style="font-weight:700;">Déclencheur à surveiller :</span> {{t.watch_trigger|md}}</div>
   {% endif %}
@@ -863,9 +906,10 @@
   <p style="margin:6px 0 0 0;font-size:11px;color:#5a5852;">🗓 Catalyseurs : {{ t.catalysts|join(' · ') }}</p>
   {% endif %}
 
-  {# ── v27 (TH6) — classement relatif intra-secteur (le meilleur cheval ?). ── #}
+  {# ── v27 (TH6) — classement relatif intra-secteur, comparatif chiffré.
+     v28 (1.B) — icône 🏇 retirée avec les métaphores : puce sobre. #}
   {% if t.sector_rank %}
-  <p style="margin:6px 0 0 0;font-size:11px;color:#5a5852;">🏇 {{t.sector_rank}}</p>
+  <p style="margin:6px 0 0 0;font-size:11px;color:#5a5852;">▸ {{t.sector_rank}}</p>
   {% endif %}
 
   {# ── v27 (TH2/ES1/ES2/ES3) — SCÉNARIOS bull/base/bear + EV 30j (fourchettes
@@ -956,7 +1000,7 @@
           <td style="vertical-align:middle;font-size:10px;color:#5a5852;">
             {# v26 (B6) — cible + distance restante + % du chemin parcouru :
                le lecteur voit OÙ en est la reco, pas un badge binaire. #}
-            {% if r.days_open is not none %}<span style="color:#8a8880;">{{r.days_open}}j</span> · {% endif %}{% if r.entry_price is not none %}entrée {{r.entry_price|fmt_money}}{% endif %}{% if r.ct_target %} · cible {{r.ct_target|fmt_money}}{% if (r.dist_to_target_pct|num(none)) is not none %} <span style="color:#8a8880;">(à {{ r.dist_to_target_pct|fmt_pct }})</span>{% endif %}{% endif %}{% if r.stop_loss %} · stop {{r.stop_loss|fmt_money}}{% if (r.stop_distance_pct|num(none)) is not none %} <span style="color:{% if (r.stop_distance_pct|num(0))|abs <= 3 %}#A32D2D{% else %}#8a8880{% endif %};">({{ r.stop_distance_pct|fmt_pct }})</span>{% endif %}{% endif %}{% if (r.target_path_pct|num(none)) is not none %} · <span style="color:{% if (r.target_path_pct|num(0)) >= 40 %}#3B6D11{% elif (r.target_path_pct|num(0)) < 0 %}#A32D2D{% else %}#5a5852{% endif %};">{{ '%.0f'|format(r.target_path_pct|num(0)) }}% du chemin</span>{% endif %}
+            {% if r.days_open is not none %}<span style="color:#8a8880;">{{r.days_open}}j</span> · {% endif %}{% if r.entry_price is not none %}entrée {{r.entry_price|fmt_money}}{% endif %}{% if r.ct_target %} · cible{% if r.ct_target_fallback %} act.{% endif %} {{r.ct_target|fmt_money}}{% if (r.dist_to_target_pct|num(none)) is not none %} <span style="color:#8a8880;">(à {{ r.dist_to_target_pct|fmt_pct }})</span>{% endif %}{% if r.ct_target_fallback %} <span style="color:#8a8880;">(plan du jour)</span>{% endif %}{% endif %}{% if r.stop_loss %} · stop {{r.stop_loss|fmt_money}}{% if (r.stop_distance_pct|num(none)) is not none %} <span style="color:{% if (r.stop_distance_pct|num(0))|abs <= 3 %}#A32D2D{% else %}#8a8880{% endif %};">({{ r.stop_distance_pct|fmt_pct }})</span>{% endif %}{% endif %}{% if (r.target_path_pct|num(none)) is not none %} · <span style="color:{% if (r.target_path_pct|num(0)) >= 40 %}#3B6D11{% elif (r.target_path_pct|num(0)) < 0 %}#A32D2D{% else %}#5a5852{% endif %};">{{ '%.0f'|format(r.target_path_pct|num(0)) }}% du chemin</span>{% endif %}
           </td>
           <td style="vertical-align:middle;text-align:right;white-space:nowrap;">
             {% if r.health_status %}<span style="font-size:11px;font-weight:600;color:{{r.health_color or '#5a5852'}};">{{r.health_status}}</span>{% else %}<span style="font-size:11px;color:{{r.status_color or '#5a5852'}};">{{r.status or '● en cours'}}</span>{% endif %}

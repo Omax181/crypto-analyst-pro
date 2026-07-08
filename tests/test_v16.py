@@ -24,13 +24,13 @@ import datetime as dt
 # Heatmap v16 : 15 + extra, %PTF
 # --------------------------------------------------------------------------- #
 def test_heatmap_v16_20_cells_plus_extra():
-    # v23.x : heatmap 5×4 = 19 cases pleines + 1 « +N autres » = 20 cases.
+    # v28 (M-A11) : 15 cases pleines (tri impact) + 1 « +N autres ».
     from src.main import _portfolio_heatmap
     enriched = {f"P{i}": {"value_usd": 100 - i, "change_24h": 1.0}
                 for i in range(25)}  # 25 positions
     out = _portfolio_heatmap(enriched)
-    assert len(out["cells"]) == 19           # 19 cases pleines
-    assert out["extra"]["count"] == 6        # 25 − 19 = 6 → « +6 autres »
+    assert len(out["cells"]) == 15           # 15 cases pleines
+    assert out["extra"]["count"] == 10       # 25 − 15 = 10 → « +10 autres »
     assert all("ptf_pct" in c for c in out["cells"])
     assert out["extra"]["ptf_pct"] is not None
     # cohérence : somme des %PTF des cases + extra ≈ 100
@@ -223,7 +223,7 @@ def test_render_morning_v16_no_history_onchain_grid():
     # macro reste affichée telle quelle, actionnable.
     assert "Donc :" not in html
     assert "TAO à alléger si DXY casse 100" in html  # implication macro présente
-    assert "Crypto Analyst Pro · v27" in html
+    assert "Crypto Analyst Pro · v28" in html
 
 
 def test_render_evening_v16_bars_no_heatmap():
@@ -256,7 +256,7 @@ def test_render_evening_v16_bars_no_heatmap():
     assert "accord : 17% Polymarket" in html or "accord : 17%" in html
     assert "RISQUE" in html.upper()                 # tag rendu
     assert "Pas d'événement macro majeur dans les 48h" in html
-    assert "Crypto Analyst Pro · v27" in html
+    assert "Crypto Analyst Pro · v28" in html
 
 
 def test_render_weekly_v16_no_btc_hold_bullets_sectors():
@@ -287,4 +287,4 @@ def test_render_weekly_v16_no_btc_hold_bullets_sectors():
     assert "drawdown pondéré -50% vs ATH" in html         # plus de « n/d »
     assert "0/5 minimum pour calibration" in html         # gate label dans header
     assert "13 juin" in html                              # upcoming_week corrigé
-    assert "Crypto Analyst Pro · v27" in html
+    assert "Crypto Analyst Pro · v28" in html

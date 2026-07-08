@@ -204,19 +204,20 @@ def test_m_b12_macro_guardrail_active_and_inactive():
 
 
 def test_m_b17_heatmap_sorted_by_movement():
-    """M-B17 — la heatmap est triée par |variation 24h| décroissante."""
+    """v28 (M-A11) — la heatmap est triée par IMPACT (poids × |variation|) :
+    ce qui bouge le portefeuille d'abord, plus le bruit des poussières."""
     _stub_tenacity()
     from src.main import _portfolio_heatmap
 
     enriched = {f"A{i}": {"value_usd": 100 - i, "change_24h": (i - 9) * 1.0}
-                for i in range(22)}  # v23.x : > 20 pour déclencher l'agrégat
-    enriched["BIG"] = {"value_usd": 50, "change_24h": 18.0}
-    enriched["CRASH"] = {"value_usd": 40, "change_24h": -15.0}
+                for i in range(22)}  # > 15 pour déclencher l'agrégat
+    enriched["BIG"] = {"value_usd": 200, "change_24h": 18.0}
+    enriched["CRASH"] = {"value_usd": 150, "change_24h": -15.0}
     hm = _portfolio_heatmap(enriched)
-    # Les 2 plus gros mouvements en tête.
+    # Les 2 plus gros IMPACTS (mouvement × poids) en tête.
     assert hm["cells"][0]["symbol"] == "BIG"
     assert hm["cells"][1]["symbol"] == "CRASH"
-    # Agrégat = positions les plus calmes (proche de 0%).
+    # Agrégat = positions au moindre impact.
     assert hm["extra"] is not None
 
 

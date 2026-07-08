@@ -103,6 +103,10 @@ class GeminiClient:
         # jamais facturée, ce repli garantit « meilleure qualité quand dispo,
         # jamais de panne » sans coût. None = pas de repli (comportement v18).
         self.fallback_model = fallback_model
+        # v28 (4.2) — dernier modèle AYANT RÉELLEMENT produit une réponse
+        # (primaire ou repli). Permet au DecisionEngine de détecter qu'un
+        # rapport a été rédigé par le modèle de repli → bandeau « dégradé ».
+        self.last_used_model: Optional[str] = None
         from google import genai
         self._client = genai.Client(api_key=api_key)
         logger.info(
@@ -122,13 +126,17 @@ class GeminiClient:
         le filet de sécurité (repli) reste garanti quel que soit le primaire."""
         model_used = primary or self.model_name
         try:
-            return call(model_used)
+            out = call(model_used)
+            self.last_used_model = model_used  # v28 — traçage du modèle réel
+            return out
         except Exception as exc:  # noqa: BLE001
             if self.fallback_model and self.fallback_model != model_used:
                 logger.warning(
                     "Modèle %s indisponible (%s) → repli sur %s.",
                     model_used, type(exc).__name__, self.fallback_model)
-                return call(self.fallback_model)
+                out = call(self.fallback_model)
+                self.last_used_model = self.fallback_model  # v28 — repli utilisé
+                return out
             raise
 
     @retry(**_RETRY_KWARGS)

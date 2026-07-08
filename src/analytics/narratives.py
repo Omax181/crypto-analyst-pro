@@ -45,7 +45,10 @@ NARRATIVES: dict[str, str] = {
     # Infra / oracle / interop
     "LINK": "Oracle/Infra",
     "QNT": "Oracle/Infra",
-    "GRT": "Indexing/Infra",
+    # v28 (M-A9) — « Indexing/Infra » fusionné dans « Infra » : le 07/07, les
+    # tuiles de rotation affichaient DEUX secteurs quasi homonymes
+    # (« Indexing/Infra » pour GRT, « Infra » pour ANKR) — taxonomie confuse.
+    "GRT": "Infra",
     "AXL": "Interop",
     # v26 (W-A17) — W = Wormhole, un BRIDGE cross-chain : c'est de l'interop,
     # pas de l'IA (l'audit a vu « AI : FET, RENDER, TAO, W » dans l'exposition

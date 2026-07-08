@@ -380,48 +380,73 @@ def _render_bollinger(plt, symbol: str, closes: list[float], days: int) -> bytes
 # Évolution du portefeuille (hebdo) — valeur $ + performance vs BTC
 # --------------------------------------------------------------------------- #
 def _draw_value_panel(ax, vals: list[float], labels: list[str]) -> None:
-    """Aire + ligne de la VALEUR du PTF en $, axe temporel en bas, $ à droite."""
-    x = list(range(len(vals)))
+    """Aire + ligne de la VALEUR du PTF en $, axe temporel en bas, $ à droite.
+
+    v28 (3.B) — pixel-perfect : le 07/07, le label « $2,716 » (ha=right, sans
+    marge) était rogné contre le bord droit et l'axe. On réserve désormais une
+    MARGE DROITE explicite (xlim élargi) et on pose le label À DROITE du point
+    (ha=left) dans cet espace, + une grille horizontale fine pour la lecture.
+    """
+    n = len(vals)
+    x = list(range(n))
     up = vals[-1] >= vals[0]
     color = _C_SUP if up else _C_RES
-    floor = min(vals) * 0.985
-    ax.fill_between(x, floor, vals, color=color, alpha=0.12, zorder=2)
-    ax.plot(x, vals, color=color, linewidth=1.9, zorder=4)
-    ax.scatter([x[-1]], [vals[-1]], color=color, s=16, zorder=5)
-    ax.text(x[-1], vals[-1], f" ${vals[-1]:,.0f}", fontsize=7, color=color,
-            va="center", ha="right", fontweight="bold", bbox=_LBL_BBOX, zorder=6)
-    ax.set_title("Valeur du portefeuille ($)", fontsize=8.5, color="#334155")
-    ax.set_ylim(floor, max(vals) * 1.015)
-    # $ sur l'axe de droite.
+    lo, hi = min(vals), max(vals)
+    span = (hi - lo) or (hi or 1.0)
+    floor = lo - span * 0.12
+    ceil = hi + span * 0.12
+    # Grille horizontale fine SOUS la courbe (lecture des niveaux).
+    ax.set_axisbelow(True)
+    ax.grid(axis="y", color=_C_AXIS, linewidth=0.5, alpha=0.55, zorder=0)
+    ax.fill_between(x, floor, vals, color=color, alpha=0.13, zorder=2)
+    ax.plot(x, vals, color=color, linewidth=2.0, solid_capstyle="round", zorder=4)
+    ax.scatter([x[-1]], [vals[-1]], color=color, s=22, zorder=5,
+               edgecolors="#ffffff", linewidths=0.8)
+    # Marge droite = 16% de la fenêtre pour loger le point + son label sans rognure.
+    ax.set_xlim(-0.02 * (n - 1), (n - 1) + 0.17 * (n - 1) + 0.4)
+    ax.text(x[-1] + 0.03 * (n - 1) + 0.15, vals[-1], f"${vals[-1]:,.0f}",
+            fontsize=7.5, color=color, va="center", ha="left",
+            fontweight="bold", bbox=_LBL_BBOX, zorder=6, clip_on=False)
+    ax.set_title("Valeur du portefeuille ($)", fontsize=9, color="#334155",
+                 pad=6)
+    ax.set_ylim(floor, ceil)
+    # $ sur l'axe de droite, chiffres alignés (tabular via monospace-ish).
     ax.yaxis.tick_right()
     ax.tick_params(labelsize=6, colors=_C_TICK)
     try:
-        from matplotlib.ticker import FuncFormatter
+        from matplotlib.ticker import FuncFormatter, MaxNLocator
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=5, prune="both"))
         ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"${v:,.0f}"))
     except Exception:  # noqa: BLE001
         pass
-    for spine in ("top", "left"):
+    for spine in ("top", "left", "right"):
         ax.spines[spine].set_visible(False)
-    for spine in ("right", "bottom"):
-        ax.spines[spine].set_color(_C_AXIS)
-    _time_xticks(ax, labels, len(vals))
-    ax.margins(x=0.02)
+    ax.spines["bottom"].set_color(_C_AXIS)
+    _time_xticks(ax, labels, n)
 
 
 def _draw_perf_panel(ax, perf_ptf: list[float], perf_btc: list[float],
                      labels: list[str]) -> None:
     """Performance cumulée (%) PTF vs BTC depuis le début de la fenêtre."""
-    x = list(range(len(perf_ptf)))
-    ax.axhline(0, color=_C_TICK, linewidth=0.7, linestyle=":", alpha=0.7)
+    n = len(perf_ptf)
+    x = list(range(n))
+    ax.set_axisbelow(True)
+    ax.grid(axis="y", color=_C_AXIS, linewidth=0.5, alpha=0.5, zorder=0)
+    ax.axhline(0, color=_C_TICK, linewidth=0.8, linestyle=":", alpha=0.7, zorder=1)
     ax.fill_between(x, 0, perf_ptf, color=_C_PTF, alpha=0.10, zorder=2)
-    ax.plot(x, perf_ptf, color=_C_PTF, linewidth=1.9, label="PTF", zorder=4)
+    ax.plot(x, perf_ptf, color=_C_PTF, linewidth=2.0, solid_capstyle="round",
+            label="PTF", zorder=4)
     ax.plot(x, perf_btc, color=_C_BTC, linewidth=1.4, linestyle="--",
             label="BTC", zorder=3)
-    ax.set_title("Performance · PTF vs BTC", fontsize=8.5, color="#334155")
-    ax.text(x[-1], perf_ptf[-1], f" {perf_ptf[-1]:+.0f}%", fontsize=6.5,
-            color=_C_PTF, va="center", ha="right", fontweight="bold",
-            bbox=_LBL_BBOX, zorder=6)
-    ax.legend(loc="upper left", fontsize=6, frameon=False, ncol=2)
+    ax.set_title("Performance · PTF vs BTC", fontsize=9, color="#334155", pad=6)
+    # v28 (3.B) — label endpoint À DROITE du point, marge réservée (pas de rognure).
+    ax.set_xlim(-0.02 * (n - 1), (n - 1) + 0.17 * (n - 1) + 0.4)
+    ax.scatter([x[-1]], [perf_ptf[-1]], color=_C_PTF, s=18, zorder=5,
+               edgecolors="#ffffff", linewidths=0.7)
+    ax.text(x[-1] + 0.03 * (n - 1) + 0.15, perf_ptf[-1], f"{perf_ptf[-1]:+.0f}%",
+            fontsize=7, color=_C_PTF, va="center", ha="left", fontweight="bold",
+            bbox=_LBL_BBOX, zorder=6, clip_on=False)
+    ax.legend(loc="upper left", fontsize=6.5, frameon=False, ncol=2)
     ax.yaxis.tick_right()
     ax.tick_params(labelsize=6, colors=_C_TICK)
     try:
@@ -429,12 +454,10 @@ def _draw_perf_panel(ax, perf_ptf: list[float], perf_btc: list[float],
         ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:+.0f}%"))
     except Exception:  # noqa: BLE001
         pass
-    for spine in ("top", "left"):
+    for spine in ("top", "left", "right"):
         ax.spines[spine].set_visible(False)
-    for spine in ("right", "bottom"):
-        ax.spines[spine].set_color(_C_AXIS)
-    _time_xticks(ax, labels, len(perf_ptf))
-    ax.margins(x=0.02)
+    ax.spines["bottom"].set_color(_C_AXIS)
+    _time_xticks(ax, labels, n)
 
 
 def _time_xticks(ax, labels: list[str], n: int) -> None:
@@ -824,9 +847,22 @@ def chart_for_thesis(thesis: dict[str, Any]) -> Optional[bytes]:
     series = _load_series(sym, days=365)
     if not series:
         return None
+    # v28 (M-A17) — le DERNIER point du graphe = prix SPOT de la fiche. Le
+    # 07/07, l'annotation du chart BTC disait 63 080 (clôture J-1 de la série
+    # daily) sous une fiche titrée 63 214 $ : deux « prix actuels » différents
+    # dans le même bloc. On substitue le spot au dernier close avant rendu.
+    _spot_raw = thesis.get("current_price") or thesis.get("price")
+    try:
+        _spot = float(str(_spot_raw).replace(",", "").replace("$", "")
+                      .replace(" ", "").replace(" ", ""))
+    except (TypeError, ValueError):
+        _spot = None
+    closes = list(series["closes"])
+    if _spot and _spot > 0 and closes:
+        closes[-1] = _spot
     try:
         mode = _select_analysis(thesis)
-        return _render_analysis(plt, sym, series["closes"], mode,
+        return _render_analysis(plt, sym, closes, mode,
                                 thesis.get("support_resistance"),
                                 volumes_full=series.get("volumes"))
     except Exception as exc:  # noqa: BLE001

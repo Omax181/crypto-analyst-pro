@@ -109,6 +109,11 @@ def test_coinmetrics_parsing(monkeypatch) -> None:
     ]
     monkeypatch.setattr(coinmetrics, "get_json", lambda *a, **k: {"data": rows})
     monkeypatch.setattr(coinmetrics.CACHE, "get_or_compute", lambda key, ttl, fn: fn())
+    # v28 — les lignes synthétiques sont datées (mai) → stale=True : on
+    # neutralise la surcouche bitcoin-data.com (appel réseau) qui pourrait
+    # sinon écraser le MVRV BTC et rendre le test non déterministe.
+    from src.data_sources import bitcoin_data
+    monkeypatch.setattr(bitcoin_data, "get_btc_mvrv", lambda: {"available": False})
     r = coinmetrics.get_onchain_metrics()
     assert r["available"] is True
     btc = r["assets"]["BTC"]

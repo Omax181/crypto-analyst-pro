@@ -47,7 +47,7 @@ _MORNING_SCHEMA = """
      "historical_pattern": {"verified","narrative (PROSE détaillée si verified)","occurrences_count","avg_move_pct","max_drawdown_pct","win_rate","data_source"},
      "self_critique (PROSE plusieurs arguments)","macro_coherence (PROSE)",
      "counter_thesis (v27/TH3 — OBLIGATOIRE pour toute thèse FERME : le MEILLEUR argument CONTRE ta propre thèse, honnête et chiffré, + ce qui te ferait changer d'avis. 1-2 phrases. Ex. 'Si le funding TAO repasse durablement positif, le squeeze est déjà pricé et la cassure de 205 devient un piège haussier ; je réviserais sous 195 en clôture D1.' JAMAIS un homme de paille : le vrai risque. Sers-toi de data.cross_signals.signals.confirmation_bias si actif.)",
-     "sector_rank (v27/TH6 — OPTIONNEL : si l'actif appartient à un secteur où tu détiens plusieurs positions, situe-le vs ses pairs en 1 phrase chiffrée. Ex. 'meilleur cheval AI que je détiens : TAO +8% vs RENDER 30j, funding le moins tendu'. Croise data.sector_rotation + les perfs des positions du même secteur.)",
+     "sector_rank (v27/TH6 — OPTIONNEL : si l'actif appartient à un secteur où tu détiens plusieurs positions, situe-le vs ses pairs en 1 phrase chiffrée FACTUELLE. Ex. 'TAO surperforme RENDER de +8 pts sur 30j avec un funding moins tendu'. v28 (1.B, M-A16) : AUCUNE métaphore — pas de 'meilleur cheval', 'gérant du portefeuille', 'mène la danse' ; des faits chiffrés, point. Croise data.sector_rotation + les perfs des positions du même secteur.)",
      "targets": {"short_term_label (ex. 'Tactique court terme · 30j')","short_term_30d (NOMBRE BRUT, ex. 285 — JAMAIS '285,00 $' ni '285$' — ANCRE-le sur data.eligible_theses[].projection.short_term_30d.target, confluence prioritaire, DANS la bande réaliste ; cf. RÈGLE PROJECTION)","short_term_note (ex. '+19,8% · confluence résistance + Fibonacci 0,618' — CITE la base du chiffre)","long_term_6_12m_low (NOMBRE BRUT — ancré sur projection.long_term_6_12m.low)","long_term_6_12m_high (NOMBRE BRUT — ancré sur projection.long_term_6_12m.high)","long_term_note (CONDITION NOMMÉE, ex. 'retour ATH si narratif AI confirmé')"},
      "watch_trigger (UNIQUEMENT si action SURVEILLER/MAINTENIR : 1 phrase, le déclencheur chiffré qui ferait passer à l'action)",
      "action_plan": "OBJET UNIQUEMENT si action = RENFORCER ou ALLÉGER. Pour SURVEILLER/MAINTENIR : OMETTRE complètement action_plan (ne pas mettre de champs 'None'). Forme: {entry, limit_orders, position_size_pct, take_profit:{30pct,30pct_b,40pct}, stop_loss, stop_loss_basis, rr (ex '3.2:1' si fondé sinon omettre), invalidation_conditions}. v17 RÈGLE STRICTE FORMAT : entry, take_profit.*, stop_loss et TOUS les prix sont des NOMBRES BRUTS (ex. 264.3, 285, 302.17) — JAMAIS de chaîne pré-formatée ('264,30 $', '302.17 $', '285,00 $'). Le rendu applique le format ; si tu écris le symbole $ ou des séparateurs, tu provoques des incohérences (302.17 $ ET 302,00 $). stop_loss_basis est du TEXTE court (ex. 'bande basse Bollinger') et le niveau qu'il cite DOIT être cohérent avec stop_loss (même valeur). v18/M-B15 — position_size_pct (NOMBRE) : taille du geste en % DU PORTEFEUILLE (ex. 2 pour '+2% du PTF'), pas en % de la position. Dimensionne selon la conviction × la tradabilité (data.eligible_theses[].tradability) × le garde-fou macro (réduis si prudence). NE fournis PAS position_size_usd : la taille en $ est calculée AUTOMATIQUEMENT (% × valeur PTF). v23.x — stop_loss S'ANCRE sur data.eligible_theses[].projection.stop_suggestion (swing low réel) quand il existe. v18/M-B16 — stop_loss pour une CONVICTION LONG TERME = niveau d'INVALIDATION DE LA THÈSE (cassure d'un support majeur W1/M1, perte d'un palier structurel), PAS un stop technique serré (RSI/Bollinger intraday) qui serait touché par le bruit. Pour Omar (investisseur long terme), un stop à -3% sur une conviction n'a aucun sens : le stop doit laisser respirer la thèse. stop_loss_basis explicite la nature (ex. 'invalidation : cassure support W1 58k' vs 'bande basse Bollinger 1h')."
@@ -118,8 +118,8 @@ INSTRUCTIONS :
      le niveau qui te ferait changer d'avis. C'est non négociable : une thèse
      sans son propre point faible est un biais de confirmation.
    • RELATIF SECTEUR (TH6) : quand tu détiens plusieurs actifs d'un même
-     secteur, situe l'actif de la thèse vs ses pairs (`sector_rank`) — est-ce
-     le meilleur cheval du narratif ?
+     secteur, situe l'actif de la thèse vs ses pairs (`sector_rank`), en
+     comparatif chiffré sobre (v28 : sans métaphore hippique ni figure de style).
    • VALORISATION (TH7) : exploite data.eligible_theses[].valuation.metrics
      (FDV/MC = dilution, dilution_remaining_pct, pf_ratio/ps_ratio = cher/pas
      cher vs revenus réels, mc_tvl_ratio) DANS la thèse et pour ancrer la
@@ -302,12 +302,24 @@ INSTRUCTIONS :
    - data.eligible_theses[].derivatives (ou les signaux) contient le funding rate
      RÉEL (Binance Futures) : un funding élevé/positif = surchauffe longs (signal
      d'allègement), négatif = excès shorts. Utilise-le dans le raisonnement.
+     v28 (W-A11) — UNITÉ OBLIGATOIRE : cite le funding UNIQUEMENT via
+     funding_annualized_pct, suffixé « /an » (ex. « funding +2,4%/an »). Jamais
+     le taux 8h brut : le 07/07, « +0.0022% » (matin) face à « −3,89% » (hebdo)
+     rendait les deux mails incomparables pour la même donnée.
    - data.whale_inflows : gros dépôts ETH vers exchanges (pression vendeuse).
    - v26 (A3) — data.etf_flows : flux ETF STRUCTURÉS (btc/eth : total_flow_musd
      en M$, date, avg_7d_musd, source). C'est la SEULE base autorisée pour citer
      un chiffre de flux ETF ; mentionne sa date (« au 01/07 ») car c'est du J-1.
      Si data.etf_flows.available est false, AUCUN chiffre de flux ETF nulle part
      (pas même repris d'une news sans l'attribuer explicitement à cette news).
+     v28 (M-A6) — RÈGLE DURCIE (violée le 07/07 : « +254,7 M$ » cité dans
+     l'essentiel et le bilan on-chain alors que la source était indisponible) :
+     quand data.etf_flows.available est false, un chiffre de flux vu dans une
+     news ou un message Telegram ne peut apparaître QUE dans la carte news
+     correspondante, TOUJOURS préfixé « selon [média] », et JAMAIS dans
+     l'essentiel, le bilan on-chain, les thèses ou la macro. Partout ailleurs,
+     reste qualitatif (« entrées nettes rapportées par CoinDesk »). Le footer
+     liste la source indisponible : un chiffre non attribué le contredirait.
    - data.stablecoin_supply : variation supply stablecoins (dry powder entrant/sortant).
    - data.btc_network : hashrate/difficulté (santé réseau BTC).
    - data.position_correlation : clusters de positions corrélées (risque concentré).
@@ -399,6 +411,13 @@ INSTRUCTIONS :
      (déjà arrondie à l'entier pour les extra_markets). N'invente JAMAIS un
      dixième (« 21,3% » alors que data dit 21%) : la tuile et ton texte doivent
      afficher le MÊME chiffre.
+   - v28 (M-A18) — COHÉRENCE « RISK-OFF » : ne qualifie un événement de
+     « risk-off » / « aversion au risque » QUE si les données le confirment
+     (or en hausse OU VIX en hausse OU indices actions en baisse). Le 07/07,
+     une news titrait « risk-off » sur Ormuz alors que l'or RECULAIT (−0,7%)
+     et que le VIX restait calme — incohérence visible. Si les faits divergent
+     du narratif, DIS-LE (« tensions à Ormuz mais l'or recule : le marché n'y
+     croit pas ») au lieu de plaquer l'étiquette.
    - MOUVEMENTS PTF > ±10% (v15, audit P1-6) : data.ptf_big_movers_24h liste
      les positions ayant bougé de plus de 10% sur 24h. CHAQUE entrée DOIT être
      commentée quelque part (thèse dédiée si éligible, sinon 1 ligne dans
@@ -501,6 +520,12 @@ INSTRUCTIONS :
      vs supports/résistances D1 ET W1, RSI multi-TF, MA50/200, Bollinger, volume),
      (4) ON-CHAIN (MVRV, NVT, adresses actives, flux exchanges, concentration
      whales), (5) DÉRIVÉS (funding, Open Interest, put/call, max pain, skew),
+     v28 (M-A8) — MAX PAIN : reprends EXCLUSIVEMENT la lecture déterministe
+     fournie par le système (« aimant haussier/baissier/neutre » selon le
+     signe de l'écart au spot), JAMAIS l'inverse. Le 07/07, la grille disait
+     « aimant baissier » (max pain SOUS le spot) et la thèse BTC « support
+     psychologique » (lecture haussière) pour le MÊME chiffre : interdit.
+     Un max pain sous le spot tire le prix VERS LE BAS à court terme, point.
      (6) SENTIMENT (Fear & Greed, Polymarket pertinent, social), (7) POSITION DANS
      LE PTF (PRU, drawdown depuis entrée, poids actuel, sur/sous-pondération vs
      conviction LT), (8) ROTATION SECTORIELLE (perf 7j du secteur, narratif,
@@ -692,6 +717,13 @@ INSTRUCTIONS :
      « Infra » (« Oracle/Infra », « Infra », « Indexing/Infra ») — un secteur =
      un nom. Un actif garde le MÊME secteur entre le matin et le weekly (GRT n'est
      pas « Indexing/Infra » le matin et « Infra » le weekly).
+   - v28 (M-A9) ROTATION SECTORIELLE : ton commentaire « SUR TON PORTEFEUILLE »
+     (sector_rotation_ptf_note) commente EXCLUSIVEMENT les secteurs de
+     data.sector_rotation_display — ce sont les TUILES que le lecteur a sous
+     les yeux. Le 07/07, le texte parlait de L1/L2/DeFi/AI pendant que les
+     tuiles montraient Data/Interop/Infra : impossible de relier le texte aux
+     chiffres. Si un secteur hors tuiles mérite UNE mention (mouvement
+     majeur), dis explicitement « hors tuiles : … », une seule fois maximum.
    - (M-A16) MARCHÉ vs NARRATIF : si une probabilité Polymarket CONTREDIT une news
      (ex. marché « accord US-Iran d'ici juin 25% » alors qu'une news annonce
      « accord signé demain » à confiance 75%), SIGNALE le désaccord plutôt que de

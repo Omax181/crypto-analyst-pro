@@ -48,7 +48,9 @@
         {% set _wr_parts_e = (header.win_rate_total or '0/0').split('/') %}
         {% set _wr_total_e = (_wr_parts_e[1]|num(0)) if (_wr_parts_e|length > 1) else 0 %}
         {% set _wr_val_e = header.win_rate_30d|num(none) %}
-        <p style="font-size:10px;color:#8a8880;margin:8px 0 0 0;">Win rate 30j · <span style="font-weight:600;color:{% if _wr_total_e >= 5 and _wr_val_e is not none and _wr_val_e >= 50 %}#3B6D11{% elif _wr_total_e >= 5 and _wr_val_e is not none and _wr_val_e < 50 %}#A32D2D{% else %}#5a5852{% endif %};">{% if _wr_total_e < 1 or _wr_val_e is none %}— pas encore d'historique{% else %}{{ '%.0f'|format(_wr_val_e) }}%{% if _wr_total_e < 5 %} ({{header.win_rate_total}}){% endif %}{% endif %}</span></p>
+        {# v28 (M-A15) — < 5 clôtures : « en calibration (2/2) », plus de %
+           flatteur non calibré (aligné sur le header du matin). #}
+        <p style="font-size:10px;color:#8a8880;margin:8px 0 0 0;">Win rate 30j · <span style="font-weight:600;color:{% if _wr_total_e >= 5 and _wr_val_e is not none and _wr_val_e >= 50 %}#3B6D11{% elif _wr_total_e >= 5 and _wr_val_e is not none and _wr_val_e < 50 %}#A32D2D{% else %}#5a5852{% endif %};">{% if _wr_total_e < 1 or _wr_val_e is none %}— pas encore d'historique{% elif _wr_total_e < 5 %}en calibration ({{header.win_rate_total}}){% else %}{{ '%.0f'|format(_wr_val_e) }}%{% endif %}</span></p>
       </td>
     </tr>
   </table>
@@ -60,7 +62,8 @@
 {% set _rgebg = '#EAF3DE' if _rge == 'bull' else ('#FCEBEB' if _rge == 'bear' else ('#FAEEDA' if _rge == 'transition' else '#EEF2F7')) %}
 {% set _rgefg = '#27500A' if _rge == 'bull' else ('#791F1F' if _rge == 'bear' else ('#633806' if _rge == 'transition' else '#0C447C')) %}
 <div style="background:{{_rgebg}};border-radius:8px;padding:7px 14px;margin-bottom:1rem;">
-  <p style="margin:0;font-size:12px;color:{{_rgefg}};line-height:1.5;"><span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Régime : {{market_regime.label_fr}}</span>{% if market_regime.days_in_regime is not none %} <span style="color:#5a5852;">· depuis {{market_regime.days_in_regime}} j</span>{% endif %}{% if market_regime.changed and market_regime.previous_label_fr %} <span style="font-weight:700;">· ⚠️ {{market_regime.previous_label_fr}} → {{market_regime.label_fr}}</span>{% endif %}</p>
+  {# v28 (M-A5) — libellé aligné sur matin/hebdo : régime TECHNIQUE BTC. #}
+  <p style="margin:0;font-size:12px;color:{{_rgefg}};line-height:1.5;"><span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Régime BTC (technique) : {{market_regime.label_fr}}</span>{% if market_regime.days_in_regime is not none %} <span style="color:#5a5852;">· depuis {{market_regime.days_in_regime}} j</span>{% endif %}{% if market_regime.changed and market_regime.previous_label_fr %} <span style="font-weight:700;">· ⚠️ {{market_regime.previous_label_fr}} → {{market_regime.label_fr}}</span>{% endif %}</p>
 </div>
 {% endif %}
 
@@ -132,7 +135,9 @@
   {% if daily_pnl.top_movers %}
   <p style="font-size:9px;color:#8a8880;margin:12px 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;border-top:0.5px solid #f0efe8;padding-top:10px;">Top mouvements · 24h glissant <span style="text-transform:none;letter-spacing:0;font-style:italic;">(fenêtre 24h ≠ P&amp;L depuis matin)</span></p>
   <p style="margin:0;font-size:12px;line-height:1.7;">
-    {% for m in daily_pnl.top_movers %}<span style="display:inline-block;margin-right:14px;white-space:nowrap;"><strong>{{m.symbol}}</strong> <span style="color:{% if (m.change|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (m.change|num(0)) >= 0 else '' }}{{m.change}}%</span> <span style="color:#8a8880;font-size:11px;">({% set _pu = m.pnl_usd|num(0) %}{{ '+' if _pu >= 0 else '−' }}${{ '{:,.0f}'.format(_pu|abs) }})</span></span>{% endfor %}
+    {# v28 (E-A4) — l'impact $ n'apparaît que s'il est SIGNIFICATIF (≥ 5 $) :
+       les « (−$1) / (−$0) » du 07/07 n'apportaient rien. #}
+    {% for m in daily_pnl.top_movers %}<span style="display:inline-block;margin-right:14px;white-space:nowrap;"><strong>{{m.symbol}}</strong> <span style="color:{% if (m.change|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (m.change|num(0)) >= 0 else '' }}{{m.change}}%</span>{% set _pu = m.pnl_usd|num(0) %}{% if _pu|abs >= 5 %} <span style="color:#8a8880;font-size:11px;">({{ '+' if _pu >= 0 else '−' }}${{ '{:,.0f}'.format(_pu|abs) }})</span>{% endif %}</span>{% endfor %}
   </p>
   {% endif %}
 </div>
@@ -166,7 +171,8 @@
 {% set _em = evening_macro or {} %}
 {% set _mss_e = macro_source_status or {} %}
 {% if _em.btc_price or _em.sp500 or _em.dxy %}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Marchés · mi-séance</h2>
+{# v28 (E-A2/E-A6) — « mi-séance » uniquement si la séance US est OUVERTE. #}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Marchés · {% if header.us_market_open %}mi-séance{% else %}instantané <span style="font-size:11px;color:#8a8880;font-weight:400;">(séance US fermée)</span>{% endif %}</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
   {# Ligne 1 — Crypto & sentiment #}
   <p style="font-size:9px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Crypto &amp; sentiment</p>
@@ -327,7 +333,8 @@
 <p style="font-size:11px;color:#5a5852;margin:1.5rem 0 0 0;">Espérance mathématique des recos : {% if _exp_has_value %}<strong style="color:{% if (expectancy.expectancy_pct|num(0)) > 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (expectancy.expectancy_pct|num(0)) >= 0 else '' }}{{expectancy.expectancy_pct}}% / reco</strong>{% else %}<span style="color:#8a8880;font-style:italic;">disponible après 5 recos clôturées</span>{% endif %}</p>
 {% endif %}
 {% if reco_bilan %}
-{% set _st = {'on_track':['✓ on track','#EAF3DE','#27500A'],'under_pressure':['⚠ sous pression','#FAEEDA','#412402'],'invalidated':['✗ invalidé','#FCEBEB','#791F1F'],'pending':['• en cours','#f5f4ee','#8a8880']} %}
+{# v28 (E-A5) — statut « stable » : proche de l'entrée = pas d'alarme. #}
+{% set _st = {'on_track':['✓ on track','#EAF3DE','#27500A'],'stable':['● stable','#f5f4ee','#5a5852'],'under_pressure':['⚠ sous pression','#FAEEDA','#412402'],'invalidated':['✗ invalidé','#FCEBEB','#791F1F'],'pending':['• en cours','#f5f4ee','#8a8880']} %}
 <h2 style="margin:1.5rem 0 0.5rem 0;font-size:17px;font-weight:500;">Recos du matin · bilan soir</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 0.75rem;margin-bottom:1.5rem;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -365,7 +372,8 @@
 {# ════════ BLOC 7 · NIVEAUX À SURVEILLER CETTE NUIT ════════ #}
 {% if levels_tonight %}
 {% set _lt = {'support':['support','#FAEEDA','#412402'],'resistance':['résistance','#EAF3DE','#27500A'],'critical':['critique','#FCEBEB','#791F1F'],'threshold':['seuil','#E6F1FB','#0C447C']} %}
-<h2 style="margin:1.5rem 0 0.5rem 0;font-size:17px;font-weight:500;">Niveaux à surveiller cette nuit</h2>
+{# v28 (E-A1) — « cette nuit » seulement quand le run est bien un run du soir. #}
+<h2 style="margin:1.5rem 0 0.5rem 0;font-size:17px;font-weight:500;">{{ header.levels_window_label or "Niveaux à surveiller cette nuit" }}</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 0.75rem;margin-bottom:1.5rem;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-size:12px;">
     {# v16.1 — UNE ligne par actif : tous ses niveaux (support/résistance/seuil)
@@ -423,7 +431,8 @@
 {% set _tc = tomorrow_checklist or {} %}
 {% if _tc.calendar or _tc.checks or _tc.scenario or _tc.invalidation or tomorrow_macro_events %}
 <div style="background:#1a1a18;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
-  <p style="font-size:11px;color:#8a8880;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Demain matin · check list</p>
+  {# v28 (E-A1) — titre calculé selon l'heure du run (rattrapage matinal ≠ soir). #}
+  <p style="font-size:11px;color:#8a8880;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">{{ header.checklist_title or "Demain matin · check list" }}</p>
   {# v26 (E-A6/E-B6) — les événements J0 déjà tombés sont exclus côté Python ;
      un événement encore à venir aujourd'hui porte « ce soir » + son heure. #}
   <p style="margin:0 0 7px 0;font-size:12px;line-height:1.55;color:#f5f4ee;">📅 <span style="color:#8a8880;">À l'agenda :</span> {% if tomorrow_macro_events %}{% for e in tomorrow_macro_events %}{% if e.when %}<span style="color:#e5b567;">{{e.when}}</span> {% endif %}{{e.label}}{% if e.time %} <span style="color:#8a8880;">{{e.time}}</span>{% endif %}{% if e.date_label %} <span style="color:#8a8880;">· {{e.date_label}}</span>{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}{% elif _tc.calendar %}{{_tc.calendar}}{% else %}Pas d'événement macro majeur dans les 48h.{% endif %}</p>
@@ -444,7 +453,8 @@
   <p style="font-size:11px;color:#BA7517;margin:0 0 6px 0;font-weight:600;">⚠️ {{ footer.note or "Rapport généré en mode dégradé." }}</p>
   {% endif %}
   <p style="font-size:11px;color:#8a8880;margin:0;">Prochain rapport · {{ footer.next_report_at or ("demain " ~ (footer.next_morning_time or '08h30')) }} · format complet</p>
-  <p style="font-size:11px;color:#8a8880;margin:4px 0 0 0;">Bonne soirée.</p>
+  {# v28 (E-A1) — salutation calculée : plus de « Bonne soirée. » à 09h46. #}
+  <p style="font-size:11px;color:#8a8880;margin:4px 0 0 0;">{{ header.closing_greeting or "Bonne soirée." }}</p>
   {# v27 (AF5) — légende unique des codes couleur (cohérente sur les 3 mails). #}
   <p style="font-size:9px;color:#8a8880;margin:6px 0 0 0;"><span style="color:#3B6D11;">■</span> achat/haussier · <span style="color:#A32D2D;">■</span> vente/baissier · <span style="color:#BA7517;">■</span> prudence</p>
   <p style="font-size:9px;color:#b5b3ab;margin:8px 0 0 0;">Crypto Analyst Pro · {{app_version or "v15"}}</p>
