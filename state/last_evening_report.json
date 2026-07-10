@@ -1,9 +1,7 @@
 {
   "header": {
-    "title": "Veille crypto",
-    "subtitle": "rapport dégradé",
-    "date": "jeudi 9 juillet 2026 · 20:12 Casablanca",
-    "time_casablanca": "jeudi 9 juillet 2026 · 20:12 Casablanca",
+    "date": "vendredi 10 juillet 2026 · 20:02 Casablanca",
+    "time_casablanca": "vendredi 10 juillet 2026 · 20:02 Casablanca",
     "hours_since_morning": 11,
     "morning_time_label": "08h38",
     "since_morning_label": "il y a 11h",
@@ -16,125 +14,257 @@
     "levels_window_label": "Niveaux à surveiller cette nuit",
     "checklist_title": "Demain matin · check list",
     "us_market_open": true,
-    "ptf_value_delta_since_morning": 14.89,
-    "ptf_value_pct_since_morning": 0.55
+    "ptf_value_delta_since_morning": -4.17,
+    "ptf_value_pct_since_morning": -0.15
   },
-  "_degraded": true,
-  "footer": {
-    "note": "Génération IA indisponible. Données brutes disponibles.",
-    "next_report_at": "demain 08h30"
+  "portfolio_snapshot": {
+    "value_usd": 2730.71,
+    "change_since_morning_pct": -0.15
   },
   "delta_summary": [
     {
-      "icon": "⚠",
-      "text": "Génération IA indisponible."
+      "icon": "✓",
+      "text": "Les indices actions US (S&P 500 +29 points, Nasdaq +74 points) ont poursuivi leur progression, confirmant le régime 'risk-on' et la diminution de la volatilité (VIX -0.57 point à 15.27)."
     },
     {
       "icon": "⚠",
-      "text": "Fear & Greed à 22 (Peur extrême) — aversion au risque persistante, prudence sur toute prise de risque overnight."
+      "text": "Le DXY a légèrement progressé à 100.95 (+0.2% depuis le matin), mais les probabilités de maintien des taux Fed en juillet ont diminué de 8 points à 76.5% (Polymarket), signalant une légère réévaluation des attentes."
+    },
+    {
+      "icon": "✗",
+      "text": "L'action MARA, proxy minier Bitcoin, a chuté de -5.02% en séance, indiquant une pression sur le secteur minier malgré la stabilité relative du BTC."
     },
     {
       "icon": "✓",
-      "text": "P&L du portefeuille +0,55% depuis le matin — porté par RSR +8,3%."
-    },
-    {
-      "icon": "⚠",
-      "text": "Polymarket price un maintien des taux Fed à 85,5% — cadre de liquidité inchangé pour la nuit."
-    },
-    {
-      "icon": "✓",
-      "text": "DXY 100.91 · VIX 16,1 (calme) — pas de signal de stress côté actions."
+      "text": "L'action Nvidia a progressé de +3.64%, renforçant le narratif autour de l'IA et potentiellement favorable aux tokens liés comme RENDER et TAO."
     }
   ],
+  "market_changes": [
+    {
+      "status": "confirmed",
+      "tag": "Macro",
+      "importance": 4,
+      "description": "Le S&P 500 a gagné 29 points à 7572.69 et le Nasdaq 74 points à 26281.47, prolongeant la dynamique haussière des actions US.",
+      "source": "Yahoo Finance"
+    },
+    {
+      "status": "confirmed",
+      "tag": "Macro",
+      "importance": 3,
+      "description": "L'indice de volatilité VIX a reculé de 0.57 point à 15.27, signalant une diminution de l'aversion au risque sur les marchés traditionnels.",
+      "source": "Yahoo Finance"
+    },
+    {
+      "status": "new",
+      "tag": "Macro",
+      "importance": 4,
+      "description": "La probabilité de maintien des taux par la Fed en juillet a baissé de 8 points à 76.5% sur Polymarket, indiquant une légère réévaluation des attentes de politique monétaire.",
+      "source": "Polymarket"
+    },
+    {
+      "status": "new",
+      "tag": "Risque",
+      "importance": 4,
+      "description": "L'action MARA a chuté de -5.02% en séance à 12.56$, reflétant une pression sur le secteur minier crypto malgré la stabilité du BTC.",
+      "source": "Yahoo Finance"
+    },
+    {
+      "status": "new",
+      "tag": "Catalyseur",
+      "importance": 4,
+      "description": "L'action Nvidia a progressé de +3.64% à 210.17$, renforçant le narratif IA et potentiellement favorable aux tokens liés comme RENDER et TAO.",
+      "source": "Yahoo Finance"
+    }
+  ],
+  "news_today": [
+    {
+      "title": "Circle obtient l'approbation finale de l'OCC pour sa banque fiduciaire nationale",
+      "source": "Bitcoin Magazine",
+      "time": "16h43",
+      "impact": "Renforce la légitimité réglementaire de Circle et des stablecoins, potentiellement positif pour la liquidité crypto.",
+      "status": "actionnable"
+    },
+    {
+      "title": "Le dollar numérique du gouvernement US pourrait être interdit ce soir",
+      "source": "CoinDesk",
+      "time": "16h02",
+      "impact": "Un potentiel bannissement du CBDC américain est favorable aux cryptomonnaies décentralisées, réduisant la concurrence étatique.",
+      "status": "actionnable"
+    },
+    {
+      "title": "Les whales Bitcoin ont poussé le prix à 64K $ (Coinbase Premium)",
+      "source": "Cointelegraph",
+      "time": "14h59",
+      "impact": "Les achats institutionnels via Coinbase ont soutenu le prix du BTC, mais l'effet est déjà intégré dans le cours actuel.",
+      "status": "intégré"
+    }
+  ],
+  "levels_tonight": [
+    {
+      "asset": "BTC",
+      "level": "64 072 $",
+      "type": "resistance",
+      "trigger": "Au-dessus → test de 65 970 $ (MM50), renforce le biais haussier."
+    },
+    {
+      "asset": "BTC",
+      "level": "62 900 $",
+      "type": "support",
+      "trigger": "En-dessous → risque de retour vers 60 862 $ (stop loss BTC actif), invalidation du rebond CT."
+    },
+    {
+      "asset": "ETH",
+      "level": "1 794 $",
+      "type": "resistance",
+      "trigger": "Au-dessus → test de 1 852 $ (Bollinger), poursuite du rebond."
+    },
+    {
+      "asset": "ETH",
+      "level": "1 772 $",
+      "type": "support",
+      "trigger": "En-dessous → test de 1 690 $ (pivot), fragilise la position."
+    },
+    {
+      "asset": "DXY",
+      "level": "101.50",
+      "type": "critical",
+      "trigger": "Au-dessus → invaliderait le biais haussier tactique sur BTC, pression sur les actifs à forte duration."
+    }
+  ],
+  "actions_tonight": [],
+  "tomorrow_checklist": {
+    "calendar": "Pas d'événement macro majeur dans les 48h.",
+    "checks": "Le BTC maintient le support des 62 900 $ · Le DXY reste sous le seuil critique de 101.5 · La dynamique haussière de Nvidia se prolonge.",
+    "scenario": "Le régime 'risk-on' devrait se maintenir, mais la divergence entre actions et crypto pourrait persister, favorisant une consolidation du BTC/ETH.",
+    "invalidation": "S&P 500 sous 7400 ou DXY au-dessus de 101.5 invaliderait le biais haussier global."
+  },
+  "blind_spots": "L'absence de données sur les flux ETF du jour limite la visibilité sur la demande institutionnelle immédiate.",
+  "footer": {
+    "next_morning_time": "08h30",
+    "next_report_at": "demain 08h30"
+  },
   "expectancy": {
     "available": false,
     "sample": 0,
     "reason": "Espérance mathématique disponible dès 5 recos clôturées avec niveaux (actuellement 0)."
   },
-  "portfolio_snapshot": {
-    "change_since_morning_pct": 0.55,
-    "value_usd": 2704.22
-  },
   "daily_pnl": {
-    "value_usd": 2704.22,
-    "day_change_usd": 14.89,
-    "day_change_pct": 0.55,
+    "value_usd": 2730.71,
+    "day_change_usd": -4.17,
+    "day_change_pct": -0.15,
     "day_change_label": null,
     "top_movers": [
       {
-        "symbol": "RSR",
-        "change": 8.3,
-        "pnl_usd": 4.51,
-        "value_usd": 54.62
-      },
-      {
-        "symbol": "INJ",
-        "change": 5.7,
-        "pnl_usd": 2.81,
-        "value_usd": 49.34
-      },
-      {
-        "symbol": "CKB",
-        "change": 4.1,
-        "pnl_usd": 1.9,
-        "value_usd": 46.05
-      },
-      {
         "symbol": "QNT",
-        "change": 3.4,
-        "pnl_usd": 1.47,
-        "value_usd": 43.82
+        "change": 2.5,
+        "pnl_usd": 1.1,
+        "value_usd": 44.89
+      },
+      {
+        "symbol": "JASMY",
+        "change": 2.2,
+        "pnl_usd": 1.4,
+        "value_usd": 63.16
       },
       {
         "symbol": "STX",
-        "change": 2.4,
-        "pnl_usd": 0.98,
-        "value_usd": 40.16
+        "change": -2.0,
+        "pnl_usd": -0.79,
+        "value_usd": 39.33
+      },
+      {
+        "symbol": "IMX",
+        "change": -2.0,
+        "pnl_usd": -0.31,
+        "value_usd": 15.96
+      },
+      {
+        "symbol": "ETH",
+        "change": 1.9,
+        "pnl_usd": 10.32,
+        "value_usd": 535.71
       }
     ]
   },
-  "reco_bilan": [],
+  "reco_bilan": [
+    {
+      "asset": "RENDER",
+      "action": "RENFORCER",
+      "confidence": 75.0,
+      "entry": 1.56,
+      "target": 1.67,
+      "current": 1.55,
+      "delta_pct": -0.64,
+      "status": "stable",
+      "reason": "proche de l'entrée (bruit court terme) · invalidation $1.48"
+    },
+    {
+      "asset": "LINK",
+      "action": "RENFORCER",
+      "confidence": 70.0,
+      "entry": 7.91,
+      "target": 8.49,
+      "current": 7.89,
+      "delta_pct": -0.25,
+      "status": "stable",
+      "reason": "proche de l'entrée (bruit court terme) · invalidation $7.34"
+    },
+    {
+      "asset": "RSR",
+      "action": "RENFORCER",
+      "confidence": 70.0,
+      "entry": 0.001271,
+      "target": 0.001297,
+      "current": 0.00128207,
+      "delta_pct": 0.87,
+      "status": "on_track",
+      "reason": "au-dessus de l'entrée · invalidation $0.001067"
+    },
+    {
+      "asset": "INJ",
+      "action": "RENFORCER",
+      "confidence": 70.0,
+      "entry": 4.8,
+      "target": 4.9,
+      "current": 4.83,
+      "delta_pct": 0.63,
+      "status": "on_track",
+      "reason": "au-dessus de l'entrée · invalidation $4.49"
+    }
+  ],
   "polymarket_facts": {
     "fed_bars": {
-      "cut_pct": 0.5,
-      "hold_pct": 85.5,
-      "hike_pct": 14.6,
+      "cut_pct": 0.0,
+      "hold_pct": 76.5,
+      "hike_pct": 22.1,
       "dominant": "maintien",
-      "dominant_pct": 85.5,
+      "dominant_pct": 76.5,
       "meeting_hint": "réunion juillet 2026"
     },
-    "extra_markets": [
-      {
-        "question": "Will the US announce a blockade on Iran by July 31?",
-        "probability_pct": 28,
-        "volume_usd": 750909,
-        "end_date": "2026-07-31T23:59:00Z"
-      }
-    ]
+    "extra_markets": []
   },
   "since_morning_facts": {
     "available": true,
     "window_label": "depuis le matin (08h38)",
-    "line": "BTC 62 847 $ → 63 158 $ (+0,5%) · ETH 1 751 $ → 1 750 $ (−0,1%) · F&G 22 → 22 (stable) · DXY 100.88 → 100.91 (+0,0%) · Fed maintien 78,5% → 85,5% (+7,0 pts)"
+    "line": "BTC 63 921 $ → 63 753 $ (−0,3%) · ETH 1 774 $ → 1 783 $ (+0,5%) · F&G 23 → 23 (stable) · DXY 100.80 → 100.95 (+0,2%) · Fed maintien 84,5% → 76,5% (−8,0 pts)"
   },
-  "derivatives_flows_line": "Funding BTC +5,5%/an · L/S 1,43",
+  "derivatives_flows_line": "Funding BTC +10,9%/an · L/S 1,18",
   "levels_readout": {
-    "BTC": "RSI 50 (neutre) · MACD haussier · Bollinger médiane · ATR 1,2% (≈789 $/j) · −3,8% vs MM50 · volume 7j −5% vs 30j",
-    "ETH": "RSI 53 (neutre) · MACD haussier · Bollinger médiane · ATR 1,6% (≈27.64 $/j) · −1,7% vs MM50 · volume 7j −7% vs 30j",
-    "RSR": "RSI 52 (neutre) · MACD haussier · Bollinger médiane · ATR 2,9% (≈0.0000 $/j) · −7,2% vs MM50 · volume 7j +2% vs 30j"
+    "BTC": "RSI 52 (neutre) · MACD haussier · Bollinger médiane · ATR 1,3% (≈810 $/j) · −2,5% vs MM50 · volume 7j −5% vs 30j",
+    "ETH": "RSI 56 (neutre) · MACD haussier · Bollinger médiane · ATR 1,6% (≈29.25 $/j) · +0,6% vs MM50 · volume 7j −6% vs 30j"
   },
   "risk_score": {
-    "score": 3.9,
+    "score": 3.6,
     "level": "maîtrisé",
     "level_color": "#3B6D11",
     "factors": [
       "concentration L1 67%",
-      "sentiment Peur Extrême (F&G 22)"
+      "sentiment Peur Extrême (F&G 23)"
     ],
     "components": [
       {
         "label": "Drawdown 7j",
-        "pts": 0.2,
+        "pts": 0.0,
         "max": 3.0
       },
       {
@@ -144,7 +274,7 @@
       },
       {
         "label": "Volatilité 24h",
-        "pts": 0.3,
+        "pts": 0.2,
         "max": 2.0
       },
       {
@@ -206,11 +336,11 @@
   },
   "risk_unchanged_since_morning": {
     "active": true,
-    "morning_score": 3.8,
-    "note": "Risque stable depuis ce matin (3.8/10 → 3.9/10) — composition du portefeuille inchangée."
+    "morning_score": 3.6,
+    "note": "Risque stable depuis ce matin (3.6/10 → 3.6/10) — composition du portefeuille inchangée."
   },
   "health_score": {
-    "score": 3.1,
+    "score": 3.0,
     "level": "à risque",
     "level_color": "#A32D2D",
     "axes": [
@@ -222,7 +352,7 @@
       },
       {
         "label": "Momentum vs BTC",
-        "score": 4.7,
+        "score": 4.6,
         "max": 10.0,
         "detail": "-0.7 pts vs BTC 7j"
       },
@@ -230,44 +360,44 @@
         "label": "Solidité (vs ATH)",
         "score": 3.0,
         "max": 10.0,
-        "detail": "drawdown -67% vs ATH"
+        "detail": "drawdown -66% vs ATH"
       }
     ],
-    "driver": "Portée par Momentum vs BTC (4.7/10), pénalisée par Diversification (1.5/10).",
+    "driver": "Portée par Momentum vs BTC (4.6/10), pénalisée par Diversification (1.5/10).",
     "improve": "Alléger le secteur dominant sur rebond et étaler sur d'autres narratifs."
   },
   "health_unchanged_since_morning": {
     "active": true,
-    "note": "Santé stable depuis ce matin (3.1/10 → 3.1/10) — composition du portefeuille inchangée."
+    "note": "Santé stable depuis ce matin (3.0/10 → 3.0/10) — composition du portefeuille inchangée."
   },
   "evening_macro": {
-    "btc_price": 63158,
-    "btc_change_24h": 1.6321092015750862,
-    "eth_price": 1749.62,
-    "eth_change_24h": 0.791643495778634,
-    "fear_greed": 22,
+    "btc_price": 63753,
+    "btc_change_24h": 0.9411008308612339,
+    "eth_price": 1783.31,
+    "eth_change_24h": 1.9267164835301542,
+    "fear_greed": 23,
     "fear_greed_label": "Peur extrême",
     "fear_greed_delta": 0,
-    "gold_usd": 4132.7,
-    "gold_delta": 50.29999999999973,
-    "sp500": 7536.14,
-    "sp500_delta": 53.43000000000029,
-    "nasdaq": 26165.2,
-    "nasdaq_delta": 294.5480000000025,
-    "vix": 16.05,
-    "vix_delta": -0.8499999999999979,
-    "brent_usd": 76.06,
-    "brent_delta": -1.9599999999999937,
-    "dxy": 100.911,
+    "gold_usd": 4109.3,
+    "gold_delta": -31.5,
+    "sp500": 7572.69,
+    "sp500_delta": 29.049999999999272,
+    "nasdaq": 26281.469,
+    "nasdaq_delta": 74.57900000000154,
+    "vix": 15.27,
+    "vix_delta": -0.5700000000000003,
+    "brent_usd": 76.11,
+    "brent_delta": -0.18999999999999773,
+    "dxy": 100.953,
     "dxy_broad": 120.6902,
-    "dxy_ice": 100.911,
-    "dxy_delta": -0.0799999999999983,
-    "nikkei": 67743.85,
-    "nikkei_delta": 924.8000000000029,
-    "stoxx50": 6284.27,
-    "stoxx50_delta": 79.36000000000058,
-    "eur_usd": 1.1436,
-    "usd_jpy": 162.333,
+    "dxy_ice": 100.953,
+    "dxy_delta": 0.049000000000006594,
+    "nikkei": 68557.73,
+    "nikkei_delta": 813.8799999999901,
+    "stoxx50": 6269.97,
+    "stoxx50_delta": -14.300000000000182,
+    "eur_usd": 1.1419,
+    "usd_jpy": 161.691,
     "ecb_deposit_rate": 2.25,
     "boj_rate": 0.727
   },
@@ -291,125 +421,46 @@
   },
   "intraday_news": [
     {
-      "title": "Ethereum Foundation Turns AI Loose on ETH Network to Find Bugs Before Hackers Do",
-      "source": "Decrypt",
-      "timestamp": "19h27"
+      "title": "Stocks offer 'antidote' to inflation fears - strategist",
+      "source": "Seeking Alpha",
+      "timestamp": "19h41"
     },
     {
-      "title": "Billions flowing out of bitcoin ETFs and private credit funds suggest rising market risks",
+      "title": "Xbox CEO Joins Fed AI Jobs Task Force Days After Announcing 3,200 Layoffs",
+      "source": "Decrypt",
+      "timestamp": "19h02"
+    },
+    {
+      "title": "Circle (CRCL) Wins Final OCC Approval for National Trust Bank",
+      "source": "Bitcoin Magazine",
+      "timestamp": "17h43"
+    },
+    {
+      "title": "U.S. government digital dollar set to be banned tonight under housing law's CBDC limit",
       "source": "CoinDesk",
-      "timestamp": "19h13"
+      "timestamp": "17h02"
     },
     {
-      "title": "Best Crypto to Buy Now as Pepeto Nears Listing - TechBullion",
-      "source": "Stocktwits",
-      "timestamp": "19h09"
-    },
-    {
-      "title": "UK politicians mull permanent crypto donation ban in wake of Nigel Farage scandal",
-      "source": "Cointelegraph",
-      "timestamp": "17h42"
-    },
-    {
-      "title": "Labour MPs Push to Make UK Crypto Donation Ban Permanent",
+      "title": "Trump Won't Sign Housing Bill With CBDC Ban—Will It Become Law Tonight Anyway?",
       "source": "Decrypt",
-      "timestamp": "16h26"
+      "timestamp": "16h13"
     }
   ],
-  "levels_tonight": [
-    {
-      "asset": "BTC",
-      "level": "62 900 $",
-      "type": "support",
-      "trigger": "Sous 62 900 $ (pivot + seuil rond) → prochain appui 60 862 $ (−3,6%)."
-    },
-    {
-      "asset": "BTC",
-      "level": "60 862 $",
-      "type": "support",
-      "trigger": "Sous 60 862 $ (pivot) → prochain appui 58 551 $ (−7,3%)."
-    },
-    {
-      "asset": "BTC",
-      "level": "64 072 $",
-      "type": "resistance",
-      "trigger": "Au-dessus de 64 072 $ (pivot + seuil rond) → ouverture vers 65 970 $ (+4,5%)."
-    },
-    {
-      "asset": "BTC",
-      "level": "65 970 $",
-      "type": "resistance",
-      "trigger": "Au-dessus de 65 970 $ (pivot + MM50) → ouverture vers 67 849 $ (+7,4%)."
-    },
-    {
-      "asset": "ETH",
-      "level": "1 690 $",
-      "type": "support",
-      "trigger": "Sous 1 690 $ (pivot + seuil rond) → prochain appui 1 621 $ (−7,3%)."
-    },
-    {
-      "asset": "ETH",
-      "level": "1 621 $",
-      "type": "support",
-      "trigger": "Sous 1 621 $ (pivot) → prochain appui 1 565 $ (−10,6%)."
-    },
-    {
-      "asset": "ETH",
-      "level": "1 794 $",
-      "type": "resistance",
-      "trigger": "Au-dessus de 1 794 $ (pivot + MM50) → ouverture vers 1 846 $ (+5,5%)."
-    },
-    {
-      "asset": "ETH",
-      "level": "1 846 $",
-      "type": "resistance",
-      "trigger": "Au-dessus de 1 846 $ (Bollinger) → ouverture vers 1 892 $ (+8,1%)."
-    },
-    {
-      "asset": "RSR",
-      "level": "0.0012 $",
-      "type": "support",
-      "trigger": "Sous 0.0012 $ (seuil rond) → prochain appui 0.0011 $ (−16,6%)."
-    },
-    {
-      "asset": "RSR",
-      "level": "0.0011 $",
-      "type": "support",
-      "trigger": "Sous 0.0011 $ (pivot + Bollinger) → plus de filet dans la fenêtre 120j, prudence."
-    },
-    {
-      "asset": "RSR",
-      "level": "0.0013 $",
-      "type": "resistance",
-      "trigger": "Au-dessus de 0.0013 $ (seuil rond) → ouverture vers 0.0013 $ (+3,0%)."
-    },
-    {
-      "asset": "RSR",
-      "level": "0.0013 $",
-      "type": "resistance",
-      "trigger": "Au-dessus de 0.0013 $ (pivot) → ouverture vers 0.0013 $ (+4,2%)."
-    }
-  ],
-  "tomorrow_checklist": {
-    "scenario": "Nuit attendue dans le range 62 369 $–63 947 $ (±ATR) tant que 62 900 $ tient · biais prudent (peur extrême).",
-    "invalidation": "Clôture sous 62 900 $ (pivot + seuil rond) → test de 60 862 $ probable.",
-    "checks": "BTC tient 62 900 $ ? · RSR conserve son +8,3% overnight ?"
-  },
   "market_regime": {
     "available": true,
     "regime": "bear",
     "label_fr": "BAISSIER",
     "reasons": [
-      "prix −15.0% vs MM200",
-      "MM50 −11.3% vs MM200",
-      "pente MM50 14j −7.2%"
+      "prix −14.1% vs MM200",
+      "MM50 −11.6% vs MM200",
+      "pente MM50 14j −7.1%"
     ],
-    "price_vs_ma200_pct": -15.0,
-    "ma50_vs_ma200_pct": -11.3,
-    "ma50_slope_14d_pct": -7.2,
+    "price_vs_ma200_pct": -14.1,
+    "ma50_vs_ma200_pct": -11.6,
+    "ma50_slope_14d_pct": -7.1,
     "since": "2026-07-06",
     "changed": false,
-    "days_in_regime": 3
+    "days_in_regime": 4
   },
-  "_saved_at": "2026-07-09T19:12:01.953773+00:00"
+  "_saved_at": "2026-07-10T19:02:31.425424+00:00"
 }
