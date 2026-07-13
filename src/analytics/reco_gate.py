@@ -89,6 +89,15 @@ def apply_reco_gate(payload: dict[str, Any]) -> list[str]:
             t["gate_note"] = (ap.get("sizing_note")
                               or "plafond de concentration atteint — aucun renfort")
             fixes.append(f"{asset} : RENFORCER+0.0% → MAINTENIR (plafond)")
+            # v29 (MA7) — l'ancien continue sautait le check EV : le 10/07,
+            # ETH/BTC/TAO (MAINTENIR plafond) affichaient « Espérance 30j
+            # −2.1% » sans aucune réconciliation frontale. Une espérance CT
+            # négative mérite la même mention explicite que sur une conviction.
+            if ev is not None and ev < 0:
+                t["ct_warning"] = (
+                    f"⚠ EV 30j −{abs(ev)}% — espérance court-terme négative : "
+                    "conserver (plafond atteint), ce n'est pas un trade 30 j")
+                fixes.append(f"{asset} : MAINTENIR (plafond) + mention EV<0")
             continue
 
         ct_bad = ((ev is not None and ev < 0)

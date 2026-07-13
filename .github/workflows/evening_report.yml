@@ -62,7 +62,6 @@ jobs:
           # absent s'evalue en chaine vide -> sans effet tant qu'il n'existe pas.
           COINMETRICS_API_KEY: ${{ secrets.COINMETRICS_API_KEY }}
           COINGLASS_PAID: ${{ secrets.COINGLASS_PAID }}
-          KAITO_API_KEY: ${{ secrets.KAITO_API_KEY }}
         run: python -m src.main evening
       - name: Commit state files
         if: always()

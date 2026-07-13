@@ -27,7 +27,7 @@ from src.reporting.email_html import APP_VERSION, render
 # ─────────────────────────────────────────────────────────────────────────────
 def test_app_version_v26():
     # Nommage final : le livrable est étiqueté v26 (décision Omar, 2026-07-05).
-    assert APP_VERSION == "v28"
+    assert APP_VERSION == "v29"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -528,7 +528,10 @@ def test_tracking_chart_rendered_in_template():
              "health_color": "#3B6D11"}],
     }, "morning", charts={"track_TAO": b"png"})
     assert "cid:chart_track_TAO" in html
-    assert "48% du chemin" in html
+    # v29 (MB7) — le suivi passe en table compacte + BARRE de progression : le
+    # « X% du chemin » (affiché en double avant) devient la barre + « 48% ».
+    assert "du chemin" not in html
+    assert "48%" in html
     assert "En bonne voie" in html
 
 

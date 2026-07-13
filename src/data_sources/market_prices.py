@@ -385,52 +385,6 @@ def get_crypto_quotes() -> dict[str, float]:
         return {}
 
 
-def cross_check_prices(
-    market: dict[str, dict[str, Any]],
-    *,
-    tolerance_pct: float = 10.0,
-) -> dict[str, Any]:
-    """Recoupe les prix CoinGecko (``market``) avec Yahoo.
-
-    Pour chaque crypto présente dans les deux sources, calcule l'écart relatif.
-    Si l'écart dépasse ``tolerance_pct`` (10% par défaut, garde-fou unique), la
-    crypto est signalée comme divergente et son prix sera masqué (—) côté rendu,
-    avec report dans les angles morts — on préfère prévenir qu'afficher faux.
-
-    Returns:
-        ``{"checked": int, "divergent": [{symbol, coingecko, yahoo, gap_pct}],
-           "available": bool}``. ``available=False`` si Yahoo est injoignable.
-    """
-    yahoo = get_crypto_quotes()
-    if not yahoo:
-        return {"checked": 0, "divergent": [], "available": False}
-
-    divergent: list[dict[str, Any]] = []
-    checked = 0
-    for ticker, ydata_price in yahoo.items():
-        cg = market.get(ticker) or {}
-        cg_price = cg.get("price")
-        if not isinstance(cg_price, (int, float)) or not cg_price:
-            continue
-        if not ydata_price:
-            continue
-        checked += 1
-        gap_pct = abs(cg_price - ydata_price) / ydata_price * 100.0
-        if gap_pct > tolerance_pct:
-            divergent.append({
-                "symbol": ticker,
-                "coingecko": round(cg_price, 6),
-                "yahoo": round(ydata_price, 6),
-                "gap_pct": round(gap_pct, 1),
-            })
-            logger.warning(
-                "Cross-check prix %s : CoinGecko=%s vs Yahoo=%s (écart %.1f%%).",
-                ticker, cg_price, ydata_price, gap_pct,
-            )
-
-    return {"checked": checked, "divergent": divergent, "available": True}
-
-
 def compute_crypto_price_status(
     market: dict[str, dict[str, Any]],
     cmc_quotes: Optional[dict[str, dict[str, Any]]] = None,

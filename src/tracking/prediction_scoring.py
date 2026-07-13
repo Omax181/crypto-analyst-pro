@@ -499,6 +499,11 @@ class PredictionTracker:
                 "holding_days": holding,
                 "status": status,
                 "score": score,
+                # v29 (Telegram briefing) — conviction + évolution + cible CT,
+                # pour la section « Évolution des thèses énoncées » de l'hebdo.
+                "confidence": reco.get("confidence"),
+                "prev_confidence": reco.get("prev_confidence"),
+                "ct_target": reco.get("ct_target") or reco.get("target_price"),
                 "_anchor": anchor,
             }
 
@@ -672,6 +677,10 @@ class PredictionTracker:
                 "asset": asset,
                 "action": "ALLÉGER" if action == "ALLEGER" else action,
                 "issued_at": (anchor.strftime("%d/%m") if anchor else None),
+                # v29 (Telegram briefing) — conviction du signal + son évolution
+                # (prev_confidence posé par add_recommendation à la ré-émission).
+                "confidence": reco.get("confidence"),
+                "prev_confidence": reco.get("prev_confidence"),
                 "entry_price": entry,
                 "progress_pct": progress,
                 "ct_target": _ct,

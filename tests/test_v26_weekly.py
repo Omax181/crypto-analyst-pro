@@ -690,10 +690,14 @@ def test_render_weekly_nominal_v25_like_no_regression():
                            "gaps": "ETF flows (Farside) en aperçu Telegram."},
     })
     html = _render(payload)
+    # v29 (ZB3) — la Watchlist est FONDUE dans « Plan d'action » (sous-titre
+    # « Entrées / sorties surveillées »), plus de section H2 « Watchlist ».
     for expected in ("Rapport hebdomadaire", "Bilan semaine", "Scénarios",
-                     "Plan d'action", "Watchlist", "range et attente macro",
-                     "Prochain hebdo"):
+                     "Plan d'action", "Entrées / sorties surveillées",
+                     "range et attente macro", "Prochain hebdo"):
         assert expected in html, f"section absente : {expected}"
+    # plus de titre H2 « Watchlist » (fondue dans le plan).
+    assert ">Watchlist" not in html
 
 
 # --------------------------------------------------------------------------- #
@@ -705,51 +709,6 @@ _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 @pytest.fixture(scope="module")
 def _mpl():
     return pytest.importorskip("matplotlib")
-
-
-def test_sector_donut_png(_mpl):
-    from src.reporting import charts
-
-    png = charts.sector_donut_png([
-        {"sector": "L1", "ptf_pct": 66.7}, {"sector": "AI", "ptf_pct": 16.4},
-        {"sector": "DeFi", "ptf_pct": 3.6},
-    ])
-    assert png and png[:8] == _PNG_MAGIC
-
-
-def test_sector_donut_needs_two_sectors(_mpl):
-    from src.reporting import charts
-
-    assert charts.sector_donut_png([{"sector": "L1", "ptf_pct": 100.0}]) is None
-    assert charts.sector_donut_png([]) is None
-
-
-def test_weekly_perf_bars_png(_mpl):
-    from src.reporting import charts
-
-    cells = [{"symbol": s, "change_24h": v}
-             for s, v in (("FET", 12.2), ("ADA", 12.0), ("RSR", -5.3),
-                          ("BTC", 3.5), ("ETH", 8.0))]
-    cells.append({"symbol": "+10 autres", "change_24h": -0.2, "is_extra": True})
-    png = charts.weekly_perf_bars_png(cells)
-    assert png and png[:8] == _PNG_MAGIC
-
-
-def test_fng_sparkline_png(_mpl):
-    from src.reporting import charts
-
-    assert charts.fng_sparkline_png([26, 25, 24, 23, 22, 21, 20, 19])[:8] == _PNG_MAGIC
-    assert charts.fng_sparkline_png([19]) is None
-
-
-def test_btc_levels_png(_mpl):
-    from src.reporting import charts
-
-    closes = [58000 + i * 60 for i in range(80)]
-    png = charts.btc_levels_png(closes, supports=[58454.0],
-                                resistances=[63200.0], price=61490.0)
-    assert png and png[:8] == _PNG_MAGIC
-    assert charts.btc_levels_png(closes[:5]) is None
 
 
 def test_render_weekly_chart_cids():

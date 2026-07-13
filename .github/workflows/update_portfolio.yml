@@ -68,20 +68,35 @@ jobs:
           python-version: '3.11'
 
       - name: Mettre à jour le portfolio
+        # v29 (audit sécurité) — les inputs ne sont JAMAIS interpolés dans le
+        # shell (injection GHA classique : une apostrophe dans « notes » cassait
+        # la commande, un input forgé exécutait du code avec contents:write).
+        # Ils passent par l'environnement, et l'`eval` est supprimé.
+        env:
+          IN_ASSET: ${{ inputs.asset }}
+          IN_ACTION: ${{ inputs.action }}
+          IN_QUANTITY: ${{ inputs.quantity }}
+          IN_TIER: ${{ inputs.tier }}
+          IN_CGID: ${{ inputs.coingecko_id }}
+          IN_NOTES: ${{ inputs.notes }}
         run: |
-          ARGS="--asset '${{ inputs.asset }}' --action '${{ inputs.action }}' --quantity '${{ inputs.quantity }}'"
-          if [ "${{ inputs.action }}" = "add" ]; then
-            ARGS="$ARGS --tier ${{ inputs.tier }}"
-            if [ -n "${{ inputs.coingecko_id }}" ]; then
-              ARGS="$ARGS --coingecko-id '${{ inputs.coingecko_id }}'"
+          set -- --asset "$IN_ASSET" --action "$IN_ACTION" --quantity "$IN_QUANTITY"
+          if [ "$IN_ACTION" = "add" ]; then
+            set -- "$@" --tier "$IN_TIER"
+            if [ -n "$IN_CGID" ]; then
+              set -- "$@" --coingecko-id "$IN_CGID"
             fi
           fi
-          if [ -n "${{ inputs.notes }}" ]; then
-            ARGS="$ARGS --notes '${{ inputs.notes }}'"
+          if [ -n "$IN_NOTES" ]; then
+            set -- "$@" --notes "$IN_NOTES"
           fi
-          eval python scripts/update_portfolio.py $ARGS
+          python scripts/update_portfolio.py "$@"
 
       - name: Commit et push
+        env:
+          IN_ASSET: ${{ inputs.asset }}
+          IN_ACTION: ${{ inputs.action }}
+          IN_QUANTITY: ${{ inputs.quantity }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -90,9 +105,7 @@ jobs:
             echo "Aucun changement détecté."
             exit 0
           fi
-          ASSET=$(echo "${{ inputs.asset }}" | tr '[:lower:]' '[:upper:]')
-          ACTION="${{ inputs.action }}"
-          QTY="${{ inputs.quantity }}"
-          git commit -m "portfolio: ${ACTION} ${QTY} ${ASSET} [skip ci]"
+          ASSET=$(echo "$IN_ASSET" | tr '[:lower:]' '[:upper:]')
+          git commit -m "portfolio: ${IN_ACTION} ${IN_QUANTITY} ${ASSET} [skip ci]"
           git push
-          echo "✅ Commit poussé : ${ACTION} ${QTY} ${ASSET}"
+          echo "✅ Commit poussé : ${IN_ACTION} ${IN_QUANTITY} ${ASSET}"

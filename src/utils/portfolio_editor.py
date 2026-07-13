@@ -68,15 +68,6 @@ def _format_price(p: float) -> str:
     return s if s else "0"
 
 
-def _tier_comment(tier: int) -> str:
-    return {
-        1: "  # === TIER 1 (analyse deep) ===",
-        2: "  # === TIER 2 (analyse condensee) ===",
-        3: "  # === TIER 3 (silence sauf mouvement >10%) ===",
-        4: "  # === TIER 4 (poussieres) ===",
-    }.get(tier, "")
-
-
 def _to_float(s: Optional[str]) -> Optional[float]:
     if s is None:
         return None
@@ -168,40 +159,6 @@ def apply_quantity_change(
         "old_qty": old_qty, "new_qty": new_qty,
         "old_pru": old_pru, "new_pru": new_pru, "price": price,
     }
-
-
-def add_asset(
-    text: str, asset: str, qty: float, tier: int,
-    price: Optional[float] = None, notes: Optional[str] = None,
-) -> tuple[str, dict[str, Any]]:
-    """Ajoute un NOUVEL actif. Lève si l'actif existe déjà ou tier invalide."""
-    asset = asset.upper()
-    if tier not in (1, 2, 3, 4):
-        raise PortfolioEditError(f"Tier invalide : {tier} (attendu 1-4).")
-    if qty <= 0:
-        raise PortfolioEditError("La quantité doit être strictement positive.")
-    if _find_asset_block(text, asset) is not None:
-        raise PortfolioEditError(f"« {asset} » existe déjà. Utilise buy/sell/set.")
-
-    val = round(qty * price, 2) if price is not None else 0
-    lines = [f"  {asset}:", f"    quantity: {_format_qty(qty)}",
-             f"    value_usd: {val}"]
-    if price is not None:
-        lines.append(f"    pru: {_format_price(price)}")
-    lines.append(f"    tier: {tier}")
-    if notes:
-        lines.append(f'    notes: "{notes}"')
-    new_block = "\n".join(lines) + "\n"
-
-    next_comment = _tier_comment(tier + 1)
-    if next_comment and next_comment in text:
-        idx = text.index(next_comment)
-        new_text = text[:idx] + new_block + text[idx:]
-    else:
-        new_text = text.rstrip("\n") + "\n" + new_block
-
-    return new_text, {"asset": asset, "action": "add", "new_qty": qty,
-                      "tier": tier, "price": price}
 
 
 # --------------------------------------------------------------------------- #

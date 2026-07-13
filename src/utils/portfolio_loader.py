@@ -72,11 +72,6 @@ def load_portfolio() -> dict[str, Any]:
     return data
 
 
-def exchange_symbol(symbol: str, info: dict[str, Any]) -> str:
-    """Retourne le ticker à utiliser (champ ``symbol`` ou clé par défaut)."""
-    return str(info.get("symbol", symbol))
-
-
 def total_value_usd(portfolio: dict[str, Any]) -> float:
     """Somme des ``value_usd`` du portfolio."""
     return float(

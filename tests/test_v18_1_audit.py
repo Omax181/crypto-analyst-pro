@@ -10,8 +10,6 @@ Couvre :
 
 from __future__ import annotations
 
-import sys
-import types
 
 import src.main as main
 from src.analytics.coherence_checker import check_report

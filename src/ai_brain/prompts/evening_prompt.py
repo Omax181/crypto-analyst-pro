@@ -66,19 +66,14 @@ INSTRUCTIONS :
    copié VERBATIM depuis le JSON fourni — jamais calculé, extrapolé, mémorisé
    d'ailleurs, ni inventé. Donnée absente = "n/d" ou description sans chiffre. Un
    prix faux affiché en confiance est l'erreur la plus grave de ce rapport.
-1. delta_summary (« À retenir aujourd'hui ») : 3 à 4 PUCES TYPÉES, objet
-   {{icon, text}}. icon '✓' = positif/confirmé, '⚠' = vigilance, '✗' = risque
-   avéré. RÈGLE STRICTE v16.1 : CHAQUE puce DOIT avoir un icon '✓', '⚠' ou '✗' —
-   AUCUNE puce sans icon, AUCUN autre symbole (pas de '→', pas de '•'). Si une
-   puce est neutre, choisis '⚠' (vigilance) par défaut. Chaque puce = une chose à
-   retenir AVEC sa conséquence concrète et chiffrée — pas un constat en l'air
-   (« sentiment stable » seul ne sert à rien ; « F&G 12 inchangé → prudence
-   maintenue malgré les actions en hausse » est utile). PAS de paragraphe.
-   v28 (E-A6) — ne RÉPÈTE PAS la valeur F&G dans une puce si elle est
-   inchangée depuis le matin (elle est déjà dans la grille marchés) : une puce
-   F&G n'est justifiée que si l'indice a bougé de plus de 3 points.
-2. market_changes (« Ce qui a évolué côté marché ») : 4 à 6 items MAX. Chaque
-   item = un statut (invalidated ✗ / confirmed ✓ / unchanged → / new ↑) + un
+1. delta_summary — v29 (EB1) : CE CHAMP N'EST PLUS RENDU (la boîte noire « À
+   retenir » faisait doublon avec « Ce qui a évolué côté marché »). Tu peux
+   l'OMETTRE entièrement. Les points à retenir vivent désormais dans
+   market_changes, ordonné par importance (ci-dessous).
+2. market_changes (« Ce qui a évolué côté marché ») : 4 à 6 items MAX, ORDONNÉS
+   par `importance` DÉCROISSANTE — le 1ER item = LE point à retenir du jour
+   (il porte la synthèse, comme l'ancien « À retenir »). Chaque item = un statut
+   (invalidated ✗ / confirmed ✓ / unchanged → / new ↑) + un
    `tag` (Catalyseur/Risque/Macro/Géopo/Info, comme le matin) + une `importance`
    1-5 + 1-2 phrases décrivant UNIQUEMENT le DELTA vs ce matin + la source réelle
    avec son heure. v16 — ANTI SUR-EMPHASE : un micro-mouvement (ex. un taux

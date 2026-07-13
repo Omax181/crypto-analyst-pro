@@ -13,8 +13,6 @@ Couvre :
 
 from __future__ import annotations
 
-import json
-import os
 import re
 
 
@@ -252,7 +250,7 @@ def test_evening_render_8_blocs():
     html = render(_enriched_evening_payload(), "evening")
     assert not re.search(r"\{\{|\{%", html)          # pas de Jinja non rendu
     assert "rendu simplifié" not in html             # pas de fallback
-    assert "Crypto Analyst Pro · v28" in html        # versioning
+    assert "Crypto Analyst Pro · v29" in html        # versioning
     # blocs présents
     assert "Bilan du jour" in html
     assert "Marchés · mi-séance" in html
@@ -345,7 +343,7 @@ def test_morning_arrows_and_plural_and_polymarket():
     assert "▼" in html                              # flèche down (Nasdaq)
     assert "données partielles" in html             # pluriel
     assert "maintien" in html and "99.8%" in html    # Polymarket reframé
-    assert "Crypto Analyst Pro · v28" in html
+    assert "Crypto Analyst Pro · v29" in html
 
 
 # ─────────────────── v14 AUDIT HARDENING TESTS ─────────────────── #
@@ -377,11 +375,20 @@ def test_strict_60_filter_all_below_shows_empty_reason():
     assert out.get("thesis_empty_reason")
 
 
-def test_evening_delta_summary_rendered():
+def test_evening_delta_summary_not_rendered_v29():
+    """v29 (EB1) — la boîte noire « À retenir aujourd'hui » (delta_summary) a été
+    SUPPRIMÉE (doublon avec « Ce qui a évolué côté marché »). Le champ, même
+    fourni, ne doit plus produire de bloc. Les points à retenir vivent dans
+    market_changes."""
     from src.reporting.email_html import render
-    html = render({"delta_summary": ["Un", "Deux", "Trois"], "footer": {}}, "evening")
-    assert "À retenir" in html
-    assert "Un" in html and "Trois" in html
+    html = render({"delta_summary": ["Un", "Deux", "Trois"],
+                   "market_changes": [{"status": "new", "tag": "Catalyseur",
+                                       "description": "S&P +29 pts",
+                                       "source": "Yahoo"}],
+                   "footer": {}}, "evening")
+    assert "À retenir" not in html
+    assert "Un" not in html and "Trois" not in html
+    assert "Ce qui a évolué" in html and "S&amp;P +29 pts" in html
 
 
 def test_no_grid_flex_in_templates():

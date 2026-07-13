@@ -29,11 +29,12 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Mot de passe d'édition. Surchargé par le secret GitHub PORTFOLIO_EDIT_PASSWORD
-# s'il est NON VIDE ; sinon défaut = choix d'Omar (non confidentiel, garde-fou
-# anti-erreur). Le `or` évite qu'un secret vide/absent (que GitHub passe en chaîne
-# vide) ne désactive l'édition.
-EDIT_PASSWORD = (os.environ.get("PORTFOLIO_EDIT_PASSWORD") or "Omax181").strip()
+# Mot de passe d'édition = secret GitHub PORTFOLIO_EDIT_PASSWORD, OBLIGATOIRE.
+# v29 (audit sécurité) : l'ancien défaut en dur (le pseudo GitHub d'Omar —
+# devinable et versionné dans le repo) est SUPPRIMÉ. Secret absent ou vide →
+# l'écriture est désactivée et le bot explique quoi configurer ; les APERÇUS
+# (sans mot de passe) restent disponibles.
+EDIT_PASSWORD = (os.environ.get("PORTFOLIO_EDIT_PASSWORD") or "").strip()
 
 _NUM_RE = re.compile(r"^[-+]?\d+(?:[.,]\d+)?$")
 _PRICE_MARKERS = {"à", "a", "@", "at", "prix", "=>", "->", "="}
@@ -161,6 +162,13 @@ def handle_edit(text: str) -> tuple[str, bool]:
     else:
         pru_line = f"PRU : {_fp(summ.get('old_pru'))} (inchangé)"
     body = f"*{head}*\n{change}\n{pru_line}"
+
+    if not EDIT_PASSWORD:
+        # v29 (audit sécurité) — pas de secret configuré = écriture désactivée.
+        return (f"🔒 Aperçu (NON appliqué) :\n{body}\n\n"
+                "⚠ L'édition est désactivée : configure le secret GitHub "
+                "`PORTFOLIO_EDIT_PASSWORD` (Settings → Secrets → Actions) "
+                "pour pouvoir confirmer les modifications.", False)
 
     if not intent["has_password"]:
         return (f"🔒 Aperçu (NON appliqué) :\n{body}\n\n"

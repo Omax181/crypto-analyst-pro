@@ -503,7 +503,9 @@ def test_degraded_render_end_to_end():
         payload, daily_pnl=daily_pnl, evening_macro=em, polymarket=pm,
         computed_levels=levels, since_morning=None)
     html = _render(payload)
-    assert "retenir aujourd" in html.lower()
+    # v29 (EB1) — boîte noire « À retenir » supprimée (doublon) ; le mode dégradé
+    # garde les blocs essentiels ci-dessous.
+    assert "retenir aujourd" not in html.lower()
     assert "Niveaux à surveiller cette nuit" in html
     assert "Scénario probable" in html and "Invalidation" in html
     assert "RSI" in html and "MACD" in html
@@ -636,8 +638,10 @@ def test_nominal_payload_regression():
                         "status": "on_track"}],
         "footer": {"next_report_at": "demain 08h30"},
     })
-    for fragment in ("À retenir aujourd", "Ce qui a évolué", "Ce qui est tombé",
+    # v29 (EB1) — « À retenir aujourd'hui » retiré des sections attendues.
+    for fragment in ("Ce qui a évolué", "Ce qui est tombé",
                      "Niveaux à surveiller", "Demain matin", "on track",
                      "Espérance mathématique"):
         assert fragment.lower() in html.lower(), f"section perdue : {fragment}"
+    assert "à retenir aujourd" not in html.lower()
     assert "Génération IA indisponible" not in html

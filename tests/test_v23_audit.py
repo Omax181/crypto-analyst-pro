@@ -16,7 +16,7 @@ import inspect
 def test_app_version_v23():
     from src.reporting.email_html import APP_VERSION
     # Nommage final : le livrable est étiqueté v26 (décision Omar, 2026-07-05).
-    assert APP_VERSION == "v28"
+    assert APP_VERSION == "v29"
 
 
 # --------------------------------------------------------------------------- #
@@ -99,7 +99,10 @@ def test_portfolio_risk_renders_morning():
         ]},
     }
     html = render(payload, "morning")
-    assert "STRESS-TEST" in html          # v23 — bloc renommé (plus « RISQUE »)
+    # v29 (ZB1) — bloc fusionné dans « Santé & structure » ; le sous-titre
+    # « Structure & stress-test » est mis en capitales par CSS (texte en casse
+    # normale dans la source). On vérifie le libellé + les lectures rendues.
+    assert "Structure &amp; stress-test" in html
     assert "Stress-test" in html and "VaR 95%" in html
 
 
@@ -277,7 +280,8 @@ def test_sector_exposure_six_cases_multi_horizon():
     top = out[0]                                           # S0 = le plus gros
     assert top["market_change_7d"] is not None and top["market_change_30d"] is not None
     agg = out[-1]
-    assert agg["is_aggregate"] and agg["sector"].startswith("Autres secteurs")
+    # v29 (WA11) — libellé explicite « Autres · N secteurs (M actifs) ».
+    assert agg["is_aggregate"] and agg["sector"].startswith("Autres ·")
     # tail = S5 (val 300, c30=15) + S6 (val 200, c30=18) + S7 (val 100, c30=21)
     # 30j pondéré = (300×15 + 200×18 + 100×21)/600 = 17.0
     assert agg["market_change_30d"] == 17.0

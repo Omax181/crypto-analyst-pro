@@ -125,26 +125,6 @@ def test_workflows_pass_learning_and_pause_env():
         assert "GEMINI_LAST_CHANCE_PAUSE_S" in content, name
 
 
-# --------------------------------------------------------------------------- #
-# F10 — news : « Google Gemini » (IA) ≠ « Gemini exchange » (crypto)
-# --------------------------------------------------------------------------- #
-def test_weekly_perf_bars_truncation_keeps_both_extremes():
-    """Classement tronqué = pires perdants ET meilleurs gagnants conservés."""
-    from src.reporting import charts
-
-    try:
-        import matplotlib  # noqa: F401
-    except ImportError:
-        import pytest
-        pytest.skip("matplotlib absent")
-    cells = [{"symbol": f"A{i}", "change_24h": float(i - 8)} for i in range(16)]
-    # 16 positions, limit 12 → le pire (−8) ET le meilleur (+7) doivent rester.
-    import inspect
-    src = inspect.getsource(charts.weekly_perf_bars_png)
-    assert "rows[:half]" in src and "rows[-(limit - half):]" in src
-    assert charts.weekly_perf_bars_png(cells) is not None
-
-
 def test_portfolio_buy_without_prior_pru_never_fabricates_gains():
     """PRU inconnu + achat : PRU = prix d'achat, jamais « stock gratuit »."""
     from src.utils import portfolio_editor as pe

@@ -56,7 +56,6 @@ from src.data_sources import (
     fred,
     geopolitics,
     github_dev,
-    kaito,
     lunarcrush,
     market_prices,
     news_relevance,
@@ -114,7 +113,9 @@ _ALL_SOURCES_LIST = [
     # canal Telegram ETF_Flows parsé en Python) : le libellé ne nomme plus
     # uniquement Farside (source déclarée down alors que les chiffres Telegram
     # étaient cités — contradiction A3 de l'audit v25).
-    "ETF flows", "Telegram", "DeFiLlama", "Kaito", "Social trending",
+    # v29 (audit) — « Kaito » renommé : les narratifs viennent des catégories
+    # CoinGecko depuis v25 (OB6) ; l'étiquette mentait sur la source réelle.
+    "ETF flows", "Telegram", "DeFiLlama", "Narratifs (CoinGecko)", "Social trending",
     "Token Unlocks", "News", "YouTube", "Géopolitique", "BTC Network",
     "Stablecoins", "Whale Tracking", "Yahoo Finance", "Calendrier macro",
     "RSS news (crypto + macro · 16 flux)",
@@ -588,11 +589,13 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     # l'EN BREF mais source déclarée indisponible » (audit v25 A3).
     etf = etf_flows.merge_with_telegram(etf, telegram)
     defi = defillama.get_defi_tvl()
-    narratives = kaito.get_trending_narratives()
     social_trending = lunarcrush.get_trending_coins()
     # OB6 — narratifs qui chauffent/refroidissent (catégories CoinGecko, gratuit,
-    # sans clé) : remplace Kaito, MORT en prod faute de secret KAITO_API_KEY.
-    # Filtré du bruit micro-cap / écosystèmes de chaînes / artefacts de composition.
+    # sans clé). v29 (audit) : l'appel legacy au module narratifs PAYANT (mort,
+    # toujours indisponible sans clé) est SUPPRIMÉ — le drapeau de source
+    # « Narratifs (CoinGecko) » reflète désormais la VRAIE source
+    # (hot_narratives), fini la provenance mensongère (source déclarée down
+    # alors que les catégories CoinGecko alimentaient bien l'analyse).
     hot_narratives = detect_hot_narratives(coingecko.get_categories())
     # v26 (C2) — les événements CoinMarketCal (déjà en main) servent de repli
     # aux unlocks depuis que DefiLlama /emissions est payant.
@@ -1077,7 +1080,7 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
 
     active_sources = _active_sources(
         market=market, fng=fng, macro=macro, onchain=onchain, polymarket=polymarket,
-        etf=etf, telegram=telegram, defi=defi, narratives=narratives,
+        etf=etf, telegram=telegram, defi=defi, narratives=hot_narratives,
         social=social_trending, unlocks=unlocks, news=bool(news_global_items),
         youtube=youtube_corpus, geopolitics=geopol,
         btc_network=btc_network, stablecoins=stablecoin_supply, whales=whale_inflows,
@@ -1319,7 +1322,7 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         "market_global": glob, "fear_greed": fng, "macro": _sanitize_macro_for_prompt(macro),
         "economic_calendar": upcoming_calendar, "onchain_indicators": onchain,
         "polymarket": polymarket, "etf_flows": etf, "reddit": reddit_data,
-        "telegram": telegram, "defi_tvl": defi, "kaito_narratives": narratives,
+        "telegram": telegram, "defi_tvl": defi,
         "hot_narratives": hot_narratives,        # OB6 — narratifs qui chauffent
         "social_trending": social_trending, "token_unlocks": unlocks,
         "sector_rotation": rotation, "news_counts": news_counts,
@@ -1825,10 +1828,13 @@ def _compute_sector_exposure(
             {h for r in tail for h in (r.get("holdings") or [])}
         )
         head.append({
-            # v23 (W7) — « Autres secteurs (N) » (petits secteurs IDENTIFIÉS
-            # agrégés), distinct de « Autre / non classé » (positions sans secteur
-            # connu). Évite deux libellés « Autre » prêtant à confusion dans le hebdo.
-            "sector": f"Autres secteurs ({len(tail)})",
+            # v23 (W7) — petits secteurs IDENTIFIÉS agrégés, distinct de
+            # « Autre / non classé » (positions sans secteur connu).
+            # v29 (WA11) — « Autres secteurs (4) » suivi de 8 actifs se lisait
+            # comme un compte d'ACTIFS faux. Libellé explicite : secteurs ET actifs.
+            "sector": (f"Autres · {len(tail)} secteurs"
+                       f" ({len(_tail_holdings)} actifs)" if _tail_holdings
+                       else f"Autres · {len(tail)} secteurs"),
             "ptf_pct": round(tail_val / total * 100, 1),
             "value_usd": round(tail_val, 2),
             "market_change_24h": _tail_weighted("market_change_24h"),
@@ -2499,29 +2505,43 @@ def _select_rotation_tiles(sec: dict[str, Any]) -> list[dict[str, Any]]:
             "your_holdings": sd.get("members", []),
             "_weight": len(sd.get("members", []) or []) or 1,
         })
-    rot_list.sort(key=lambda r: abs(r["change_24h"]), reverse=True)
+    # v29 (MA14) — le pseudo-secteur « Autre » (actifs non classés) n'est
+    # JAMAIS une tuile individuelle : une case « Autre +2.88% · 1000SATS » ne
+    # dit rien au lecteur. Il rejoint l'agrégat « Autres secteurs ».
+    _PSEUDO_SECTORS = {"autre", "autres", "other", "others", "divers"}
+    pseudo = [r for r in rot_list
+              if str(r.get("sector") or "").strip().lower() in _PSEUDO_SECTORS]
+    named = [r for r in rot_list if r not in pseudo]
+    named.sort(key=lambda r: abs(r["change_24h"]), reverse=True)
     _MAX_INDIVIDUAL = 4
-    if len(rot_list) > _MAX_INDIVIDUAL + 1:
-        top = rot_list[:_MAX_INDIVIDUAL]
-        rest = rot_list[_MAX_INDIVIDUAL:]
-        _tot_w = sum(r["_weight"] for r in rest) or 1
-        _avg = sum(r["change_24h"] * r["_weight"] for r in rest) / _tot_w
-        # 7j/30j pondérés sur les secteurs restants qui les ont.
-        _r7 = [r for r in rest if isinstance(r.get("change_7d"), (int, float))]
-        _r30 = [r for r in rest if isinstance(r.get("change_30d"), (int, float))]
-        _avg7 = (sum(r["change_7d"] * r["_weight"] for r in _r7)
-                 / (sum(r["_weight"] for r in _r7) or 1)) if _r7 else None
-        _avg30 = (sum(r["change_30d"] * r["_weight"] for r in _r30)
-                  / (sum(r["_weight"] for r in _r30) or 1)) if _r30 else None
-        top.append({
-            "sector": f"Autres secteurs ({len(rest)})",
-            "change_24h": round(_avg, 2),
-            "change_7d": round(_avg7, 2) if _avg7 is not None else None,
-            "change_30d": round(_avg30, 2) if _avg30 is not None else None,
-            "your_holdings": [],
-            "is_aggregate": True,
-        })
+    rest = named[_MAX_INDIVIDUAL:] + pseudo
+    if len(rest) >= 2 or pseudo:
+        top = named[:_MAX_INDIVIDUAL]
+        if rest:
+            _tot_w = sum(r["_weight"] for r in rest) or 1
+            _avg = sum(r["change_24h"] * r["_weight"] for r in rest) / _tot_w
+            # 7j/30j pondérés sur les secteurs restants qui les ont.
+            _r7 = [r for r in rest if isinstance(r.get("change_7d"), (int, float))]
+            _r30 = [r for r in rest if isinstance(r.get("change_30d"), (int, float))]
+            _avg7 = (sum(r["change_7d"] * r["_weight"] for r in _r7)
+                     / (sum(r["_weight"] for r in _r7) or 1)) if _r7 else None
+            _avg30 = (sum(r["change_30d"] * r["_weight"] for r in _r30)
+                      / (sum(r["_weight"] for r in _r30) or 1)) if _r30 else None
+            # v29 (WA11) — libellé sans ambiguïté : « (8) » se lisait comme
+            # un nombre d'actifs. « Autres · 8 secteurs » est explicite.
+            top.append({
+                "sector": (f"Autres · {len(rest)} secteurs" if len(rest) > 1
+                           else "Autres (1 secteur)"),
+                "change_24h": round(_avg, 2),
+                "change_7d": round(_avg7, 2) if _avg7 is not None else None,
+                "change_30d": round(_avg30, 2) if _avg30 is not None else None,
+                "your_holdings": [],
+                "is_aggregate": True,
+            })
         rot_list = top
+    else:
+        # ≤ 5 secteurs nommés, aucun pseudo : tous en tuiles individuelles.
+        rot_list = named
     for r in rot_list:
         r.pop("_weight", None)
     return rot_list
@@ -2561,7 +2581,9 @@ def _active_sources(**flags: Any) -> list[str]:
     mapping = {
         "market": "CoinGecko", "fng": "Fear&Greed", "macro": "FRED",
         "onchain": "On-chain", "polymarket": "Polymarket", "etf": "ETF flows",
-        "telegram": "Telegram", "defi": "DeFiLlama", "narratives": "Kaito",
+        # v29 (audit) — narratifs = catégories CoinGecko (OB6), plus Kaito.
+        "telegram": "Telegram", "defi": "DeFiLlama",
+        "narratives": "Narratifs (CoinGecko)",
         "social": "Social trending", "unlocks": "Token Unlocks", "news": "News",
         "youtube": "YouTube", "geopolitics": "Géopolitique",
         "btc_network": "BTC Network", "stablecoins": "Stablecoins", "whales": "Whale Tracking",
@@ -3018,18 +3040,31 @@ def _apply_asset_plans_to_theses(
                 ap["position_size_usd"] = _sz.get("trim_usd")
             ap["sizing_note"] = _sz.get("note")
         t["action_plan"] = ap
-        # Cibles (ES1/ES2) : 30j en fourchette + cycle. On respecte le contenu
-        # LLM s'il existe, sinon on remplit avec les valeurs Python.
+        # Cibles (ES1/ES2) : 30j en fourchette + cycle.
+        # v29 (MA5/WA1) — les cibles Python ÉCRASENT les cibles LLM (fini le
+        # setdefault) : le 10/07, la cible 30j IA de BTC (70 401 $, +10.1%)
+        # dépassait son propre scénario BULL (67 145 $) et les bornes basses LT
+        # IA (BTC 87 666 $ / ETH 2 986 $ / TAO 420 $) divergeaient du weekly
+        # (mêmes actifs : 102 366 / 3 742 / 549 — fib 0.618 → ATH Python).
+        # Une seule source de vérité = asset_plan, la MÊME que le weekly ; la
+        # cible 30j (résistance ancrée) est par construction ≤ scénario bull
+        # (bull = cible + 1 ATR). La prose LLM reste libre, pas ses chiffres.
         _tg = t.get("targets") if isinstance(t.get("targets"), dict) else {}
-        _tg.setdefault("short_term_30d", tgt.get("level"))
+        if tgt.get("level") is not None:
+            _tg["short_term_30d"] = tgt.get("level")
+            if tgt.get("low_label"):
+                _tg["short_term_note"] = (
+                    f"{_pct_fr_signed(tgt.get('upside_pct'))} · {tgt.get('basis')}"
+                    f" · fourchette {tgt.get('low_label')}–{tgt.get('high_label')}"
+                    if tgt.get("upside_pct") is not None and tgt.get("basis")
+                    else f"fourchette {tgt.get('low_label')}–{tgt.get('high_label')}")
         _tg.setdefault("short_term_label", "Cible 30j (technique)")
-        if not _tg.get("short_term_note") and tgt.get("low_label"):
-            _tg["short_term_note"] = (f"fourchette {tgt.get('low_label')}"
-                                      f"–{tgt.get('high_label')}")
         _cyc = plan.get("target_cycle")
         if _cyc:
-            _tg.setdefault("long_term_6_12m_low", _cyc.get("low"))
-            _tg.setdefault("long_term_6_12m_high", _cyc.get("high"))
+            if _cyc.get("low") is not None:
+                _tg["long_term_6_12m_low"] = _cyc.get("low")
+            if _cyc.get("high") is not None:
+                _tg["long_term_6_12m_high"] = _cyc.get("high")
             if not _tg.get("long_term_note"):
                 _tg["long_term_note"] = (
                     "reconquête ATH (cycle)" if _cyc.get("kind") == "cycle"
@@ -3826,6 +3861,17 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         from src.analytics.reco_gate import apply_reco_gate
         apply_reco_gate(payload)
         _compute_top_action(payload)
+        # v29 (MA16) — le compteur d'en-tête est recalculé APRÈS le gate :
+        # le 10/07, « 7 nouvelles reco » comptait 3 RENFORCER requalifiés en
+        # MAINTENIR (plafond) — un MAINTENIR n'est pas une nouvelle reco.
+        _theses_post = payload.get("thesis_of_the_day") or []
+        _firm_post = sum(
+            1 for t in _theses_post if isinstance(t, dict)
+            and any(k in (t.get("action") or "").upper()
+                    for k in ("RENFORC", "ALLÉG", "ALLEG")))
+        _hdr_post = payload.setdefault("header", {})
+        _hdr_post["firm_theses_count"] = _firm_post
+        _hdr_post["watch_theses_count"] = max(0, len(_theses_post) - _firm_post)
     except Exception as _apexc:  # noqa: BLE001 — jamais bloquant
         logger.info("Application des plans v27 ignorée : %s", _apexc)
 
@@ -3996,6 +4042,169 @@ def _confidence_caps_from_data(data: dict[str, Any]) -> dict[str, int]:
     return caps
 
 
+def _apply_morning_guards(payload: dict[str, Any], data: dict[str, Any]) -> list[str]:
+    """v29 — gardes déterministes du MATIN (audit mails 10/07, points MA*).
+
+    Corrige EN PYTHON, après génération, les contradictions narratif IA ↔
+    chiffres déterministes du même mail : adresses actives (MA3), qualificatif
+    dollar (MA4), CPI non sourcé (MA10), % Polymarket recyclés (MA11), bilan
+    Fed (WA4), spin chartiste (MA8), EN BREF vs plans (MA2), narratif de
+    rotation hors tuiles (MA12). Best-effort : chaque garde est isolée, une
+    donnée de référence absente → garde inactive, jamais bloquante.
+    """
+    import re as _re_g
+    from src.analytics import daily_guards as _dg
+
+    fixes: list[str] = []
+    # Champs de PROSE du matin — les seuls que les gardes texte réécrivent.
+    _PROSE_KEYS = ("executive_summary", "macro_context", "macro_impact",
+                   "onchain_indicators", "thesis_of_the_day", "market_watch",
+                   "invalidation_watch", "self_critique", "watch_today",
+                   "sector_rotation_ptf_note", "news_24h")
+
+    def _apply(fn, *args, **kw) -> None:
+        for key in _PROSE_KEYS:
+            if payload.get(key) is not None:
+                try:
+                    payload[key], fx = fn(payload[key], *args, **kw)
+                    fixes.extend(fx)
+                except Exception as _gexc:  # noqa: BLE001 — garde isolée
+                    logger.info("Garde %s ignorée sur %s : %s",
+                                getattr(fn, "__name__", "?"), key, _gexc)
+
+    # ── MA3 — adresses actives : les TUILES Python sont la source de vérité.
+    real_addr: dict[str, float] = {}
+    for m in ((payload.get("onchain_indicators") or {}).get("metrics") or []):
+        lbl = str((m or {}).get("label") or "")
+        mm = _re_g.match(r"(?i)adresses\s+actives\s+(BTC|ETH)", lbl)
+        if not mm:
+            continue
+        pm = _re_g.search(r"([+\-−]?\d+(?:[.,]\d+)?)\s?%",
+                          str(m.get("short") or m.get("interpretation") or ""))
+        if pm:
+            v = _parse_num(pm.group(1).replace("−", "-").replace(",", "."))
+            if v is not None:
+                real_addr[mm.group(1).upper()] = v
+    if real_addr:
+        for key in _PROSE_KEYS:
+            if key == "thesis_of_the_day" or payload.get(key) is None:
+                continue
+            try:
+                payload[key], fx = _dg.fix_active_addresses(payload[key], real_addr)
+                fixes.extend(fx)
+            except Exception:  # noqa: BLE001
+                pass
+        theses = payload.get("thesis_of_the_day")
+        if isinstance(theses, list):
+            for i, t in enumerate(theses):
+                if not isinstance(t, dict):
+                    continue
+                try:
+                    theses[i], fx = _dg.fix_active_addresses(
+                        t, real_addr,
+                        asset_hint=str(t.get("asset") or "").upper() or None)
+                    fixes.extend(fx)
+                except Exception:  # noqa: BLE001
+                    pass
+
+    # ── MA4 — un seul qualificatif dollar (delta DXY du jour, ICE).
+    _apply(_dg.fix_dxy_wording,
+           _dg.dxy_qualifier((data.get("macro_context") or {}).get("dxy_delta")))
+
+    # ── MA10 — CPI : YoY FRED réel ou pas de chiffre du tout.
+    _cpi_yoy = None
+    try:
+        from src.data_sources import fred as _fred_g
+        for p in (_fred_g.get_calendar_prints() or {}).get("prints") or []:
+            if p.get("key") == "cpi" and p.get("display_value") is not None:
+                _cpi_yoy = p["display_value"]
+                break
+    except Exception:  # noqa: BLE001
+        _cpi_yoy = None
+    _apply(_dg.fix_cpi_claims, _cpi_yoy)
+
+    # ── MA11 — % Polymarket : seuls les marchés fournis (et leurs
+    # compléments 100−p) sont citables, et tout STRIKE cité (« 65 000 $ »)
+    # doit figurer dans la question d'un marché fourni ; sinon la phrase saute.
+    _known: list[float] = []
+    _known_strikes: set[str] = set()
+    _fb_g = (data.get("macro_context") or {}).get("polymarket_fed_bars") or {}
+    for k in ("cut_pct", "hold_pct", "hike_pct", "dominant_pct"):
+        v = _parse_num(_fb_g.get(k))
+        if v is not None:
+            _known += [v, 100.0 - v]
+    for mkt in ((data.get("macro_context") or {}).get("polymarket_extra_markets")
+                or []):
+        v = _parse_num((mkt or {}).get("probability_pct"))
+        if v is not None:
+            _known += [v, 100.0 - v]
+        _known_strikes |= _dg._norm_strikes(str((mkt or {}).get("question") or ""))
+    if _known:
+        _apply(_dg.sanitize_polymarket_claims, _known, _known_strikes)
+
+    # ── WA4 — bilan Fed : change_pct FRED canonique (cross_signals).
+    def _find_fed_change(node: Any) -> Any:
+        if isinstance(node, dict):
+            if {"change_pct", "trend", "reading"} <= set(node.keys()):
+                return node.get("change_pct")
+            for v in node.values():
+                r = _find_fed_change(v)
+                if r is not None:
+                    return r
+        elif isinstance(node, list):
+            for v in node:
+                r = _find_fed_change(v)
+                if r is not None:
+                    return r
+        return None
+    _apply(_dg.fix_fed_balance_claims,
+           _find_fed_change(data.get("cross_signals")))
+
+    # ── MA8 — conclusion chartiste : le verdict suit les chiffres cités.
+    _apply(_dg.fix_historical_spin)
+
+    # ── MA2 — l'EN BREF ne contredit pas les plans (renfort vs plafond).
+    _theses_g = payload.get("thesis_of_the_day") or []
+    _reinf = {str(t.get("asset") or "").upper() for t in _theses_g
+              if isinstance(t, dict)
+              and "RENFORC" in (t.get("action") or "").upper()}
+    _capped = {str(t.get("asset") or "").upper() for t in _theses_g
+               if isinstance(t, dict) and (t.get("action") or "") == "MAINTENIR"
+               and (t.get("_gated") == "plafond" or t.get("gate_note"))}
+    _es = payload.get("executive_summary")
+    try:
+        if isinstance(_es, dict) and isinstance(_es.get("bullets"), list):
+            _es["bullets"], fx = _dg.fix_reinforce_claims(
+                _es["bullets"], _reinf - {""}, _capped - {""})
+            fixes.extend(fx)
+        elif isinstance(_es, list):
+            payload["executive_summary"], fx = _dg.fix_reinforce_claims(
+                _es, _reinf - {""}, _capped - {""})
+            fixes.extend(fx)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # ── MA12 — le narratif de rotation ne cite que les tuiles affichées.
+    try:
+        _note = payload.get("sector_rotation_ptf_note")
+        _displayed = [str(s.get("sector") or "")
+                      for s in (payload.get("sector_rotation") or [])
+                      if isinstance(s, dict)]
+        _all_sec = list(((data.get("sector_rotation") or {}).get("sectors")
+                         or {}).keys())
+        if _note and _displayed and _all_sec:
+            payload["sector_rotation_ptf_note"], fx = _dg.filter_rotation_note(
+                _note, _displayed, _all_sec)
+            fixes.extend(fx)
+    except Exception:  # noqa: BLE001
+        pass
+
+    if fixes:
+        logger.info("Gardes matin v29 : %d correction(s) — %s",
+                    len(fixes), " | ".join(fixes[:8]))
+    return fixes
+
+
 def run_morning() -> int:
     """Génère et envoie le rapport du matin."""
     from src.ai_brain.decision_engine import DecisionEngine
@@ -4016,6 +4225,12 @@ def run_morning() -> int:
     payload = _merge_python_facts(payload, data, _now_str())
     checked = check_report(payload, _confidence_caps_from_data(data))
     payload = checked["sanitized_payload"]
+    # v29 — GARDES DÉTERMINISTES DU MATIN (audit 10/07, points MA*) : le
+    # narratif IA est réaligné sur les chiffres déterministes du même mail.
+    try:
+        _apply_morning_guards(payload, data)
+    except Exception as _mg_exc:  # noqa: BLE001 — jamais bloquant
+        logger.info("Gardes matin v29 ignorées : %s", _mg_exc)
     # Boucle de tracking : on persiste les thèses fermes du jour pour que le win
     # rate, la calibration et le regret puissent réellement se calculer (gardé :
     # une erreur de persistance ne doit jamais bloquer l'envoi du rapport).
@@ -4056,16 +4271,24 @@ def run_morning() -> int:
     # Graphiques adaptés pour les thèses DÉTAILLÉES (top-3 dépliées en
     # prose, audit A1). limit=3 pour coller au détail rendu : générer un 4e
     # graphique l'attacherait en CID sans qu'il soit jamais référencé (orphelin).
-    # v26 — seules les thèses FERMES sont chartées (le template ne rend que
-    # leurs cartes ; une SURVEILLER chartée créait un CID orphelin latent).
+    # v29 (MA1) — on charte EXACTEMENT les thèses que le template déplie
+    # (flag ``_expand``, posé AVANT le reco_gate). L'ancien filtre « fermes »
+    # divergeait après requalification RENFORCER→MAINTENIR (plafond) : le
+    # 10/07, les charts couvraient RENDER/LINK/RSR (fermes) alors que le
+    # détail rendu était ETH/BTC/TAO (_expand) → 3 PJ orphelines, zéro image
+    # inline. Le template n'affiche <img cid:chart_X> que dans les cartes
+    # dépliées : charter _expand garantit inline = attaché (aucun orphelin).
     from src.reporting import charts
-    _firm_for_charts = [
+    # Même prédicat que le template (report_morning : _firm_theses × _expand) :
+    # une thèse _expand dégradée en SURVEILLER par le gate n'est PAS rendue,
+    # donc pas chartée non plus (sinon CID orphelin → pièce jointe parasite).
+    _RENDERED_ACTIONS = ("RENFORCER", "ALLÉGER", "ALLEGER", "MAINTENIR")
+    _detailed_for_charts = [
         t for t in (payload.get("thesis_of_the_day") or [])
-        if isinstance(t, dict)
-        and any(k in (t.get("action") or "").upper()
-                for k in ("RENFORC", "ALLÉG", "ALLEG"))
+        if isinstance(t, dict) and t.get("_expand")
+        and (t.get("action") or "") in _RENDERED_ACTIONS
     ]
-    chart_imgs = charts.charts_for_theses(_firm_for_charts, limit=3)
+    chart_imgs = charts.charts_for_theses(_detailed_for_charts, limit=3)
     # v26 (B8/A20) — JOUR SANS NOUVELLE RECO : le mail ne perd plus tous ses
     # graphiques. On charte les recos ACTIVES où la lecture a de la valeur
     # (proche stop/cible, mouvement notable) : cours + plan (entrée/cible/
@@ -4457,6 +4680,24 @@ def _build_since_morning_facts(
             f"Fed {e_dom} {str(m_pct).replace('.', ',')}% → "
             f"{str(e_pct).replace('.', ',')}%"
             f"{'' if _dp == 0 else ' (' + _pct_fr_signed(_dp).replace('%', ' pts') + ')'}")
+    # v29 (EA2) — REPRICING HAWKISH/DOVISH EXPLICITE : le 10/07, la proba de
+    # HAUSSE de taux bondissait de 14,6% → 22,1% (+7,5 pts) pendant que le mail
+    # martelait « risk-on confirmé », sans jamais relever le signal. Dès que la
+    # proba hausse OU baisse bouge de ≥ 3 pts, le delta est nommé et qualifié.
+    for _leg, _lbl, _adj_up in (("hike_pct", "proba hausse taux", "hawkish"),
+                                ("cut_pct", "proba baisse taux", "dovish")):
+        m_leg = _parse_num(m_fed.get(_leg))
+        e_leg = _parse_num(e_fed.get(_leg))
+        if m_leg is None or e_leg is None:
+            continue
+        _dl = round(e_leg - m_leg, 1)
+        if abs(_dl) >= 3.0:
+            _tone = _adj_up if _dl > 0 else ("dovish" if _leg == "hike_pct"
+                                             else "hawkish")
+            parts.append(
+                f"⚠ {_lbl} {str(m_leg).replace('.', ',')}% → "
+                f"{str(e_leg).replace('.', ',')}% "
+                f"({_pct_fr_signed(_dl).replace('%', ' pts')} — repricing {_tone})")
     if not parts:
         return None
     return {
@@ -4975,6 +5216,20 @@ def run_evening() -> int:
     )
     checked = check_report(payload, _confidence_caps_from_data(data))
     payload = checked["sanitized_payload"]
+    # v29 (EA1) — le tag « actionnable » est réservé aux news factuelles :
+    # une formulation au conditionnel (« pourrait être interdit ce soir ») est
+    # dégradée en « à suivre ». Déterministe, best-effort, jamais bloquant.
+    try:
+        from src.analytics import daily_guards as _dg_ev
+        _ea1_fixes: list[str] = []
+        for _nk in ("news_today", "intraday_news"):
+            _ea1_fixes += _dg_ev.downgrade_speculative_actionable(
+                payload.get(_nk))
+        if _ea1_fixes:
+            logger.info("Gardes soir v29 : %d correction(s) — %s",
+                        len(_ea1_fixes), " | ".join(_ea1_fixes[:4]))
+    except Exception as _ea1_exc:  # noqa: BLE001
+        logger.info("Garde news soir ignorée : %s", _ea1_exc)
     # v19/W-B12 — espérance mathématique des recos AUSSI dans le soir (présente
     # dans les 3 mails). Calculée Python, vide tant que < 5 recos clôturées.
     payload["expectancy"] = tracker.compute_expectancy(30)
@@ -5055,6 +5310,18 @@ def run_evening() -> int:
     header["us_market_open"] = (
         _now_utc_ev.weekday() < 5
         and (13, 30) <= (_now_utc_ev.hour, _now_utc_ev.minute) < (20, 0))
+    # v29 (EA5) — PHASE DE SÉANCE précise : le run de 20h Casablanca tombe à
+    # ~15h New York, soit la DERNIÈRE heure de cotation — « mi-séance » était
+    # approximatif. Découpage de la séance 9h30-16h ET (390 min) en trois tiers
+    # lisibles ; le template affiche ce libellé quand la séance est ouverte.
+    if header["us_market_open"]:
+        _mins_open = (_now_utc_ev.hour * 60 + _now_utc_ev.minute) - (13 * 60 + 30)
+        header["us_session_label"] = (
+            "début de séance" if _mins_open < 130
+            else "mi-séance" if _mins_open < 260
+            else "fin de séance")
+    else:
+        header["us_session_label"] = None
 
     # v28 (E-A2/E-A3, 2.B) — MARCHÉ US FERMÉ : plus de « NOUVEAU CATALYSEUR »
     # actions « en séance » fabriqué depuis la session de la VEILLE (le 07/07 :
@@ -5527,6 +5794,13 @@ def run_weekly() -> int:
                 # de l'exit plan à tort. Source de vérité unique cœur/satellite.
                 "conviction": _is_core_asset(s, portfolio.get(s) or {}),
                 "active_reco": False,
+                # v29 (WA10) — règle de sortie CALCULÉE (le 10/07, l'IA
+                # recommandait de « liquider immédiatement » SXT tout en notant
+                # que les frais dépasseraient sa valeur) : sous ~2 $, vendre
+                # coûte plus que ça ne rapporte → abandon assumé de la ligne.
+                "suggested_handling": (
+                    "abandonner (frais > valeur résiduelle — ne pas vendre)"
+                    if _pv < 2.0 else "vendre sur rebond technique (+20-30%)"),
             })
 
     # V6 : corrélation entre positions principales (>$5) pour les clusters de
@@ -5579,6 +5853,10 @@ def run_weekly() -> int:
     # v23.x — échafaudage déterministe des SCÉNARIOS de la semaine (rempli dans le
     # try ci-dessous quand les signaux sont prêts ; {} si indispo → repli LLM seul).
     _scenario_scaffold: dict[str, Any] = {}
+    # v29 (WB5) — contexte COMMUN aux 3 scénarios (préambule + ligne de bascule),
+    # sorti en tête pour ne plus répéter « CPI lundi » dans chaque scénario et
+    # donner LE signal qui dit lequel se réalise. Rempli dans le try (niveaux BTC).
+    _scenarios_context: dict[str, Any] = {}
 
     # v18 (Chantier E) — signaux d'analyse transverses pour le weekly (l'analyse
     # la plus profonde) : liquidité M2, cycle DXY, spreads HY, saisonnalité,
@@ -5703,6 +5981,35 @@ def run_weekly() -> int:
             btc_change_7d=_btc_mk.get("change_7d"),
             calendar_events=(calendar.get("events") if isinstance(calendar, dict) else None),
         )
+        # v29 (WB5) — CONTEXTE COMMUN des scénarios : catalyseur de la semaine
+        # (1er événement macro high-impact non encore publié) + ligne de BASCULE
+        # déterministe (seuils BTC : au-dessus de la résistance = haussier, sous
+        # le support = baissier, entre = neutre). Sorti en tête → plus besoin de
+        # répéter « CPI lundi » dans les 3 scénarios, et le lecteur sait ce qui
+        # départage les scénarios.
+        _res_sc = _parse_num(_res_comp_w if _res_comp_w else _btc_sr_w.get("resistance"))
+        _sup_sc = _parse_num(_sup_comp_w if _sup_comp_w else _btc_sr_w.get("support"))
+        _cat_sc = None
+        for _ev_sc in ((calendar.get("events") if isinstance(calendar, dict) else None) or []):
+            if str(_ev_sc.get("importance")) == "high" and not _ev_sc.get("already_published"):
+                _when_sc = _ev_sc.get("when")
+                if not _when_sc:
+                    _da_sc = _ev_sc.get("days_ahead")
+                    _when_sc = ("aujourd'hui" if _da_sc == 0 else "demain"
+                                if _da_sc == 1 else f"dans {_da_sc}j"
+                                if _da_sc is not None else None)
+                _cat_sc = str(_ev_sc.get("label") or "")
+                if _when_sc:
+                    _cat_sc += f" ({_when_sc})"
+                break
+        if _res_sc and _sup_sc and _res_sc > _sup_sc:
+            _scenarios_context = {
+                "catalyst": _cat_sc,
+                "btc_pivot_label": _fmt_usd_short(_sup_sc),
+                "bascule": (
+                    f"clôture BTC > {_fmt_usd_short(_res_sc)} = haussier · "
+                    f"< {_fmt_usd_short(_sup_sc)} = baissier · entre = neutre"),
+            }
     except Exception as _xexc_w:  # noqa: BLE001
         logger.info("cross_signals weekly ignoré : %s", _xexc_w)
 
@@ -5723,8 +6030,16 @@ def run_weekly() -> int:
                 _d_lbl = f"{_JOURS_FR[_pdt.weekday()][:3]} {_pdt.day:02d}/{_pdt.month:02d}"
             except (ValueError, TypeError):
                 pass
+            _clean_title = news_relevance.sanitize_title(_title)
+            # v29 (WA2) — DÉDUP TOPIQUE : le 10/07, 3 des 5 lignes couvraient
+            # la même actu (CBDC / loi logement, 3 sources). Un événement = une
+            # ligne ; le doublon libère la place pour une vraie 5e news.
+            from src.analytics.weekly_guards import is_duplicate_news as _is_dup_n
+            if any(_is_dup_n(_clean_title, _k.get("title") or "")
+                   for _k in weekly_news_digest):
+                continue
             weekly_news_digest.append({
-                "title": news_relevance.sanitize_title(_title),
+                "title": _clean_title,
                 "source": _n.get("source"),
                 "date_label": _d_lbl,
             })
@@ -5854,6 +6169,12 @@ def run_weekly() -> int:
     trend_note = None
     wr_week = win_rate.get("win_rate_pct")
     wr_month = win_rate_30d.get("win_rate_pct")
+    # v29 (WA6) — < 5 recos clôturées sur 30 j : JAMAIS un % (le « Win rate
+    # 30j · 100% » du 10/07 reposait sur 2/2 — chiffre flatteur non calibré,
+    # contredisant le « en calibration » affiché partout ailleurs).
+    _closed_30d_wr = win_rate_30d.get("total") or 0
+    if _closed_30d_wr < 5:
+        wr_month = None
     if wr_week is not None and wr_month is not None:
         if wr_week > wr_month + 2:
             trend_direction = "up"
@@ -5986,6 +6307,9 @@ def run_weekly() -> int:
     payload = engine.generate_weekly(timestamp=_now_str(), data=data, week_state=week_state)
     checked = check_report(payload, _confidence_caps_from_data(data))
     payload = checked["sanitized_payload"]
+    # v29 (WB5) — préambule + ligne de bascule des scénarios (déterministe).
+    if _scenarios_context:
+        payload["scenarios_context"] = _scenarios_context
 
     # ─────────────────────────────────────────────────────────────
     # Bug weekly #1 : portfolio_snapshot N'ÉTAIT PAS injecté côté Python.
@@ -6205,7 +6529,11 @@ def run_weekly() -> int:
     # v16.1 — win_rate_30d explicitement posé (était absent du scoring hebdo →
     # le template affichait « Win rate 30j · % » avec une valeur vide). None si
     # pas d'historique 30j suffisant.
+    # v29 (WA6) — wr_month est déjà None sous 5 clôturées 30 j ; le libellé
+    # « en calibration (X/5) » remplace le tiret pour rester informatif.
     _sc["win_rate_30d"] = wr_month
+    if wr_month is None:
+        _sc["win_rate_30d_gate"] = f"en calibration ({_closed_30d_wr}/5)"
     if len(_closed) >= 5:
         _sc["win_rate_pct"] = round(_sc["validated"] / len(_closed) * 100)
         _sc["no_history"] = False
@@ -6293,6 +6621,63 @@ def run_weekly() -> int:
         payload[_k_held], _fx = _wg.fix_held_opportunity_wording(
             payload.get(_k_held), _held_w)
         _wg_fixes += _fx
+    # v29 (WA12) — « structure daily baissière … → Renforcer » reçoit son
+    # cadrage LT explicite (accumulation DCA), sinon signal et action semblent
+    # se contredire sur la même ligne.
+    _wg_fixes += _wg.reconcile_bearish_reinforce(payload.get("positions_review"))
+    # v29 (WA9) — impact PTF pondéré chiffré à côté des pertes citées dans le
+    # post-mortem (FET −14,7% commenté comme LA perte… pour 1,1% du PTF).
+    _impacts_w: dict[str, dict[str, Any]] = {}
+    if current_value:
+        for _s_imp in symbols:
+            _v_imp = _position_value(portfolio[_s_imp], market.get(_s_imp))
+            _c7_imp = (market.get(_s_imp) or {}).get("change_7d")
+            if _v_imp > 0 and isinstance(_c7_imp, (int, float)):
+                _w_imp = _v_imp / current_value * 100.0
+                _impacts_w[_s_imp.upper()] = {
+                    "weight_pct": round(_w_imp, 2),
+                    "impact_pt": round(_c7_imp * _w_imp / 100.0, 2),
+                }
+    _wg_fixes += _wg.append_ptf_impact_in_payload(payload, _impacts_w)
+    # v29 (WA10) — poussières sous le seuil de frais : « liquidation
+    # immédiate » (payer pour vendre) devient un abandon de ligne assumé.
+    _tiny_dust = {str(d.get("asset") or "").upper() for d in dust
+                  if isinstance(d, dict)
+                  and (_parse_num(d.get("value_usd")) or 0) < 2.0}
+    if _tiny_dust and payload.get("exit_plan") is not None:
+        payload["exit_plan"], _fx = _wg.fix_dust_advice(
+            payload["exit_plan"], _tiny_dust)
+        _wg_fixes += _fx
+    # v29 (WA4) — bilan Fed : un SEUL chiffre cross-mail (le change_pct FRED
+    # des cross_signals, la même source que le matin).
+    try:
+        from src.analytics import daily_guards as _dg_w
+
+        def _find_fed_change_w(node: Any) -> Any:
+            if isinstance(node, dict):
+                if {"change_pct", "trend", "reading"} <= set(node.keys()):
+                    return node.get("change_pct")
+                for _v_f in node.values():
+                    _r_f = _find_fed_change_w(_v_f)
+                    if _r_f is not None:
+                        return _r_f
+            elif isinstance(node, list):
+                for _v_f in node:
+                    _r_f = _find_fed_change_w(_v_f)
+                    if _r_f is not None:
+                        return _r_f
+            return None
+
+        _fed_pct_w = _find_fed_change_w(weekly_cross_signals)
+        if _fed_pct_w is not None:
+            for _k_fed in ("weekly_summary", "macro_panorama", "strategy_focus",
+                           "scenarios", "long_term_positioning"):
+                if payload.get(_k_fed) is not None:
+                    payload[_k_fed], _fx = _dg_w.fix_fed_balance_claims(
+                        payload[_k_fed], _fed_pct_w)
+                    _wg_fixes += _fx
+    except Exception as _fed_exc_w:  # noqa: BLE001
+        logger.info("Garde bilan Fed weekly ignorée : %s", _fed_exc_w)
     if _wg_fixes:
         logger.info("Gardes weekly v26 : %d correction(s) — %s",
                     len(_wg_fixes), " | ".join(_wg_fixes[:8]))
@@ -6351,12 +6736,19 @@ def run_weekly() -> int:
     # afficher le bloc, message neutre si pas d'historique — la transparence
     # sur l'absence de données est elle-même une info pour l'utilisateur).
     calibration = tracker.compute_calibration(30)
-    if calibration.get("available"):
+    # v29 (WA7) — une « analyse de calibration » sur 2 recos clôturées est
+    # statistiquement vide (le 10/07 : « Confiance 70-79% → réalisé 100%
+    # (sous-confiance) » sur n=2). Le bloc n'apparaît qu'à partir de 5
+    # clôtures sur 30 j ; avant, une seule ligne honnête.
+    if calibration.get("available") and _closed_30d_wr >= 5:
         payload["calibration"] = calibration
     else:
         payload["calibration"] = {
             "available": False,
-            "empty_reason": "Pas encore d'historique · calibration disponible après 5 recos clôturées minimum.",
+            "empty_reason": (
+                f"Calibration disponible dès 5 recos clôturées "
+                f"({_closed_30d_wr}/5 sur 30 j) — trop tôt pour juger la "
+                "confiance annoncée."),
         }
     # v18 (W-B12) : espérance mathématique des recos (gain moyen × winrate −
     # perte moyenne × échec). Affichée dès 5 recos clôturées avec niveaux.
@@ -6444,6 +6836,15 @@ def run_weekly() -> int:
             "fed_bars": _fed_bars_w or None,
             "extra_markets": polymarket.get("extra_markets") or [],
         }
+    # v29 (Telegram briefing) — F&G aussi dans le PAYLOAD hebdo : la ligne 📊
+    # du digest argumente le régime (« BTC −x% vs MM200 · F&G 26 peur ») ; sans
+    # cette clé, l'hebdo perdait le volet sentiment. Aucun template mail ne lit
+    # `fear_greed` : zéro impact sur le rendu HTML.
+    if fng_w.get("available"):
+        payload["fear_greed"] = {
+            "value": fng_w.get("value"),
+            "label": fng_w.get("classification"),
+        }
 
     # ─────────────────────────────────────────────────────────────
     # v26 (W-A11/A13/B3/B9) — REPÈRES DÉTERMINISTES : lignes factuelles 100%
@@ -6455,10 +6856,19 @@ def run_weekly() -> int:
     if _fed_bars_w:
         _fl = (f"📊 Probas taux Fed (Polymarket) · {_fed_bars_w.get('dominant')} "
                f"{_fed_bars_w.get('dominant_pct')}%")
-        if _fed_bars_w.get("cut_pct") is not None:
-            _fl += (f" (baisse {_fed_bars_w.get('cut_pct')}% · maintien "
-                    f"{_fed_bars_w.get('hold_pct')}% · hausse "
-                    f"{_fed_bars_w.get('hike_pct')}%)")
+        # v29 (WA8) — la parenthèse ne RÉPÈTE plus la jambe dominante
+        # (« maintien 77.5% (… maintien 77.5% …) » le 10/07) et une proba
+        # < 0,5% s'affiche « ≈0% » (EA3 : pas de fausse précision « 0.0% »).
+        _legs_w = []
+        for _lg_k, _lg_lbl in (("cut_pct", "baisse"), ("hold_pct", "maintien"),
+                               ("hike_pct", "hausse")):
+            _lg_v = _parse_num(_fed_bars_w.get(_lg_k))
+            if _lg_v is None or _lg_lbl == str(_fed_bars_w.get("dominant")):
+                continue
+            _legs_w.append(
+                f"{_lg_lbl} ≈0%" if _lg_v < 0.5 else f"{_lg_lbl} {_lg_v}%")
+        if _legs_w:
+            _fl += f" ({' · '.join(_legs_w)})"
         _facts_lines.append(_fl)
     _dxy_ice_w = _yq_w.get("dxy_ice")
     if _dxy_ice_w is not None or _dxy_broad_w is not None:
@@ -6987,6 +7397,23 @@ def run_weekly() -> int:
         if _btc_closes_w:
             _bt = _sbt.compute_dip_buy_stats(_btc_closes_w)
             if _bt.get("available"):
+                # v29 (WA5) — LECTURE DÉTERMINISTE : le 10/07, le backtest
+                # affichait « 7j : 0% de hausse » juste au-dessus d'un plan
+                # d'accumulation sur repli, sans réconcilier les deux. La note
+                # tire la conclusion des chiffres eux-mêmes.
+                _hz_bt = _bt.get("horizons") or {}
+                _h7 = _parse_num(((_hz_bt.get("7") or _hz_bt.get(7))
+                                  or {}).get("hit_rate_pct"))
+                _h30 = _parse_num(((_hz_bt.get("30") or _hz_bt.get(30))
+                                   or {}).get("hit_rate_pct"))
+                if _h7 is not None and _h7 <= 40:
+                    _bt_read = (
+                        " Lecture : signal défavorable à 7 j"
+                        + (f", avantage seulement à 30 j ({_h7:.0f}% vs "
+                           f"{_h30:.0f}%) — étaler le DCA, pas d'achat impulsif."
+                           if _h30 is not None and _h30 >= 55 else
+                           " — la patience prime sur l'accumulation immédiate."))
+                    _bt["note"] = (str(_bt.get("note") or "").rstrip() + _bt_read).strip()
                 payload["strategy_backtest"] = _bt
     except Exception as _btexc:  # noqa: BLE001
         logger.info("Auto-backtest indisponible : %s", _btexc)

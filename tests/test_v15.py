@@ -448,9 +448,10 @@ def test_render_morning_v15_blocks():
     assert "réseau sain" in html                     # v16 : grille on-chain horizontale
     assert "Bilan on-chain : neutre" in html         # v16 : verdict-first
     assert "DXY &gt; 101" in html or "DXY > 101" in html
-    assert "Crypto Analyst Pro · v28" in html
-    # Ordre : invalidation AVANT auto-critique.
-    assert html.index("invalider mon scénario") < html.index("Auto-critique de l'analyse")
+    assert "Crypto Analyst Pro · v29" in html
+    # v29 (MB6) — « À surveiller » + « invalider » fusionnés en « À surveiller ·
+    # seuils d'invalidation », AVANT l'auto-critique (qui reste séparée).
+    assert html.index("seuils d'invalidation") < html.index("Auto-critique de l'analyse")
 
 
 def test_render_evening_v15_blocks():
@@ -466,7 +467,7 @@ def test_render_evening_v15_blocks():
                             "losers": [{"symbol": "FET", "change": -3.1}]},
         "actions_tonight": ["Placer un ordre limite BTC à 60 000 $"],
         "evening_macro": {"btc_price": 62800, "stoxx50": 5400,
-                          "nikkei": 39000, "eur_usd": 1.1537},
+                          "nikkei": 39000, "eur_usd": 1.1537, "usd_jpy": 161.5},
         "polymarket_facts": {"fed_bars": {"cut_pct": 0.2, "hold_pct": 99.2,
                                           "hike_pct": 0.4, "dominant": "maintien",
                                           "dominant_pct": 99.2}},
@@ -475,9 +476,12 @@ def test_render_evening_v15_blocks():
     assert "+0.04%" in html and "journée neutre" in html
     assert "+$1.00" in html                    # $ adaptatif < 10 $
     assert "Actions à poser ce soir" in html and "ordre limite BTC" in html
-    assert "International · Europe" in html and "Nikkei 225" in html
+    # v29 (ZB5) — International du soir allégé : USD/JPY (carry) conservé,
+    # Nikkei/Stoxx/EUR-USD retirés (déjà couverts le matin).
+    assert "USD/JPY" in html and "carry trade yen" in html
+    assert "Nikkei 225" not in html and "Stoxx 50" not in html
     assert "maintien" in html and "99.2%" in html
-    assert "Crypto Analyst Pro · v28" in html
+    assert "Crypto Analyst Pro · v29" in html
 
 
 def test_render_weekly_v15_blocks():
@@ -564,9 +568,13 @@ def test_render_weekly_v15_blocks():
     # v23.x — ATH/description retirés ; le tableau fusionné montre phase de cycle
     # + action déterministe (couleurs logiques).
     assert "Accumulation" in html and "Capitulation" in html
-    assert "Renforcer" in html and "Alléger" in html
+    # v29 (WB6) — la flèche « → Renforcer » est SUPPRIMÉE quand le badge Horizon
+    # 30j porte déjà RENFORCER (dédup) ; « → Alléger » (action ≠ reco 30j) reste.
+    assert "RENFORCER" in html          # badge Horizon 30j (ETH)
+    assert "→ Alléger" in html          # flèche non dupliquée (CKB)
+    assert "→ Renforcer" not in html    # dédup WB6
     assert "Stratégie de la semaine" in html
     assert "1\u202f773" in html or "1,773" in html or "1 773" in html  # fenêtre P&L
-    assert "Crypto Analyst Pro · v28" in html
+    assert "Crypto Analyst Pro · v29" in html
     # Ordre : la vue PTF arrive avant le fil rouge macro (P3-1).
     assert html.index("Portfolio · vue d'ensemble") < html.index("Fil rouge macro")

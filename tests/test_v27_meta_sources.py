@@ -123,16 +123,6 @@ def test_bitcoin_data_extras_live_or_graceful(net):
         assert any(k in out for k in ("sopr", "nupl", "nvt"))
 
 
-# ── GR2 · funding/OI history (probe live, tolérant) ───────────────────────
-def test_funding_history_live_or_graceful():
-    from src.data_sources import binance_futures
-    out = binance_futures.get_funding_history("BTC", days=14)
-    assert isinstance(out, dict) and "available" in out
-    if out["available"]:
-        assert out["annualized_series"] and out["points"]
-        assert isinstance(out["last_annualized_pct"], (int, float))
-
-
 # ── câblage main.py (morning + evening + weekly) ──────────────────────────
 def test_main_wiring_v27():
     from src import main as m

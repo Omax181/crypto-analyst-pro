@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 # v15 — version produit UNIQUE, injectée dans les 3 footers (audit : « v13 »
 # en dur dans les templates). main.py la ré-exporte pour les logs.
-APP_VERSION = "v28"
+APP_VERSION = "v29"
 
 _COLORS = {
     "bg": "#fafaf6",
@@ -321,7 +321,8 @@ _SOURCE_NAME_MAP = {
     "coinmarketcap": "CoinMarketCap",
     "cmc": "CoinMarketCap",
     "lunarcrush": "LunarCrush",
-    "kaito": "Kaito",
+    # v29 (audit) — les narratifs viennent des catégories CoinGecko (OB6).
+    "kaito": "Narratifs (CoinGecko)",
     "tokenunlocks": "Token Unlocks",
     "token_unlocks": "Token Unlocks",
     "defillama": "DeFiLlama",

@@ -64,6 +64,13 @@
 <div style="background:{{_rgebg}};border-radius:8px;padding:7px 14px;margin-bottom:1rem;">
   {# v28 (M-A5) — libellé aligné sur matin/hebdo : régime TECHNIQUE BTC. #}
   <p style="margin:0;font-size:12px;color:{{_rgefg}};line-height:1.5;"><span style="font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Régime BTC (technique) : {{market_regime.label_fr}}</span>{% if market_regime.days_in_regime is not none %} <span style="color:#5a5852;">· depuis {{market_regime.days_in_regime}} j</span>{% endif %}{% if market_regime.changed and market_regime.previous_label_fr %} <span style="font-weight:700;">· ⚠️ {{market_regime.previous_label_fr}} → {{market_regime.label_fr}}</span>{% endif %}</p>
+  {# v29 (EA6) — même ligne de réconciliation que le hebdo : le régime
+     TECHNIQUE (moyennes longues) peut être baissier pendant que les niveaux
+     de la nuit décrivent un rebond CT — sans cette phrase, le mail semblait
+     se contredire (bandeau BAISSIER vs narratif haussier partout). #}
+  {% if _rge == 'bear' %}
+  <p style="margin:4px 0 0 0;font-size:10px;color:#5a5852;line-height:1.5;">Le régime TECHNIQUE BTC reste baissier (prix sous les moyennes longues) ; les niveaux et scénarios du soir décrivent le court terme — les deux lectures coexistent sans se contredire.</p>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -135,9 +142,12 @@
   {% if daily_pnl.top_movers %}
   <p style="font-size:9px;color:#8a8880;margin:12px 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;border-top:0.5px solid #f0efe8;padding-top:10px;">Top mouvements · 24h glissant <span style="text-transform:none;letter-spacing:0;font-style:italic;">(fenêtre 24h ≠ P&amp;L depuis matin)</span></p>
   <p style="margin:0;font-size:12px;line-height:1.7;">
-    {# v28 (E-A4) — l'impact $ n'apparaît que s'il est SIGNIFICATIF (≥ 5 $) :
-       les « (−$1) / (−$0) » du 07/07 n'apportaient rien. #}
-    {% for m in daily_pnl.top_movers %}<span style="display:inline-block;margin-right:14px;white-space:nowrap;"><strong>{{m.symbol}}</strong> <span style="color:{% if (m.change|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (m.change|num(0)) >= 0 else '' }}{{m.change}}%</span>{% set _pu = m.pnl_usd|num(0) %}{% if _pu|abs >= 5 %} <span style="color:#8a8880;font-size:11px;">({{ '+' if _pu >= 0 else '−' }}${{ '{:,.0f}'.format(_pu|abs) }})</span>{% endif %}</span>{% endfor %}
+    {# v29 (EA4) — impact $ HOMOGÈNE : soit tous les movers l'affichent, soit
+       aucun. Le 10/07, seul ETH portait « (+$10) » (seuil 5 $) — format
+       incohérent. Règle : dès qu'un impact est calculable, chaque mover ≥ 1 $
+       affiche le sien ; sous 1 $ (bruit), « <$1 » explicite. #}
+    {% set _any_pu = [] %}{% for m in daily_pnl.top_movers %}{% if (m.pnl_usd|num(none)) is not none %}{% set _ = _any_pu.append(1) %}{% endif %}{% endfor %}
+    {% for m in daily_pnl.top_movers %}<span style="display:inline-block;margin-right:14px;white-space:nowrap;"><strong>{{m.symbol}}</strong> <span style="color:{% if (m.change|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (m.change|num(0)) >= 0 else '' }}{{m.change}}%</span>{% set _pun = m.pnl_usd|num(none) %}{% if _any_pu and _pun is not none %} <span style="color:#8a8880;font-size:11px;">({% if _pun|abs >= 1 %}{{ '+' if _pun >= 0 else '−' }}${{ '{:,.0f}'.format(_pun|abs) }}{% else %}&lt;$1{% endif %})</span>{% endif %}</span>{% endfor %}
   </p>
   {% endif %}
 </div>
@@ -147,32 +157,21 @@
    mouvements » ci-dessus (et parfois s'en écartait). On garde uniquement la
    liste « Top mouvements », plus lisible. ════════ #}
 
-{# ════════ BLOC 2bis · À RETENIR AUJOURD'HUI (puces typées, v16) ════════ #}
-{% if delta_summary %}
-<div style="background:#1a1a18;border-radius:12px;padding:14px 16px;margin-bottom:1.5rem;">
-  <p style="font-size:10px;color:#8a8880;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">À retenir aujourd'hui</p>
-  {# v23.x (Omar) — puce neutre • par défaut ; ⚠️ jaune RÉSERVÉ aux points
-     URGENTS/IMPORTANTS (icon ⚠). Plus de ✓/✗ dans la colonne d'icônes. #}
-  {% for d in delta_summary %}
-  {% if d is mapping %}
-  {% set _warn = (d.icon or '') in ['⚠', '⚠️'] %}
-  <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;"><tr>
-    <td style="width:22px;vertical-align:top;font-size:13px;line-height:1.55;color:{% if _warn %}#e5b567{% else %}#b5b3ab{% endif %};">{% if _warn %}⚠️{% else %}•{% endif %}</td>
-    <td style="font-size:13px;line-height:1.55;color:#f5f4ee;">{{ d.text|md }}</td>
-  </tr></table>
-  {% else %}
-  <p style="margin:0 0 {{ '7px' if not loop.last else '0' }} 0;font-size:13px;line-height:1.5;color:#f5f4ee;">→ {{ d|md }}</p>
-  {% endif %}
-  {% endfor %}
-</div>
-{% endif %}
+{# ════════ v29 (EB1) — la boîte noire « À retenir aujourd'hui » (delta_summary)
+   a été SUPPRIMÉE : elle faisait doublon avec « Ce qui a évolué côté marché »
+   (mêmes S&P/Nasdaq/VIX/MARA/NVDA, sans les sources). On garde la liste
+   sourcée/taggée (✓ CONFIRMÉ / ↑ NOUVEAU) plus bas, qui porte la synthèse ET
+   la provenance. Le prompt ordonne market_changes par importance décroissante
+   pour que le 1er item = le takeaway du jour. ════════ #}
 
 {# ════════ BLOC 3 · MARCHÉS GLOBAUX (crypto + tradfi unifiés, 2 lignes) ════════ #}
 {% set _em = evening_macro or {} %}
 {% set _mss_e = macro_source_status or {} %}
 {% if _em.btc_price or _em.sp500 or _em.dxy %}
-{# v28 (E-A2/E-A6) — « mi-séance » uniquement si la séance US est OUVERTE. #}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Marchés · {% if header.us_market_open %}mi-séance{% else %}instantané <span style="font-size:11px;color:#8a8880;font-weight:400;">(séance US fermée)</span>{% endif %}</h2>
+{# v28 (E-A2/E-A6) — libellé de séance seulement si la séance US est OUVERTE.
+   v29 (EA5) — phase PRÉCISE (début/mi/fin de séance) calculée en Python :
+   le run de 20h Casablanca tombe en FIN de séance US, pas « mi-séance ». #}
+<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Marchés · {% if header.us_market_open %}{{ header.us_session_label or 'mi-séance' }}{% else %}instantané <span style="font-size:11px;color:#8a8880;font-weight:400;">(séance US fermée)</span>{% endif %}</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
   {# Ligne 1 — Crypto & sentiment #}
   <p style="font-size:9px;color:#8a8880;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">Crypto &amp; sentiment</p>
@@ -231,37 +230,11 @@
     </tr>
   </table>
   {% endif %}
-  {# v15 (audit B-3) — ligne 3 : INTERNATIONAL (le crypto ne vit pas qu'aux USA). #}
-  {% if _em.nikkei or _em.stoxx50 or _em.eur_usd or _em.usd_jpy %}
-  <p style="font-size:9px;color:#8a8880;margin:12px 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;border-top:0.5px solid #f0efe8;padding-top:10px;">International · Europe &amp; Asie</p>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
-    <tr>
-      {% if _em.stoxx50 %}
-      <td style="width:25%;vertical-align:top;padding-right:6px;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">Stoxx 50</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format(_em.stoxx50|num(0)) }}{{ arrow24(_em.stoxx50, _em.stoxx50_delta) }}</p>
-      </td>
-      {% endif %}
-      {% if _em.nikkei %}
-      <td style="width:25%;vertical-align:top;padding-right:6px;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">Nikkei 225</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '{:,.0f}'.format(_em.nikkei|num(0)) }}{{ arrow24(_em.nikkei, _em.nikkei_delta) }}</p>
-      </td>
-      {% endif %}
-      {% if _em.eur_usd %}
-      <td style="width:25%;vertical-align:top;padding-right:6px;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">EUR/USD</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.4f'|format(_em.eur_usd|num(0)) }}</p>
-      </td>
-      {% endif %}
-      {% if _em.usd_jpy %}
-      <td style="width:25%;vertical-align:top;">
-        <p style="font-size:10px;color:#8a8880;margin:0;">USD/JPY</p>
-        <p style="font-size:15px;font-weight:500;margin:2px 0 0 0;">{{ '%.2f'|format(_em.usd_jpy|num(0)) }}</p>
-      </td>
-      {% endif %}
-    </tr>
-  </table>
+  {# v29 (ZB5) — INTERNATIONAL ALLÉGÉ le soir : Nikkei/Stoxx/EUR-USD (déjà
+     couverts le matin) retirés ; on garde SEULEMENT USD/JPY, pertinent le soir
+     pour le carry trade yen. Le soir est un complément, pas un doublon du matin. #}
+  {% if _em.usd_jpy %}
+  <p style="font-size:11px;color:#5a5852;margin:12px 0 0 0;border-top:0.5px solid #f0efe8;padding-top:8px;"><span style="font-weight:600;color:#1a1a18;">USD/JPY :</span> {{ '%.2f'|format(_em.usd_jpy|num(0)) }}{% if (_em.usd_jpy_delta|num(none)) is not none %}{{ arrow24(_em.usd_jpy, _em.usd_jpy_delta) }}{% endif %} <span style="color:#8a8880;">· carry trade yen</span></p>
   {% endif %}
   {# v26 (E-B10) — deltas matin→soir DÉTERMINISTES (Python) : l'essence du
      « complément du matin », toujours présents même si l'IA tombe. #}
@@ -275,7 +248,9 @@
   {% if polymarket_facts and (polymarket_facts.fed_bars or polymarket_facts.extra_markets) %}
   {% if polymarket_facts.fed_bars %}
   {% set _pf = polymarket_facts.fed_bars %}
-  <p style="font-size:10px;color:#5a5852;margin:10px 0 0 0;border-top:0.5px solid #f0efe8;padding-top:8px;">Polymarket · taux Fed{% if _pf.meeting_hint %} ({{_pf.meeting_hint}}){% endif %} : <strong>{{_pf.dominant}} {{ '%.1f'|format(_pf.dominant_pct|num(0)) }}%</strong> · baisse {{ '%.1f'|format(_pf.cut_pct|num(0)) }}% · hausse {{ '%.1f'|format(_pf.hike_pct|num(0)) }}%</p>
+  {# v29 (EA3) — « baisse 0.0% » est une fausse précision : sous 0,5% on
+     affiche « ≈0% » (le marché price un quasi-zéro, pas un zéro exact). #}
+  <p style="font-size:10px;color:#5a5852;margin:10px 0 0 0;border-top:0.5px solid #f0efe8;padding-top:8px;">Polymarket · taux Fed{% if _pf.meeting_hint %} ({{_pf.meeting_hint}}){% endif %} : <strong>{{_pf.dominant}} {{ '%.1f'|format(_pf.dominant_pct|num(0)) }}%</strong> · baisse {% if (_pf.cut_pct|num(0)) < 0.5 %}≈0%{% else %}{{ '%.1f'|format(_pf.cut_pct|num(0)) }}%{% endif %} · hausse {% if (_pf.hike_pct|num(0)) < 0.5 %}≈0%{% else %}{{ '%.1f'|format(_pf.hike_pct|num(0)) }}%{% endif %}</p>
   {% endif %}
   {% if polymarket_facts.extra_markets %}
   <p style="font-size:10px;color:#5a5852;margin:{% if polymarket_facts.fed_bars %}6px{% else %}10px{% endif %} 0 0 0;{% if not polymarket_facts.fed_bars %}border-top:0.5px solid #f0efe8;padding-top:8px;{% endif %}"><span style="font-weight:600;color:#1a1a18;">Autres marchés :</span> {% for m in polymarket_facts.extra_markets %}{{m.question}} <strong>{{ '%.0f'|format(m.probability_pct|num(0)) }}%</strong>{% if not loop.last %} · {% endif %}{% endfor %}</p>
@@ -374,36 +349,22 @@
 {% set _lt = {'support':['support','#FAEEDA','#412402'],'resistance':['résistance','#EAF3DE','#27500A'],'critical':['critique','#FCEBEB','#791F1F'],'threshold':['seuil','#E6F1FB','#0C447C']} %}
 {# v28 (E-A1) — « cette nuit » seulement quand le run est bien un run du soir. #}
 <h2 style="margin:1.5rem 0 0.5rem 0;font-size:17px;font-weight:500;">{{ header.levels_window_label or "Niveaux à surveiller cette nuit" }}</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 0.75rem;margin-bottom:1.5rem;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-size:12px;">
-    {# v16.1 — UNE ligne par actif : tous ses niveaux (support/résistance/seuil)
-       sont regroupés, plus de doublons « TAO » sur plusieurs lignes. #}
-    {% for _asset, _levels in levels_tonight|groupby('asset') %}
-    <tr style="{% if not loop.first %}border-top:0.5px solid #f0efe8;{% endif %}">
-      <td style="padding:8px 6px 8px 4px;font-weight:700;white-space:nowrap;width:56px;vertical-align:top;">{{_asset}}
-        {# v19/E-A14/V18-E9 : prix de référence sous le symbole (BTC/ETH) pour
-           situer les niveaux — l'Evening donnait des niveaux ETH sans prix actuel. #}
-        {% set _ap = (evening_macro.btc_price if _asset == 'BTC' else (evening_macro.eth_price if _asset == 'ETH' else none)) %}
-        {% if _ap %}<div style="font-size:9px;color:#8a8880;font-weight:500;">{{ _ap|fmt_price }}</div>{% endif %}
-      </td>
-      <td style="padding:8px 4px;vertical-align:top;">
-        {% for lv in _levels %}
-        {% set _t = _lt.get(lv.type, ['niveau','#f5f4ee','#5a5852']) %}
-        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;"><tr>
-          <td style="padding:1px 8px 1px 0;font-weight:600;white-space:nowrap;width:64px;vertical-align:top;">{{lv.level}}</td>
-          <td style="padding:1px 8px 1px 0;white-space:nowrap;width:74px;vertical-align:top;"><span style="background:{{_t[1]}};color:{{_t[2]}};padding:1px 7px;border-radius:6px;font-size:10px;font-weight:600;">{{_t[0]}}</span></td>
-          <td style="padding:1px 0 {% if not loop.last %}5px{% else %}1px{% endif %} 0;color:#5a5852;line-height:1.4;">{{lv.trigger|md}}</td>
-        </tr></table>
-        {% endfor %}
-        {# v26 (E-B5) — readout technique calculé (RSI/MACD/Bollinger/ATR/volume)
-           sous les niveaux de l'actif : l'analyse profonde, sans blabla. #}
-        {% if levels_readout and levels_readout.get(_asset) %}
-        <p style="margin:4px 0 0 0;font-size:10px;color:#8a8880;line-height:1.4;">{{ levels_readout.get(_asset) }}</p>
-        {% endif %}
-      </td>
-    </tr>
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 0.9rem;margin-bottom:1.5rem;">
+  {# v29 (EB3) — NIVEAUX NUIT densifiés : 1 bloc par actif, chaque niveau sur UNE
+     ligne inline (badge + niveau + déclencheur) au lieu d'une sous-table par
+     niveau. Le readout technique (RSI/MACD/Bollinger/ATR) reste sous l'actif —
+     l'analyse est conservée, la hauteur ~divisée par deux. #}
+  {% for _asset, _levels in levels_tonight|groupby('asset') %}
+  {% set _ap = (evening_macro.btc_price if _asset == 'BTC' else (evening_macro.eth_price if _asset == 'ETH' else none)) %}
+  <div style="{% if not loop.first %}border-top:0.5px solid #f0efe8;{% endif %}padding:8px 0;">
+    <p style="margin:0 0 3px 0;font-size:12px;"><span style="font-weight:700;color:#1a1a18;">{{_asset}}</span>{% if _ap %} <span style="color:#8a8880;font-size:10px;">{{ _ap|fmt_price }}</span>{% endif %}</p>
+    {% for lv in _levels %}
+    {% set _t = _lt.get(lv.type, ['niveau','#f5f4ee','#5a5852']) %}
+    <p style="margin:0 0 2px 0;font-size:11px;line-height:1.4;color:#5a5852;"><span style="background:{{_t[1]}};color:{{_t[2]}};padding:1px 6px;border-radius:5px;font-size:9px;font-weight:600;">{{_t[0]}}</span> <strong style="color:#1a1a18;">{{lv.level}}</strong> — {{lv.trigger|md}}</p>
     {% endfor %}
-  </table>
+    {% if levels_readout and levels_readout.get(_asset) %}<p style="margin:3px 0 0 0;font-size:10px;color:#8a8880;line-height:1.4;">{{ levels_readout.get(_asset) }}</p>{% endif %}
+  </div>
+  {% endfor %}
 </div>
 {% endif %}
 

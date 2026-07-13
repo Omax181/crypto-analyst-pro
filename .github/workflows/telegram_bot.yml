@@ -50,8 +50,9 @@ jobs:
           # Absents → le bot retombe sur le polling getUpdates (rétro-compat).
           RELAY_PULL_URL: ${{ secrets.RELAY_PULL_URL }}
           RELAY_SECRET: ${{ secrets.RELAY_SECRET }}
-          # v21 — mot de passe d'édition du portefeuille (/buy /sell /set). Si le
-          # secret est absent/vide, le code retombe sur le défaut « Omax181 ».
+          # v21 — mot de passe d'édition du portefeuille (/buy /sell /set).
+          # v29 (audit sécurité) : OBLIGATOIRE — sans ce secret, l'écriture est
+          # désactivée (aperçus seulement). Plus aucun défaut en dur dans le code.
           PORTFOLIO_EDIT_PASSWORD: ${{ secrets.PORTFOLIO_EDIT_PASSWORD }}
         run: python -m src.telegram_bot.bot
       - name: Commit state changes (offset, history, reco actions, portfolio edits)

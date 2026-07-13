@@ -120,9 +120,8 @@ def test_cm_realized_price_derived_without_caprealusd(monkeypatch):
 def test_ptf_evolution_chart_endpoint_label_not_clipped(_mpl=None):
     """3.B — le chart PTF se rend ; label endpoint dans la marge droite
     réservée (xlim élargi), plus de rognure comme le 07/07."""
-    try:
-        import matplotlib  # noqa: F401
-    except Exception:
+    import importlib.util
+    if importlib.util.find_spec("matplotlib") is None:
         import pytest
         pytest.skip("matplotlib absent")
     from src.reporting import charts

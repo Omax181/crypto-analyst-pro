@@ -205,8 +205,10 @@ def test_sector_heatmap_autre_consolidation():
     }}
     r = _compute_sector_exposure(enriched, rotation)
     secs = r["sectors"]
-    assert len(secs) == 6  # 5 individuels + agrégat « Autres secteurs »
-    assert secs[-1]["sector"].startswith("Autres secteurs")  # v23 (W7)
+    assert len(secs) == 6  # 5 individuels + agrégat « Autres · N secteurs »
+    # v29 (WA11) — libellé explicite « Autres · N secteurs (M actifs) ».
+    assert secs[-1]["sector"].startswith("Autres ·")
+    assert "2 secteurs" in secs[-1]["sector"]
     # Moyenne pondérée de l'agrégat (F,G) : (6×3 + 4×-2)/10 = 1.0
     assert secs[-1]["market_change_24h"] == 1.0
     assert secs[-1]["is_aggregate"] is True

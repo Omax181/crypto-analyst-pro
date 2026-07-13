@@ -1,4 +1,4 @@
-# 🤖 Crypto Analyst Pro · v28
+# 🤖 Crypto Analyst Pro · v29
 
 Agent d'analyse crypto personnel et autonome. Analyste **multi-sources à voix
 critique** (et non plus résumeur monosource) : il croise jusqu'à 14 sources, un

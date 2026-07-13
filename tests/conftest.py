@@ -29,24 +29,21 @@ for _m in _STUBS:
         except ImportError:
             sys.modules[_m] = types.ModuleType(_m)
 
-# tenacity : fournir des décorateurs no-op si absent.
-if "tenacity" not in sys.modules:
-    try:
-        import tenacity  # noqa: F401
-    except ImportError:
-        _t = types.ModuleType("tenacity")
-        _t.retry = lambda *a, **k: (lambda f: f)
-        _t.retry_if_exception_type = lambda *a, **k: None
-        _t.stop_after_attempt = lambda *a, **k: None
-        _t.wait_exponential = lambda *a, **k: None
-        sys.modules["tenacity"] = _t
+# tenacity : fournir des décorateurs no-op si absent. v29 (audit) — probe de
+# présence via find_spec (pyflakes-clean), sémantique identique à l'import.
+import importlib.util as _ilu
+
+if "tenacity" not in sys.modules and _ilu.find_spec("tenacity") is None:
+    _t = types.ModuleType("tenacity")
+    _t.retry = lambda *a, **k: (lambda f: f)
+    _t.retry_if_exception_type = lambda *a, **k: None
+    _t.stop_after_attempt = lambda *a, **k: None
+    _t.wait_exponential = lambda *a, **k: None
+    sys.modules["tenacity"] = _t
 
 # requests : exceptions minimales si absent.
-if "requests" not in sys.modules:
-    try:
-        import requests  # noqa: F401
-    except ImportError:
-        _r = types.ModuleType("requests")
-        _r.RequestException = Exception
-        _r.get = lambda *a, **k: None
-        sys.modules["requests"] = _r
+if "requests" not in sys.modules and _ilu.find_spec("requests") is None:
+    _r = types.ModuleType("requests")
+    _r.RequestException = Exception
+    _r.get = lambda *a, **k: None
+    sys.modules["requests"] = _r

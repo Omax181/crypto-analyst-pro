@@ -77,11 +77,21 @@
 </div>
 {% endif %}
 
-{# ── v27 (ME2/ME3) — VERDICT des appels de la semaine passée (auto-évaluation). ── #}
-{% if calls_review and calls_review.available and calls_review.summary_line %}
+{# ── v29 (ZB2) — RÉTROSPECTIVE FUSIONNÉE : le verdict des appels (calls_review)
+   et le diff « depuis le hebdo précédent » (week_over_week) étaient deux
+   mini-bandeaux séparés (l'un avant, l'autre après le Bilan semaine). Réunis en
+   UN bandeau ici. « Bilan semaine » (les 5 puces d'analyse) reste distinct. ── #}
+{% if (calls_review and calls_review.available and calls_review.summary_line) or (week_over_week and week_over_week.available and week_over_week.lines) %}
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:8px;padding:10px 14px;margin-bottom:1rem;">
+  {% if calls_review and calls_review.available and calls_review.summary_line %}
   <p style="margin:0 0 3px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Mes appels de la semaine passée · verdict</p>
   <p style="margin:0;font-size:12px;color:#33312e;line-height:1.55;">📏 {{calls_review.summary_line}}</p>
+  {% endif %}
+  {% if week_over_week and week_over_week.available and week_over_week.lines %}
+  <p style="margin:{% if calls_review and calls_review.available and calls_review.summary_line %}10px{% else %}0{% endif %} 0 4px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;{% if calls_review and calls_review.available and calls_review.summary_line %}padding-top:8px;border-top:0.5px solid #f0efe8;{% endif %}">Depuis le hebdo précédent{% if week_over_week.prev_date_label %} <span style="text-transform:none;letter-spacing:0;font-weight:400;">(du {{week_over_week.prev_date_label}})</span>{% endif %}</p>
+  <p style="margin:0;font-size:12px;color:#33312e;line-height:1.6;">{{ week_over_week.lines|join(' · ') }}</p>
+  <p style="margin:4px 0 0 0;font-size:9px;color:#a8a6a0;font-style:italic;">« P&amp;L semaine » (en-tête) = 7 jours glissants ; ce bloc compare au dernier rapport hebdo.</p>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -102,17 +112,8 @@
   {% endif %}
 </div>
 
-{# ── v26 (W-B9) — DEPUIS LE HEBDO PRÉCÉDENT : diff déterministe WoW (valeur,
-   santé, F&G, dollar). Absent la 1re semaine (pas de snapshot N-1). ── #}
-{% if week_over_week and week_over_week.available and week_over_week.lines %}
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:8px;padding:10px 14px;margin:-0.75rem 0 1.5rem 0;">
-  <p style="margin:0 0 4px 0;font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Depuis le hebdo précédent{% if week_over_week.prev_date_label %} <span style="text-transform:none;letter-spacing:0;font-weight:400;">(du {{week_over_week.prev_date_label}})</span>{% endif %}</p>
-  <p style="margin:0;font-size:12px;color:#33312e;line-height:1.6;">{{ week_over_week.lines|join(' · ') }}</p>
-  {# v28 (W-A16) — lever la confusion des DEUX bases : « P&L semaine » = fenêtre
-     7 j glissante ; ce bloc = variation depuis le dernier hebdo daté. #}
-  <p style="margin:4px 0 0 0;font-size:9px;color:#a8a6a0;font-style:italic;">« P&L semaine » (en-tête) = 7 jours glissants ; ce bloc compare au dernier rapport hebdo.</p>
-</div>
-{% endif %}
+{# v29 (ZB2) — « Depuis le hebdo précédent » a été REMONTÉ dans le bandeau
+   rétrospectif fusionné (au-dessus de « Bilan semaine »). Bloc supprimé ici. #}
 
 {# ── PORTFOLIO · VUE D'ENSEMBLE (table 4 col 25%, P&L semaine remplace
    drawdown — points 9+10) ── #}
@@ -186,7 +187,11 @@
   {% endif %}
   {# v15 (audit P0-8) — fenêtre du P&L semaine EXPLICITE : début → fin. #}
   {% if portfolio_snapshot.week_start_value and portfolio_snapshot.week_end_value %}
-  <p style="font-size:10px;color:#8a8880;margin:10px 0 0 0;">Fenêtre du P&amp;L semaine : {{portfolio_snapshot.week_start_value|fmt_price}} (il y a 7 j) → {{portfolio_snapshot.week_end_value|fmt_price}} (aujourd'hui){% if header.period_covered %} · {{header.period_covered}}{% endif %}.</p>
+  {# v29 (WA3) — méthode de la baseline EXPLICITE : la valeur « il y a 7 j »
+     est reconstituée depuis les variations 7 j par position (CoinGecko), pas
+     copiée d'un snapshot — sa proximité avec la valeur du matin est une
+     coïncidence de marché, pas un bug. #}
+  <p style="font-size:10px;color:#8a8880;margin:10px 0 0 0;">Fenêtre du P&amp;L semaine : {{portfolio_snapshot.week_start_value|fmt_price}} (il y a 7 j, reconstitué des variations 7 j par position) → {{portfolio_snapshot.week_end_value|fmt_price}} (aujourd'hui){% if header.period_covered %} · {{header.period_covered}}{% endif %}.</p>
   {% endif %}
   {# ── GESTION ACTIVE VS BTC HOLD : SUPPRIMÉ en v16 (Omar dispose déjà de cette
      comparaison ailleurs ; règle au passage le doublon « [fenêtre : 7 jours] »). ── #}
@@ -370,8 +375,10 @@
       </td>
     </tr>
   </table>
-  {# Point 38 : ligne secondaire claire "Win rate sem. · — · Win rate 30j · —". #}
-  <p style="font-size:11px;color:#8a8880;margin:8px 0 0 0;">Win rate sem. · {% if _wr_total < 5 or (_ps.win_rate_pct|num(none)) is none %}—{% else %}{{_ps.win_rate_pct}}%{% endif %} · Win rate 30j · {% if (_ps.win_rate_30d|num(none)) is not none %}{{_ps.win_rate_30d}}%{% else %}—{% endif %}</p>
+  {# Point 38 : ligne secondaire claire "Win rate sem. · — · Win rate 30j · —".
+     v29 (WA6) — plus jamais « Win rate 30j · 100% » sur 2/2 : sous 5
+     clôturées, le payload envoie None + le libellé « en calibration (X/5) ». #}
+  <p style="font-size:11px;color:#8a8880;margin:8px 0 0 0;">Win rate sem. · {% if _wr_total < 5 or (_ps.win_rate_pct|num(none)) is none %}—{% else %}{{_ps.win_rate_pct}}%{% endif %} · Win rate 30j · {% if (_ps.win_rate_30d|num(none)) is not none %}{{_ps.win_rate_30d}}%{% elif _ps.win_rate_30d_gate %}{{_ps.win_rate_30d_gate}}{% else %}—{% endif %}</p>
   {# v16 — jauge de calibration explicite dans le header (et plus seulement en
      légende) : « Recos clôturées : X/5 minimum pour calibration ». #}
   {% if _ps.winrate_gate_label %}
@@ -473,19 +480,26 @@
     <div style="color:#501313;">{{losses_vs_recos|md}}</div>
   </div>
   {% endif %}
+  {# v29 (WB2) — quand RIEN n'est clôturé, « Pertes » et « Coût des erreurs »
+     disaient tous les deux « aucune reco clôturée ». On n'affiche « Coût des
+     erreurs » VIDE que si « Pertes » ne l'a pas déjà expliqué (sinon doublon).
+     Avec des pertes réelles (regret.entries), le bloc complet reste. #}
+  {% if regret and regret.entries %}
   <div{% if my_errors %} style="padding-bottom:10px;margin-bottom:10px;border-bottom:0.5px solid #efeee7;"{% endif %}>
     <p style="margin:0 0 3px 0;font-weight:600;color:#1a1a18;">Coût des erreurs · le regret de la semaine</p>
-    {% if regret and regret.entries %}
     {% for it in regret.entries %}
     <div style="padding:4px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}line-height:1.5;">
       <span style="font-weight:500;">{{it.asset}}</span> — {{it.description}}{% if it.cost_pct is not none %} <span style="color:#A32D2D;font-weight:500;">{{ it.cost_pct|fmt_pct }} {{it.cost_label or 'non capturés'}}</span>{% endif %}{% if it.cost_usd %} ≈ {{ it.cost_usd|fmt_price }}{% endif %}
     </div>
     {% endfor %}
     {% if regret.total_note %}<p style="color:#5a5852;margin:8px 0 0 0;line-height:1.5;"><span style="font-weight:500;">Regret total :</span> {{regret.total_note}}</p>{% endif %}
-    {% else %}
-    <p style="margin:0;color:#5a5852;">{{ (regret and regret.empty_reason) or "Pas encore de reco clôturée sur la fenêtre · mesure disponible dès la première clôture." }}</p>
-    {% endif %}
   </div>
+  {% elif not losses_vs_recos %}
+  <div{% if my_errors %} style="padding-bottom:10px;margin-bottom:10px;border-bottom:0.5px solid #efeee7;"{% endif %}>
+    <p style="margin:0 0 3px 0;font-weight:600;color:#1a1a18;">Pertes &amp; coût des erreurs</p>
+    <p style="margin:0;color:#5a5852;">{{ (regret and regret.empty_reason) or "Aucune reco clôturée sur la fenêtre — rien à mesurer ; le coût des erreurs s'active dès la 1re clôture." }}</p>
+  </div>
+  {% endif %}
   {% if my_errors %}
   <div>
     <p style="margin:0 0 3px 0;font-weight:600;color:#633806;">Mon erreur de la semaine</p>
@@ -661,6 +675,17 @@
 {% if scenarios %}
 <h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Scénarios pour la semaine</h2>
 <div style="margin-bottom:1.5rem;">
+  {# v29 (WB5) — PRÉAMBULE COMMUN + ligne de BASCULE (déterministes) : le
+     catalyseur de la semaine (CPI…) et le seuil BTC qui départage les 3
+     scénarios, sortis UNE fois en tête → plus besoin de répéter « CPI lundi »
+     dans chaque scénario, et le lecteur sait quoi surveiller pour savoir lequel
+     se réalise. #}
+  {% if scenarios_context and (scenarios_context.catalyst or scenarios_context.bascule) %}
+  <div style="background:#f5f4ee;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;line-height:1.55;color:#33312e;">
+    {% if scenarios_context.catalyst %}<p style="margin:0 0 3px 0;"><span style="font-weight:600;color:#1a1a18;">Catalyseur commun :</span> {{ scenarios_context.catalyst }}{% if scenarios_context.btc_pivot_label %} · pivot BTC {{ scenarios_context.btc_pivot_label }}{% endif %}</p>{% endif %}
+    {% if scenarios_context.bascule %}<p style="margin:0;color:#5a5852;">▸ <span style="font-weight:600;color:#1a1a18;">Signal de bascule :</span> {{ scenarios_context.bascule }}</p>{% endif %}
+  </div>
+  {% endif %}
   {% for s in scenarios %}
   {% set scen_bg = '#FCEBEB' if s.type == 'bearish' else ('#EAF3DE' if s.type == 'bullish' else '#FAEEDA') %}
   {% set scen_label = '#791F1F' if s.type == 'bearish' else ('#27500A' if s.type == 'bullish' else '#633806') %}
@@ -710,7 +735,11 @@
 {# ── PLAN D'ACTION DE LA SEMAINE (v24) — la STRATÉGIE (synthèse en bullets, fond
    BLANC homogène) est REGROUPÉE en tête de cette section (sous le H2), suivie des
    actions numérotées. Ancien bloc noir « Stratégie de la semaine » supprimé. ── #}
-{% if weekly_action_plan or strategy_focus %}
+{# v29 (ZB3) — la « Watchlist · entrées/sorties » est FUSIONNÉE ici : les mêmes
+   niveaux (BTC 62 900 $, ETH 1 690 $…) apparaissaient dans les scénarios, le
+   plan ET la watchlist. Une SEULE liste d'actions de référence : stratégie +
+   gestes numérotés + entrées/sorties surveillées. #}
+{% if weekly_action_plan or strategy_focus or watchlist %}
 <h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Plan d'action de la semaine</h2>
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 1rem;margin-bottom:1.5rem;">
   {% if strategy_focus %}
@@ -726,27 +755,26 @@
   </div>
   {% endif %}
   {% for a in (weekly_action_plan or []) %}
-  <div style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}">
+  <div style="padding:8px 0;{% if not loop.last or watchlist %}border-bottom:0.5px solid #f0efe9;{% endif %}">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr>
       <td style="vertical-align:top;width:26px;"><span style="display:inline-block;width:20px;height:20px;background:#534AB7;color:#fff;border-radius:50%;text-align:center;line-height:20px;font-size:11px;font-weight:700;">{{a.priority or loop.index}}</span></td>
       <td style="vertical-align:top;font-size:12px;line-height:1.5;"><span style="font-weight:600;color:#1a1a18;">{{a.action|md}}</span>{% if a.rationale %}<br><span style="color:#5a5852;font-size:11px;">{{a.rationale|md}}</span>{% endif %}</td>
     </tr></table>
   </div>
   {% endfor %}
-</div>
-{% endif %}
-
-{# ── WATCHLIST · entrées / sorties (B7) ── #}
-{% if watchlist %}
-<h2 style="margin:1.5rem 0 0.75rem 0;font-size:17px;font-weight:500;">Watchlist · entrées / sorties</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:0.5rem 1rem;margin-bottom:1.5rem;">
-  {% for w in watchlist %}
-  {% set _entry = (w.direction or '')|lower in ['entrée','entree','achat','buy','in', 'entry'] %}
-  <div style="padding:7px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;">
-    <span style="font-size:10px;padding:1px 7px;border-radius:6px;font-weight:700;background:{% if _entry %}#EAF3DE{% else %}#FCEBEB{% endif %};color:{% if _entry %}#27500A{% else %}#791F1F{% endif %};">{{ '▲ ENTRÉE' if _entry else '▼ SORTIE' }}</span>
-    <span style="font-weight:600;color:#1a1a18;margin-left:6px;">{{w.asset}}</span>{% if w.trigger %} · <span style="color:#1a1a18;">{{w.trigger}}</span>{% endif %}{% if w.rationale %}<br><span style="color:#5a5852;font-size:11px;margin-left:2px;">{{w.rationale}}</span>{% endif %}
+  {# v29 (ZB3) — Watchlist (entrées/sorties surveillées) fondue dans le plan. #}
+  {% if watchlist %}
+  <div style="padding:10px 0 6px 0;">
+    <p style="font-size:10px;color:#8a8880;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Entrées / sorties surveillées</p>
+    {% for w in watchlist %}
+    {% set _entry = (w.direction or '')|lower in ['entrée','entree','achat','buy','in', 'entry'] %}
+    <div style="padding:5px 0;{% if not loop.last %}border-bottom:0.5px solid #f0efe9;{% endif %}font-size:12px;line-height:1.5;">
+      <span style="font-size:10px;padding:1px 7px;border-radius:6px;font-weight:700;background:{% if _entry %}#EAF3DE{% else %}#FCEBEB{% endif %};color:{% if _entry %}#27500A{% else %}#791F1F{% endif %};">{{ '▲ ENTRÉE' if _entry else '▼ SORTIE' }}</span>
+      <span style="font-weight:600;color:#1a1a18;margin-left:6px;">{{w.asset}}</span>{% if w.trigger %} · <span style="color:#1a1a18;">{{w.trigger}}</span>{% endif %}{% if w.rationale %}<br><span style="color:#5a5852;font-size:11px;margin-left:2px;">{{w.rationale}}</span>{% endif %}
+    </div>
+    {% endfor %}
   </div>
-  {% endfor %}
+  {% endif %}
 </div>
 {% endif %}
 
@@ -785,7 +813,12 @@
          identique aux fiches du matin) prime sur la cible LLM. #}
       <td style="padding:6px 6px;vertical-align:top;"><span style="display:inline-block;padding:1px 7px;border-radius:10px;background:{{_ph[2]}};color:{{_ph[1]}};font-weight:600;font-size:9px;">{{_ph[0]}}</span>{% if r.lt_target_high %}<br><span style="font-size:10px;color:#5a5852;">{% if r.lt_target_kind == 'cycle' %}cible cycle{% else %}cible{% endif %} {{ r.lt_target_low|fmt_price }}–{{ r.lt_target_high|fmt_price }}{% set _ltp = r.lt_target_pct|num(none) %}{% if _ltp is not none %} <span style="color:{% if _ltp >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">({{ '+' if _ltp >= 0 else '' }}{{_ltp|int}}%)</span>{% endif %}</span>{% elif r.lt_target %}<br><span style="font-size:10px;color:#5a5852;">{% if r.lt_target_kind == 'cycle' %}cible cycle{% else %}cible{% endif %} {{ r.lt_target|fmt_price }}{% set _ltp = r.lt_target_pct|num(none) %}{% if _ltp is not none %} <span style="color:{% if _ltp >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">({{ '+' if _ltp >= 0 else '' }}{{_ltp|int}}%)</span>{% endif %}</span>{% else %}<br><span style="font-size:10px;color:#b5b3ab;">cible à définir</span>{% endif %}</td>
     </tr>
-    {% if r.analysis or _ac[0] != '—' %}<tr><td colspan="4" style="padding:0 6px 6px 6px;color:#8a8880;font-size:10px;line-height:1.35;">{% if r.analysis %}⚙ {{ r.analysis }}{% endif %}{% if _ac[0] != '—' %} <span style="color:{{_ac[1]}};font-weight:700;">→ {{_ac[0]}}</span>{% endif %}</td></tr>{% endif %}
+    {# v29 (WB6) — la flèche « → Renforcer » ne s'affiche QUE si la colonne
+       « Horizon 30j » ne porte PAS déjà cette reco (sinon doublon). Pour une
+       position SANS reco 30j active, la flèche reste le seul indicateur d'action
+       (→ Garder / Sortir). #}
+    {% set _dup_action = (r.h30 and r.h30.reco and (r.h30.reco|lower).startswith((_ac[0]|lower)[:5])) %}
+    {% if r.analysis or (_ac[0] != '—' and not _dup_action) %}<tr><td colspan="4" style="padding:0 6px 6px 6px;color:#8a8880;font-size:10px;line-height:1.35;">{% if r.analysis %}⚙ {{ r.analysis }}{% endif %}{% if _ac[0] != '—' and not _dup_action %} <span style="color:{{_ac[1]}};font-weight:700;">→ {{_ac[0]}}</span>{% endif %}</td></tr>{% endif %}
     {% endfor %}
   </table>
   <p style="font-size:9px;color:#a8a6a0;margin:8px 6px 0 6px;font-style:italic;">Horizon 30j = perf de la reco en cours (Δ depuis l'entrée) · Long terme = phase de cycle + cible 6-12m — « cible cycle » = reconquête de l'ATH, horizon &gt; 12m · ★ cœur = conviction (vs satellite à offloader sur force).</p>
@@ -800,10 +833,10 @@
 {% if sources_review or (blind_spots_weekly and blind_spots_weekly.entries) or (header.active_sources_count is not none) %}
 <div style="background:#F1EFE8;border-radius:8px;padding:12px 14px;margin-bottom:1.5rem;font-size:12px;color:#5a5852;line-height:1.6;">
   <p style="margin:0 0 6px 0;font-weight:500;color:#1a1a18;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Sources &amp; angles morts récurrents · {{header.active_sources_count or 0}}{% if header.total_sources_count %} / {{header.total_sources_count}}{% endif %} actives</p>
-  {% if sources_review.summary %}
-  <p style="margin:6px 0 0 0;font-size:11px;color:#1a1a18;font-weight:500;">Sources actives</p>
-  <div style="margin:2px 0 0 0;font-size:12px;color:#5a5852;">{{sources_review.summary|md}}</div>
-  {% endif %}
+  {# v29 (WB7) — le paragraphe prose « Sources actives » (« Nous exploitons un
+     ensemble de sources diversifiées… ») était du remplissage : le compte
+     X/25 actives est déjà dans le titre ci-dessus. On garde UNIQUEMENT les
+     lacunes/angles morts (l'info utile), sous forme de liste sèche. #}
   {% if sources_review.gaps or (blind_spots_weekly and blind_spots_weekly.entries) %}
   <p style="margin:8px 0 0 0;font-size:11px;color:#1a1a18;font-weight:500;">Lacunes &amp; angles morts récurrents</p>
   {% if sources_review.gaps %}<div style="margin:2px 0 0 0;font-size:12px;color:#5a5852;">{{sources_review.gaps|md}}</div>{% endif %}

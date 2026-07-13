@@ -305,8 +305,10 @@ def test_ws8_sector_exposure_six_cases():
     out = _compute_sector_exposure(enriched, rotation)
     assert out["available"]
     assert len(out["sectors"]) == 6          # 5 individuels + agrégat (avant : 4 + agg)
-    # v23 (W7) — libellé « Autres secteurs (N) » (distinct de « Autre / non classé »).
-    assert out["sectors"][-1]["sector"].startswith("Autres secteurs")
+    # v29 (WA11) — libellé « Autres · N secteurs (M actifs) » (le « (4) » de
+    # l'ancien libellé se lisait comme un compte d'actifs faux).
+    assert out["sectors"][-1]["sector"].startswith("Autres ·")
+    assert "3 secteurs" in out["sectors"][-1]["sector"]
     assert out["sectors"][-1].get("is_aggregate") is True
 
 

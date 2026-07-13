@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pathlib
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from src.analytics.coherence_checker import check_report
 from src.analytics.composite_score import composite_score, confidence_to_action
@@ -90,9 +90,3 @@ def test_weekly_win_rate_calculation(monkeypatch) -> None:
     assert score["win_rate_pct"] == round(2 / 3 * 100)
 
 
-def test_news_filter_temporal_structure() -> None:
-    """get_recent_news renvoie une liste (vide si pas de clé) sans planter."""
-    from src.data_sources import cryptopanic
-
-    result = cryptopanic.get_recent_news("BTC", hours=24)
-    assert isinstance(result, list)

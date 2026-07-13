@@ -345,8 +345,8 @@ def test_run_from_relay_empty_queue_is_noop(monkeypatch):
 # Notifications push
 # --------------------------------------------------------------------------- #
 def test_notify_summary_line_morning():
-    # v28 (TG-refonte) — _build_digest = digest à 2 zones : 📌 EN BREF (⚡ verdict
-    # + 📊 marché + 💼) puis détail (🌍 marché, 🎯 actions, 📈 positions, ⚠️).
+    # v29 (TG-briefing) — _build_digest = briefing à 2 zones : 📌 EN BREF (⚡
+    # verdict + 📊 régime ARGUMENTÉ + 💼) puis détail (🌍, 🎯, 📊 thèses, ⚠️).
     from src.telegram_bot import notify
 
     digest = notify._build_digest(
@@ -363,20 +363,23 @@ def test_notify_summary_line_morning():
     assert "MATIN" in digest and "jeudi 3 juillet" in digest
     assert "📌 EN BREF" in digest
     assert "⚡" in digest and "RENFORCER TAO" in digest      # verdict adaptatif
-    assert "Fond range" in digest                            # état marché
+    assert "Crypto en range" in digest                       # régime + accord
+    assert "F&G 19" in digest                                # argument sentiment
     assert "/pourquoi TAO" in digest                         # commandes perso
-    # Éléments RETIRÉS de l'ancien format.
+    # Éléments RETIRÉS des anciens formats.
+    assert "Fond range" not in digest
     assert "Risque PTF" not in digest
     assert "Réponds ici pour creuser" not in digest
 
 
 def test_notify_digest_evening_and_weekly():
-    """v28 (TG-refonte) — digests soir & hebdo : EN BREF + détail, FR (virgule)."""
+    """v29 (TG-briefing) — digests soir & hebdo : EN BREF + détail, FR (virgule)."""
     from src.telegram_bot import notify
 
     ev = notify._build_digest(
         {"header": {"time_casablanca": "jeudi 3 juillet, 20:00"},
-         "daily_pnl": {"day_change_pct": -1.4, "day_change_usd": -37}},
+         "daily_pnl": {"value_usd": 2589, "day_change_pct": -1.4,
+                       "day_change_usd": -37}},
         "evening")
     assert "SOIR" in ev and "📌 EN BREF" in ev
     assert "−1,40%" in ev and "(−37 $)" in ev
@@ -388,7 +391,9 @@ def test_notify_digest_evening_and_weekly():
          "scenarios": [{"label": "range", "probability_pct": 55}],
          "weekly_action_plan": [{"action": "Renforcer BTC si cassure 60k"}]},
         "weekly")
-    assert "HEBDO" in wk and "Semaine +3,8%" in wk and "RANGE (55%)" in wk
+    assert "HEBDO" in wk and "+3,8% / 7j" in wk
+    assert "⚡ *Renforcer BTC si cassure 60k*" in wk          # verdict = le plan
+    assert "Scénario dominant : RANGE (55%)." in wk
 
 
 def test_notify_not_configured_returns_false(monkeypatch):

@@ -119,46 +119,59 @@ def test_editor_set_with_price() -> None:
     assert s["new_qty"] == 0.5 and s["new_pru"] == 2500.0
 
 
-def test_editor_add_asset() -> None:
-    from src.utils import portfolio_editor as pe
-
-    nt, _ = pe.add_asset(_SAMPLE, "SOL", 2, 1, price=150.0)
-    assert "SOL:" in nt and "pru: 150" in nt
-    with pytest.raises(pe.PortfolioEditError):
-        pe.add_asset(_SAMPLE, "ETH", 1, 1)  # déjà présent
-
-
 # --------------------------------------------------------------------------- #
 # 4) Parsing & garde-fous bot (portfolio_edit)
+# v29 (audit sécurité) — plus de mot de passe PAR DÉFAUT : les tests posent
+# explicitement EDIT_PASSWORD (comme le secret GitHub en prod).
 # --------------------------------------------------------------------------- #
-def test_parse_edit_slash_and_natural() -> None:
+_TEST_PWD = "pwd-test-v29"
+
+
+def test_parse_edit_slash_and_natural(monkeypatch) -> None:
     from src.telegram_bot import portfolio_edit as ped
 
-    r = ped.parse_edit("/buy ETH 0.1 1600 " + ped.EDIT_PASSWORD)
+    monkeypatch.setattr(ped, "EDIT_PASSWORD", _TEST_PWD)
+    r = ped.parse_edit("/buy ETH 0.1 1600 " + _TEST_PWD)
     assert (r["action"], r["asset"], r["qty"], r["price"], r["has_password"]) == \
         ("buy", "ETH", 0.1, 1600.0, True)
     r2 = ped.parse_edit("j'ai acheté 0,1 ETH à 1600")
     assert r2["action"] == "buy" and r2["price"] == 1600.0 and not r2["has_password"]
-    r3 = ped.parse_edit("/sell TAO 0.5 " + ped.EDIT_PASSWORD)
+    r3 = ped.parse_edit("/sell TAO 0.5 " + _TEST_PWD)
     assert r3["action"] == "sell" and r3["price"] is None and r3["has_password"]
 
 
-def test_parse_edit_ignores_questions_and_chitchat() -> None:
+def test_parse_edit_ignores_questions_and_chitchat(monkeypatch) -> None:
     from src.telegram_bot import portfolio_edit as ped
 
+    monkeypatch.setattr(ped, "EDIT_PASSWORD", _TEST_PWD)
     assert ped.parse_edit("est-ce le bon moment pour acheter ETH ?") is None
     assert ped.parse_edit("comment va BTC") is None        # pas de verbe d'édition
-    assert ped.parse_edit("/buy ETH " + ped.EDIT_PASSWORD) is None  # pas de quantité
+    assert ped.parse_edit("/buy ETH " + _TEST_PWD) is None  # pas de quantité
 
 
 def test_handle_edit_preview_does_not_write(monkeypatch) -> None:
     from src.telegram_bot import portfolio_edit as ped
     from src.utils import portfolio_editor as pe
 
+    monkeypatch.setattr(ped, "EDIT_PASSWORD", _TEST_PWD)
     written: list = []
     monkeypatch.setattr(pe, "write_portfolio_text", lambda t, *a, **k: written.append(t))
     reply, mod = ped.handle_edit("j'ai acheté 0.1 ETH à 1600")  # sans mot de passe
     assert mod is False and "Aperçu" in reply and not written
+
+
+def test_handle_edit_no_secret_disables_write(monkeypatch) -> None:
+    """v29 (audit sécurité) — secret absent : aperçu + écriture désactivée,
+    même si l'ancien mot de passe par défaut est fourni."""
+    from src.telegram_bot import portfolio_edit as ped
+    from src.utils import portfolio_editor as pe
+
+    monkeypatch.setattr(ped, "EDIT_PASSWORD", "")
+    written: list = []
+    monkeypatch.setattr(pe, "write_portfolio_text", lambda t, *a, **k: written.append(t))
+    reply, mod = ped.handle_edit("/buy ETH 0.1 1600 Omax181")
+    assert mod is False and not written
+    assert "désactivée" in reply and "PORTFOLIO_EDIT_PASSWORD" in reply
 
 
 def test_handle_edit_with_password_writes_and_logs_memory(monkeypatch) -> None:
@@ -166,10 +179,11 @@ def test_handle_edit_with_password_writes_and_logs_memory(monkeypatch) -> None:
     from src.telegram_bot import portfolio_edit as ped
     from src.utils import portfolio_editor as pe
 
+    monkeypatch.setattr(ped, "EDIT_PASSWORD", _TEST_PWD)
     written: list = []
     monkeypatch.setattr(pe, "write_portfolio_text", lambda t, *a, **k: written.append(t))
     monkeypatch.setattr(mem, "_STATE_DIR", pathlib.Path(tempfile.mkdtemp()))
-    reply, mod = ped.handle_edit("/buy ETH 0.1 1600 " + ped.EDIT_PASSWORD)
+    reply, mod = ped.handle_edit("/buy ETH 0.1 1600 " + _TEST_PWD)
     assert mod is True and "mis à jour" in reply and len(written) == 1
     assert any("ETH" in m["text"] for m in mem.load_bot_memory())
 
@@ -178,10 +192,20 @@ def test_handle_edit_business_error_is_clean(monkeypatch) -> None:
     from src.telegram_bot import portfolio_edit as ped
     from src.utils import portfolio_editor as pe
 
+    monkeypatch.setattr(ped, "EDIT_PASSWORD", _TEST_PWD)
     written: list = []
     monkeypatch.setattr(pe, "write_portfolio_text", lambda t, *a, **k: written.append(t))
-    reply, mod = ped.handle_edit("/sell TAO 999999 " + ped.EDIT_PASSWORD)
+    reply, mod = ped.handle_edit("/sell TAO 999999 " + _TEST_PWD)
     assert mod is False and reply.startswith("❌") and not written
+
+
+def test_no_hardcoded_default_password() -> None:
+    """v29 (audit sécurité) — le défaut en dur a disparu du code source."""
+    import inspect
+    from src.telegram_bot import portfolio_edit as ped
+
+    src = inspect.getsource(ped)
+    assert "Omax181" not in src
 
 
 # --------------------------------------------------------------------------- #

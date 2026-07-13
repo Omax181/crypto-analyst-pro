@@ -207,11 +207,14 @@
 </div>
 {% endif %}
 
-{# ── SANTÉ DU PORTEFEUILLE (v23) — note /10 réflective (plus haut = plus sain),
-   3 axes + ce qui tire la note + comment l'améliorer. Remplace l'ancienne note
-   de « risque ». Code couleur INVERSÉ : vert quand la santé est haute. ── #}
-{% if health_score and (health_score.score is not none) %}
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-left:3px solid {{health_score.level_color or '#8a8880'}};border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;">
+{# ── v29 (ZB1) — SANTÉ & STRUCTURE FUSIONNÉES : la note /10 réflective (santé
+   structurelle) et la strip STRUCTURE/STRESS-TEST (concentration HHI, stress
+   BTC −20%, VaR 95%) parlaient toutes deux du risque du PTF, en deux cartes
+   adjacentes. Une seule carte : santé (score + axes + amélioration) puis, sous
+   un séparateur, les faits de structure. Zéro perte, un titre en moins. ── #}
+{% if (health_score and (health_score.score is not none)) or (portfolio_risk and portfolio_risk.available and portfolio_risk.readings) %}
+<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-left:3px solid {{ (health_score.level_color if health_score else none) or '#BA7517' }};border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;">
+  {% if health_score and (health_score.score is not none) %}
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
     <tr>
       <td style="vertical-align:middle;white-space:nowrap;padding-right:14px;">
@@ -239,22 +242,19 @@
       </td>
     </tr>
   </table>
-  <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid #f0efe8;font-size:11px;line-height:1.5;color:#5a5852;">
+  <div style="margin-top:8px;{% if portfolio_risk and portfolio_risk.available and portfolio_risk.readings %}margin-bottom:8px;{% endif %}padding-top:8px;border-top:0.5px solid #f0efe8;font-size:11px;line-height:1.5;color:#5a5852;">
     {% if health_score.driver %}<p style="margin:0 0 3px 0;">{{health_score.driver}}</p>{% endif %}
     {% if health_score.improve %}<p style="margin:0;color:#1a1a18;"><span style="font-weight:600;">Pour l'améliorer :</span> {{health_score.improve}}</p>{% endif %}
   </div>
-</div>
-{% endif %}
-
-{# ── v23 (C5) — RISQUE PORTEFEUILLE consolidé : concentration HHI / paris
-   effectifs, stress-test « BTC −20% », VaR 95%. Données v22 jusqu'ici calculées
-   mais INVISIBLES dans le mail. readings = phrases prêtes (Python, factuelles). ── #}
-{% if portfolio_risk and portfolio_risk.available and portfolio_risk.readings %}
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-left:3px solid #BA7517;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;font-size:11px;color:#5a5852;line-height:1.55;">
-  <p style="margin:0 0 4px 0;font-size:11px;font-weight:700;letter-spacing:0.04em;color:#1a1a18;">STRUCTURE &amp; STRESS-TEST</p>
-  {% for r in portfolio_risk.readings %}
-  <p style="margin:0 0 2px 0;">{{ r }}</p>
-  {% endfor %}
+  {% endif %}
+  {% if portfolio_risk and portfolio_risk.available and portfolio_risk.readings %}
+  <div style="{% if health_score and (health_score.score is not none) %}padding-top:8px;border-top:0.5px solid #f0efe8;{% endif %}font-size:11px;color:#5a5852;line-height:1.55;">
+    <p style="margin:0 0 4px 0;font-size:10px;font-weight:700;letter-spacing:0.5px;color:#8a8880;text-transform:uppercase;">Structure &amp; stress-test</p>
+    {% for r in portfolio_risk.readings %}
+    <p style="margin:0 0 2px 0;">{{ r }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -472,6 +472,31 @@
   {% if macro_context.polymarket_extra_markets %}
   <p style="font-size:11px;color:#5a5852;margin:12px 0 0 0;border-top:0.5px solid #f0efe8;padding-top:8px;"><span style="font-weight:500;color:#1a1a18;">Autres marchés Polymarket&nbsp;:</span> {% for m in macro_context.polymarket_extra_markets %}{{m.question}} <strong>{{ '%.0f'|format(m.probability_pct|num(0)) }}%{% if m.outcome %} « {{m.outcome}} »{% endif %}</strong>{% if not loop.last %} · {% endif %}{% endfor %}</p>
   {% endif %}
+  {# ── v29 (MB3) — LIENS CHIFFRÉS PTF fondus DANS le Contexte global : le régime
+     macro (récit + tuiles) et son impact chiffré par actif (driver→effet)
+     forment une seule section. Fini la carte « Macro · liens chiffrés » séparée
+     qui re-décrivait le régime. La « Cohérence macro » des fiches est retirée
+     en conséquence (le récit global la couvre). ── #}
+  {% if macro_impact and (macro_impact.intro or macro_impact.exposed_positions or macro_impact.implication) %}
+  <div style="margin-top:12px;padding-top:10px;border-top:0.5px solid #e5e4dc;">
+    <p style="font-size:9px;color:#8a8880;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.5px;">Liens chiffrés sur ton portefeuille</p>
+    {% if macro_impact.intro %}<p style="margin:0 0 8px 0;font-size:12px;line-height:1.6;">{{macro_impact.intro|md}}</p>{% endif %}
+    {% if macro_impact.exposed_positions %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:0 0 8px 0;">
+      {% for ep in macro_impact.exposed_positions %}
+      {% if ep.asset %}
+      <tr{% if not loop.last %} style="border-bottom:0.5px solid #f0efe8;"{% endif %}>
+        <td style="font-size:11px;font-weight:700;color:#1a1a18;padding:4px 8px 4px 0;white-space:nowrap;vertical-align:top;">{{ep.asset}}</td>
+        <td style="font-size:11px;color:#5a5852;padding:4px 8px 4px 0;vertical-align:top;white-space:nowrap;">{% if ep.driver %}{{ep.driver}} →{% endif %}</td>
+        <td style="font-size:11px;color:#1a1a18;padding:4px 0;line-height:1.45;vertical-align:top;">{{ep.effect or ''}}</td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </table>
+    {% endif %}
+    {% if macro_impact.implication %}<p style="margin:0;font-size:12px;line-height:1.6;background:#f5f4ee;border-radius:8px;padding:8px 12px;">{{macro_impact.implication|md}}</p>{% endif %}
+  </div>
+  {% endif %}
 </div>
 
 {# ── v26 (B18/B21) — AGENDA MACRO · 72h : événements datés + consensus/précédent
@@ -499,29 +524,9 @@
 </div>
 {% endif %}
 
-{# ── MACRO · LIENS CHIFFRÉS PTF ── #}
-{% if macro_impact %}
-<h2 style="margin:2rem 0 0.75rem 0;font-size:17px;font-weight:500;">Macro · liens chiffrés sur ton PTF</h2>
-<div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1.5rem;">
-  {% if macro_impact.intro %}<p style="margin:0 0 10px 0;font-size:13px;line-height:1.65;">{{macro_impact.intro|md}}</p>{% endif %}
-  {# v16 — exposition du PTF en CAUSES → EFFETS (scannable), actifs nommés.
-     Remplace l'ancien champ « Donc » qui répétait l'auto-critique. #}
-  {% if macro_impact.exposed_positions %}
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;margin:0 0 10px 0;">
-    {% for ep in macro_impact.exposed_positions %}
-    {% if ep.asset %}
-    <tr{% if not loop.last %} style="border-bottom:0.5px solid #f0efe8;"{% endif %}>
-      <td style="font-size:12px;font-weight:700;color:#1a1a18;padding:4px 8px 4px 0;white-space:nowrap;vertical-align:top;">{{ep.asset}}</td>
-      <td style="font-size:11px;color:#5a5852;padding:4px 8px 4px 0;vertical-align:top;white-space:nowrap;">{% if ep.driver %}{{ep.driver}} →{% endif %}</td>
-      <td style="font-size:11px;color:#1a1a18;padding:4px 0;line-height:1.45;vertical-align:top;">{{ep.effect or ''}}</td>
-    </tr>
-    {% endif %}
-    {% endfor %}
-  </table>
-  {% endif %}
-  {% if macro_impact.implication %}<p style="margin:0;font-size:13px;line-height:1.65;background:#f5f4ee;border-radius:8px;padding:8px 12px;">{{macro_impact.implication|md}}</p>{% endif %}
-</div>
-{% endif %}
+{# v29 (MB3) — la carte « Macro · liens chiffrés sur ton PTF » a été FONDUE dans
+   « Contexte global » ci-dessus (intro + tableau driver→effet + implication).
+   Une seule section macro : régime + tuiles + liens chiffrés PTF. #}
 
 {# v23.x (Omar — anti-doublon) : les blocs « Données quantitatives · référence »
    (dupliquait les tuiles on-chain ; sa seule donnée unique, le DVOL, est
@@ -583,7 +588,7 @@
   {% if sector_rotation %}
   <table role="presentation" cellpadding="0" cellspacing="3" border="0" style="width:100%;border-collapse:separate;table-layout:fixed;">
     {% for row in sector_rotation|batch(5) %}
-    <tr>
+    <tr style="page-break-inside:avoid;">
       {% for s in row %}
       {% set ch = s.change_24h|num(0) %}
       {% set bg = '#C0DD97' if ch >= 5 else ('#EAF3DE' if ch >= 2 else ('#F4F8EC' if ch >= 0 else ('#F7C1C1' if ch <= -5 else ('#FCEBEB' if ch <= -2 else '#FDF1F1')))) %}
@@ -620,8 +625,10 @@
   {% set _hm_cells = portfolio_heatmap.cells + [{'symbol': '+' ~ portfolio_heatmap.extra.count ~ ' autres', 'change_24h': portfolio_heatmap.extra.avg_change_24h, 'ptf_pct': portfolio_heatmap.extra.ptf_pct, 'is_extra': true}] %}
   {% endif %}
   <table role="presentation" cellpadding="0" cellspacing="3" border="0" style="width:100%;border-collapse:separate;table-layout:fixed;">
+    {# v29 (MA17) — page-break-inside:avoid : à l'impression/PDF, une cellule
+       de heatmap coupée en deux affichait ses poids PTF orphelins page suivante. #}
     {% for row in _hm_cells|batch(5) %}
-    <tr>
+    <tr style="page-break-inside:avoid;">
       {% for cell in row %}
       {% set ch = cell.change_24h|num(none) %}
       {% set bg = '#e5e4dc' if ch is none else ('#C0DD97' if ch >= 5 else ('#EAF3DE' if ch >= 2 else ('#F4F8EC' if ch >= 0 else ('#F7C1C1' if ch <= -5 else ('#FCEBEB' if ch <= -2 else '#FDF1F1'))))) %}
@@ -663,7 +670,10 @@
         </td>
       </tr>
     </table>
-    <p style="margin:5px 0 0 78px;font-size:11px;color:#5a5852;line-height:1.5;">{% if n.source %}{{n.source|humanize_source}}{% if n.timestamp %} · {{n.timestamp}}{% endif %} — {% endif %}{{n.impact_on_ptf or n.analysis or ''}}{% if n.confidence %} <span style="color:#8a8880;">Confiance {{n.confidence}}%</span>{% endif %}</p>
+    {# v29 (MB9) — le « Confiance X% » par news est RETIRÉ (pseudo-précision peu
+       actionnable) ; il reste tag + titre + source·heure + 1 ligne d'impact
+       (qui garde les liens à forte valeur : corrélations NVDA↔FET, funding…). #}
+    <p style="margin:5px 0 0 78px;font-size:11px;color:#5a5852;line-height:1.5;">{% if n.source %}{{n.source|humanize_source}}{% if n.timestamp %} · {{n.timestamp}}{% endif %} — {% endif %}{{n.impact_on_ptf or n.analysis or ''}}</p>
   </div>
   {% endfor %}
   {% else %}
@@ -671,31 +681,29 @@
   {% endif %}
 </div>
 
-{# ── À SURVEILLER AUJOURD'HUI ── #}
-{% if today_watch %}
+{# ── v29 (MB6) — « À surveiller aujourd'hui » + « Ce qui invaliderait mon
+   scénario » FUSIONNÉS : les deux se recoupaient (DXY 101.5, S&P 7400…).
+   Un seul bloc « À surveiller · seuils d'invalidation » = la veille du jour
+   (today_watch) PUIS les triggers chiffrés (franchis/menacés en rouge/orange).
+   L'auto-critique reste séparée juste dessous : elle parle des TROUS de
+   l'analyse (données manquantes), pas d'un seuil de marché. ── #}
+{% if today_watch or invalidation_watch %}
 <div style="background:#E6F1FB;border-radius:8px;padding:10px 14px;margin-bottom:1.5rem;border-left:2px solid #378ADD;border-top-left-radius:0;border-bottom-left-radius:0;">
-  <p style="font-size:11px;color:#0C447C;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">À surveiller aujourd'hui</p>
-  <p style="margin:0;font-size:12px;line-height:1.6;color:#042C53;">{{today_watch|md}}</p>
-</div>
-{% endif %}
-
-{# ── v15 (audit P2-15) — ORDRE : Invalidation AVANT l'auto-critique (le flux
-   logique se termine sur les limites de l'analyse, pas l'inverse). ── #}
-{# ── TRIGGERS D'INVALIDATION DU JOUR — liste scannable (audit P2-8) ── #}
-{% if invalidation_watch %}
-<div style="background:#E6F1FB;border-radius:8px;padding:10px 14px;margin-bottom:1rem;border-left:2px solid #378ADD;border-top-left-radius:0;border-bottom-left-radius:0;">
-  <p style="font-size:11px;color:#0C447C;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Ce que je surveille pour invalider mon scénario</p>
-  {% if invalidation_watch is string %}
-  <p style="margin:0;font-size:12px;line-height:1.6;color:#042C53;">{{invalidation_watch|md}}</p>
-  {% else %}
-  {% for iw in invalidation_watch %}
-  {# v27 (TH1) — une invalidation FRANCHIE (déterministe) passe en rouge/urgent. #}
-  {% set _brk = iw.status == 'franchi' %}{% set _thr = iw.status == 'menacé' %}
-  <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;"><tr>
-    <td style="width:18px;vertical-align:top;font-size:12px;line-height:1.6;color:{% if _brk %}#A32D2D{% elif _thr %}#BA7517{% else %}#378ADD{% endif %};">{% if _brk %}🔴{% elif _thr %}⚠️{% else %}▸{% endif %}</td>
-    <td style="font-size:12px;line-height:1.6;color:{% if _brk %}#791F1F{% else %}#042C53{% endif %};"><strong>{{iw.condition}}</strong>{% if iw.implication %} — {{iw.implication}}{% endif %}</td>
-  </tr></table>
-  {% endfor %}
+  <p style="font-size:11px;color:#0C447C;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">À surveiller · seuils d'invalidation</p>
+  {% if today_watch %}<p style="margin:0 0 {% if invalidation_watch %}8px{% else %}0{% endif %} 0;font-size:12px;line-height:1.6;color:#042C53;">{{today_watch|md}}</p>{% endif %}
+  {% if invalidation_watch %}
+    {% if invalidation_watch is string %}
+    <p style="margin:0;font-size:12px;line-height:1.6;color:#042C53;">{{invalidation_watch|md}}</p>
+    {% else %}
+    {% for iw in invalidation_watch %}
+    {# v27 (TH1) — une invalidation FRANCHIE (déterministe) passe en rouge/urgent. #}
+    {% set _brk = iw.status == 'franchi' %}{% set _thr = iw.status == 'menacé' %}
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;"><tr>
+      <td style="width:18px;vertical-align:top;font-size:12px;line-height:1.6;color:{% if _brk %}#A32D2D{% elif _thr %}#BA7517{% else %}#378ADD{% endif %};">{% if _brk %}🔴{% elif _thr %}⚠️{% else %}▸{% endif %}</td>
+      <td style="font-size:12px;line-height:1.6;color:{% if _brk %}#791F1F{% else %}#042C53{% endif %};"><strong>{{iw.condition}}</strong>{% if iw.implication %} — {{iw.implication}}{% endif %}</td>
+    </tr></table>
+    {% endfor %}
+    {% endif %}
   {% endif %}
 </div>
 {% endif %}
@@ -753,14 +761,20 @@
     <td style="padding:6px 3px 1px 3px;text-align:right;color:#27500A;white-space:nowrap;vertical-align:top;">{% if t.targets and t.targets.short_term_30d %}{{t.targets.short_term_30d|fmt_price}}{% else %}—{% endif %}</td>
     <td style="padding:6px 3px 1px 3px;text-align:right;color:#085041;white-space:nowrap;vertical-align:top;">{% if t.targets and t.targets.long_term_6_12m_low %}{{t.targets.long_term_6_12m_low|fmt_price}}{% if t.targets.long_term_6_12m_high %}–{{t.targets.long_term_6_12m_high|fmt_price|replace('$','')}}{% endif %}{% else %}—{% endif %}</td>
     <td style="padding:6px 3px 1px 3px;text-align:right;color:#791F1F;white-space:nowrap;vertical-align:top;">{% if t.action_plan and t.action_plan.stop_loss %}{{t.action_plan.stop_loss|fmt_price}}{% else %}—{% endif %}</td>
-    <td style="padding:6px 3px 1px 3px;text-align:right;color:#5a5852;white-space:nowrap;vertical-align:top;">{% if t.rr_value %}{{t.rr_value}}:1{% else %}—{% endif %}</td>
+    {# v29 (MA9) — † : reco LT dont le R:R tactique < seuil — le chiffre reste
+       affiché (honnêteté) mais la logique de la reco est le DCA sous PRU. #}
+    <td style="padding:6px 3px 1px 3px;text-align:right;color:#5a5852;white-space:nowrap;vertical-align:top;">{% if t.rr_value %}{{t.rr_value}}:1{% if t.ct_warning %} <span style="color:#BA7517;">†</span>{% endif %}{% else %}—{% endif %}</td>
   </tr>
+  {# v29 (MB8) — la ligne ⚙ (top-3 signaux) ne s'affiche QUE pour les thèses
+     NON dépliées : les dépliées (★) ont déjà le bloc « Score pondéré » complet
+     dans leur fiche → fini le doublon. Pour une thèse dépliée, on ne laisse
+     que le renvoi « ★ détail ci-dessous » (+ ⚠ si stats CT défavorables). #}
   <tr style="border-bottom:0.5px solid #f0efe8;">
-    <td colspan="7" style="padding:0 3px 6px 3px;color:#8a8880;font-size:9px;line-height:1.35;">{% if t.thesis_scoring and t.thesis_scoring.signals %}⚙ {% for s in t.thesis_scoring.signals[:3] %}{{s.label}}{% if not loop.last %} · {% endif %}{% endfor %}{% endif %}</td>
+    <td colspan="7" style="padding:0 3px 6px 3px;color:#8a8880;font-size:9px;line-height:1.35;">{% if t._expand %}★ détail ci-dessous{% elif t.thesis_scoring and t.thesis_scoring.signals %}⚙ {% for s in t.thesis_scoring.signals[:3] %}{{s.label}}{% if not loop.last %} · {% endif %}{% endfor %}{% endif %}{% if t.ct_warning %} · <span style="color:#7A4E12;">⚠ accumulation LT — stats CT défavorables</span>{% endif %}</td>
   </tr>
   {% endfor %}
 </table>
-<p style="font-size:10px;color:#8a8880;margin:0 0 1rem 0;">★ Détail complet ci-dessous pour les 3 plus fortes convictions. Cibles : 30j (tactique) · 6-12m (positionnement). « Actuel » = cours à l'heure d'envoi.</p>
+<p style="font-size:10px;color:#8a8880;margin:0 0 1rem 0;">★ Détail complet ci-dessous pour les 3 plus fortes convictions. Cibles : 30j (tactique) · 6-12m (positionnement). « Actuel » = cours à l'heure d'envoi.{% set _has_dagger = [] %}{% for t in _firm_theses %}{% if t.ct_warning %}{% set _ = _has_dagger.append(1) %}{% endif %}{% endfor %}{% if _has_dagger %}<br>† = reco de conviction LT : l'objectif est la moyenne d'accumulation (DCA) sous le PRU — le R:R tactique 30 j n'est pas le critère de la reco.{% endif %}</p>
 {% for t in _firm_theses if (t._expand is not defined) or t._expand %}
 {% set accent = '#639922' if t.action_type == 'bullish' else ('#E24B4A' if t.action_type == 'bearish' else '#378ADD') %}
 <div style="background:#ffffff;border:0.5px solid #e5e4dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;border-left:2px solid {{accent}};border-top-left-radius:0;border-bottom-left-radius:0;">
@@ -808,7 +822,7 @@
      un comptage binaire). #}
   {% if t.thesis_scoring and t.thesis_scoring.signals %}
   <div style="margin:8px 0;padding:7px 11px;background:#f5f4ee;border-radius:6px;">
-    <p style="margin:0;font-size:10px;color:#5a5852;line-height:1.55;"><span style="font-weight:600;color:#1a1a18;">Score pondéré · {{t.thesis_scoring.score}}{% if t.thesis_scoring.threshold %} <span style="font-weight:400;color:#8a8880;">(seuil {{t.thesis_scoring.threshold}})</span>{% endif %} :</span> {% for s in t.thesis_scoring.signals %}{{s.label}} <span style="color:#27500A;font-weight:600;">+{{s.weight}}</span>{% if not loop.last %} · {% endif %}{% endfor %}{% set _dc = t.thesis_scoring.dimensions_count|num(0) %}{% if _dc %} <span style="color:#8a8880;">· {{_dc|int}} dimension{{ 's' if _dc > 1 else '' }} pondérée{{ 's' if _dc > 1 else '' }}</span>{% endif %}{# OB21 — TRANSPARENCE DE L'INCERTITUDE : complétude des données derrière le score (⚠ si analyse partielle) pour ne pas donner une fausse impression de précision. #}{% set _cp = t.thesis_scoring.completeness %}{% if _cp and _cp.pct is not none %} <span style="color:{% if _cp.pct|num(100) < 50 %}#B8860B{% else %}#8a8880{% endif %};">· complétude {{_cp.pct}}%{% if _cp.pct|num(100) < 50 %} ⚠ analyse partielle{% endif %}{% if _cp.missing %} (manque : {{_cp.missing|join(', ')}}){% endif %}</span>{% endif %}</p>
+    <p style="margin:0;font-size:10px;color:#5a5852;line-height:1.55;"><span style="font-weight:600;color:#1a1a18;">Score pondéré · {{t.thesis_scoring.score}}{% if t.thesis_scoring.threshold %} <span style="font-weight:400;color:#8a8880;">(seuil {{t.thesis_scoring.threshold}})</span>{% endif %} :</span> {% for s in t.thesis_scoring.signals %}{{s.label}} <span style="color:#27500A;font-weight:600;">+{{s.weight}}</span>{% if not loop.last %} · {% endif %}{% endfor %}{% set _dc = t.thesis_scoring.dimensions_count|num(0) %}{% if _dc %} <span style="color:#8a8880;">· {{_dc|int}} dimension{{ 's' if _dc > 1 else '' }} pondérée{{ 's' if _dc > 1 else '' }}</span>{% endif %}{# OB21 — TRANSPARENCE DE L'INCERTITUDE : complétude des données derrière le score (⚠ si analyse partielle) pour ne pas donner une fausse impression de précision. #}{% set _cp = t.thesis_scoring.completeness %}{% if _cp and _cp.pct is not none %} <span style="color:{% if _cp.pct|num(100) < 50 %}#B8860B{% else %}#8a8880{% endif %};">· complétude {{_cp.pct}}%{% if _cp.pct|num(100) < 50 %} ⚠ analyse partielle{% endif %}{# v29 (MA13) — « manque : sentiment » se lisait comme une contradiction avec le raisonnement citant Polymarket (sentiment de MARCHÉ) : la dimension manquante est le sentiment SOCIAL. #}{% if _cp.missing %} (manque : {{_cp.missing|join(', ')|replace('sentiment', 'sentiment social (LunarCrush/social trending)')}}){% endif %}</span>{% endif %}</p>
   </div>
   {% endif %}
 
@@ -834,39 +848,60 @@
   </div>
   {% endif %}
 
-  {% if t.self_critique %}
-  <div style="margin:12px 0;">
-    <p style="font-size:11px;color:#5a5852;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;">Mon auto-critique</p>
-    <p style="margin:0;font-size:13px;line-height:1.65;color:#5a5852;">{{t.self_critique|md}}</p>
+  {# v29 (MB4) — « Ce qui me ferait tort » : fusion de la CONTRE-THÈSE (le
+     meilleur argument CONTRE, anti-biais) et de l'AUTO-CRITIQUE (les limites
+     que je me connais). Un seul bloc au lieu de deux qui se répondaient.
+     v29 (MB3) — « Cohérence macro du jour » retirée : le récit macro global du
+     Contexte l'a déjà couverte (fini la 3e description du régime). #}
+  {% if t.counter_thesis or t.self_critique %}
+  <div style="margin:12px 0;border-left:2px solid #BA7517;background:#FBF3E4;border-radius:0 8px 8px 0;padding:8px 12px;">
+    <p style="font-size:11px;color:#8A5A12;margin:0 0 3px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:600;">⚖️ Ce qui me ferait tort</p>
+    {% if t.counter_thesis %}<p style="margin:0;font-size:12px;line-height:1.6;color:#5a4a28;">{{t.counter_thesis|md}}</p>{% endif %}
+    {% if t.self_critique %}<p style="margin:{% if t.counter_thesis %}6px{% else %}0{% endif %} 0 0 0;font-size:12px;line-height:1.6;color:#5a5852;">{% if t.counter_thesis %}<span style="color:#8a8880;">Aussi (mon auto-critique) : </span>{% endif %}{{t.self_critique|md}}</p>{% endif %}
   </div>
   {% endif %}
 
-  {% if t.macro_coherence %}
+  {# v29 (MB4) — « Niveaux & scénarios » : l'encadré cibles CT/LT + les scénarios
+     bull/base/bear + l'espérance 30j réunis sous un seul titre (les trois lisent
+     les MÊMES niveaux, les séparer forçait à relire 3 fois). Le plan DCA/
+     invalidation, lui, migre dans le bloc « plan d'action » ci-dessous. #}
+  {% if t.targets or (t.asset_plan and t.asset_plan.scenarios) %}
   <div style="margin:12px 0;">
-    <p style="font-size:11px;color:#5a5852;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;">Cohérence avec la macro du jour</p>
-    <p style="margin:0;font-size:13px;line-height:1.65;">{{t.macro_coherence|md}}</p>
+    <p style="font-size:11px;color:#5a5852;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;">Niveaux &amp; scénarios</p>
+    {% if t.targets %}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
+      <tr>
+        <td style="width:50%;vertical-align:top;padding-right:4px;">
+          <div style="background:{% if t.action_type == 'bearish' %}#FCEBEB{% else %}#EAF3DE{% endif %};border-radius:8px;padding:10px 12px;">
+            <p style="margin:0 0 4px 0;font-size:10px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">{{t.targets.short_term_label or 'Tactique court terme'}}</p>
+            <p style="margin:0;font-size:16px;font-weight:500;color:{% if t.action_type == 'bearish' %}#501313{% else %}#173404{% endif %};">{{t.targets.short_term_30d|fmt_money}}</p>
+            {% if t.targets.short_term_note %}<p style="margin:2px 0 0 0;font-size:11px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};">{{t.targets.short_term_note|md}}</p>{% endif %}
+          </div>
+        </td>
+        <td style="width:50%;vertical-align:top;padding-left:4px;">
+          <div style="background:#E1F5EE;border-radius:8px;padding:10px 12px;">
+            <p style="margin:0 0 4px 0;font-size:10px;color:#085041;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Positionnement LT · 6-12 mois</p>
+            <p style="margin:0;font-size:16px;font-weight:500;color:#04342C;">{% if t.targets.long_term_6_12m_low %}{{t.targets.long_term_6_12m_low|fmt_money}}{% if t.targets.long_term_6_12m_high %} — {{t.targets.long_term_6_12m_high|fmt_money}}{% endif %}{% endif %}</p>
+            {% if t.targets.long_term_note %}<p style="margin:2px 0 0 0;font-size:11px;color:#085041;">{{t.targets.long_term_note|md}}</p>{% endif %}
+          </div>
+        </td>
+      </tr>
+    </table>
+    {% endif %}
+    {% if t.asset_plan and t.asset_plan.scenarios %}
+    {% set _ap = t.asset_plan %}{% set _sc = _ap.scenarios %}
+    <div style="margin:8px 0 0 0;background:#f8f7f2;border-radius:8px;padding:10px 12px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
+        <tr>
+          <td style="width:33%;vertical-align:top;padding-right:4px;"><div style="background:#EAF3DE;border-radius:6px;padding:6px 8px;"><p style="margin:0;font-size:9px;color:#27500A;text-transform:uppercase;font-weight:700;">Bull {{_sc.bull.probability_pct}}%</p><p style="margin:2px 0 0 0;font-size:12px;font-weight:600;color:#173404;">{{_sc.bull.level_label}}</p></div></td>
+          <td style="width:33%;vertical-align:top;padding:0 4px;"><div style="background:#EEF2F7;border-radius:6px;padding:6px 8px;"><p style="margin:0;font-size:9px;color:#0C447C;text-transform:uppercase;font-weight:700;">Base {{_sc.base.probability_pct}}%</p><p style="margin:2px 0 0 0;font-size:11px;font-weight:600;color:#042C53;">{{_sc.base.range_label}}</p></div></td>
+          <td style="width:33%;vertical-align:top;padding-left:4px;"><div style="background:#FCEBEB;border-radius:6px;padding:6px 8px;"><p style="margin:0;font-size:9px;color:#791F1F;text-transform:uppercase;font-weight:700;">Bear {{_sc.bear.probability_pct}}%</p><p style="margin:2px 0 0 0;font-size:12px;font-weight:600;color:#501313;">{{_sc.bear.level_label}}</p></div></td>
+        </tr>
+      </table>
+      {% if _ap.ev_30d_pct is not none %}<p style="margin:8px 0 0 0;font-size:11px;color:#5a5852;">Espérance 30j <strong style="color:{% if (_ap.ev_30d_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '%+.1f'|format(_ap.ev_30d_pct|num(0)) }}%</strong> <span style="color:#8a8880;">(p↑ {{ (_ap.prob_up_30d|num(0) * 100)|round|int }}% · {{_ap.ev_note}})</span></p>{% endif %}
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
-
-  {% if t.targets %}
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;margin:12px 0;">
-    <tr>
-      <td style="width:50%;vertical-align:top;padding-right:4px;">
-        <div style="background:{% if t.action_type == 'bearish' %}#FCEBEB{% else %}#EAF3DE{% endif %};border-radius:8px;padding:10px 12px;">
-          <p style="margin:0 0 4px 0;font-size:10px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">{{t.targets.short_term_label or 'Tactique court terme'}}</p>
-          <p style="margin:0;font-size:16px;font-weight:500;color:{% if t.action_type == 'bearish' %}#501313{% else %}#173404{% endif %};">{{t.targets.short_term_30d|fmt_money}}</p>
-          {% if t.targets.short_term_note %}<p style="margin:2px 0 0 0;font-size:11px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};">{{t.targets.short_term_note|md}}</p>{% endif %}
-        </div>
-      </td>
-      <td style="width:50%;vertical-align:top;padding-left:4px;">
-        <div style="background:#E1F5EE;border-radius:8px;padding:10px 12px;">
-          <p style="margin:0 0 4px 0;font-size:10px;color:#085041;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Positionnement LT · 6-12 mois</p>
-          <p style="margin:0;font-size:16px;font-weight:500;color:#04342C;">{% if t.targets.long_term_6_12m_low %}{{t.targets.long_term_6_12m_low|fmt_money}}{% if t.targets.long_term_6_12m_high %} — {{t.targets.long_term_6_12m_high|fmt_money}}{% endif %}{% endif %}</p>
-          {% if t.targets.long_term_note %}<p style="margin:2px 0 0 0;font-size:11px;color:#085041;">{{t.targets.long_term_note|md}}</p>{% endif %}
-        </div>
-      </td>
-    </tr>
-  </table>
   {% endif %}
 
   {# A7 — n'affiche le plan QUE pour une action ferme (RENFORCER/ALLÉGER) ET
@@ -886,6 +921,9 @@
       {% if t.action_plan.rr %}{% set _rrnum = (t.action_plan.rr|string|replace(':1','')|replace(',','.')|float(0)) %}<span style="font-weight:700;">Risque/récompense :</span> <span style="background:{% if _rrnum > 8 %}#FCEBEB{% elif _rrnum >= 2 %}#EAF3DE{% elif _rrnum >= 1.5 %}#FBF0DA{% else %}#FCEBEB{% endif %};color:{% if _rrnum > 8 %}#791F1F{% elif _rrnum >= 2 %}#27500A{% elif _rrnum >= 1.5 %}#7A4E12{% else %}#791F1F{% endif %};padding:1px 7px;border-radius:6px;font-weight:700;">{{t.action_plan.rr}}{% if _rrnum > 8 %} · irréaliste (SL trop serré){% elif _rrnum and _rrnum < 1.5 %} · faible{% elif _rrnum >= 2 %} · favorable{% endif %}</span><br>{% endif %}
       {% if t.action_plan.invalidation_conditions %}<span style="font-weight:700;">Invalidation :</span> {{t.action_plan.invalidation_conditions|md}}{% endif %}
     </p>
+    {# v29 (MB4/MA6/MA15) — le plan DCA vit ici (dans le PLAN), pas dans les
+       scénarios ; 1re tranche = prix courant → « immédiat » ; RENFORCER seul. #}
+    {% if t.asset_plan and t.asset_plan.dca and t.action == 'RENFORCER' %}<p style="margin:8px 0 0 0;font-size:11px;color:{% if t.action_type == 'bearish' %}#791F1F{% else %}#27500A{% endif %};">📥 DCA en 3 tranches : {% for d in t.asset_plan.dca %}{% if loop.first and d.basis == 'prix actuel' %}{{d.weight_pct}}% immédiat ({{d.price_label}}){% else %}{{d.weight_pct}}% à {{d.price_label}}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
   </div>
   {% elif t.action == 'MAINTENIR' and t.gate_note %}
   {# v28 (M-A2) — plafond de concentration : le plan dit POURQUOI aucun renfort,
@@ -912,31 +950,9 @@
   <p style="margin:6px 0 0 0;font-size:11px;color:#5a5852;">▸ {{t.sector_rank}}</p>
   {% endif %}
 
-  {# ── v27 (TH2/ES1/ES2/ES3) — SCÉNARIOS bull/base/bear + EV 30j (fourchettes
-     & probabilités déterministes ancrées sur les niveaux calculés). ── #}
-  {% if t.asset_plan and t.asset_plan.scenarios %}
-  {% set _ap = t.asset_plan %}{% set _sc = _ap.scenarios %}
-  <div style="margin:12px 0;background:#f8f7f2;border-radius:8px;padding:10px 12px;">
-    <p style="font-size:11px;color:#5a5852;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.3px;">Scénarios 30j · bull / base / bear</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;">
-      <tr>
-        <td style="width:33%;vertical-align:top;padding-right:4px;"><div style="background:#EAF3DE;border-radius:6px;padding:6px 8px;"><p style="margin:0;font-size:9px;color:#27500A;text-transform:uppercase;font-weight:700;">Bull {{_sc.bull.probability_pct}}%</p><p style="margin:2px 0 0 0;font-size:12px;font-weight:600;color:#173404;">{{_sc.bull.level_label}}</p></div></td>
-        <td style="width:33%;vertical-align:top;padding:0 4px;"><div style="background:#EEF2F7;border-radius:6px;padding:6px 8px;"><p style="margin:0;font-size:9px;color:#0C447C;text-transform:uppercase;font-weight:700;">Base {{_sc.base.probability_pct}}%</p><p style="margin:2px 0 0 0;font-size:11px;font-weight:600;color:#042C53;">{{_sc.base.range_label}}</p></div></td>
-        <td style="width:33%;vertical-align:top;padding-left:4px;"><div style="background:#FCEBEB;border-radius:6px;padding:6px 8px;"><p style="margin:0;font-size:9px;color:#791F1F;text-transform:uppercase;font-weight:700;">Bear {{_sc.bear.probability_pct}}%</p><p style="margin:2px 0 0 0;font-size:12px;font-weight:600;color:#501313;">{{_sc.bear.level_label}}</p></div></td>
-      </tr>
-    </table>
-    {% if _ap.ev_30d_pct is not none %}<p style="margin:8px 0 0 0;font-size:11px;color:#5a5852;">Espérance 30j <strong style="color:{% if (_ap.ev_30d_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '%+.1f'|format(_ap.ev_30d_pct|num(0)) }}%</strong> <span style="color:#8a8880;">(p↑ {{ (_ap.prob_up_30d|num(0) * 100)|round|int }}% · {{_ap.ev_note}})</span></p>{% endif %}
-    {% if _ap.dca %}<p style="margin:4px 0 0 0;font-size:11px;color:#5a5852;">📥 DCA en 3 tranches : {% for d in _ap.dca %}{{d.weight_pct}}% à {{d.price_label}}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
-  </div>
-  {% endif %}
-
-  {# ── v27 (TH3) — CONTRE-THÈSE : le meilleur argument CONTRE (anti-biais). ── #}
-  {% if t.counter_thesis %}
-  <div style="margin:12px 0;border-left:2px solid #BA7517;background:#FBF3E4;border-radius:0 8px 8px 0;padding:8px 12px;">
-    <p style="font-size:11px;color:#8A5A12;margin:0 0 3px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:600;">⚖️ Contre-thèse (ce qui me ferait tort)</p>
-    <p style="margin:0;font-size:12px;line-height:1.6;color:#5a4a28;">{{t.counter_thesis|md}}</p>
-  </div>
-  {% endif %}
+  {# v29 (MB4) — les scénarios bull/base/bear + EV sont désormais DANS le bloc
+     « Niveaux & scénarios » (plus haut), et la contre-thèse dans « Ce qui me
+     ferait tort ». Ces deux blocs séparés ont été retirés d'ici (fusion). #}
 </div>
 {% endfor %}
 {% else %}
@@ -982,38 +998,45 @@
   <p style="font-size:11px;color:#5a5852;margin:0 0 10px 0;border-bottom:0.5px solid #f0efe8;padding-bottom:8px;">Espérance mathématique : {% if expectancy and expectancy.available and (expectancy.expectancy_pct is not none) %}<strong style="color:{% if (expectancy.expectancy_pct|num(0)) > 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ '+' if (expectancy.expectancy_pct|num(0)) >= 0 else '' }}{{expectancy.expectancy_pct}}% / reco</strong>{% else %}<span style="color:#8a8880;font-style:italic;">disponible après 5 recos clôturées</span>{% endif %}</p>
   {% if active_recommendations_tracking %}
   <p style="font-size:11px;color:#5a5852;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.3px;">{{active_recommendations_tracking|length}} recommandation{{'s' if active_recommendations_tracking|length > 1 else ''}} en cours · suivi</p>
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+  {# v29 (MB7) — TABLE COMPACTE 1 ligne/reco + BARRE de progression vers la
+     cible. L'ancien format carte affichait « X% du chemin » DEUX fois (ligne
+     stats + commentaire r.comment) : le doublon est supprimé, la barre EST le
+     % du chemin. Tout le détail (entrée/actuel/Δ/cible/reste) reste, sur une
+     ligne. Le stop vit dans la fiche thèse ; ici le statut signale le danger. #}
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;font-size:10px;">
+    <tr style="color:#8a8880;border-bottom:0.5px solid #e5e4dc;">
+      <td style="padding:3px 4px 4px 0;font-weight:600;">Reco</td>
+      <td style="padding:3px 4px 4px 4px;font-weight:600;">Entrée→actuel</td>
+      <td style="padding:3px 4px 4px 4px;font-weight:600;">Cible (reste)</td>
+      <td style="padding:3px 4px 4px 4px;font-weight:600;">Progrès</td>
+      <td style="padding:3px 0 4px 4px;font-weight:600;text-align:right;">Statut</td>
+    </tr>
     {% for r in active_recommendations_tracking %}
-    <tr>
-      <td style="padding:8px 0;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}vertical-align:top;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr>
-          <td style="vertical-align:middle;">
-            <span style="font-size:13px;font-weight:700;color:#1a1a18;">{{r.asset}}</span>
-            <span style="display:inline-block;background:{{r.action_badge_bg or '#EEF2F7'}};color:{{r.action_badge_fg or '#33312e'}};font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;padding:2px 7px;border-radius:4px;margin-left:6px;">{{r.action}}</span>
-            {% if r.issued_at %}<span style="font-size:10px;color:#8a8880;margin-left:6px;">depuis {{r.issued_at}}</span>{% endif %}
-          </td>
-          <td style="vertical-align:middle;text-align:right;white-space:nowrap;">
-            {% if r.progress_pct is not none %}<span style="font-size:13px;font-weight:700;color:{% if (r.progress_pct|num(0)) > 0 %}#3B6D11{% elif (r.progress_pct|num(0)) < 0 %}#A32D2D{% else %}#BA7517{% endif %};">{{ r.progress_pct|fmt_pct }}</span><br><span style="font-size:9px;color:#8a8880;">Δ depuis entrée</span>{% endif %}
-          </td>
-        </tr></table>
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin-top:4px;"><tr>
-          <td style="vertical-align:middle;font-size:10px;color:#5a5852;">
-            {# v26 (B6) — cible + distance restante + % du chemin parcouru :
-               le lecteur voit OÙ en est la reco, pas un badge binaire. #}
-            {% if r.days_open is not none %}<span style="color:#8a8880;">{{r.days_open}}j</span> · {% endif %}{% if r.entry_price is not none %}entrée {{r.entry_price|fmt_money}}{% endif %}{% if r.ct_target %} · cible{% if r.ct_target_fallback %} act.{% endif %} {{r.ct_target|fmt_money}}{% if (r.dist_to_target_pct|num(none)) is not none %} <span style="color:#8a8880;">(à {{ r.dist_to_target_pct|fmt_pct }})</span>{% endif %}{% if r.ct_target_fallback %} <span style="color:#8a8880;">(plan du jour)</span>{% endif %}{% endif %}{% if r.stop_loss %} · stop {{r.stop_loss|fmt_money}}{% if (r.stop_distance_pct|num(none)) is not none %} <span style="color:{% if (r.stop_distance_pct|num(0))|abs <= 3 %}#A32D2D{% else %}#8a8880{% endif %};">({{ r.stop_distance_pct|fmt_pct }})</span>{% endif %}{% endif %}{% if (r.target_path_pct|num(none)) is not none %} · <span style="color:{% if (r.target_path_pct|num(0)) >= 40 %}#3B6D11{% elif (r.target_path_pct|num(0)) < 0 %}#A32D2D{% else %}#5a5852{% endif %};">{{ '%.0f'|format(r.target_path_pct|num(0)) }}% du chemin</span>{% endif %}
-          </td>
-          <td style="vertical-align:middle;text-align:right;white-space:nowrap;">
-            {% if r.health_status %}<span style="font-size:11px;font-weight:600;color:{{r.health_color or '#5a5852'}};">{{r.health_status}}</span>{% else %}<span style="font-size:11px;color:{{r.status_color or '#5a5852'}};">{{r.status or '● en cours'}}</span>{% endif %}
-          </td>
-        </tr></table>
-        {% if r.comment %}<p style="margin:4px 0 0 0;font-size:10px;color:#8a8880;line-height:1.45;font-style:italic;">{{r.comment}}</p>{% endif %}
-        {# v26 (B8/A20) — graphique « plan vs prix » attaché quand la lecture a
-           de la valeur (proche stop/cible, mouvement notable). #}
-        {% if charts and charts.get('track_' ~ r.asset) %}<div style="margin:8px 0 2px 0;text-align:center;"><img src="cid:chart_track_{{r.asset}}" alt="{{r.asset}} suivi reco — plan vs prix" style="max-width:100%;border:0.5px solid #e5e4dc;border-radius:8px;display:block;margin:0 auto;"></div>{% endif %}
+    {% set _pp = r.target_path_pct|num(none) %}
+    {% set _pw = (0 if _pp is none else ([_pp, 100]|min if _pp > 0 else 0)) %}
+    <tr{% if not loop.last %} style="border-bottom:0.5px solid #f0efe8;"{% endif %}>
+      <td style="padding:6px 4px 6px 0;vertical-align:top;white-space:nowrap;">
+        <span style="font-size:11px;font-weight:700;color:#1a1a18;">{{r.asset}}</span>
+        <span style="display:inline-block;background:{{r.action_badge_bg or '#EEF2F7'}};color:{{r.action_badge_fg or '#33312e'}};font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;padding:1px 5px;border-radius:3px;margin-left:3px;">{{r.action}}</span>{% if r.days_open is not none %}<br><span style="color:#8a8880;">{{r.days_open}}j{% if r.issued_at %} · dep. {{r.issued_at}}{% endif %}</span>{% endif %}
+      </td>
+      <td style="padding:6px 4px;vertical-align:top;white-space:nowrap;color:#5a5852;">
+        {% if r.entry_price is not none %}{{r.entry_price|fmt_money}}{% endif %}{% if r.current_price is not none %}→{{r.current_price|fmt_money}}{% endif %}{% if (r.progress_pct|num(none)) is not none %}<br><span style="color:{% if (r.progress_pct|num(0)) > 0 %}#3B6D11{% elif (r.progress_pct|num(0)) < 0 %}#A32D2D{% else %}#BA7517{% endif %};font-weight:600;">{{r.progress_pct|fmt_pct}}</span>{% endif %}
+      </td>
+      <td style="padding:6px 4px;vertical-align:top;white-space:nowrap;color:#5a5852;">
+        {% if r.ct_target %}{{r.ct_target|fmt_money}}{% if r.ct_target_fallback %} <span style="color:#8a8880;">(plan)</span>{% endif %}{% if (r.dist_to_target_pct|num(none)) is not none %}<br><span style="color:#8a8880;">reste {{r.dist_to_target_pct|fmt_pct}}</span>{% endif %}{% else %}—{% endif %}
+      </td>
+      <td style="padding:6px 4px;vertical-align:middle;">
+        {% if _pp is not none %}<div style="background:#eceae2;border-radius:3px;height:6px;width:100%;max-width:72px;"><div style="background:{% if _pp >= 40 %}#3B6D11{% elif _pp < 0 %}#A32D2D{% else %}#BA7517{% endif %};border-radius:3px;height:6px;width:{{ [_pw|round|int, 2]|max }}%;"></div></div><span style="font-size:9px;color:#8a8880;">{{ '%.0f'|format(_pp) }}%</span>{% else %}<span style="font-size:9px;color:#8a8880;">—</span>{% endif %}
+      </td>
+      <td style="padding:6px 0 6px 4px;vertical-align:top;text-align:right;white-space:nowrap;">
+        {% if r.health_status %}<span style="font-size:10px;font-weight:600;color:{{r.health_color or '#5a5852'}};">{{r.health_status}}</span>{% else %}<span style="font-size:10px;color:{{r.status_color or '#5a5852'}};">{{r.status or '● en cours'}}</span>{% endif %}
       </td>
     </tr>
     {% endfor %}
   </table>
+  {# v29 (MB7) — graphiques de suivi (jour sans reco ferme) SOUS la table, pas
+     en ligne, pour ne pas casser la grille. #}
+  {% for r in active_recommendations_tracking %}{% if charts and charts.get('track_' ~ r.asset) %}<div style="margin:8px 0 2px 0;text-align:center;"><img src="cid:chart_track_{{r.asset}}" alt="{{r.asset}} suivi reco — plan vs prix" style="max-width:100%;border:0.5px solid #e5e4dc;border-radius:8px;display:block;margin:0 auto;"></div>{% endif %}{% endfor %}
   {% if tracking_footnote %}<p style="font-size:10px;color:#8a8880;margin:10px 0 0 0;font-style:italic;line-height:1.5;">{{tracking_footnote}}</p>{% endif %}
   {% else %}
   <p style="font-size:12px;color:#8a8880;font-style:italic;margin:0;">{{ tracking_empty_reason or "Pas de recommandation active à suivre actuellement." }}</p>

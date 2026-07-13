@@ -255,6 +255,15 @@ def add_recommendation(reco: dict[str, Any]) -> None:
         ):
             preserved_entry = r.get("entry_price")
             preserved_created = r.get("created_at")
+            # v29 (Telegram briefing) — ÉVOLUTION DE CONVICTION : quand la
+            # confiance de la ré-émission diffère, on garde l'ancienne dans
+            # prev_confidence (affichage « conv. 72% → 78% »). Elle persiste
+            # tant que la conviction ne rebouge pas (= dernier changement).
+            _old_conf = r.get("confidence")
+            _new_conf = reco.get("confidence")
+            if (_old_conf is not None and _new_conf is not None
+                    and _new_conf != _old_conf):
+                r["prev_confidence"] = _old_conf
             for k, v in reco.items():
                 if k in ("entry_price", "created_at", "id"):
                     continue

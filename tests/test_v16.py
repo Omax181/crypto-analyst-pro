@@ -223,7 +223,7 @@ def test_render_morning_v16_no_history_onchain_grid():
     # macro reste affichée telle quelle, actionnable.
     assert "Donc :" not in html
     assert "TAO à alléger si DXY casse 100" in html  # implication macro présente
-    assert "Crypto Analyst Pro · v28" in html
+    assert "Crypto Analyst Pro · v29" in html
 
 
 def test_render_evening_v16_bars_no_heatmap():
@@ -250,13 +250,16 @@ def test_render_evening_v16_bars_no_heatmap():
         "footer": {"next_morning_time": "08h30"},
     }, "evening")
     assert "Plus fortes hausses / baisses du PTF" not in html  # heatmap retirée
-    assert "À retenir aujourd'hui" in html
-    assert "Rotation AI confirmée" in html         # puce typée
+    # v29 (EB1) — boîte noire « À retenir » supprimée ; la synthèse vit dans
+    # « Ce qui a évolué côté marché » (sourcé). delta_summary n'est plus rendu.
+    assert "À retenir aujourd'hui" not in html
+    assert "Rotation AI confirmée" not in html
+    assert "Ce qui a évolué" in html and "Tensions US-Iran" in html
     assert "Diversification" in html and "Momentum vs BTC" in html   # barres santé
     assert "accord : 17% Polymarket" in html or "accord : 17%" in html
     assert "RISQUE" in html.upper()                 # tag rendu
     assert "Pas d'événement macro majeur dans les 48h" in html
-    assert "Crypto Analyst Pro · v28" in html
+    assert "Crypto Analyst Pro · v29" in html
 
 
 def test_render_weekly_v16_no_btc_hold_bullets_sectors():
@@ -287,4 +290,4 @@ def test_render_weekly_v16_no_btc_hold_bullets_sectors():
     assert "drawdown pondéré -50% vs ATH" in html         # plus de « n/d »
     assert "0/5 minimum pour calibration" in html         # gate label dans header
     assert "13 juin" in html                              # upcoming_week corrigé
-    assert "Crypto Analyst Pro · v28" in html
+    assert "Crypto Analyst Pro · v29" in html

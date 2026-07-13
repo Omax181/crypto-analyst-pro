@@ -642,6 +642,221 @@ def sanitize_ath_text(
     return (new if new != text else text), fixes
 
 
+# ── v29 (WA2) — dédup TOPIQUE du digest news hebdo ─────────────────────
+
+_NEWS_STOPWORDS = {
+    # FR
+    "le", "la", "les", "de", "du", "des", "un", "une", "en", "et", "à", "au",
+    "aux", "sur", "pour", "avec", "sans", "dans", "par", "est", "sont", "va",
+    "vont", "ne", "pas", "plus", "son", "sa", "ses", "ce", "cette", "ces",
+    "qui", "que", "quand", "même", "soir", "vertu", "sera", "être",
+    # EN
+    "the", "of", "to", "in", "and", "a", "an", "for", "on", "as", "is", "are",
+    "will", "be", "with", "without", "its", "his", "her", "this", "that",
+    "under", "over", "after", "before", "into", "it", "not", "no", "even",
+    "tonight", "anyway", "still", "law",
+}
+
+
+def _news_tokens(title: str) -> set[str]:
+    """Tokens significatifs d'un titre, STEMMÉS (6 premiers caractères).
+
+    Le stem grossier absorbe les flexions (« ban »/« banned »,
+    « interdiction »/« interdit ») sans dépendre d'une lib NLP.
+    """
+    words = re.findall(r"[A-Za-zÀ-ÿ0-9$]{2,}", (title or "").lower())
+    return {w[:6] for w in words if w not in _NEWS_STOPWORDS}
+
+
+def is_duplicate_news(title_a: str, title_b: str) -> bool:
+    """True si deux titres couvrent le MÊME événement (recouvrement de tokens).
+
+    Le 10/07, le hebdo listait 3 variantes de la même actu CBDC/loi logement
+    (Cointelegraph, CoinDesk, Decrypt). Seuils : ≥ 4 stems communs, OU ≥ 3
+    stems communs avec un Jaccard ≥ 0,45 (titres courts).
+    """
+    ta, tb = _news_tokens(title_a), _news_tokens(title_b)
+    if not ta or not tb:
+        return False
+    inter = len(ta & tb)
+    if inter >= 4:
+        return True
+    union = len(ta | tb) or 1
+    return inter >= 3 and (inter / union) >= 0.45
+
+
+def dedupe_weekly_news(items: Any) -> tuple[list[Any], list[str]]:
+    """Déduplique le digest news hebdo par ÉVÉNEMENT (le 1er vu est conservé)."""
+    fixes: list[str] = []
+    if not isinstance(items, list):
+        return items, fixes
+    kept: list[Any] = []
+    for n in items:
+        title = str((n or {}).get("title") or "") if isinstance(n, dict) else str(n)
+        dup_of = next(
+            (str((k or {}).get("title") or "") if isinstance(k, dict) else str(k)
+             for k in kept
+             if is_duplicate_news(
+                 title,
+                 str((k or {}).get("title") or "") if isinstance(k, dict) else str(k))),
+            None)
+        if dup_of is not None:
+            fixes.append(f"news doublon retirée : « {title[:50]}… »")
+            continue
+        kept.append(n)
+    return kept, fixes
+
+
+# ── v29 (WA9) — impact PTF pondéré à côté des « pertes » citées ─────────
+
+def append_ptf_impact(
+    text: Any, impacts: Optional[dict[str, dict[str, Any]]],
+) -> tuple[Any, list[str]]:
+    """Ajoute « (poids X% · impact PTF ±Y pt) » après « SYM (−Z%) » cité.
+
+    Le 10/07, FET (−14,7%) était LA perte commentée du post-mortem… pour un
+    poids de 1,1% du PTF (impact −0,17 pt) : l'emphase était disproportionnée.
+    On ne réécrit pas le propos — on chiffre son poids réel. N'agit que si la
+    mention n'est pas déjà qualifiée (« impact » absent à proximité).
+    """
+    fixes: list[str] = []
+    if not isinstance(text, str) or not impacts:
+        return text, fixes
+
+    def _one(m: re.Match) -> str:
+        sym = m.group(1).upper()
+        fact = impacts.get(sym)
+        if not fact:
+            return m.group(0)
+        after = text[m.end():m.end() + 60]
+        if "impact" in (m.group(0) + after).lower():
+            return m.group(0)
+        w = fact.get("weight_pct")
+        ip = fact.get("impact_pt")
+        if w is None or ip is None:
+            return m.group(0)
+        _w = str(round(w, 1)).replace(".", ",")
+        _ip = ("+" if ip >= 0 else "−") + str(abs(round(ip, 2))).replace(".", ",")
+        fixes.append(f"{sym} : impact PTF chiffré ({_ip} pt)")
+        return f"{m.group(0)} (poids {_w}% · impact PTF {_ip} pt)"
+
+    pat = re.compile(
+        r"\b([A-Z0-9]{2,10})\b\s*\(\s*[−\-–]\d{1,3}(?:[.,]\d+)?\s?%[^)]{0,15}\)")
+    new = pat.sub(_one, text)
+    return (new if new != text else text), fixes
+
+
+def append_ptf_impact_in_payload(
+    payload: dict[str, Any], impacts: Optional[dict[str, dict[str, Any]]],
+    keys: tuple[str, ...] = ("losses_vs_recos", "my_errors"),
+) -> list[str]:
+    """Applique ``append_ptf_impact`` aux sections post-mortem (récursif)."""
+    fixes: list[str] = []
+    if not isinstance(payload, dict) or not impacts:
+        return fixes
+
+    def _walk(node: Any) -> Any:
+        if isinstance(node, str):
+            new, fx = append_ptf_impact(node, impacts)
+            fixes.extend(fx)
+            return new
+        if isinstance(node, list):
+            return [_walk(x) for x in node]
+        if isinstance(node, dict):
+            return {k: _walk(v) for k, v in node.items()}
+        return node
+
+    for key in keys:
+        if key in payload:
+            payload[key] = _walk(payload[key])
+    return fixes
+
+
+# ── v29 (WA10) — poussières : la règle frais > valeur est cohérente ─────
+
+_LIQUIDATE_NOW = re.compile(
+    r"(?i)(?:nous\s+)?recommandons\s+une\s+liquidation\s+immédiate[^.]*\.|"
+    r"liquidation\s+immédiate\s+sans\s+attendre[^.]*\.")
+
+
+def fix_dust_advice(
+    node: Any, tiny_assets: set[str],
+) -> tuple[Any, list[str]]:
+    """Corrige le conseil « liquidation immédiate » d'une poussière sous le
+    seuil de frais : vendre coûterait PLUS que la valeur récupérée.
+
+    Le 10/07 : « Pour SXT (valeur 0,12 $), nous recommandons une liquidation
+    immédiate sans attendre, les frais de transaction risquant de dépasser la
+    valeur résiduelle » — la prémisse (frais > valeur) contredit l'ordre
+    (vendre). La phrase devient un abandon de ligne assumé.
+    """
+    fixes: list[str] = []
+    if not tiny_assets:
+        return node, fixes
+
+    def _fn(text: str) -> str:
+        if not isinstance(text, str) or not _LIQUIDATE_NOW.search(text):
+            return text
+        near = {a for a in tiny_assets
+                if re.search(rf"\b{re.escape(a)}\b", text)}
+        if not near:
+            return text
+        fixes.append(
+            f"conseil poussière incohérent corrigé ({', '.join(sorted(near))} : "
+            "frais > valeur → abandon, pas de vente)")
+        return _LIQUIDATE_NOW.sub(
+            "les frais de transaction dépasseraient la valeur résiduelle : "
+            "ligne à ABANDONNER (sortie du suivi), ne pas payer pour vendre. ",
+            text).strip()
+
+    def _walk(n: Any) -> Any:
+        if isinstance(n, str):
+            return _fn(n)
+        if isinstance(n, list):
+            return [_walk(x) for x in n]
+        if isinstance(n, dict):
+            return {k: _walk(v) for k, v in n.items()}
+        return n
+
+    return _walk(node), fixes
+
+
+# ── v29 (WA12) — structure CT baissière + action Renforcer : cadrage LT ──
+
+_BEARISH_STRUCT = re.compile(r"(?i)structure\s+(?:daily|journalière)\s+baissière")
+_LT_QUALIFIER = re.compile(r"(?i)\bLT\b|long\s+terme|DCA|accumulation")
+
+
+def reconcile_bearish_reinforce(entries: Any) -> list[str]:
+    """Une ligne « structure daily baissière … → Renforcer » reçoit son cadrage
+    LT explicite (mutation in-place des ``analysis``).
+
+    Le 10/07, INJ affichait « Structure daily baissière mais rebond en cours »
+    avec action RENFORCER sans dire que la logique est l'accumulation LT en
+    capitulation — le signal CT et l'action semblaient se contredire.
+    """
+    fixes: list[str] = []
+    if not isinstance(entries, list):
+        return fixes
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        if str(e.get("action") or "").lower() != "renforcer":
+            continue
+        txt = e.get("analysis")
+        if not isinstance(txt, str) or not _BEARISH_STRUCT.search(txt):
+            continue
+        if _LT_QUALIFIER.search(txt):
+            continue  # déjà cadré (« accumulation », « LT », « DCA »…)
+        e["analysis"] = (txt.rstrip().rstrip(".")
+                         + ". Renfort = accumulation LT (DCA) malgré le signal "
+                           "CT défavorable.")
+        fixes.append(
+            f"{str(e.get('asset') or '?').upper()} : cadrage LT ajouté "
+            "(structure CT baissière + Renforcer)")
+    return fixes
+
+
 def sanitize_ath_in_payload_texts(
     payload: dict[str, Any], ath_facts: Optional[dict[str, Any]],
     keys: tuple[str, ...] = ("exit_plan", "losses_vs_recos", "my_errors",

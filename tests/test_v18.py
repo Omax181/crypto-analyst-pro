@@ -118,9 +118,10 @@ def test_m_a23_sector_rotation_by_abs_change_and_aggregate():
     # Trié par |variation| : IoT (9.21) en tête, Interop (4.93) ensuite.
     assert rot[0]["sector"] == "IoT"
     assert rot[1]["sector"] == "Interop"
-    # Dernière case = agrégat.
+    # Dernière case = agrégat. v29 (WA11) : libellé « Autres · N secteurs ».
     assert rot[-1].get("is_aggregate") is True
-    assert "Autres secteurs" in rot[-1]["sector"]
+    assert rot[-1]["sector"].startswith("Autres")
+    assert "4 secteurs" in rot[-1]["sector"]
 
 
 def test_m_a24_10y_adaptive_conversion(monkeypatch):
