@@ -223,7 +223,7 @@ def get_calendar_prints() -> dict[str, Any]:
                     prev_yoy = None
                     if len(obs) >= 14 and obs[-14]["value"]:
                         prev_yoy = (prev["value"] - obs[-14]["value"]) / obs[-14]["value"] * 100
-                    entry["display"] = f"{yoy:+.1f}% sur 1 an"
+                    entry["display"] = f"{yoy:+.1f}% sur 1 an".replace(".", ",")
                     entry["display_value"] = round(yoy, 1)
                     if prev_yoy is not None:
                         entry["display_delta"] = round(yoy - prev_yoy, 1)
@@ -233,7 +233,7 @@ def get_calendar_prints() -> dict[str, Any]:
                 entry["display"] = f"{jobs_k:+,.0f}k emplois (mois)"
             elif name in ("unemployment", "fed_funds"):
                 # Déjà en % : on affiche le niveau tel quel.
-                entry["display"] = f"{last['value']:.2f}%"
+                entry["display"] = f"{last['value']:.2f}%".replace(".", ",")
             prints.append(entry)
         return {"available": bool(prints), "prints": prints}
 

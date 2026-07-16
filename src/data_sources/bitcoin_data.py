@@ -107,7 +107,7 @@ def get_btc_onchain_extras() -> dict[str, Any]:
         if out.get("nupl") is not None:
             n = out["nupl"]
             readings.append(
-                f"NUPL {n:.2f} — " + ("marché sous l'eau (capitulation)"
+                f"NUPL {f'{n:.2f}'.replace('.', ',')} — " + ("marché sous l'eau (capitulation)"
                                       if n < 0 else
                                       "zone espoir/peur (bas de cycle historique)"
                                       if n < 0.25 else

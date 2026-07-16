@@ -19,26 +19,26 @@ import re
 # --------------------------------------------------------------------------- #
 # fmt_money — v23 (C2) : format ANGLO unifié avec fmt_price ($ préfixe)
 # --------------------------------------------------------------------------- #
-def test_fmt_money_anglo_format():
+def test_fmt_money_fr_format():
     from src.reporting.email_html import _fmt_money
-    assert _fmt_money(69637.63) == "$69,637.63"
-    assert _fmt_money(63180) == "$63,180.00"
-    assert _fmt_money("63180") == "$63,180.00"
-    assert _fmt_money("1,679.33") == "$1,679.33"
-    assert _fmt_money(7.94) == "$7.94"
-    # parsing FR encore toléré en ENTRÉE (rétro-compat), sortie anglo
-    assert _fmt_money("69.637,63 $") == "$69,637.63"
+    assert _fmt_money(69637.63) == "69\u202f637,63\u202f$"
+    assert _fmt_money(63180) == "63\u202f180,00\u202f$"
+    assert _fmt_money("63180") == "63\u202f180,00\u202f$"
+    assert _fmt_money("1,679.33") == "1\u202f679,33\u202f$"
+    assert _fmt_money(7.94) == "7,94\u202f$"
+    # parsing toléré en ENTRÉE (rétro-compat) ; sortie FR (v30 #67)
+    assert _fmt_money("69.637,63 $") == "69\u202f637,63\u202f$"
 
 
 def test_fmt_money_edge_cases():
     from src.reporting.email_html import _fmt_money
     assert _fmt_money(None) == "—"
     assert _fmt_money("marché") == "marché"   # non parsable → inchangé
-    assert _fmt_money(0) == "$0"
-    assert _fmt_money(-1512.07) == "−$1,512.07"
+    assert _fmt_money(0) == "0\u202f$"
+    assert _fmt_money(-1512.07) == "−1\u202f512,07\u202f$"
     # micro-prix : pas de notation scientifique, préfixe $
     out = _fmt_money(0.00000001)
-    assert "e" not in out.lower() and out.startswith("$")
+    assert "e" not in out.lower() and out.endswith("$")
 
 
 # --------------------------------------------------------------------------- #
@@ -97,7 +97,7 @@ def test_reco_bilan_statuses():
     assert bilan["BTC"]["delta_pct"] == 0.66
     # v28 (E-A5) : raison RACCOURCIE — une seule mention « invalidation $X ».
     assert "invalidation" in bilan["ETH"]["reason"]
-    assert "$1,500" in bilan["ETH"]["reason"]
+    assert "1\u202f500,00\u202f$" in bilan["ETH"]["reason"]
 
 
 def test_reco_bilan_alleger_bearish_logic():
@@ -250,7 +250,7 @@ def test_evening_render_8_blocs():
     html = render(_enriched_evening_payload(), "evening")
     assert not re.search(r"\{\{|\{%", html)          # pas de Jinja non rendu
     assert "rendu simplifié" not in html             # pas de fallback
-    assert "Crypto Analyst Pro · v29" in html        # versioning
+    assert "Crypto Analyst Pro · v30" in html        # versioning
     # blocs présents
     assert "Bilan du jour" in html
     assert "Marchés · mi-séance" in html
@@ -258,8 +258,8 @@ def test_evening_render_8_blocs():
     assert "Recos du matin" in html
     assert "Niveaux à surveiller" in html
     assert "Demain matin" in html
-    # fmt_money dans le bilan recos
-    assert "$63,180.00" in html
+    # fmt_money dans le bilan recos (convention FR v30)
+    assert "63\u202f180,00\u202f$" in html
     # statut coloré
     assert "on track" in html
 
@@ -288,7 +288,7 @@ def test_evening_subcent_price_shows_dash():
     from src.reporting.email_html import render
     html = render(_enriched_evening_payload(), "evening")
     assert "CKB" in html
-    assert "+2.7%" in html  # fmt_pct arrondit 2.68 -> +2.7%
+    assert "+2,7%" in html  # fmt_pct arrondit 2.68 -> +2,7% (FR v30)
 
 
 # --------------------------------------------------------------------------- #
@@ -325,11 +325,11 @@ def test_morning_reorder_histoire_before_enbref():
 def test_morning_plan_fmt_money():
     from src.reporting.email_html import render
     html = render(_morning_payload(), "morning")
-    assert "$63,180.00" in html   # entrée (plan d'action)
-    assert "$60,500.00" in html   # SL (plan d'action)
+    assert "63\u202f180,00\u202f$" in html   # entrée (plan d'action)
+    assert "60\u202f500,00\u202f$" in html   # SL (plan d'action)
     # v17 (M-B2) : le « Take profit » a été retiré du plan d'action (doublon des
     # cibles). La cible CT 30j reste affichée dans l'encadré cibles à droite.
-    assert "$70,990.00" in html   # cible CT 30j (targets.short_term_30d)
+    assert "70\u202f990,00\u202f$" in html   # cible CT 30j (targets.short_term_30d)
     assert "Take profit :" not in html  # plus de TP dupliqué dans le plan
 
 
@@ -343,7 +343,7 @@ def test_morning_arrows_and_plural_and_polymarket():
     assert "▼" in html                              # flèche down (Nasdaq)
     assert "données partielles" in html             # pluriel
     assert "maintien" in html and "99.8%" in html    # Polymarket reframé
-    assert "Crypto Analyst Pro · v29" in html
+    assert "Crypto Analyst Pro · v30" in html
 
 
 # ─────────────────── v14 AUDIT HARDENING TESTS ─────────────────── #
@@ -754,8 +754,8 @@ def test_render_evening_micro_price_not_masked():
     row = html[i:i + 600]
     # v23.x : colonnes séparées Entrée / Cible / Actuel (plus de « entrée → actuel »).
     # Les micro-prix (<0.01) ne sont PAS masqués en « — ».
-    assert "$0.00129" in row   # prix d'entrée micro non masqué
-    assert "$0.00131" in row   # prix actuel micro non masqué
+    assert "0,00129\u202f$" in row   # prix d'entrée micro non masqué
+    assert "0,00131\u202f$" in row   # prix actuel micro non masqué
 
 
 def test_render_degraded_shows_reason():

@@ -337,10 +337,13 @@ class PredictionTracker:
         avg_gain = (sum(gains) / len(gains)) if gains else 0.0
         avg_loss = (sum(losses) / len(losses)) if losses else 0.0  # négatif
         expectancy = avg_gain * win_rate + avg_loss * (1 - win_rate)
+        _g_fr = f"{avg_gain:+.1f}".replace(".", ",")
+        _l_fr = f"{avg_loss:+.1f}".replace(".", ",")
+        _e_fr = f"{expectancy:+.1f}".replace(".", ",")
         reading = (
-            f"Sur {sample} recos clôturées : gain moyen {avg_gain:+.1f}% "
-            f"({len(gains)} gagnantes), perte moyenne {avg_loss:+.1f}% "
-            f"({len(losses)} perdantes) → espérance {expectancy:+.1f}% par reco. "
+            f"Sur {sample} recos clôturées : gain moyen {_g_fr}% "
+            f"({len(gains)} gagnantes), perte moyenne {_l_fr}% "
+            f"({len(losses)} perdantes) → espérance {_e_fr}% par reco. "
             + ("Stratégie statistiquement gagnante."
                if expectancy > 0 else
                "Espérance négative : resserrer la sélectivité ou les niveaux.")
@@ -411,6 +414,19 @@ class PredictionTracker:
             status = self.evaluate_recommendation(reco, price)
             reco["status"] = status
             reco["current_price"] = price
+            # v30 (#43) — EXTRÊMES PERSISTÉS : le post-mortem hebdo réécrivait
+            # l'histoire (« plus bas à 4,90 $ » quand le soir avait traité
+            # 4,67 $). Chaque passage enregistre le plus bas/haut réellement
+            # VUS depuis l'entrée — le bilan les lit, il ne les devine plus.
+            if isinstance(price, (int, float)) and price > 0:
+                _lo = reco.get("low_since_entry")
+                _hi = reco.get("high_since_entry")
+                reco["low_since_entry"] = (min(_lo, price)
+                                           if isinstance(_lo, (int, float))
+                                           else price)
+                reco["high_since_entry"] = (max(_hi, price)
+                                            if isinstance(_hi, (int, float))
+                                            else price)
             created = _parse(reco.get("created_at"))
             if created is not None:
                 reco["holding_days"] = max(
@@ -633,7 +649,8 @@ class PredictionTracker:
                     # Legacy sans cible persistée : jamais « Sur objectif » —
                     # on dit ce qu'on mesure vraiment (Δ favorable).
                     _health, _health_color = "🟢 En bonne voie", "#3B6D11"
-                    _comment = f"{progress:+.1f}% depuis l'entrée (cible n/d)."
+                    _comment = (f"{progress:+.1f}".replace(".", ",")
+                                + "% depuis l'entrée (cible n/d).")
                 elif progress <= -3:
                     # v21 (M22) — PAS de commentaire boilerplate ici : le badge
                     # « ⚠️ Sous pression » + le Δ% affiché disent déjà tout.
@@ -668,11 +685,20 @@ class PredictionTracker:
                     "émise aujourd'hui" if _days_open == 0
                     else f"il y a {_days_open} j")
             if progress is not None:
-                _life_bits.append(f"{progress:+.1f}%")
-            if _path_pct is not None:
-                _life_bits.append(f"{max(min(_path_pct, 999), -999):.0f}% du chemin vers la cible")
+                _life_bits.append(f"{progress:+.1f}%".replace(".", ","))
+            # v30 (#8) — AFFICHAGE borné [0,100] : « Progrès −155% » était
+            # inintelligible. Le chemin brut sert aux seuils de santé ; le
+            # rendu montre 0-100% + « s'éloigne de la cible » si négatif.
+            _path_disp = (max(0.0, min(100.0, _path_pct))
+                          if _path_pct is not None else None)
+            if _path_disp is not None:
+                _away = _path_pct is not None and _path_pct < 0
+                _life_bits.append(
+                    f"{_path_disp:.0f}% du chemin vers la cible"
+                    + (" (s'éloigne)" if _away else ""))
             if _stop_dist_pct is not None:
-                _life_bits.append(f"stop à {_stop_dist_pct:+.1f}%")
+                _life_bits.append(
+                    f"stop à {_stop_dist_pct:+.1f}%".replace(".", ","))
             best[asset] = {
                 "asset": asset,
                 "action": "ALLÉGER" if action == "ALLEGER" else action,
@@ -694,6 +720,10 @@ class PredictionTracker:
                 # v26 (B6) — progression vers la cible + distance restante,
                 # affichées dans le Tracking (fini le badge binaire).
                 "target_path_pct": _path_pct,
+                # v30 (#8) — version AFFICHABLE bornée [0,100] + drapeau
+                # « s'éloigne » (le brut sert aux seuils de santé internes).
+                "target_path_display_pct": _path_disp,
+                "target_path_away": (_path_pct is not None and _path_pct < 0),
                 "dist_to_target_pct": _dist_to_target_pct,
                 "current_price": cur,
                 "status": {"validated": "✓ validée",
@@ -721,7 +751,8 @@ class PredictionTracker:
         return out
 
     def check_invalidations(
-        self, price_lookup: dict[str, float]
+        self, price_lookup: dict[str, float],
+        stop_overrides: Optional[dict[str, float]] = None,
     ) -> list[dict[str, Any]]:
         """v27 (TH1) — invalidations FRANCHIES ou MENACÉES des recos actives.
 
@@ -730,19 +761,29 @@ class PredictionTracker:
         franchi le stop (ou s'en approche à ≤ 2,5%) produit une alerte
         structurée ``{asset, status, condition, implication}`` prête pour le
         bloc « Ce que je surveille pour invalider mon scénario ».
+
+        v30 (#1/#66) — ``stop_overrides`` : SOURCE UNIQUE d'invalidation. Le
+        14/07, « à surveiller » lisait le stop d'HIER (TAO 201,11 $, state)
+        pendant que la thèse affichait le stop du JOUR (190 $, asset_plan) →
+        « invalidation FRANCHIE » à côté d'un RENFORCER actif. Quand le run a
+        déjà calculé les plans du jour, il passe ``{asset: stop_du_jour}`` et
+        l'alerte est évaluée sur le MÊME niveau que celui rendu dans le mail.
         """
         def _fmt(v: float) -> str:
             if abs(v) >= 1000:
                 return f"{v:,.0f}".replace(",", " ") + " $"
             if abs(v) >= 1:
-                return f"{v:,.2f} $"
-            return f"{v:.4f} $"
+                return f"{v:,.2f}".replace(".", ",") + " $"
+            return f"{v:.4f}".replace(".", ",") + " $"
 
         active = mem.load_active_recommendations()
         selected = latest_open_reco_by_asset(active)
         out: list[dict[str, Any]] = []
         for asset, reco in selected.items():
             sl = reco.get("stop_loss")
+            # v30 (#1/#66) — le stop du plan du jour PRIME sur le stop persisté.
+            if stop_overrides and stop_overrides.get(asset):
+                sl = stop_overrides[asset]
             cur = price_lookup.get(asset) or reco.get("current_price")
             action = (reco.get("action") or "").upper()
             try:
@@ -770,7 +811,8 @@ class PredictionTracker:
                     "asset": asset, "status": "menacé",
                     "level": sl_f, "current": cur_f,
                     "condition": (f"{asset} : à "
-                                  f"{abs(dist_pct):.1f}% de l'invalidation "
+                                  f"{str(round(abs(dist_pct), 1)).replace('.', ',')}"
+                                  f"% de l'invalidation "
                                   f"{_fmt(sl_f)}"),
                     "implication": "zone de décision imminente — surveiller la clôture",
                 })
@@ -797,7 +839,10 @@ class PredictionTracker:
         ]
         if not invalidated:
             return "Aucune invalidation notable sur la période. Discipline maintenue."
-        worst = invalidated[0]
+        # v30.1 — vraie « plus coûteuse » : tri par |mouvement| décroissant
+        # (l'ancien code prenait la première de l'historique).
+        worst = max(invalidated,
+                    key=lambda p: abs(p.get("price_change_pct") or 0))
         asset = worst.get("asset", "?")
         action = worst.get("action", "?")
         return (

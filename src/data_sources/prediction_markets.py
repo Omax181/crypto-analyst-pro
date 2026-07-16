@@ -243,6 +243,12 @@ def get_key_markets() -> dict[str, Any]:
                             meeting_hint = f"réunion {_mois.get(en[0], en[0])} {en[1]}"
                     break
         if any(v > 0 for v in probs.values()):
+            # v30 (#75) — NORMALISATION à 100% : le 13/07, maintien 62,5% +
+            # baisse ≈0% + hausse 35,1% = 97,6%. Si la somme est plausible
+            # (85-115%), on met à l'échelle ; sinon données suspectes, brutes.
+            _tot_p = sum(probs.values())
+            if 85.0 <= _tot_p <= 115.0 and _tot_p > 0:
+                probs = {k: v * 100.0 / _tot_p for k, v in probs.items()}
             label_fr = {"cut": "baisse", "hold": "maintien", "hike": "hausse"}
             dom = max(probs, key=lambda k: probs[k])
             fed_bars = {

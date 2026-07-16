@@ -33,7 +33,7 @@ def test_fix_equity_points_still_fixes_real_index_points():
     txt = "Le Nasdaq a perdu -230.5 points."
     out, fixes = wg.fix_equity_points(txt, {"nasdaq": -1.2})
     assert "points" not in out
-    assert "−1.2% (7j)" in out and len(fixes) == 1
+    assert "−1,2% (7j)" in out and len(fixes) == 1
 
 
 # --------------------------------------------------------------------------- #
@@ -56,7 +56,7 @@ def test_enforce_summary_still_fixes_ptf_perf():
     bullets = ["Performance du portefeuille : +2.32% sur la semaine."]
     out, fixes = wg.enforce_summary_figures(
         bullets, {"weekly_pnl_pct": 3.8, "vs_btc_7d_pct": 0.3})
-    assert "+3.8%" in out[0] and "2.32" not in out[0]
+    assert "+3,8%" in out[0] and "2.32" not in out[0]
     assert len(fixes) == 1
 
 

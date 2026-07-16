@@ -54,6 +54,11 @@ def check_report(
     theses = payload.get("thesis_of_the_day") or []
     clean_theses = []
     for th in theses:
+        # v30.1 — check_report est sur le CHEMIN CRITIQUE sans try/except :
+        # une thèse non-dict (payload LLM dégénéré) plantait tout le mail.
+        if not isinstance(th, dict):
+            warnings.append("thèse non structurée écartée (payload dégénéré).")
+            continue
         # P0 #60 — plafond imposé par la complétude de l'analyse.
         cap = caps.get((th.get("asset") or "").upper())
         conf = th.get("confidence")
@@ -63,6 +68,10 @@ def check_report(
                 f"{cap}% → ramenée à {cap}%."
             )
             th["confidence"] = cap
+            # v30 (#77) — le plafonnement devient VISIBLE dans la fiche
+            # (« taille standard · confiance plafonnée »), fini l'uniformité
+            # muette à 75% sur 4 recos.
+            th["_capped_completeness"] = True
             th["_confidence_capped"] = True
         problems = _check_thesis(th)
         if problems:
@@ -77,6 +86,8 @@ def check_report(
 
     # ATH impossible dans le récap positions.
     for pos in payload.get("all_positions_summary") or []:
+        if not isinstance(pos, dict):
+            continue
         ath = pos.get("ath_distance_pct")
         if ath is not None and ath <= -100:
             warnings.append(f"{pos.get('asset')} : ATH -100% corrigé à -99.99%.")

@@ -153,7 +153,7 @@ def equity_crypto_line(links: dict[str, Any], equity_quotes: dict[str, Any]) -> 
     for tkr in dict.fromkeys(l["equity"] for l in sig[:5]):
         q = (equity_quotes or {}).get(tkr) or {}
         if q.get("change_pct") is not None:
-            moves.append(f"{tkr} {q['change_pct']:+.1f}%")
+            moves.append(f"{tkr} " + f"{q['change_pct']:+.1f}".replace(".", ",") + "%")
     if moves:
         line += f" — séance : {', '.join(moves)}"
     return line

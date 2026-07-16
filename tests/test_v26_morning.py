@@ -27,7 +27,7 @@ from src.reporting.email_html import APP_VERSION, render
 # ─────────────────────────────────────────────────────────────────────────────
 def test_app_version_v26():
     # Nommage final : le livrable est étiqueté v26 (décision Omar, 2026-07-05).
-    assert APP_VERSION == "v29"
+    assert APP_VERSION == "v30"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ def test_onchain_tiles_eth_dated_and_note_once():
     tiles, note = _build_onchain_tiles(_tile_data())
     eth_addr = next(t for t in tiles if t["label"] == "Adresses actives ETH")
     # A2 : delta ET date sur la même tuile, grisée.
-    assert "-12.4% / 7j" in eth_addr["short"].replace("−", "-")
+    assert "-12,4% / 7j" in eth_addr["short"].replace("−", "-")
     assert "au 23/05" in eth_addr["short"]
     assert eth_addr["color"] == "#8a8880"
     assert note and "23/05" in note                     # note de fraîcheur unique
@@ -189,7 +189,7 @@ def test_onchain_tiles_btc_addresses_fresh_pref():
     tiles, _ = _build_onchain_tiles(_tile_data())
     btc_addr = next(t for t in tiles if t["label"] == "Adresses actives BTC")
     assert btc_addr["value"] == "858 340"
-    assert "+2.1% / 7j" in btc_addr["short"]
+    assert "+2,1% / 7j" in btc_addr["short"]
     assert "au " not in btc_addr["short"]               # fraîche → pas de date
 
 
@@ -204,7 +204,7 @@ def test_onchain_tiles_etf_and_funding_and_cap():
     labels = [t["label"] for t in tiles]
     assert "Flux ETF BTC" in labels and "Flux ETF ETH" in labels
     etf_btc = next(t for t in tiles if t["label"] == "Flux ETF BTC")
-    assert etf_btc["value"] == "−$325.8M" and "au 01/07" in etf_btc["short"]
+    assert etf_btc["value"] == "−325,8 M$" and "au 01/07" in etf_btc["short"]
     assert "Funding BTC" in labels
     assert len(tiles) <= 12
     mp = next(t for t in tiles if t["label"] == "Max Pain BTC")

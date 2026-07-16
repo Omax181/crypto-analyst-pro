@@ -268,7 +268,8 @@ def get_consolidated_calendar(horizon_days: int = 8) -> dict[str, Any]:
                           "source": "ForexFactory", "estimated": False,
                           "time": e.get("time"), "zone": e.get("zone"),
                           "forecast": e.get("forecast"),
-                          "previous": e.get("previous")})
+                          "previous": _sane_mm_value(
+                              e.get("label"), e.get("previous"))})
         except Exception as exc:  # noqa: BLE001
             logger.info("Calendrier éco (ForexFactory) indisponible : %s", exc)
 
@@ -338,3 +339,17 @@ def get_consolidated_calendar(horizon_days: int = 8) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Calendrier consolidé indisponible : %s", exc)
         return {"available": False, "events": [], "sources_used": []}
+def _sane_mm_value(label, value):
+    """v30 (#10) — borne de sanité : un « préc. 1,1% » sur un PPI m/m
+    (≈ 14% annualisé) est presque sûrement un artefact de source. Au-delà de
+    ±1,5% sur un indicateur m/m, la valeur est marquée « à vérifier »."""
+    try:
+        lbl = str(label or "").lower()
+        if "m/m" not in lbl:
+            return value
+        v = float(str(value).replace("%", "").replace(",", ".").strip())
+        if abs(v) > 1.5:
+            return f"{value} (à vérifier)"
+    except (TypeError, ValueError):
+        return value
+    return value

@@ -238,7 +238,7 @@ def test_cmd_ptf_shows_pnl(monkeypatch) -> None:
                        "pnl_pct": 20.0, "change_24h": 2.0}],
     })
     out = commands._cmd_portfolio()
-    assert "P&L latent" in out and "+20.0%" in out and "PRU +20%" in out
+    assert "P&L latent" in out and "+20,0%" in out and "PRU +20%" in out
 
 
 # --------------------------------------------------------------------------- #

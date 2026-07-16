@@ -39,14 +39,14 @@
         {% if portfolio_snapshot.value_usd %}
         <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;">{{ portfolio_snapshot.value_usd|fmt_price }}</p>
         {% endif %}
-        {% if (portfolio_snapshot.weekly_pnl_pct|default(none)) is not none %}<p style="font-size:10px;color:{% if (portfolio_snapshot.weekly_pnl_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ portfolio_snapshot.weekly_pnl_pct|fmt_pct }} sem.</p>{% endif %}
+        {% if (portfolio_snapshot.weekly_pnl_pct|default(none)) is not none %}<p style="font-size:10px;color:{% if (portfolio_snapshot.weekly_pnl_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};margin:0;">{{ portfolio_snapshot.weekly_pnl_pct|fmt_pct }} sem. <span style="color:#8a8880;font-weight:400;">· 7 j glissants</span></p>{% endif %}
         {# v23 — winrate 30j en tête (une fois, comme le matin/soir). #}
         {% set _wr_parts_w = (header.win_rate_total or '0/0').split('/') %}
         {% set _wr_total_w = (_wr_parts_w[1]|num(0)) if (_wr_parts_w|length > 1) else 0 %}
         {% set _wr_val_w = header.win_rate_30d|num(none) %}
         {# v28 (M-A15) — < 5 clôtures : « en calibration (2/2) », plus de %
            flatteur non calibré (aligné sur les headers matin/soir). #}
-        <p style="font-size:10px;color:#8a8880;margin:8px 0 0 0;">Win rate 30j · <span style="font-weight:600;color:{% if _wr_total_w >= 5 and _wr_val_w is not none and _wr_val_w >= 50 %}#3B6D11{% elif _wr_total_w >= 5 and _wr_val_w is not none and _wr_val_w < 50 %}#A32D2D{% else %}#5a5852{% endif %};">{% if _wr_total_w < 1 or _wr_val_w is none %}— pas encore d'historique{% elif _wr_total_w < 5 %}en calibration ({{header.win_rate_total}}){% else %}{{ '%.0f'|format(_wr_val_w) }}%{% endif %}</span></p>
+        <p style="font-size:10px;color:#8a8880;margin:8px 0 0 0;">Win rate 30j · <span style="font-weight:600;color:{% if _wr_total_w >= 5 and _wr_val_w is not none and _wr_val_w >= 50 %}#3B6D11{% elif _wr_total_w >= 5 and _wr_val_w is not none and _wr_val_w < 50 %}#A32D2D{% else %}#5a5852{% endif %};">{% if _wr_total_w < 1 or _wr_val_w is none %}— pas encore d'historique{% elif _wr_total_w < 5 %}en calibration ({{header.win_rate_calibration or header.win_rate_total}}){% else %}{{ '%.0f'|format(_wr_val_w) }}%{% endif %}</span></p>
       </td>
     </tr>
   </table>
@@ -239,7 +239,7 @@
      et jusqu'à 5 cryptos du secteur (séparées par des virgules) + « +N » pour le
      reste. Fallback barres si absent. #}
   {% if sector_exposure_cells %}
-  <p style="font-size:12px;color:#1a1a18;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Exposition sectorielle du portefeuille</p>
+  <p style="font-size:12px;color:#1a1a18;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Exposition sectorielle du portefeuille <span style="font-weight:400;color:#8a8880;text-transform:none;">· instantané du run (peut différer du matin de quelques dixièmes)</span></p>
   {# v28 (3.B/W-A14) — donut SUPPRIMÉ : les cases ci-dessous portaient déjà les
      mêmes % avec EN PLUS les perfs 24h/7j/30j (template v25 strict). #}
   <table role="presentation" cellpadding="0" cellspacing="4" border="0" style="width:100%;border-collapse:separate;table-layout:fixed;">
@@ -265,7 +265,7 @@
   {% else %}
   {% set _sectors = (sector_exposure_computed.sectors if (sector_exposure_computed and sector_exposure_computed.available) else sector_exposure) %}
   {% if _sectors %}
-  <p style="font-size:12px;color:#1a1a18;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Exposition sectorielle du portefeuille</p>
+  <p style="font-size:12px;color:#1a1a18;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:0.3px;font-weight:500;">Exposition sectorielle du portefeuille <span style="font-weight:400;color:#8a8880;text-transform:none;">· instantané du run (peut différer du matin de quelques dixièmes)</span></p>
   {% for s in _sectors %}
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;{% if not loop.last %}border-bottom:0.5px solid #e5e4dc;{% endif %}">
     <tr>
@@ -804,7 +804,7 @@
     {% set _ph = _phasemap.get(r.lt_status, [r.lt_status or '—','#5a5852','#F1EFE8']) %}
     {% set _ac = _actmap.get((r.action or '')|lower, [r.action or '—','#5a5852','#F1EFE8']) %}
     <tr style="border-top:0.5px solid #e5e4dc;">
-      <td style="padding:6px 6px;vertical-align:top;"><span style="font-size:12px;font-weight:700;color:#1a1a18;">{{r.asset}}</span>{% if r.conviction %}<br><span style="font-size:8px;color:#27500A;text-transform:uppercase;letter-spacing:0.3px;">★ cœur</span>{% else %}<br><span style="font-size:8px;color:#8a8880;text-transform:uppercase;letter-spacing:0.3px;">satellite</span>{% endif %}</td>
+      <td style="padding:6px 6px;vertical-align:top;"><span style="font-size:12px;font-weight:700;color:#1a1a18;">{{r.asset}}</span>{% if r.conviction %}<br><span style="font-size:8px;color:#27500A;text-transform:uppercase;letter-spacing:0.3px;">★ conviction</span>{% else %}<br><span style="font-size:8px;color:#8a8880;text-transform:uppercase;letter-spacing:0.3px;">satellite</span>{% endif %}</td>
       <td style="padding:6px 6px;text-align:right;vertical-align:top;white-space:nowrap;"><span style="font-weight:600;color:#1a1a18;">{{ r.current_price|fmt_price }}</span>{% if r.pru_pct is not none %}<br><span style="font-size:10px;color:{% if (r.pru_pct|num(0)) >= 0 %}#3B6D11{% else %}#A32D2D{% endif %};">{{ r.pru_pct|fmt_pct }} <span style="color:#8a8880;">/PRU</span></span>{% endif %}</td>
       <td style="padding:6px 6px;vertical-align:top;">{% if r.h30 and r.h30.reco %}{% set _hs = _h30map.get(r.h30.status, ['—','#8a8880']) %}<span style="background:{% if r.h30.reco in ['RENFORCER','BUY'] %}#EAF3DE{% elif r.h30.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] %}#FCEBEB{% else %}#E6F1FB{% endif %};color:{% if r.h30.reco in ['RENFORCER','BUY'] %}#27500A{% elif r.h30.reco in ['ALLÉGER','ALLEGER','SELL','SORTIR'] %}#791F1F{% else %}#0C447C{% endif %};font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;">{{r.h30.reco}}</span><br><span style="font-size:10px;color:{{_hs[1]}};">{% if r.h30.delta_pct is not none %}{{ r.h30.delta_pct|fmt_pct }} · {% endif %}{{_hs[0]}}</span>{% else %}<span style="font-size:10px;color:#b5b3ab;">pas de reco active</span>{% endif %}</td>
       {# v26 (W-A16) — une cible ≥ +250% est une CIBLE DE CYCLE (reconquête
@@ -821,7 +821,7 @@
     {% if r.analysis or (_ac[0] != '—' and not _dup_action) %}<tr><td colspan="4" style="padding:0 6px 6px 6px;color:#8a8880;font-size:10px;line-height:1.35;">{% if r.analysis %}⚙ {{ r.analysis }}{% endif %}{% if _ac[0] != '—' and not _dup_action %} <span style="color:{{_ac[1]}};font-weight:700;">→ {{_ac[0]}}</span>{% endif %}</td></tr>{% endif %}
     {% endfor %}
   </table>
-  <p style="font-size:9px;color:#a8a6a0;margin:8px 6px 0 6px;font-style:italic;">Horizon 30j = perf de la reco en cours (Δ depuis l'entrée) · Long terme = phase de cycle + cible 6-12m — « cible cycle » = reconquête de l'ATH, horizon &gt; 12m · ★ cœur = conviction (vs satellite à offloader sur force).</p>
+  <p style="font-size:9px;color:#a8a6a0;margin:8px 6px 0 6px;font-style:italic;">Horizon 30j = perf de la reco en cours (Δ depuis l'entrée) · Long terme = phase de cycle + cible 6-12m — « cible cycle » = reconquête de l'ATH, horizon &gt; 12m · ★ conviction = conviction (vs satellite à offloader sur force).</p>
 </div>
 {% endif %}
 

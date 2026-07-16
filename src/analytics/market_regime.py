@@ -73,9 +73,9 @@ def classify_regime(closes: list[float]) -> dict[str, Any]:
             break
 
     reasons: list[str] = [
-        f"prix {'+' if px_vs_200 >= 0 else '−'}{abs(px_vs_200):.1f}% vs MM200",
-        f"MM50 {'+' if m50_vs_200 >= 0 else '−'}{abs(m50_vs_200):.1f}% vs MM200",
-        f"pente MM50 14j {'+' if slope >= 0 else '−'}{abs(slope):.1f}%",
+        f"prix {'+' if px_vs_200 >= 0 else '−'}{f'{abs(px_vs_200):.1f}'.replace('.', ',')}% vs MM200",
+        f"MM50 {'+' if m50_vs_200 >= 0 else '−'}{f'{abs(m50_vs_200):.1f}'.replace('.', ',')}% vs MM200",
+        f"pente MM50 14j {'+' if slope >= 0 else '−'}{f'{abs(slope):.1f}'.replace('.', ',')}%",
     ]
     if crossed_recently:
         regime = "transition"

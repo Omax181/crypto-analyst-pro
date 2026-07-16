@@ -16,6 +16,8 @@ réseau, symbole sans perp), renvoie ``{available: False}`` sans planter.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import os
 from typing import Any, Optional
 
@@ -140,6 +142,9 @@ def _fetch_okx(symbol: str, inst: str) -> dict[str, Any]:
         "funding_3d_avg_pct": round(funding_3d_avg * 100, 4)
         if funding_3d_avg is not None else None,
         "funding_annualized_pct": round(annualized, 2),
+        # v30 (#70) — horodatage : le funding affiché doit être datable
+        # (le +10,9%/an identique sur 4 rapports/2 jours était indétectable).
+        "fetched_at": datetime.now(timezone.utc).isoformat(timespec="minutes"),
         "open_interest": open_interest,
         "long_short_ratio": long_short_ratio,
         "mark_price": mark_price,

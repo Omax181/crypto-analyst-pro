@@ -32,6 +32,13 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+def _fr(v, nd: int = 1, sign: bool = False) -> str:
+    """Décimale FR (virgule) pour les lectures rendues dans les mails —
+    v30.1 (ré-audit #67) : les readings mélangeaient +1.4% (US) à la prose FR."""
+    s = f"{float(v):+.{nd}f}" if sign else f"{float(v):.{nd}f}"
+    return s.replace(".", ",")
+
+
 # --------------------------------------------------------------------------- #
 # #9 — Liquidité globale (M2) comme driver structurel
 # --------------------------------------------------------------------------- #
@@ -239,7 +246,7 @@ def compute_similar_context(
         "reading": (
             f"Contexte macro proche de {best['week_label']} (VIX/F&G/DXY "
             f"similaires) : la semaine suivante, le portefeuille avait {_dir} de "
-            f"{abs(best['next_week_pct']):.1f}%. Mise en perspective historique, "
+            f"{_fr(abs(best['next_week_pct']))}%. Mise en perspective historique, "
             "pas une prédiction."
         ),
     }
@@ -280,14 +287,14 @@ def compute_implied_move(
     if near_event:
         reading = (
             f"Move implicite options {asset} (DVOL {dvol:.0f}%) : le marché price "
-            f"un mouvement attendu de ±{move_2d:.1f}% sur 48h. Avec « {near_event} » "
+            f"un mouvement attendu de ±{_fr(move_2d)}% sur 48h. Avec « {near_event} » "
             "imminent, c'est la mesure objective du risque événementiel — "
             "dimensionner les positions en conséquence."
         )
     else:
         reading = (
             f"Move implicite options {asset} (DVOL {dvol:.0f}%) : mouvement "
-            f"attendu ±{move_2d:.1f}% sur 48h, ±{move_7d:.1f}% sur 7j."
+            f"attendu ±{_fr(move_2d)}% sur 48h, ±{_fr(move_7d)}% sur 7j."
         )
     return {
         "available": True,
@@ -436,20 +443,20 @@ def liquidity_regime(fred_series: dict[str, dict[str, float]]) -> dict[str, Any]
     if change_pct > 0.3:
         trend = "expansion"
         reading = (
-            f"Liquidité (M2) en EXPANSION (+{change_pct:.1f}% sur ~3 mois) : "
+            f"Liquidité (M2) en EXPANSION (+{_fr(change_pct)}% sur ~3 mois) : "
             "contexte structurel porteur pour le risque, quelle que soit la "
             "volatilité de court terme."
         )
     elif change_pct < -0.3:
         trend = "contraction"
         reading = (
-            f"Liquidité (M2) en CONTRACTION ({change_pct:.1f}% sur ~3 mois) : "
+            f"Liquidité (M2) en CONTRACTION ({_fr(change_pct)}% sur ~3 mois) : "
             "vent de face structurel pour les actifs risqués, rester sélectif."
         )
     else:
         trend = "stable"
         reading = (
-            f"Liquidité (M2) globalement stable ({change_pct:+.1f}% sur ~3 mois) : "
+            f"Liquidité (M2) globalement stable ({_fr(change_pct, sign=True)}% sur ~3 mois) : "
             "pas d'impulsion structurelle nette dans un sens ou l'autre."
         )
     return {
@@ -486,19 +493,19 @@ def dxy_cycle(fred_series: dict[str, dict[str, float]]) -> dict[str, Any]:
     if change_pct <= -1.0:
         trend = "baissier"
         reading = (
-            f"Dollar (DXY) en cycle BAISSIER ({change_pct:.1f}% sur la fenêtre) : "
+            f"Dollar (DXY) en cycle BAISSIER ({_fr(change_pct)}% sur la fenêtre) : "
             "historiquement un contexte favorable aux altcoins."
         )
     elif change_pct >= 1.0:
         trend = "haussier"
         reading = (
-            f"Dollar (DXY) en cycle HAUSSIER (+{change_pct:.1f}%) : "
+            f"Dollar (DXY) en cycle HAUSSIER (+{_fr(change_pct)}%) : "
             "pression structurelle sur les actifs risqués, dont le crypto."
         )
     else:
         trend = "neutre"
         reading = (
-            f"Dollar (DXY) sans tendance marquée ({change_pct:+.1f}%) : "
+            f"Dollar (DXY) sans tendance marquée ({_fr(change_pct, sign=True)}%) : "
             "neutre pour le risque à ce stade."
         )
     return {
@@ -535,21 +542,21 @@ def credit_risk(fred_series: dict[str, dict[str, float]]) -> dict[str, Any]:
     if delta >= 0.3:
         widening = True
         reading = (
-            f"Spreads high yield en ÉCARTEMENT ({level:.2f}% vs moyenne "
-            f"{avg:.2f}%) : signal de risk-off structurel, prudence accrue — "
+            f"Spreads high yield en ÉCARTEMENT ({_fr(level, 2)}% vs moyenne "
+            f"{_fr(avg, 2)}%) : signal de risk-off structurel, prudence accrue — "
             "le crypto suit souvent avec retard."
         )
     elif delta <= -0.3:
         widening = False
         reading = (
-            f"Spreads high yield en RESSERREMENT ({level:.2f}% vs moyenne "
-            f"{avg:.2f}%) : appétit pour le risque sain, contexte porteur."
+            f"Spreads high yield en RESSERREMENT ({_fr(level, 2)}% vs moyenne "
+            f"{_fr(avg, 2)}%) : appétit pour le risque sain, contexte porteur."
         )
     else:
         widening = False
         reading = (
-            f"Spreads high yield stables ({level:.2f}%, proche de la moyenne "
-            f"{avg:.2f}%) : pas de stress de crédit notable."
+            f"Spreads high yield stables ({_fr(level, 2)}%, proche de la moyenne "
+            f"{_fr(avg, 2)}%) : pas de stress de crédit notable."
         )
     return {
         "available": True,
@@ -683,16 +690,16 @@ def real_rates(fred_series: dict[str, dict[str, float]]) -> dict[str, Any]:
         return {"available": False}
     if r >= 2.0:
         reading = (
-            f"Taux réel 10Y élevé ({r:.2f}%) : coût d'opportunité fort, vent de "
+            f"Taux réel 10Y élevé ({_fr(r, 2)}%) : coût d'opportunité fort, vent de "
             "face structurel pour les actifs sans rendement (dont le crypto)."
         )
     elif r <= 0.5:
         reading = (
-            f"Taux réel 10Y bas ({r:.2f}%) : contexte porteur pour les actifs "
+            f"Taux réel 10Y bas ({_fr(r, 2)}%) : contexte porteur pour les actifs "
             "risqués et le crypto (peu d'alternative sans risque attractive)."
         )
     else:
-        reading = f"Taux réel 10Y intermédiaire ({r:.2f}%) : impact neutre."
+        reading = f"Taux réel 10Y intermédiaire ({_fr(r, 2)}%) : impact neutre."
     return {"available": True, "real_10y": round(r, 2), "reading": reading}
 
 
@@ -714,18 +721,18 @@ def fed_liquidity(fred_series: dict[str, dict[str, float]]) -> dict[str, Any]:
     if change_pct <= -0.5:
         trend = "contraction"
         reading = (
-            f"Bilan Fed en CONTRACTION ({change_pct:+.1f}% sur la fenêtre, QT) : "
+            f"Bilan Fed en CONTRACTION ({_fr(change_pct, sign=True)}% sur la fenêtre, QT) : "
             "liquidité retirée, vent de face pour le risque."
         )
     elif change_pct >= 0.5:
         trend = "expansion"
         reading = (
-            f"Bilan Fed en EXPANSION ({change_pct:+.1f}%, QE) : liquidité injectée, "
+            f"Bilan Fed en EXPANSION ({_fr(change_pct, sign=True)}%, QE) : liquidité injectée, "
             "contexte porteur."
         )
     else:
         trend = "stable"
-        reading = f"Bilan Fed quasi stable ({change_pct:+.1f}%) : pas d'impulsion nette."
+        reading = f"Bilan Fed quasi stable ({_fr(change_pct, sign=True)}%) : pas d'impulsion nette."
     if rrp is not None:
         reading += f" Reverse repo à {rrp:.0f} Mds$ (liquidité parquée)."
     return {"available": True, "trend": trend, "change_pct": round(change_pct, 2),
@@ -830,20 +837,20 @@ def realized_vol_regime(
         regime = "expansion"
         reading = (
             f"Volatilité réalisée du portefeuille en EXPANSION "
-            f"({recent_vol:.1f}% vs {prior_vol:.1f}% avant) : le marché bouge "
+            f"({_fr(recent_vol)}% vs {_fr(prior_vol)}% avant) : le marché bouge "
             "plus fort, gérer la taille des positions."
         )
     elif ratio <= 0.8:
         regime = "compression"
         reading = (
-            f"Volatilité réalisée en COMPRESSION ({recent_vol:.1f}% vs "
-            f"{prior_vol:.1f}% avant) : « calme avant la tempête » possible — "
+            f"Volatilité réalisée en COMPRESSION ({_fr(recent_vol)}% vs "
+            f"{_fr(prior_vol)}% avant) : « calme avant la tempête » possible — "
             "un squeeze prolongé précède souvent un mouvement violent."
         )
     else:
         regime = "stable"
         reading = (
-            f"Volatilité réalisée stable ({recent_vol:.1f}%) : "
+            f"Volatilité réalisée stable ({_fr(recent_vol)}%) : "
             "pas de changement de régime notable."
         )
     return {
@@ -1002,21 +1009,21 @@ def mvrv_context(mvrv_value: Optional[float], asset: str = "BTC") -> dict[str, A
     if mvrv_value < 1.0:
         zone = "accumulation"
         reading = (
-            f"MVRV {asset} à {mvrv_value:.2f} (< 1) : le marché est globalement "
+            f"MVRV {asset} à {_fr(mvrv_value, 2)} (< 1) : le marché est globalement "
             "EN PERTE sur ses coins — historiquement une zone d'accumulation de "
             "cycle, pas de distribution."
         )
     elif mvrv_value > 3.5:
         zone = "euphorie"
         reading = (
-            f"MVRV {asset} à {mvrv_value:.2f} (> 3.5) : zone d'EUPHORIE "
+            f"MVRV {asset} à {_fr(mvrv_value, 2)} (> 3,5) : zone d'EUPHORIE "
             "historique (profits latents élevés) — prudence, risque de "
             "distribution de cycle."
         )
     else:
         zone = "neutre"
         reading = (
-            f"MVRV {asset} à {mvrv_value:.2f} : zone intermédiaire, ni "
+            f"MVRV {asset} à {_fr(mvrv_value, 2)} : zone intermédiaire, ni "
             "survente de cycle ni euphorie."
         )
     return {"available": True, "zone": zone, "reading": reading}

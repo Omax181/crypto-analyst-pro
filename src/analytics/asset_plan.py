@@ -42,11 +42,14 @@ def _fmt_usd(v: Optional[float]) -> Optional[str]:
     a = abs(v)
     if a >= 1000:
         return f"{v:,.0f}".replace(",", " ") + " $"
+    # v30.1 (ré-audit #67) — décimale en VIRGULE : les labels de plan
+    # (invalidation, cibles, DCA) affichaient « 270.00 $ » (US) au milieu
+    # d'une prose unifiée FR.
     if a >= 1:
-        return f"{v:,.2f} $"
+        return f"{v:,.2f}".replace(".", ",") + " $"
     if a >= 0.01:
-        return f"{v:.4f} $"
-    return f"{v:.6f} $"
+        return f"{v:.4f}".replace(".", ",") + " $"
+    return f"{v:.6f}".replace(".", ",") + " $"
 
 
 def _pct_fr(v: float, nd: int = 1) -> str:
@@ -113,27 +116,50 @@ def suggest_sizing(
     une vente. Garde-fou concentration : pas de renfort proposé au-delà de
     20% du PTF sur un même actif (12% pour un satellite).
     """
+    def _p(x: float, nd: int = 1) -> str:
+        """Pourcentage FR : 12,4 (virgule décimale) — v30 (#5/#67)."""
+        return f"{x:.{nd}f}".replace(".", ",")
+
     w = _num(weight_pct)
     ptf = _num(ptf_value_usd)
     act = (action_type or "").lower()
     if act in ("bullish", "renforcer", "buy", "accumuler"):
         cap = 20.0 if is_core else 12.0
+        _cap_lbl = f"plafond {cap:.0f}% {'cœur' if is_core else 'satellite'}"
         if w is not None and w >= cap:
             return {
                 "add_pct_ptf": 0.0,
-                "note": (f"déjà {w:.0f}% du PTF (plafond {cap:.0f}%) — "
+                "note": (f"déjà {_p(w)}% du PTF ({_cap_lbl}) — "
                          "renfort non suggéré, concentration"),
             }
         add = (2.0 if is_core else 1.0) if (w is None or w < cap - 3) else 0.5
+        # v30 (#82) — sous ~50 $ de renfort, un DCA 3 tranches est absurde
+        # (tranches de 5 $, frais > gain d'exécution) : signal au consommateur.
+        # (posé plus bas dans out["single_shot"] quand add_usd < 50.)
+        # v30 (#6) — le renfort ne DÉPASSE jamais le plafond : le 14/07,
+        # « porte 12% → 12,4% » franchissait le plafond que le même moteur
+        # opposait à BTC/ETH. Clamp au plafond ; reliquat < 0,25% = plafonné.
+        if w is not None:
+            add = min(add, round(cap - w, 1))
+            if add < 0.25:
+                return {
+                    "add_pct_ptf": 0.0,
+                    "note": (f"déjà {_p(w)}% du PTF ({_cap_lbl}) — "
+                             "renfort non suggéré, concentration"),
+                }
         out: dict[str, Any] = {"add_pct_ptf": add}
         if ptf:
             out["add_usd"] = round(ptf * add / 100.0, 0)
+            if out["add_usd"] < 50:
+                out["single_shot"] = True
         if w is not None:
             out["weight_before_pct"] = round(w, 1)
             out["weight_after_pct"] = round(w + add, 1)
             _usd = f" (≈ {_fmt_usd(out.get('add_usd'))})" if out.get("add_usd") else ""
-            out["note"] = (f"+{add:.1f}% du PTF{_usd} · porte "
-                           f"{w:.0f}% → {w + add:.1f}% du PTF")
+            # v30 (#5) — MÊME précision de part et d'autre de la flèche
+            # (fini « +1,0% … porte 2% → 3,4% » où 2 était un 2,4 tronqué).
+            out["note"] = (f"+{_p(add)}% du PTF{_usd} · porte "
+                           f"{_p(w)}% → {_p(w + add)}% du PTF")
         return out
     if act in ("bearish", "alléger", "alleger", "sell", "sortir"):
         pv = _num(position_value_usd)

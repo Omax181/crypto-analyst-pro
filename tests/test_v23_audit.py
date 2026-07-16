@@ -16,7 +16,7 @@ import inspect
 def test_app_version_v23():
     from src.reporting.email_html import APP_VERSION
     # Nommage final : le livrable est étiqueté v26 (décision Omar, 2026-07-05).
-    assert APP_VERSION == "v29"
+    assert APP_VERSION == "v30"
 
 
 # --------------------------------------------------------------------------- #
@@ -24,12 +24,13 @@ def test_app_version_v23():
 # --------------------------------------------------------------------------- #
 def test_money_and_price_same_convention():
     from src.reporting.email_html import _fmt_money, _fmt_price
-    # Même convention : $ préfixe, virgule milliers, point décimale.
-    assert _fmt_money(1570).startswith("$") and _fmt_price(1570).startswith("$")
-    assert "," in _fmt_money(60314) and "," in _fmt_price(60314)
-    assert _fmt_money(1.55) == "$1.55"
-    # Entrée FR encore tolérée (rétro-compat), sortie anglo.
-    assert _fmt_money("1.570,00 $") == "$1,570.00"
+    # Même convention (v30 #67) : FR — espace fine milliers, virgule
+    # décimale, $ suffixe — identique tuiles/plans/prose.
+    assert _fmt_money(1570).endswith("$") and _fmt_price(1570).endswith("$")
+    assert "\u202f" in _fmt_money(60314) and "\u202f" in _fmt_price(60314)
+    assert _fmt_money(1.55) == "1,55\u202f$"
+    # Entrée FR/anglo tolérée (rétro-compat), sortie FR.
+    assert _fmt_money("1.570,00 $") == "1\u202f570,00\u202f$"
 
 
 # --------------------------------------------------------------------------- #

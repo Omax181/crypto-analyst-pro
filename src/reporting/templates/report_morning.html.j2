@@ -78,7 +78,7 @@
         <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:{{_wr_color}};">{% if _wr_val is not none %}{{ '%.0f'|format(_wr_val) }}%{% else %}—{% endif %}</p>
         <p style="font-size:9px;color:#8a8880;margin:0;">{{header.win_rate_total}}</p>
         {% elif _wr_total >= 1 %}
-        <p style="font-size:12px;font-weight:500;margin:4px 0 0 0;color:#8a8880;">en calibration ({{header.win_rate_total}})</p>
+        <p style="font-size:12px;font-weight:500;margin:4px 0 0 0;color:#8a8880;">en calibration ({{header.win_rate_calibration or header.win_rate_total}})</p>
         <p style="font-size:9px;color:#8a8880;margin:0;">affiché dès 5 recos clôturées</p>
         {% else %}
         <p style="font-size:18px;font-weight:500;margin:2px 0 0 0;color:#5a5852;">—</p>
@@ -438,7 +438,10 @@
       <td style="width:25%;vertical-align:top;padding-right:6px;">
         <p style="font-size:10px;color:#8a8880;margin:0;">Nikkei 225</p>
         <p style="font-size:14px;font-weight:500;margin:1px 0 0 0;">{{ '{:,.0f}'.format((macro_context.nikkei)|num(0)) }}{{ _mss.get('nikkei') | pastille }}{{ arrow24(macro_context.nikkei, macro_context.nikkei_delta) }}</p>
-        <p style="font-size:10px;color:#5a5852;margin:0;">appétit risque Asie</p>
+        {# v30 (#30) — libellé dérivé du MOUVEMENT réel (le 14/07, « appétit
+           risque Asie » coiffait un Nikkei en jour de risk-off). #}
+        {% set _nkd = macro_context.nikkei_delta|num(none) %}
+        <p style="font-size:10px;color:#5a5852;margin:0;">{% if _nkd is not none and _nkd > 0 %}appétit risque Asie{% elif _nkd is not none and _nkd < 0 %}prudence Asie{% else %}actions Japon{% endif %}</p>
       </td>
       {% endif %}
       {% if macro_context.eur_usd %}
@@ -619,6 +622,9 @@
 {# ── HEATMAP PORTFOLIO (M8 — grille 8×2, table mail-safe) ── #}
 {% if portfolio_heatmap and portfolio_heatmap.cells %}
 <div style="margin-bottom:1.5rem;">
+  {# v30 (#87) — légende AU CONTACT de la heatmap (elle ne vivait qu'en pied
+     de mail, à plusieurs pages des couleurs qu'elle explique). #}
+  <p style="font-size:9px;color:#8a8880;margin:0 0 4px 0;"><span style="color:#3B6D11;">■</span> hausse · <span style="color:#A32D2D;">■</span> baisse · intensité = amplitude 24h</p>
   <p style="font-size:11px;color:#5a5852;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;font-weight:500;">Heatmap · performance 24h</p>
   {% set _hm_cells = portfolio_heatmap.cells %}
   {% if portfolio_heatmap.extra and portfolio_heatmap.extra.count %}
@@ -696,12 +702,16 @@
     <p style="margin:0;font-size:12px;line-height:1.6;color:#042C53;">{{invalidation_watch|md}}</p>
     {% else %}
     {% for iw in invalidation_watch %}
+    {# v30 (#4) — item sans seuil : la puce orpheline « ▸ — Forcerait une
+       réévaluation… » du 15/07 n'est plus rendue. #}
+    {% if iw.condition and (iw.condition|trim) %}
     {# v27 (TH1) — une invalidation FRANCHIE (déterministe) passe en rouge/urgent. #}
     {% set _brk = iw.status == 'franchi' %}{% set _thr = iw.status == 'menacé' %}
     <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;"><tr>
       <td style="width:18px;vertical-align:top;font-size:12px;line-height:1.6;color:{% if _brk %}#A32D2D{% elif _thr %}#BA7517{% else %}#378ADD{% endif %};">{% if _brk %}🔴{% elif _thr %}⚠️{% else %}▸{% endif %}</td>
       <td style="font-size:12px;line-height:1.6;color:{% if _brk %}#791F1F{% else %}#042C53{% endif %};"><strong>{{iw.condition}}</strong>{% if iw.implication %} — {{iw.implication}}{% endif %}</td>
     </tr></table>
+    {% endif %}
     {% endfor %}
     {% endif %}
   {% endif %}
@@ -799,6 +809,14 @@
   </table>
   {% if t.demoted_by_python %}
   <div style="background:#f5f4ee;border-radius:6px;padding:6px 10px;margin:0 0 10px 0;font-size:10px;color:#5a5852;line-height:1.45;">⛉ Garde-fou : reco ferme dégradée en SURVEILLER — {{t.demotion_reason}}.</div>
+  {% endif %}
+  {# v30 (#2) — CONTRAINTE FRONTALE : quand le gate a requalifié l'action
+     (plafond de concentration…), la contrainte est annoncée EN TÊTE de la
+     fiche — plus enfouie dans le plan en bas de carte (le 15/07, la fiche ETH
+     ouvrait sur « accumulation exceptionnelle » et ne révélait le plafond
+     qu'à la dernière ligne). #}
+  {% if t._gated and t.gate_note %}
+  <div style="background:#F1EFE8;border-left:3px solid #8a8880;border-radius:6px;padding:6px 10px;margin:0 0 10px 0;font-size:10px;color:#5a5852;line-height:1.45;"><span style="font-weight:700;">Conserver — pas de renfort aujourd'hui :</span> {{t.gate_note|md}}{% set _ev_g = (t.asset_plan or {}).get('ev_30d_pct')|num(none) %}{% if _ev_g is not none %} · EV 30j {{_ev_g|fmt_pct}}{% endif %}</div>
   {% endif %}
   {# v28 (M-A3) — conviction LT dont les stats CT sont défavorables : la
      mention est FRONTALE (plus seulement enfouie dans l'auto-critique). #}
@@ -1012,12 +1030,18 @@
       <td style="padding:3px 0 4px 4px;font-weight:600;text-align:right;">Statut</td>
     </tr>
     {% for r in active_recommendations_tracking %}
-    {% set _pp = r.target_path_pct|num(none) %}
+    {# v30 (#8) — barre = version AFFICHABLE bornée [0,100] ; « s'éloigne »
+       remplace les % négatifs absurdes (« Progrès −155% » du 15/07). #}
+    {% set _pp = (r.target_path_display_pct|num(none)) if r.target_path_display_pct is defined else (r.target_path_pct|num(none)) %}
+    {% set _away = r.target_path_away|default(false) %}
     {% set _pw = (0 if _pp is none else ([_pp, 100]|min if _pp > 0 else 0)) %}
     <tr{% if not loop.last %} style="border-bottom:0.5px solid #f0efe8;"{% endif %}>
       <td style="padding:6px 4px 6px 0;vertical-align:top;white-space:nowrap;">
         <span style="font-size:11px;font-weight:700;color:#1a1a18;">{{r.asset}}</span>
-        <span style="display:inline-block;background:{{r.action_badge_bg or '#EEF2F7'}};color:{{r.action_badge_fg or '#33312e'}};font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;padding:1px 5px;border-radius:3px;margin-left:3px;">{{r.action}}</span>{% if r.days_open is not none %}<br><span style="color:#8a8880;">{{r.days_open}}j{% if r.issued_at %} · dep. {{r.issued_at}}{% endif %}</span>{% endif %}
+        {# v30 (#7/#46) — le tracking affiche la POSTURE DU JOUR quand le gate
+           l'a requalifiée (fini BTC « RENFORCER » au tracking et « MAINTENIR »
+           aux thèses du même mail). #}
+        <span style="display:inline-block;background:{% if r.action_today and r.action_today != r.action %}#F1EFE8{% else %}{{r.action_badge_bg or '#EEF2F7'}}{% endif %};color:{% if r.action_today and r.action_today != r.action %}#5a5852{% else %}{{r.action_badge_fg or '#33312e'}}{% endif %};font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;padding:1px 5px;border-radius:3px;margin-left:3px;">{{r.action_today or r.action}}</span>{% if r.action_today and r.action_today != r.action %}<br><span style="color:#8a8880;font-size:8px;">reco {{r.action}} · gate du jour</span>{% endif %}{% if r.days_open is not none %}<br><span style="color:#8a8880;">{{r.days_open}}j{% if r.issued_at %} · dep. {{r.issued_at}}{% endif %}</span>{% endif %}
       </td>
       <td style="padding:6px 4px;vertical-align:top;white-space:nowrap;color:#5a5852;">
         {% if r.entry_price is not none %}{{r.entry_price|fmt_money}}{% endif %}{% if r.current_price is not none %}→{{r.current_price|fmt_money}}{% endif %}{% if (r.progress_pct|num(none)) is not none %}<br><span style="color:{% if (r.progress_pct|num(0)) > 0 %}#3B6D11{% elif (r.progress_pct|num(0)) < 0 %}#A32D2D{% else %}#BA7517{% endif %};font-weight:600;">{{r.progress_pct|fmt_pct}}</span>{% endif %}
@@ -1026,7 +1050,7 @@
         {% if r.ct_target %}{{r.ct_target|fmt_money}}{% if r.ct_target_fallback %} <span style="color:#8a8880;">(plan)</span>{% endif %}{% if (r.dist_to_target_pct|num(none)) is not none %}<br><span style="color:#8a8880;">reste {{r.dist_to_target_pct|fmt_pct}}</span>{% endif %}{% else %}—{% endif %}
       </td>
       <td style="padding:6px 4px;vertical-align:middle;">
-        {% if _pp is not none %}<div style="background:#eceae2;border-radius:3px;height:6px;width:100%;max-width:72px;"><div style="background:{% if _pp >= 40 %}#3B6D11{% elif _pp < 0 %}#A32D2D{% else %}#BA7517{% endif %};border-radius:3px;height:6px;width:{{ [_pw|round|int, 2]|max }}%;"></div></div><span style="font-size:9px;color:#8a8880;">{{ '%.0f'|format(_pp) }}%</span>{% else %}<span style="font-size:9px;color:#8a8880;">—</span>{% endif %}
+        {% if _pp is not none %}<div style="background:#eceae2;border-radius:3px;height:6px;width:100%;max-width:72px;"><div style="background:{% if _away %}#A32D2D{% elif _pp >= 40 %}#3B6D11{% else %}#BA7517{% endif %};border-radius:3px;height:6px;width:{{ [_pw|round|int, 2]|max }}%;"></div></div><span style="font-size:9px;color:{% if _away %}#A32D2D{% else %}#8a8880{% endif %};">{% if _away %}s'éloigne{% else %}{{ '%.0f'|format(_pp) }}%{% endif %}</span>{% else %}<span style="font-size:9px;color:#8a8880;">—</span>{% endif %}
       </td>
       <td style="padding:6px 0 6px 4px;vertical-align:top;text-align:right;white-space:nowrap;">
         {% if r.health_status %}<span style="font-size:10px;font-weight:600;color:{{r.health_color or '#5a5852'}};">{{r.health_status}}</span>{% else %}<span style="font-size:10px;color:{{r.status_color or '#5a5852'}};">{{r.status or '● en cours'}}</span>{% endif %}

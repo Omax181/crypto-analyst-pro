@@ -352,7 +352,7 @@ def test_since_morning_facts_full():
     line = out["line"]
     assert "BTC" in line and "61 207" in line.replace(" ", " ")
     assert "F&G 19 → 19 (stable)" in line
-    assert "DXY 101.04 → 100.70" in line
+    assert "DXY 101,04 → 100,70" in line
     assert "Fed maintien 86,5% → 88,5%" in line and "+2,0 pts" in line
     assert "ETH" in line
 
@@ -393,8 +393,8 @@ def test_derivatives_line_full():
          "eth": {"date": "2026-07-01", "total_flow_musd": 14.8}})
     assert "Funding BTC +0,01%" in line
     assert "L/S 1,42" in line
-    assert "ETF BTC −$325.8M (01/07)" in line
-    assert "ETF ETH +$14.8M (01/07)" in line
+    assert "ETF BTC −325,8 M$ (01/07)" in line
+    assert "ETF ETH +14,8 M$ (01/07)" in line
 
 
 def test_derivatives_line_empty():

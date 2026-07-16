@@ -183,11 +183,11 @@ def compute_portfolio_risk(
         )
     readings.append(
         f"Stress-test : un choc BTC de {btc_shock_pct:.0f}% entraînerait ≈ "
-        f"{stress_move:+.0f}% sur le portefeuille (bêta PTF {ptf_beta:.2f})."
+        f"{stress_move:+.0f}% sur le portefeuille (bêta PTF {f'{ptf_beta:.2f}'.replace('.', ',')})."
     )
     if var_95_pct is not None:
         readings.append(
-            f"VaR 95% (historique 30j) : journée de queue ≈ {var_95_pct:.1f}%."
+            f"VaR 95% (historique 30j) : journée de queue ≈ {f'{var_95_pct:.1f}'.replace('.', ',')}%."
         )
 
     return {

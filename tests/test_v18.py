@@ -229,14 +229,14 @@ def test_e_a12_micro_price_four_sig_figs():
     """E-A12/13 — micro-prix à 4 chiffres significatifs (0.00523, pas 0.00522973)."""
     from src.reporting.email_html import _fmt_price, _fmt_money
 
-    assert _fmt_price(0.00522973) == "$0.00523"
-    assert _fmt_price(0.00103287) == "$0.001033"
+    assert _fmt_price(0.00522973) == "0,00523\u202f$"
+    assert _fmt_price(0.00103287) == "0,001033\u202f$"
     # 1e-8 reste affiché entièrement (jamais arrondi à zéro).
-    assert _fmt_price(0.00000001) == "$0.00000001"
+    assert _fmt_price(0.00000001) == "0,00000001\u202f$"
     # Les prix normaux ne changent pas.
-    assert _fmt_price(63180) == "$63,180"
-    assert _fmt_price(8.98) == "$8.98"
-    assert _fmt_money(0.00522973) == "$0.00523"
+    assert _fmt_price(63180) == "63\u202f180\u202f$"
+    assert _fmt_price(8.98) == "8,98\u202f$"
+    assert _fmt_money(0.00522973) == "0,00523\u202f$"
 
 
 def test_e_b4_risk_unchanged_compact_note():

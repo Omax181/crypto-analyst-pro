@@ -301,7 +301,7 @@ def test_ma7_capped_maintain_with_negative_ev_gets_ct_warning():
     fixes = apply_reco_gate(payload)
     eth, btc = payload["thesis_of_the_day"]
     assert eth["action"] == "MAINTENIR" and btc["action"] == "MAINTENIR"
-    assert "EV 30j −2.1%" in (eth.get("ct_warning") or "")
+    assert "EV 30j −2,1%" in (eth.get("ct_warning") or "")
     assert btc.get("ct_warning") is None          # EV positive → pas de mention
     assert any("EV<0" in f for f in fixes)
 

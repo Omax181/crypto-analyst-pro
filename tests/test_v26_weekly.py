@@ -43,10 +43,10 @@ def test_enforce_summary_perf_rewritten():
                "+2.32% sur la semaine, avec un +0.03% vs BTC."]
     snap = {"weekly_pnl_pct": 3.8, "vs_btc_7d_pct": 0.3}
     out, fixes = wg.enforce_summary_figures(bullets, snap)
-    assert "+3.8%" in out[0]
+    assert "+3,8%" in out[0]
     assert "2.32" not in out[0]
     assert "0.03" not in out[0]
-    assert "+0.3%" in out[0]
+    assert "+0,3%" in out[0]
     assert len(fixes) == 2
 
 
@@ -104,7 +104,7 @@ def test_fix_equity_points_sp500():
     out, fixes = wg.fix_equity_points(
         txt, {"sp500": -0.31, "dax": 1.9})
     assert "points" not in out
-    assert "−0.31% (7j)" in out and "+1.9% (7j)" in out
+    assert "−0,31% (7j)" in out and "+1,9% (7j)" in out
     assert len(fixes) == 2
 
 

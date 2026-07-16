@@ -91,8 +91,11 @@ def test_polymarket_fed_bars_dominant(monkeypatch):
     out = pm.get_key_markets()
     fb = out["fed_bars"]
     assert fb["dominant"] == "maintien"
-    assert fb["dominant_pct"] == 99.2
+    # v30 (#75) — les probabilités sont NORMALISÉES à 100% (le 13/07,
+    # maintien+baisse+hausse = 97,6% affiché tel quel) : 99,2/99,8 → 99,4.
+    assert fb["dominant_pct"] == 99.4
     assert fb["cut_pct"] == 0.2 and fb["hike_pct"] == 0.4
+    assert abs(fb["cut_pct"] + fb["hold_pct"] + fb["hike_pct"] - 100.0) < 0.15
     assert "juin" in (fb.get("meeting_hint") or "")
     assert out["markets"] == fed_markets  # alias rétro-compat
 
@@ -448,7 +451,7 @@ def test_render_morning_v15_blocks():
     assert "réseau sain" in html                     # v16 : grille on-chain horizontale
     assert "Bilan on-chain : neutre" in html         # v16 : verdict-first
     assert "DXY &gt; 101" in html or "DXY > 101" in html
-    assert "Crypto Analyst Pro · v29" in html
+    assert "Crypto Analyst Pro · v30" in html
     # v29 (MB6) — « À surveiller » + « invalider » fusionnés en « À surveiller ·
     # seuils d'invalidation », AVANT l'auto-critique (qui reste séparée).
     assert html.index("seuils d'invalidation") < html.index("Auto-critique de l'analyse")
@@ -481,7 +484,7 @@ def test_render_evening_v15_blocks():
     assert "USD/JPY" in html and "carry trade yen" in html
     assert "Nikkei 225" not in html and "Stoxx 50" not in html
     assert "maintien" in html and "99.2%" in html
-    assert "Crypto Analyst Pro · v29" in html
+    assert "Crypto Analyst Pro · v30" in html
 
 
 def test_render_weekly_v15_blocks():
@@ -575,6 +578,6 @@ def test_render_weekly_v15_blocks():
     assert "→ Renforcer" not in html    # dédup WB6
     assert "Stratégie de la semaine" in html
     assert "1\u202f773" in html or "1,773" in html or "1 773" in html  # fenêtre P&L
-    assert "Crypto Analyst Pro · v29" in html
+    assert "Crypto Analyst Pro · v30" in html
     # Ordre : la vue PTF arrive avant le fil rouge macro (P3-1).
     assert html.index("Portfolio · vue d'ensemble") < html.index("Fil rouge macro")

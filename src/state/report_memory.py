@@ -478,6 +478,16 @@ def load_recent_theses(limit: int = 12) -> list[dict[str, Any]]:
 
 
 # --------------------------- snapshots hebdomadaires (V6) ------------------- #
+def save_weekly_snapshots(snaps: list[dict[str, Any]]) -> None:
+    """v30 (#63) — persiste la liste des snapshots (réconciliation F&G).
+
+    Quand la valeur F&G stockée contredit la série 8 j, le run corrige
+    l'affichage ET soigne le store — sinon la même correction se rejouerait
+    à chaque hebdo sans jamais réparer la source.
+    """
+    _write(WEEKLY_SNAPSHOTS_FILE, snaps)
+
+
 def load_weekly_snapshots() -> list[dict[str, Any]]:
     """Charge l'historique des snapshots hebdomadaires du portefeuille.
 
@@ -1031,12 +1041,22 @@ def load_thesis_score_deltas(days_back: int = 7) -> dict[str, Any]:
                 continue
             if abs(d) > abs(best) + 1e-9:
                 best, driver = d, cat
+        # v30 (#16) — le « moteur » est nommé en clair : le 15/07 le mail
+        # affichait la clé brute « fundamental_lt +3.0 » (jargon interne).
+        _CAT_FR = {"technical_struct": "structure technique",
+                   "technical": "signal technique",
+                   "fundamental_lt": "décote LT (PRU/drawdown)",
+                   "onchain": "on-chain", "catalyst": "catalyseurs",
+                   "sector": "rotation sectorielle",
+                   "sentiment": "sentiment", "derivatives": "dérivés",
+                   "macro": "alignement macro"}
         out[asset] = {
             "score": round(score, 1),
             "prev_score": round(prev_score, 1),
             "prev_date": ref.get("date"),
             "delta": round(score - prev_score, 1),
-            "driver": (f"{driver} {'+' if best >= 0 else '−'}{abs(best):.1f}"
+            "driver": (f"{_CAT_FR.get(driver, driver)} "
+                       f"{'+' if best >= 0 else '−'}{abs(best):.1f}"
                        if driver and abs(best) >= 0.05 else None),
         }
     return out

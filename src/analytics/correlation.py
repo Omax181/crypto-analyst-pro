@@ -145,8 +145,9 @@ def compute_correlation_analysis(
         top = clusters[0]
         reading = (
             f"{len(top['members'])} positions à forte corrélation de rendements "
-            f"(≥ {_HIGH_CORR:.2f} sur 30j) — {', '.join(top['members'])} — pèsent "
-            f"{top['ptf_pct']}% du portefeuille et tendent à bouger ensemble. "
+            f"(≥ {f'{_HIGH_CORR:.2f}'.replace('.', ',')} sur 30j) — {', '.join(top['members'])} — pèsent "
+            f"{str(top['ptf_pct']).replace('.', ',')}% du portefeuille "
+            f"et tendent à bouger ensemble. "
             f"Un choc commun les impacterait simultanément — risque de concentration "
             f"réel au-delà de la diversification apparente."
         )
@@ -436,7 +437,7 @@ def compute_equity_crypto_links(
             entry["beta"] = round(beta, 2)
             entry["reading"] = (
                 f"corr 30j {corr:+.2f} ({_corr_label(crypto, corr).split()[0]}) · "
-                f"β {beta:.2f} : +1% {equity} ≈ {beta:+.1f}% {crypto} "
+                f"β {f'{beta:.2f}'.replace('.', ',')} : +1% {equity} ≈ {f'{beta:+.1f}'.replace('.', ',')}% {crypto} "
                 f"({mechanism})"
             )
         else:
@@ -461,7 +462,7 @@ def compute_equity_crypto_links(
     else:
         summary_line = (
             "aucun lien actions↔crypto significatif sur 30j (corrélations < "
-            f"{min_abs_corr:.2f})"
+            f"{min_abs_corr:.2f})".replace(".", ",")
         )
 
     return {

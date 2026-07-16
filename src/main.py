@@ -724,12 +724,31 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
                     and _pru):
                 _pru_gap = (_price_now - _pru) / _pru * 100
             _mvrv_sym = _cm_sym.get("mvrv")
+            # v30 (#76) — le bonus « catalyseur calendrier » était le MÊME
+            # événement macro (PPI/Fed) compté pour CHAQUE actif (40% du score
+            # BTC du 15/07). Il ne compte plus que les événements SPÉCIFIQUES
+            # à l'actif (CoinMarketCal) ; le macro reste dans le contexte.
             _cat_days = None
-            for _ev in (upcoming_calendar.get("events") or []):
-                _da = _ev.get("days_ahead")
-                if isinstance(_da, (int, float)) and 0 <= _da <= 7:
-                    _cat_days = _da
-                    break
+            try:
+                _symU_cat = sym.upper()
+                _ev_list_cat = ((crypto_events.get("events")
+                                 if isinstance(crypto_events, dict) else None)
+                                or [])
+                for _ce_cat in _ev_list_cat:
+                    if not isinstance(_ce_cat, dict) or not _ce_cat.get("date"):
+                        continue
+                    _coins_cat = [str(c).upper()
+                                  for c in (_ce_cat.get("coins") or [])]
+                    if _symU_cat not in _coins_cat:
+                        continue
+                    _dd_cat = (datetime.fromisoformat(
+                        str(_ce_cat["date"])[:10]).date()
+                        - datetime.now(TZ).date()).days
+                    if 0 <= _dd_cat <= 7 and (_cat_days is None
+                                              or _dd_cat < _cat_days):
+                        _cat_days = _dd_cat
+            except Exception:  # noqa: BLE001 — bonus best-effort
+                _cat_days = None
             _sec7 = None
             for _sd in sectors.values():
                 if sym in _sd.get("members", []):
@@ -822,6 +841,12 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
             )
             entry = {
                 "asset": sym, "tier": tier,
+                # v30 (#6) — CÂBLAGE MORT RÉPARÉ : core_by_asset lisait
+                # e.get("conviction") qui n'était JAMAIS posé → is_core=False
+                # partout → plafond satellite 12% appliqué même à BTC/ETH
+                # (les fiches du 15/07 affichaient « plafond 12% » sur le cœur
+                # à 43%/20% du PTF). Source de vérité : _is_core_asset.
+                "conviction": _is_core_asset(sym, portfolio.get(sym) or {}),
                 "tier_label": _TIER_LABELS.get(tier, f"Tier {tier}"),
                 "signals_count": asset["score"]["signals_count"],
                 "bullish_count": asset["score"]["bullish_count"],
@@ -1295,6 +1320,8 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
             "price_divergences": price_divergences,
             "win_rate_30d_pct": win_rate.get("win_rate_pct"),
             "win_rate_count": f"{win_rate.get('validated', 0)}/{win_rate.get('total', 0)}",
+            # v30 (#41) — libellé « en calibration (N/5) » homogène cross-mail.
+            "win_rate_calibration": f"{win_rate.get('total', 0)}/5",
         },
         "crypto_price_status": crypto_price_status,
         "macro_source_status": macro_source_status,
@@ -1982,7 +2009,7 @@ def _compute_portfolio_risk_score(
         _dd_pts = min(3.0, abs(ch7) / 5.0)  # -15%/7j → 3 pts
         score += _dd_pts
         if _dd_pts >= 1:
-            factors.append(f"drawdown 7j {ch7:+.1f}%")
+            factors.append(f"drawdown 7j {ch7:+.1f}%".replace(".", ","))
     components.append({"label": "Drawdown 7j", "pts": round(_dd_pts, 1), "max": 3.0})
 
     # 2) Concentration sectorielle (poids du 1er secteur) — jusqu'à 2.5 pts.
@@ -2006,7 +2033,7 @@ def _compute_portfolio_risk_score(
         _vol_pts = min(2.0, avg_vol / 6.0)  # 12%/24h moyen → 2 pts
         score += _vol_pts
         if _vol_pts >= 1:
-            factors.append(f"volatilité 24h {avg_vol:.1f}% en moyenne")
+            factors.append(f"volatilité 24h {avg_vol:.1f}% en moyenne".replace(".", ","))
     # v17 (T-RISK / M-A5) : la volatilité était comptée dans le total mais ABSENTE
     # des barres → barres (3.7) ≠ total (4.4). On l'ajoute comme 5e composante.
     components.append({"label": "Volatilité 24h", "pts": round(_vol_pts, 1), "max": 2.0})
@@ -2145,7 +2172,7 @@ def _compute_portfolio_health(
     if isinstance(vsbtc, (int, float)):
         _mom = max(0.0, min(10.0, 5.0 + vsbtc / 2.0))
         axes.append({"label": "Momentum vs BTC", "score": round(_mom, 1),
-                     "max": 10.0, "detail": f"{vsbtc:+.1f} pts vs BTC 7j"})
+                     "max": 10.0, "detail": f"{vsbtc:+.1f} pts vs BTC 7j".replace(".", ",")})
 
     dd = snapshot.get("drawdown_ath_pct")
     if isinstance(dd, (int, float)):
@@ -2166,12 +2193,24 @@ def _compute_portfolio_health(
         level, color = "à risque", "#A32D2D"
     strongest = max(axes, key=lambda a: a["score"])
     weakest = min(axes, key=lambda a: a["score"])
-    driver = (f"Portée par {strongest['label']} ({strongest['score']}/10), "
+    # v30 (#14) — un axe fort SOUS la moyenne n'est pas une force : le 15/07,
+    # « Portée par Momentum vs BTC (4,6/10) » présentait un score médiocre
+    # comme un soutien. Sous 5/10, on dit « moins pénalisée par ».
+    _carry = "Portée par" if strongest["score"] >= 5 else "Moins pénalisée par"
+    driver = (f"{_carry} {strongest['label']} ({strongest['score']}/10), "
               f"pénalisée par {weakest['label']} ({weakest['score']}/10).")
     _imp = _HEALTH_AXIS_IMPROVE.get(weakest["label"], "renforcer l'axe le plus faible")
+    # v30 (#83) — le conseil cite le SCORE du jour de l'axe visé (fini le
+    # boilerplate mot pour mot identique matin/matin/hebdo) ; v30 (#18) — s'il
+    # vise la diversification, il rappelle la limite aux accumulations du jour.
+    _imp_txt = (f"{_imp[0].upper()}{_imp[1:]} "
+                f"(axe {weakest['label']} à {weakest['score']}/10 ce jour).")
+    if weakest["label"] == "Diversification":
+        _imp_txt += (" Tout renfort du jour doit respecter les plafonds de "
+                     "concentration — ne pas aggraver l'axe faible.")
     return {"score": score, "level": level, "level_color": color,
             "axes": axes, "driver": driver,
-            "improve": _imp[0].upper() + _imp[1:] + "."}
+            "improve": _imp_txt}
 
 
 def _fred_value(macro: dict[str, Any], *keys: str) -> dict[str, Any]:
@@ -2782,7 +2821,7 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
             short = f"{zone} · au {_fr_ddmm(entry.get('as_of'))}"
             color = _GRAY
             stale_notes.append(f"MVRV {sym} au {_fr_ddmm(entry.get('as_of'))}")
-        tiles.append({"label": f"MVRV {sym}", "value": f"{mvrv:.2f}",
+        tiles.append({"label": f"MVRV {sym}", "value": f"{mvrv:.2f}".replace(".", ","),
                       "color": color, "short": short})
 
     # ── Adresses actives BTC (fraîches — blockchain.info/bitcoin-data) ──
@@ -2790,7 +2829,7 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
     if fresh_btc.get("available") and _int_fr(fresh_btc.get("value")):
         trend = _parse_num(fresh_btc.get("trend_7d_pct"))
         if trend is not None:
-            short = f"{trend:+.1f}% / 7j"
+            short = f"{trend:+.1f}% / 7j".replace(".", ",")
             color = _GREEN if trend > 1 else _RED if trend < -1 else _INK
         else:
             short, color = "tendance 7j n/d", _INK
@@ -2803,7 +2842,7 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
         if _int_fr(btc_cm.get("active_addresses")):
             trend = _parse_num(btc_cm.get("active_addresses_trend_pct"))
             dd = _fr_ddmm(btc_cm.get("as_of"))
-            short = (f"{trend:+.1f}% / 7j" if trend is not None else "Δ n/d")
+            short = (f"{trend:+.1f}% / 7j".replace(".", ",") if trend is not None else "Δ n/d")
             if dd and _is_dated(btc_cm.get("as_of")):
                 short += f" · au {dd}"
             tiles.append({"label": "Adresses actives BTC",
@@ -2816,7 +2855,7 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
         trend = _parse_num(eth_cm.get("active_addresses_trend_pct"))
         dd = _fr_ddmm(eth_cm.get("as_of"))
         dated = _is_dated(eth_cm.get("as_of"))
-        short = (f"{trend:+.1f}% / 7j" if trend is not None else "Δ n/d")
+        short = (f"{trend:+.1f}% / 7j".replace(".", ",") if trend is not None else "Δ n/d")
         if dd and dated:
             short += f" · au {dd}"
             stale_notes.append(f"adresses actives ETH au {dd}")
@@ -2832,18 +2871,19 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
     if pcr is not None:
         short, color = ("appétit calls (haussier)", _GREEN) if pcr < 0.7 else \
             (("hedging puts (prudence)", _AMBER) if pcr > 1.3 else ("équilibré", _INK))
-        tiles.append({"label": "Put/Call BTC", "value": f"{pcr:.2f}",
+        tiles.append({"label": "Put/Call BTC", "value": f"{pcr:.2f}".replace(".", ","),
                       "color": color, "short": short})
     mp = _parse_num(btc_opt.get("max_pain"))
     if mp is not None:
         gap = _parse_num(btc_opt.get("max_pain_gap_pct"))
         if gap is not None and gap >= 1:
-            short, color = f"+{gap:.1f}% vs spot · aimant haussier CT", _GREEN
+            short, color = f"+{gap:.1f}% vs spot · aimant haussier CT".replace(".", ","), _GREEN
         elif gap is not None and gap <= -1:
-            short, color = f"{gap:.1f}% vs spot · aimant baissier CT", _RED
+            short, color = f"{gap:.1f}% vs spot · aimant baissier CT".replace(".", ","), _RED
         else:
             short, color = "proche du spot · effet neutre", _INK
-        tiles.append({"label": "Max Pain BTC", "value": f"${mp:,.0f}",
+        tiles.append({"label": "Max Pain BTC",
+                      "value": f"{mp:,.0f}".replace(",", "\u202f") + "\u202f$",
                       "color": color, "short": short})
 
     # ── Supply stablecoins : absolu ET Δ7j (B22 — les deux, plus jamais l'un
@@ -2855,12 +2895,13 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
         if chg is not None:
             word = "stable" if abs(chg) < 0.5 else (
                 "dry powder entrant" if chg > 0 else "capital sortant")
-            short = f"{chg:+.2f}% / 7j · {word}"
+            short = f"{chg:+.2f}".replace(".", ",") + f"% / 7j · {word}"
             color = _GREEN if chg >= 0.5 else _RED if chg <= -0.5 else _INK
         else:
             short, color = "Δ 7j n/d", _INK
         tiles.append({"label": "Supply Stablecoins",
-                      "value": f"{st_total / 1e9:,.1f} Mds$",
+                      "value": (f"{st_total / 1e9:,.1f}".replace(",", "\u202f")
+                                    .replace(".", ",") + " Mds$"),
                       "color": color, "short": short})
 
     # ── Dépôts whales ETH (A1 : plus JAMAIS un « 0 » nu fabriqué d'un vide ;
@@ -2898,14 +2939,16 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
             if flow is None:
                 continue
             sign = "+" if flow >= 0 else "−"
-            value = f"{sign}${abs(flow):,.1f}M"
+            value = (sign + f"{abs(flow):,.1f}".replace(",", "\u202f")
+                     .replace(".", ",") + " M$")
             dd = _fr_ddmm(row.get("date"))
             avg = _parse_num(row.get("avg_7d_musd"))
             bits = []
             if dd:
                 bits.append(f"au {dd}")
             if avg is not None:
-                bits.append(f"7j moy {'+' if avg >= 0 else '−'}${abs(avg):,.0f}M")
+                bits.append(f"7j moy {'+' if avg >= 0 else '−'}"
+                            + f"{abs(avg):,.0f}".replace(",", "\u202f") + " M$")
             bits.append("entrées nettes" if flow >= 0 else "sorties nettes")
             tiles.append({"label": f"Flux ETF {sym.upper()}", "value": value,
                           "color": _GREEN if flow >= 0 else _RED,
@@ -2915,24 +2958,30 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
     der = data.get("btc_derivatives") or {}
     fr_pct = _parse_num(der.get("funding_rate_pct"))
     if fr_pct is not None:
+        ls = _parse_num(der.get("long_short_ratio"))
+        # v30 (#12) — le qualificatif intègre AUSSI le L/S : « équilibré ·
+        # L/S 1,37 » (longs nettement dominants) se contredisait tout seul.
         if fr_pct >= 0.03:
             short, color = "longs surchauffés (risque flush)", _AMBER
         elif fr_pct <= -0.01:
             short, color = "shorts dominants (squeeze possible)", _GREEN
+        elif ls is not None and ls >= 1.3:
+            short, color = "longs dominants", _AMBER
+        elif ls is not None and ls <= 0.75:
+            short, color = "shorts dominants", _AMBER
         else:
             short, color = "équilibré", _INK
-        ls = _parse_num(der.get("long_short_ratio"))
         if ls is not None:
-            short += f" · L/S {ls:.2f}"
+            short += f" · L/S {ls:.2f}".replace(".", ",")
         # v28 (W-A11) — UNITÉ UNIQUE cross-mail : annualisé + « /an », comme le
         # hebdo. Le 07/07, « +0.007% » (taux 8h, matin) côtoyait « +6,06%/an »
         # (hebdo) pour la MÊME réalité — illisible. Repli 8h si l'annualisé
         # manque, alors étiqueté « /8h » explicitement.
         fr_ann = _parse_num(der.get("funding_annualized_pct"))
         if fr_ann is not None:
-            _fr_val = f"{fr_ann:+.1f}%/an"
+            _fr_val = f"{fr_ann:+.1f}%/an".replace(".", ",")
         else:
-            _fr_val = f"{fr_pct:+.3f}%/8h"
+            _fr_val = f"{fr_pct:+.3f}%/8h".replace(".", ",")
         tiles.append({"label": "Funding BTC", "value": _fr_val,
                       "color": color, "short": short})
 
@@ -3141,6 +3190,7 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
     header["total_sources_count"] = meta.get("total_sources_count")
     header["win_rate_30d"] = meta.get("win_rate_30d_pct")
     header["win_rate_total"] = meta.get("win_rate_count")
+    header["win_rate_calibration"] = meta.get("win_rate_calibration")
 
     # Snapshot et macro : remplacés par les chiffres Python
     snap = data.get("portfolio_snapshot") or {}
@@ -3451,7 +3501,8 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
                     demote_reason = ("stop loss du mauvais côté de l'entrée "
                                      "(incohérence support/résistance)")
                 elif sl_dist_pct < 1.5:
-                    demote_reason = (f"SL à {sl_dist_pct:.1f}% de l'entrée — "
+                    demote_reason = (f"SL à {sl_dist_pct:.1f}%".replace(".", ",")
+                                 + " de l'entrée — "
                                      "trigeable par le bruit, pas un vrai swing low")
             # R:R explicite fourni par Gemini ou calculable depuis TP/SL.
             rr_val = None
@@ -3586,7 +3637,8 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
                             _tg["short_term_30d"] = _stp["target"]
                             _tg["short_term_30d_capped"] = True
                             _tg["short_term_note"] = (
-                                f"{_stp.get('move_pct', 0):+.1f}% · {_stp.get('basis')} "
+                                f"{_stp.get('move_pct', 0):+.1f}".replace(".", ",")
+                                + f"% · {_stp.get('basis')} "
                                 "(cible ramenée au niveau réaliste · ATR 30j)"
                             )
             _ap = _t.get("action_plan") if isinstance(_t.get("action_plan"), dict) else None
@@ -3858,9 +3910,84 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         # v28 (M-A1/A2/A3/A4) — GATE DE COHÉRENCE (décision Omar 07/07) : les
         # actions affichées doivent suivre leurs propres preuves (sizing,
         # EV 30j, R:R) AVANT le choix du « one thing ».
-        from src.analytics.reco_gate import apply_reco_gate
+        from src.analytics.reco_gate import apply_reco_gate, apply_stop_slide_gate
         apply_reco_gate(payload)
+        # v30 (#1/#68) — ANTI-GLISSEMENT : un RENFORCER dont le stop persisté
+        # est déjà franchi est dégradé en SURVEILLER AVANT le choix du « one
+        # thing » (fini « RENFORCER TAO » en action n°1 sous un stop cassé).
+        _price_by_asset_v30 = {
+            str(r.get("asset") or "").upper(): r.get("price")
+            for r in (data.get("all_positions_summary") or [])
+            if isinstance(r, dict) and r.get("asset")
+        }
+        apply_stop_slide_gate(
+            payload, mem.load_active_recommendations(), _price_by_asset_v30)
         _compute_top_action(payload)
+        # v30 (#7/#46) — le TRACKING se réconcilie avec le gate DU JOUR : une
+        # reco d'état RENFORCER dont la thèse du jour est MAINTENIR/SURVEILLER
+        # porte la posture du jour (fini BTC « RENFORCER » au tracking et
+        # « MAINTENIR » aux thèses dans le même mail).
+        _stance_today: dict[str, str] = {}
+        for _tt in (payload.get("thesis_of_the_day") or []):
+            if isinstance(_tt, dict) and _tt.get("asset"):
+                _stance_today[str(_tt["asset"]).upper()] = (
+                    _tt.get("action") or "").upper()
+        for _row in (payload.get("active_recommendations_tracking") or []):
+            if not isinstance(_row, dict):
+                continue
+            _ra = str(_row.get("asset") or "").upper()
+            _st = _stance_today.get(_ra)
+            if _st and _st in ("MAINTENIR", "SURVEILLER") and _st != (
+                    _row.get("action") or "").upper():
+                _row["action_today"] = _st
+        # v30 (#7) — les recos fermes ÉMISES CE MATIN entrent au tracking dès
+        # ce mail (le 15/07, LINK — l'action n°1 — manquait au tableau).
+        _tracked_syms = {str(r.get("asset") or "").upper()
+                         for r in (payload.get("active_recommendations_tracking") or [])
+                         if isinstance(r, dict)}
+        for _tt in (payload.get("thesis_of_the_day") or []):
+            if not isinstance(_tt, dict):
+                continue
+            _ta = str(_tt.get("asset") or "").upper()
+            _tact = (_tt.get("action") or "").upper()
+            if (not _ta or _ta in _tracked_syms
+                    or not any(k in _tact for k in ("RENFORC", "ALLÉG", "ALLEG"))):
+                continue
+            _px_new = _price_by_asset_v30.get(_ta)
+            _tgt_new = (_parse_num((_tt.get("targets") or {}).get("short_term_30d"))
+                        if isinstance(_tt.get("targets"), dict) else None)
+            _rows_trk = payload.setdefault("active_recommendations_tracking", [])
+            _rows_trk.append({
+                "asset": _ta,
+                "action": "RENFORCER" if "RENFORC" in _tact else "ALLÉGER",
+                "issued_at": datetime.now(TZ).strftime("%d/%m"),
+                "days_open": 0,
+                "confidence": _coerce_confidence(_tt.get("confidence")),
+                "entry_price": _px_new, "current_price": _px_new,
+                "progress_pct": 0.0, "ct_target": _tgt_new,
+                "target_path_pct": 0.0, "target_path_display_pct": 0.0,
+                "target_path_away": False,
+                "dist_to_target_pct": (round((_tgt_new - _px_new) / _px_new * 100, 1)
+                                       if _tgt_new and _px_new else None),
+                "status": "● en cours", "status_color": "#BA7517",
+                "health_status": "• Nouvelle (émise ce matin)",
+                "health_color": "#8a8880",
+            })
+            _tracked_syms.add(_ta)
+        payload.setdefault("header", {})["active_recos_count"] = len(
+            payload.get("active_recommendations_tracking") or [])
+        # v30 (#74) — « données complètes/partielles » DÉRIVÉ de la complétude
+        # réelle du score (le 15/07 : « données complètes » sur TAO à 67%).
+        for _tt in (payload.get("thesis_of_the_day") or []):
+            if not isinstance(_tt, dict):
+                continue
+            _cp = ((_tt.get("thesis_scoring") or {}).get("completeness")
+                   or {}).get("pct")
+            if isinstance(_cp, (int, float)):
+                _tt["reliability"] = "complète" if _cp >= 90 else "partielle"
+        # v30 (#2/#3) — ton du narratif plafonné sur les thèses gatées.
+        from src.analytics import daily_guards as _dg_tone
+        _dg_tone.tone_down_gated_theses(payload.get("thesis_of_the_day"))
         # v29 (MA16) — le compteur d'en-tête est recalculé APRÈS le gate :
         # le 10/07, « 7 nouvelles reco » comptait 3 RENFORCER requalifiés en
         # MAINTENIR (plafond) — un MAINTENIR n'est pas une nouvelle reco.
@@ -3893,7 +4020,33 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
     # Fusion des invalidations DÉTERMINISTES (prix réel vs stop des recos
     # actives) avec le bloc invalidation_watch : les FRANCHIES/menacées Python
     # priment et passent en tête (le LLM ne peut pas les inventer ni les rater).
+    # v30 (#1/#66) — SOURCE UNIQUE : les alertes rendues sont RECALCULÉES avec
+    # les stops du JOUR (asset_plan, les mêmes que la table des thèses) pour
+    # les actifs re-émis non dégradés. Un actif dégradé par le stop-slide gate
+    # (pas d'override) garde l'alerte sur l'ancien stop — cohérent avec sa
+    # posture SURVEILLER. Repli : la valeur calculée en début de run.
     _inv_det = data.get("invalidations_deterministic") or []
+    try:
+        _stop_over_v30: dict[str, float] = {}
+        for _t30 in (payload.get("thesis_of_the_day") or []):
+            if not isinstance(_t30, dict) or _t30.get("_gated") == "stop_slide":
+                continue
+            _a30 = str(_t30.get("asset") or "").upper()
+            _ap30 = (_t30.get("action_plan")
+                     if isinstance(_t30.get("action_plan"), dict) else {})
+            _sl30 = _parse_num(_ap30.get("stop_loss"))
+            _act30 = (_t30.get("action") or "").upper()
+            if (_a30 and _sl30 and _sl30 > 0 and any(
+                    k in _act30 for k in ("RENFORC", "ALLÉG", "ALLEG", "MAINTENIR"))):
+                _stop_over_v30[_a30] = _sl30
+        _px30 = {str(r.get("asset") or "").upper(): r.get("price")
+                 for r in (data.get("all_positions_summary") or [])
+                 if isinstance(r, dict) and isinstance(r.get("price"), (int, float))}
+        if _stop_over_v30 and _px30:
+            _inv_det = PredictionTracker().check_invalidations(
+                _px30, stop_overrides=_stop_over_v30)
+    except Exception as _inv30_exc:  # noqa: BLE001 — jamais bloquant
+        logger.info("Recalcul invalidations v30 ignoré : %s", _inv30_exc)
     if _inv_det:
         _existing = payload.get("invalidation_watch")
         _existing = _existing if isinstance(_existing, list) else []
@@ -4199,8 +4352,95 @@ def _apply_morning_guards(payload: dict[str, Any], data: dict[str, Any]) -> list
     except Exception:  # noqa: BLE001
         pass
 
+    # ── v30 (#11) — seuil DXY unique dans tout le mail du matin (état
+    # PARTAGÉ entre les sections : une seule ancre canonique par rapport).
+    _dxy_state_v30: dict[str, Any] = {"canon": None, "canon_txt": None}
+    _apply(_dg.unify_dxy_thresholds, _dxy_state_v30)
+
+    # ── v30 (#40) — décimales cassées « X, Y% » recollées dans la prose.
+    _apply(_dg.fix_broken_decimals)
+
+    # ── v30 (#24) — indices boursiers : « 7 547,62 $ » → « 7 547,62 points ».
+    _apply(_dg.strip_index_dollar)
+
+    # ── v30 (#72) — chiffre ETF de canal Telegram étiqueté « non recoupé »
+    # quand la source structurée est indisponible.
+    try:
+        _etf_ok = bool((data.get("etf_flows") or {}).get("available"))
+        fixes.extend(_dg.flag_etf_news_provenance(
+            payload.get("news_24h"), _etf_ok))
+    except Exception:  # noqa: BLE001
+        pass
+
+    # ── v30 (#78) — « survendu » vs RSI réel, thèse par thèse.
+    for _t78 in (payload.get("thesis_of_the_day") or []):
+        if not isinstance(_t78, dict):
+            continue
+        _rsi78 = (((_t78.get("asset_plan") or {}).get("readout") or {})
+                  .get("rsi"))
+        if _rsi78 is None:
+            continue
+        try:
+            for _k78 in ("observation", "thesis", "summary",
+                         "historical_analysis"):
+                if isinstance(_t78.get(_k78), str):
+                    _t78[_k78], _fx78 = _dg.fix_oversold_claims(
+                        _t78[_k78], _rsi78,
+                        str(_t78.get("asset") or "?").upper())
+                    fixes.extend(_fx78)
+        except Exception:  # noqa: BLE001
+            pass
+
+    # ── v30 (#9) — chiffre CPI/PPI cité le jour de sa re-publication.
+    try:
+        _prepub = [(r"(?i)\bCPI\b[^.%\n]{0,25}\d(?:[.,]\d+)?\s?%", "CPI"),
+                   (r"(?i)\bPPI\b[^.%\n]{0,25}\d(?:[.,]\d+)?\s?%", "PPI")]
+        _today_events = " · ".join(
+            str(e.get("label") or "")
+            for e in ((data.get("upcoming_calendar") or {}).get("events") or [])
+            if e.get("days_ahead") == 0 and not e.get("already_published"))
+        for _pat9, _lbl9 in _prepub:
+            if _lbl9.lower() in _today_events.lower():
+                _apply(_dg.mark_prepub_claims, _pat9, _lbl9)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # ── v30 (#90) — HYSTÉRÉSIS du régime macro : une bascule risk-on/off à
+    # confiance < 75% est marquée « à confirmer » (le 14→15/07, le régime a
+    # basculé deux fois en 24 h).
+    try:
+        _prev_reg = ((mem.load_morning_report() or {}).get("macro_context")
+                     or {}).get("regime")
+        _cur_mc = payload.get("macro_context") or {}
+        _cur_reg = _cur_mc.get("regime")
+        _cur_cf = _parse_num(_cur_mc.get("confidence_pct")
+                             or _cur_mc.get("confidence"))
+        if (_prev_reg and _cur_reg
+                and str(_cur_reg).lower() != str(_prev_reg).lower()
+                and (_cur_cf is None or _cur_cf < 75)):
+            _cur_mc["regime_note"] = (
+                f"bascule {_prev_reg} → {_cur_reg} récente"
+                + (f" (confiance {_cur_cf:.0f}%)" if _cur_cf else "")
+                + " — à confirmer sur une 2e journée")
+            fixes.append(f"régime macro : bascule {_prev_reg}→{_cur_reg} "
+                         "marquée « à confirmer » (hystérésis)")
+    except Exception:  # noqa: BLE001
+        pass
+
+    # ── v30 (#77) — une confiance PLAFONNÉE le dit (fini le mystère du
+    # « tout le monde à 75% » : plafond de complétude rendu visible).
+    for _t77 in (payload.get("thesis_of_the_day") or []):
+        if isinstance(_t77, dict) and (_t77.get("_confidence_capped_ct")
+                                       or _t77.get("_capped_completeness")):
+            _t77["size_note"] = ((_t77.get("size_note") or "taille standard")
+                                 + " · confiance plafonnée")
+
+    # ── v30 (#22) — micro-prix en prose : 4 chiffres significatifs, comme
+    # les tuiles (fini RSR sous 3 précisions différentes dans le même mail).
+    _apply(_dg.round_micro_prices)
+
     if fixes:
-        logger.info("Gardes matin v29 : %d correction(s) — %s",
+        logger.info("Gardes matin v30 : %d correction(s) — %s",
                     len(fixes), " | ".join(fixes[:8]))
     return fixes
 
@@ -4253,11 +4493,17 @@ def run_morning() -> int:
             continue
         if any(k in _act for k in ("RENFORC", "ALLÉG", "ALLEG")):
             _ap = _th.get("action_plan") if isinstance(_th.get("action_plan"), dict) else {}
+            # v30 (#26) — la cible du bilan soir = la MÊME « Cible 30j » que la
+            # table des thèses du matin (targets.short_term_30d). Le 14/07, le
+            # soir affichait le TP1 (TAO 210,74 $) quand le matin montrait
+            # 215,06 $ : la « cible » d'une même reco changeait dans la journée.
+            _tgt30 = (_parse_num((_th.get("targets") or {}).get("short_term_30d"))
+                      if isinstance(_th.get("targets"), dict) else None)
             _firm_postures[_a] = {
                 "action": "RENFORCER" if "RENFORC" in _act else "ALLÉGER",
                 "entry": _ap.get("entry"),
                 "stop_loss": _ap.get("stop_loss"),
-                "target": _first_take_profit(_ap),  # v23.x : prix cible (TP1) pour le bilan soir
+                "target": _tgt30 or _first_take_profit(_ap),
                 "confidence": _coerce_confidence(_th.get("confidence")),
             }
     payload["firm_postures"] = _firm_postures
@@ -4515,8 +4761,30 @@ def _build_evening_reco_bilan(
             continue
         seen.add(asset)
         ap = t.get("action_plan") or {}
+        # v30 (#26) — même cible que le matin (Cible 30j), TP1 en repli.
+        _t30 = (_parse_num((t.get("targets") or {}).get("short_term_30d"))
+                if isinstance(t.get("targets"), dict) else None)
         _emit(asset, action_raw, ap.get("entry"), ap.get("stop_loss"),
-              _first_take_profit(ap), t.get("confidence"))
+              _t30 or _first_take_profit(ap), t.get("confidence"))
+    # 3) v30 (#20) — FILET « recos ouvertes » : quand le matin du jour n'a émis
+    #    AUCUNE thèse ferme (morning_state vide/périmé), le soir affichait
+    #    « Aucune reco active — rien à arbitrer » alors que le tracking portait
+    #    des recos OUVERTES (TAO −6,5% le 13/07, à la veille de son
+    #    invalidation). Le bilan du soir couvre désormais TOUTES les positions
+    #    suivies : repli sur le state (entrée/stop/cible 30j persistés).
+    if not out:
+        try:
+            from src.tracking.prediction_scoring import latest_open_reco_by_asset
+            for _asset, _r in latest_open_reco_by_asset(
+                    mem.load_active_recommendations()).items():
+                if _asset in seen:
+                    continue
+                seen.add(_asset)
+                _emit(_asset, (_r.get("action") or "").upper(),
+                      _r.get("entry_price"), _r.get("stop_loss"),
+                      _r.get("ct_target"), _r.get("confidence"))
+        except Exception as _fb_exc:  # noqa: BLE001 — filet best-effort
+            logger.info("Filet recos ouvertes du bilan soir ignoré : %s", _fb_exc)
     return out
 
 
@@ -4623,7 +4891,7 @@ def _fmt_usd_short(v: Any) -> Optional[str]:
         return f"{x:,.0f}".replace(",", " ") + " $"
     if abs(x) >= 100:
         return f"{x:.0f} $"
-    return f"{x:.2f} $"
+    return f"{x:.2f}".replace(".", ",") + "\u202f$"
 
 
 def _pct_fr_signed(v: float, nd: int = 1) -> str:
@@ -4667,8 +4935,8 @@ def _build_since_morning_facts(
     m_dxy = _parse_num(m_macro.get("dxy"))
     e_dxy = _parse_num(evening_macro.get("dxy"))
     if m_dxy and e_dxy:
-        parts.append(f"DXY {m_dxy:.2f} → {e_dxy:.2f}"
-                     f" ({_pct_fr_signed((e_dxy / m_dxy - 1) * 100)})")
+        parts.append(f"DXY {m_dxy:.2f} → {e_dxy:.2f}".replace(".", ",")
+                     + f" ({_pct_fr_signed((e_dxy / m_dxy - 1) * 100)})")
     m_fed = (m_macro.get("polymarket_fed_bars") or {})
     e_fed = ((polymarket or {}).get("fed_bars") or {})
     m_dom, e_dom = m_fed.get("dominant"), e_fed.get("dominant")
@@ -4740,7 +5008,8 @@ def _build_evening_derivatives_line(
             _dt = _fr_ddmm(entry.get("date"))
             parts.append(
                 f"ETF {sym.upper()} {'+' if flow >= 0 else '−'}"
-                f"${abs(flow):,.1f}M".replace(",", " ")
+                + f"{abs(flow):,.1f}".replace(",", "\u202f").replace(".", ",")
+                + " M$"
                 + (f" ({_dt})" if _dt else ""))
     return " · ".join(parts) if parts else None
 
@@ -4801,7 +5070,7 @@ def _apply_evening_degraded_fallbacks(
     if _vix is not None or _dxy is not None:
         _vix_txt = (f"VIX {str(round(_vix, 1)).replace('.', ',')} "
                     f"({'stress' if _vix >= 25 else 'calme'})" if _vix is not None else "")
-        _dxy_txt = f"DXY {_dxy:.2f}" if _dxy is not None else ""
+        _dxy_txt = f"DXY {_dxy:.2f}".replace(".", ",") if _dxy is not None else ""
         _sep = " · " if _vix_txt and _dxy_txt else ""
         bullets.append({
             "icon": "✗" if (_vix is not None and _vix >= 25) else "✓",
@@ -5222,14 +5491,57 @@ def run_evening() -> int:
     try:
         from src.analytics import daily_guards as _dg_ev
         _ea1_fixes: list[str] = []
+        _held_ev = {s.upper() for s in symbols}
         for _nk in ("news_today", "intraday_news"):
             _ea1_fixes += _dg_ev.downgrade_speculative_actionable(
-                payload.get(_nk))
+                payload.get(_nk), held_assets=_held_ev)
+        # v30 (#19/#21/#65) — RÉCONCILIATION LT/CT : les « actions à poser ce
+        # soir » ne peuvent plus contredire une thèse LT active (fini
+        # « Alléger 100% INJ · sortie définitive » la veille d'un RENFORCER).
+        _at_v30 = payload.get("actions_tonight")
+        if isinstance(_at_v30, list) and _at_v30:
+            _at_new, _at_fixes = _dg_ev.reconcile_evening_actions(
+                _at_v30, mem.load_active_recommendations())
+            payload["actions_tonight"] = _at_new
+            _ea1_fixes += _at_fixes
+        # v30 (#29) — seuil DXY unique par rapport (checklist vs niveaux),
+        # ancre canonique PARTAGÉE entre les sections du soir.
+        _dxy_state_ev: dict[str, Any] = {"canon": None, "canon_txt": None}
+        for _pk_dxy in ("tomorrow_checklist", "levels_tonight", "market_changes"):
+            if payload.get(_pk_dxy) is not None:
+                payload[_pk_dxy], _dxy_fx = _dg_ev.unify_dxy_thresholds(
+                    payload[_pk_dxy], _dxy_state_ev)
+                _ea1_fixes += _dxy_fx
+        # v30 (#28) — la checklist cite les MÊMES niveaux que le bloc calculé
+        # (fini « clôture sous 60 800 $ » vs « support 60 862 $ »).
+        _canon_lvls: list[float] = []
+        for _cl in computed_levels.values():
+            for _side in ("supports", "resistances"):
+                for _lv in (_cl.get(_side) or []):
+                    _lvf = _parse_num(_lv.get("level") if isinstance(_lv, dict)
+                                      else _lv)
+                    if _lvf:
+                        _canon_lvls.append(_lvf)
+        if _canon_lvls and payload.get("tomorrow_checklist") is not None:
+            payload["tomorrow_checklist"], _lvl_fx = (
+                _dg_ev.align_checklist_levels(
+                    payload["tomorrow_checklist"], _canon_lvls))
+            _ea1_fixes += _lvl_fx
+        # v30 (#40/#24/#22) — décimales cassées recollées, indices sans « $ »,
+        # micro-prix à précision unifiée, dans toute la prose du soir.
+        for _pk_dec in ("market_changes", "news_today", "intraday_news",
+                        "delta_summary", "tomorrow_checklist", "actions_tonight"):
+            if payload.get(_pk_dec) is not None:
+                for _gfn in (_dg_ev.fix_broken_decimals,
+                             _dg_ev.strip_index_dollar,
+                             _dg_ev.round_micro_prices):
+                    payload[_pk_dec], _g_fx = _gfn(payload[_pk_dec])
+                    _ea1_fixes += _g_fx
         if _ea1_fixes:
-            logger.info("Gardes soir v29 : %d correction(s) — %s",
-                        len(_ea1_fixes), " | ".join(_ea1_fixes[:4]))
+            logger.info("Gardes soir v30 : %d correction(s) — %s",
+                        len(_ea1_fixes), " | ".join(_ea1_fixes[:6]))
     except Exception as _ea1_exc:  # noqa: BLE001
-        logger.info("Garde news soir ignorée : %s", _ea1_exc)
+        logger.info("Gardes soir ignorées : %s", _ea1_exc)
     # v19/W-B12 — espérance mathématique des recos AUSSI dans le soir (présente
     # dans les 3 mails). Calculée Python, vide tant que < 5 recos clôturées.
     payload["expectancy"] = tracker.compute_expectancy(30)
@@ -5263,6 +5575,7 @@ def run_evening() -> int:
         header["win_rate_30d"] = _wr30_ev.get("win_rate_pct")
         header["win_rate_total"] = (
             f"{_wr30_ev.get('validated', 0)}/{_wr30_ev.get('total', 0)}")
+        header["win_rate_calibration"] = f"{_wr30_ev.get('total', 0)}/5"
     except Exception:  # noqa: BLE001
         pass
     # v15 (audit B4) : sous-titre FACTUEL « matin 10h14 · soir 19h32 · Δ9h »
@@ -5316,10 +5629,13 @@ def run_evening() -> int:
     # lisibles ; le template affiche ce libellé quand la séance est ouverte.
     if header["us_market_open"]:
         _mins_open = (_now_utc_ev.hour * 60 + _now_utc_ev.minute) - (13 * 60 + 30)
+        # v30 (#31) — « (en cours) » explicite : les niveaux affichés sont
+        # LIVE, pas la clôture officielle (qui apparaît le lendemain matin —
+        # d'où le « S&P 7 521 le soir / 7 515 le matin » du 13-14/07).
         header["us_session_label"] = (
-            "début de séance" if _mins_open < 130
-            else "mi-séance" if _mins_open < 260
-            else "fin de séance")
+            "début de séance (en cours)" if _mins_open < 130
+            else "mi-séance (en cours)" if _mins_open < 260
+            else "fin de séance (en cours)")
     else:
         header["us_session_label"] = None
 
@@ -5414,12 +5730,17 @@ def run_evening() -> int:
                 _e_assets = set(symbols)
                 _same_comp = (not _m_assets) or (_m_assets == _e_assets)
                 if _same_comp and abs(_e_score - _m_score) <= 0.3:
+                    # v30 (#32) — « inchangée » nuancé quand des actions
+                    # tactiques sont proposées plus bas dans le même mail.
+                    _suffix_r = (" (actions tactiques proposées plus bas)"
+                                 if payload.get("actions_tonight") else ".")
                     payload["risk_unchanged_since_morning"] = {
                         "active": True,
                         "morning_score": _m_score,
                         "note": (
                             f"Risque stable depuis ce matin ({_m_score}/10 → "
-                            f"{_e_score}/10) — composition du portefeuille inchangée."
+                            f"{_e_score}/10) — composition du portefeuille "
+                            f"non modifiée à ce jour{_suffix_r}"
                         ),
                     }
         except Exception:  # noqa: BLE001
@@ -5448,10 +5769,14 @@ def run_evening() -> int:
         _mh_score, _eh_score = _mh.get("score"), _health_recomputed.get("score")
         if (isinstance(_mh_score, (int, float)) and isinstance(_eh_score, (int, float))
                 and abs(_eh_score - _mh_score) <= 0.3):
+            # v30 (#32) — même nuance que le bloc risque ci-dessus.
+            _suffix_h = (" (actions tactiques proposées plus bas)"
+                         if payload.get("actions_tonight") else ".")
             payload["health_unchanged_since_morning"] = {
                 "active": True,
                 "note": (f"Santé stable depuis ce matin ({_mh_score}/10 → "
-                         f"{_eh_score}/10) — composition du portefeuille inchangée."),
+                         f"{_eh_score}/10) — composition du portefeuille "
+                         f"non modifiée à ce jour{_suffix_h}"),
             }
     elif (morning_state or {}).get("health_score"):
         payload["health_score"] = morning_state["health_score"]
@@ -5684,6 +6009,23 @@ def _build_positions_review(
             target_high = _parse_num(_cyc_a.get("high"))
             target_pct = _parse_num(_cyc_a.get("upside_pct"))
             target_kind = _cyc_a.get("kind") or "cycle"
+            # v30 (#39/#69) — CIBLES CYCLE PLAFONNÉES : « RSR +9462% »,
+            # « ANKR +5928% » (retour mécanique à l'ATH ×10-×95) ancrent des
+            # attentes fantaisistes. Au-delà de +300% de « upside » vers la
+            # borne haute : on ne retient que la borne PRUDENTE (fib 0,618) ;
+            # si même elle dépasse +300%, la cible est masquée honnêtement.
+            _pct_low_cap = (round((target_low - price) / price * 100)
+                            if target_low and price and price > 0 else None)
+            if target_pct is not None and target_pct > 300:
+                if _pct_low_cap is not None and _pct_low_cap <= 300:
+                    target = target_low
+                    target_low = target_high = None
+                    target_pct = _pct_low_cap
+                    target_kind = "cycle · borne prudente (fib 0,618 — ATH non retenu)"
+                else:
+                    target = target_low = target_high = None
+                    target_pct = None
+                    target_kind = None
         else:
             # ── v26 (W-A16/B5) — repli LLM : cible crédible, jamais > ATH réel,
             # et une cible ≥ +250% est étiquetée « cycle » (reconquête ATH).
@@ -5757,6 +6099,20 @@ def run_weekly() -> int:
     tracker.refresh_active(price_lookup)
     win_rate = tracker.compute_win_rate(7)
     lesson = tracker.extract_lesson(7)
+    # v30 (#42) — « Aucune invalidation notable · Discipline maintenue »
+    # cohabitait avec « Mon erreur de la semaine » (INJ) et les alertes de
+    # stop du soir : si un stop d'une reco OUVERTE est franchi/menacé au
+    # moment du bilan, la leçon le dit au lieu du satisfecit générique.
+    try:
+        _breaches_w = tracker.check_invalidations(price_lookup)
+        if _breaches_w and (not lesson or "aucune" in lesson.lower()
+                            or "discipline" in lesson.lower()):
+            _b0 = _breaches_w[0]
+            lesson = (f"{_b0.get('asset')} : {_b0.get('condition')} — "
+                      "statuer plutôt que laisser dériver ; pas de "
+                      "re-renforcement automatique sous un stop cassé.")
+    except Exception as _les_exc:  # noqa: BLE001
+        logger.info("Leçon invalidations ignorée : %s", _les_exc)
     # v15 (audit weekly P0) — tableau de scoring 100% Python, dédupliqué,
     # une ligne par (actif, action), la plus récente prime. Gemini ne génère
     # plus jamais ce détail (cause des « 11 recos clôturées en 1 jour »).
@@ -6037,6 +6393,28 @@ def run_weekly() -> int:
             from src.analytics.weekly_guards import is_duplicate_news as _is_dup_n
             if any(_is_dup_n(_clean_title, _k.get("title") or "")
                    for _k in weekly_news_digest):
+                continue
+            # v30 (#47) — dédup par ÉVÉNEMENT : le 15/07, 3 des 5 lignes
+            # racontaient « BTC monte sur le ralentissement du CPI » via 3
+            # sources. Deux titres partageant ≥ 2 entités-clés = même sujet.
+            import re as _re_ents
+            _ENTS_ALIAS = {"btc": ("bitcoin", "btc"),
+                           "eth": ("ethereum", "eth"),
+                           "inflation": ("cpi", "inflation"),
+                           "fed": ("fed", "fomc"), "etf": ("etf",),
+                           "sec": ("sec",), "trump": ("trump",),
+                           "airbnb": ("airbnb",), "xrp": ("ripple", "xrp")}
+
+            def _ents_of(_txt_e: str) -> set[str]:
+                _tl_e = _txt_e.lower()
+                return {_k_e for _k_e, _als in _ENTS_ALIAS.items()
+                        if any(_re_ents.search(rf"\b{_a_e}\b", _tl_e)
+                               for _a_e in _als)}
+
+            _ents_new = _ents_of(_clean_title)
+            if len(_ents_new) >= 2 and any(
+                    len(_ents_new & _ents_of(str(_k.get("title") or ""))) >= 2
+                    for _k in weekly_news_digest):
                 continue
             weekly_news_digest.append({
                 "title": _clean_title,
@@ -6372,8 +6750,8 @@ def run_weekly() -> int:
                 "window_label": "7 jours",
                 "verdict": (
                     f"Ta gestion active {'surperforme' if _outperf else 'sous-performe'} "
-                    f"un simple BTC hold de {abs(_diff):.1f}% sur 7 jours "
-                    f"(même fenêtre que le P&L semaine)."
+                    f"un simple BTC hold de {abs(_diff):.1f}% sur 7 jours ".replace(".", ",")
+                    + "(même fenêtre que le P&L semaine)."
                 ),
             }
     elif len(snapshots) >= 2:  # repli : snapshot semaine précédente
@@ -6399,7 +6777,8 @@ def run_weekly() -> int:
                     "window_label": "depuis le dernier hebdo",
                     "verdict": (
                         f"Ta gestion active {'surperforme' if _outperf else 'sous-performe'} "
-                        f"un simple BTC hold de {abs(_diff):.1f}% depuis le dernier hebdo."
+                        f"un simple BTC hold de {abs(_diff):.1f}".replace(".", ",")
+                        + "% depuis le dernier hebdo."
                     ),
                 }
 
@@ -6466,6 +6845,7 @@ def run_weekly() -> int:
     header["win_rate_30d"] = win_rate_30d.get("win_rate_pct")
     header["win_rate_total"] = (
         f"{win_rate_30d.get('validated', 0)}/{win_rate_30d.get('total', 0)}")
+    header["win_rate_calibration"] = f"{win_rate_30d.get('total', 0)}/5"
     # v15 (audit P2) — PÉRIODE COUVERTE explicite : fenêtre 7j glissante du
     # bilan (même fenêtre que P&L/scoring), au lieu d'un « semaine 24/2026 » nu.
     from datetime import timedelta as _td_h
@@ -6540,8 +6920,12 @@ def run_weekly() -> int:
     else:
         _sc["win_rate_pct"] = None
         _sc["no_history"] = len(scoring_detail) == 0
+        # v30 (#41) — fenêtres EXPLICITES : le 15/07, « 0/5 » (semaine),
+        # « (4/5) » (30 j) et « (4/4) » (validées/clôturées) se contredisaient
+        # dans le même rapport. Un seul format : clôturées 30 j / 5 requis.
         _sc["winrate_gate_label"] = (
-            f"Recos clôturées : {len(_closed)}/5 minimum pour calibration"
+            f"Recos clôturées : {len(_closed)} cette semaine · "
+            f"{_closed_30d_wr}/5 sur 30 j (minimum pour calibration)"
         )
     # v28 (W-A11) — CIBLES LT UNIQUES : plans déterministes par actif (même
     # moteur que le matin : asset_plan.target_cycle, fib 0.618 → ATH réel) pour
@@ -6566,6 +6950,23 @@ def run_weekly() -> int:
                 _lt_plans_w[_s_lt.upper()] = _plan_lt
     except Exception as _exc_lt:  # noqa: BLE001
         logger.info("Plans LT weekly indisponibles : %s", _exc_lt)
+    # v30 (#57) — CIBLES LT IDENTIQUES cross-mail : l'hebdo réutilise les
+    # bornes cycle DU DERNIER MATIN PUBLIÉ (le 15/07, BTC affichait
+    # 102 552 $ le matin et 102 615 $ l'hebdo — même moteur, prix ayant
+    # bougé d'une heure). La dernière valeur publiée fait foi.
+    try:
+        for _th_m57 in ((mem.load_morning_report() or {})
+                        .get("thesis_of_the_day") or []):
+            if not isinstance(_th_m57, dict):
+                continue
+            _am57 = str(_th_m57.get("asset") or "").upper()
+            _apm57 = (_th_m57.get("asset_plan")
+                      if isinstance(_th_m57.get("asset_plan"), dict) else {})
+            _tcm57 = _apm57.get("target_cycle")
+            if _am57 in _lt_plans_w and isinstance(_tcm57, dict):
+                _lt_plans_w[_am57]["target_cycle"] = _tcm57
+    except Exception as _exc_57:  # noqa: BLE001
+        logger.info("Réutilisation cibles LT du matin ignorée : %s", _exc_57)
 
     # v23.x — TABLEAU UNIFIÉ « Positions · 30j & long terme » : fusion du
     # positionnement LT (LLM) + perf reco 30j (scoring_detail) + prix/PRU/
@@ -6648,6 +7049,30 @@ def run_weekly() -> int:
         payload["exit_plan"], _fx = _wg.fix_dust_advice(
             payload["exit_plan"], _tiny_dust)
         _wg_fixes += _fx
+    # v30 (#61) — le 15/07, « liquider immédiatement SXT (0,15 $) » vivait
+    # dans le PLAN D'ACTION (pas l'exit plan) : même règle, mêmes sections.
+    if _tiny_dust:
+        for _kd30 in ("weekly_action_plan", "strategy_focus"):
+            if payload.get(_kd30) is not None:
+                payload[_kd30], _fx = _wg.fix_dust_advice(
+                    payload[_kd30], _tiny_dust)
+                _wg_fixes += _fx
+    # v30 (#48) — « sans valeur fondamentale » visait des L1 majeurs (ADA,
+    # AR) : c'est la TAILLE de ligne qui est résiduelle, pas l'actif.
+    def _fix_dust_wording_v30(node):
+        def _fn(txt):
+            return txt.replace("sans valeur fondamentale",
+                               "de taille résiduelle (sous le seuil de frais)")
+        from src.analytics.daily_guards import walk_strings as _ws30
+        return _ws30(node, _fn)
+    for _kw30 in ("exit_plan", "weekly_action_plan", "strategy_focus",
+                  "dust_management"):
+        if payload.get(_kw30) is not None:
+            _before30 = repr(payload[_kw30])
+            payload[_kw30] = _fix_dust_wording_v30(payload[_kw30])
+            if repr(payload[_kw30]) != _before30:
+                _wg_fixes.append(f"{_kw30} : « sans valeur fondamentale » → "
+                                 "« taille résiduelle »")
     # v29 (WA4) — bilan Fed : un SEUL chiffre cross-mail (le change_pct FRED
     # des cross_signals, la même source que le matin).
     try:
@@ -6678,8 +7103,66 @@ def run_weekly() -> int:
                     _wg_fixes += _fx
     except Exception as _fed_exc_w:  # noqa: BLE001
         logger.info("Garde bilan Fed weekly ignorée : %s", _fed_exc_w)
+    # ── v30 (#35/#36/#50) — perfs 7j par actif réalignées sur CoinGecko
+    # (fini « BTC +3,9% » en prose vs +2,9% en tuile, et la perf PTF +2,46%
+    # recopiée dans LINK alors que LINK faisait +9,2%).
+    _real7_w = {s.upper(): (market.get(s) or {}).get("change_7d")
+                for s in symbols
+                if isinstance((market.get(s) or {}).get("change_7d"),
+                              (int, float))}
+    for _k7 in ("weekly_summary", "macro_panorama", "strategy_focus",
+                "losses_vs_recos", "my_errors", "scenarios"):
+        if payload.get(_k7) is not None:
+            payload[_k7], _fx = _wg.fix_asset_7d_claims(payload[_k7], _real7_w)
+            _wg_fixes += _fx
+    # ── v30 (#37) — le plan hebdo consomme le GATE de concentration : pas de
+    # « renforcer BTC +3% » sur un actif au plafond (cœur 20% / satellite 12%).
+    _capped_w: dict[str, float] = {}
+    if current_value:
+        for _s_cap in symbols:
+            _v_cap = _position_value(portfolio[_s_cap], market.get(_s_cap))
+            if not _v_cap:
+                continue
+            _w_cap = _v_cap / current_value * 100.0
+            _is_core_cap = _is_core_asset(_s_cap, portfolio.get(_s_cap) or {})
+            if _w_cap >= (20.0 if _is_core_cap else 12.0):
+                _capped_w[_s_cap.upper()] = round(_w_cap, 1)
+    for _kp in ("weekly_action_plan", "strategy_focus", "watchlist"):
+        if payload.get(_kp) is not None and _capped_w:
+            payload[_kp], _fx = _wg.gate_weekly_plan_reinforce(
+                payload[_kp], _capped_w)
+            _wg_fixes += _fx
+    # ── v30 (#38) — « excellent R:R » vs le R:R réel du plan du jour.
+    _rr_w = {a: (p.get("rr_30d")) for a, p in (_lt_plans_w or {}).items()
+             if isinstance(p, dict)}
+    for _kr in ("weekly_action_plan", "strategy_focus"):
+        if payload.get(_kr) is not None and _rr_w:
+            payload[_kr], _fx = _wg.fix_rr_superlatives(payload[_kr], _rr_w)
+            _wg_fixes += _fx
+    # ── v30 (#60) — la watchlist porte aussi des SORTIES déterministes
+    # (recos ALLÉGER actives + poussières condamnées par l'exit plan).
+    try:
+        _exit_cands: list[dict[str, Any]] = []
+        for _r_ex in (payload.get("positions_review") or []):
+            if not isinstance(_r_ex, dict):
+                continue
+            if str(_r_ex.get("action") or "").lower() in ("alléger", "sortir"):
+                _exit_cands.append({
+                    "asset": _r_ex.get("asset"),
+                    "trigger": None,
+                    "rationale": ("reco d'allègement active"
+                                  if str(_r_ex.get("action")).lower() == "alléger"
+                                  else "sortie recommandée"),
+                })
+        _wl_new, _fx = _wg.append_watchlist_exits(
+            payload.get("watchlist"), _exit_cands)
+        if _fx:
+            payload["watchlist"] = _wl_new
+            _wg_fixes += _fx
+    except Exception as _wl_exc:  # noqa: BLE001
+        logger.info("Sorties watchlist ignorées : %s", _wl_exc)
     if _wg_fixes:
-        logger.info("Gardes weekly v26 : %d correction(s) — %s",
+        logger.info("Gardes weekly v30 : %d correction(s) — %s",
                     len(_wg_fixes), " | ".join(_wg_fixes[:8]))
     # Drawdown depuis le dernier snapshot
     if last_snap.get("drawdown_ath_pct") is not None:
@@ -6876,10 +7359,10 @@ def run_weekly() -> int:
         if _dxy_ice_w is not None:
             _d7 = _macro_week_pct.get("dxy_ice") if _macro_week_pct else None
             _parts_dxy.append(
-                f"DXY (ICE) {_dxy_ice_w:.2f}"
+                f"DXY (ICE) {_dxy_ice_w:.2f}".replace(".", ",")
                 + (f" ({_pct_fr_signed(_d7)} 7j)" if isinstance(_d7, (int, float)) else ""))
         if _dxy_broad_w is not None:
-            _parts_dxy.append(f"indice élargi (Fed) {_dxy_broad_w:.2f}")
+            _parts_dxy.append(f"indice élargi (Fed) {_dxy_broad_w:.2f}".replace(".", ","))
         _facts_lines.append("💵 Dollar · " + " · ".join(_parts_dxy))
     if etf.get("available"):
         _etf_parts = []
@@ -6888,11 +7371,15 @@ def run_weekly() -> int:
         if _etf_btc.get("total_flow_musd") is not None:
             _v = _etf_btc["total_flow_musd"]
             _etf_parts.append(
-                f"BTC {'+' if _v >= 0 else '−'}${abs(_v):,.1f}M"
+                f"BTC {'+' if _v >= 0 else '−'}"
+                + f"{abs(_v):,.1f}".replace(",", "\u202f").replace(".", ",")
+                + " M$"
                 + (f" ({_etf_btc.get('date')})" if _etf_btc.get("date") else ""))
         if _etf_eth.get("total_flow_musd") is not None:
             _v = _etf_eth["total_flow_musd"]
-            _etf_parts.append(f"ETH {'+' if _v >= 0 else '−'}${abs(_v):,.1f}M")
+            _etf_parts.append(f"ETH {'+' if _v >= 0 else '−'}"
+                + f"{abs(_v):,.1f}".replace(",", "\u202f").replace(".", ",")
+                + " M$")
         if _etf_parts:
             _facts_lines.append("🏦 Flux ETF · " + " · ".join(_etf_parts))
     if fng_w.get("available"):
@@ -6908,9 +7395,11 @@ def run_weekly() -> int:
         _ms = data.get("market_structure") or {}
         _ms_parts = []
         if _ms.get("btc_dominance_pct") is not None:
-            _ms_parts.append(f"dominance BTC {_ms['btc_dominance_pct']:.1f}%")
+            _ms_parts.append(
+                f"dominance BTC {_ms['btc_dominance_pct']:.1f}%".replace(".", ","))
         if _ms.get("eth_dominance_pct") is not None:
-            _ms_parts.append(f"ETH {_ms['eth_dominance_pct']:.1f}%")
+            _ms_parts.append(
+                f"ETH {_ms['eth_dominance_pct']:.1f}%".replace(".", ","))
         if _ms.get("eth_btc_ratio") is not None:
             _r = f"ETH/BTC {_ms['eth_btc_ratio']:.5f}"
             if _ms.get("eth_btc_7d_pct") is not None:
@@ -6918,7 +7407,7 @@ def run_weekly() -> int:
             _ms_parts.append(_r)
         if _ms.get("total_market_cap_usd"):
             _t = _ms["total_market_cap_usd"] / 1e12
-            _mc = f"MCap ${_t:.2f}T"
+            _mc = "MCap " + f"{_t:.2f}".replace(".", ",") + " T$"
             if _ms.get("market_cap_change_24h_pct") is not None:
                 _mc += f" (24h {_pct_fr_signed(_ms['market_cap_change_24h_pct'])})"
             _ms_parts.append(_mc)
@@ -7193,7 +7682,7 @@ def run_weekly() -> int:
         _mom = max(0.0, min(10.0, 5.0 + (_vsbtc or 0) / 2.0))
         # v26 (W-A19) — « % » (comme le KPI vs BTC 7j du header), plus « pts ».
         _q_axes.append({"label": "Momentum vs BTC", "score": round(_mom, 1),
-                        "detail": (f"{_vsbtc:+.1f}% vs BTC 7j"
+                        "detail": (f"{_vsbtc:+.1f}% vs BTC 7j".replace(".", ",")
                                    if _vsbtc is not None
                                    else "aligné sur BTC (donnée 7j manquante)")})
         _ddq = snap_w.get("drawdown_ath_pct")
@@ -7201,10 +7690,25 @@ def run_weekly() -> int:
         _sol = max(0.0, min(10.0, 10.0 + _ddq_used / 9.5))
         # v26 (W-A19) — 1 décimale (le bilan disait « −67.8% », l'axe « −68% »).
         _q_axes.append({"label": "Solidité (vs ATH)", "score": round(_sol, 1),
-                        "detail": (f"drawdown pondéré {_ddq:.1f}% vs ATH"
+                        "detail": (f"drawdown pondéré {_ddq:.1f}% vs ATH".replace(".", ",")
                                    if _ddq is not None
                                    else "drawdown vs ATH estimé (−50% par défaut)")})
         _q_score = round(sum(a["score"] for a in _q_axes) / len(_q_axes), 1)
+        # v30 (#44) — MÊME JOUR ⇒ MÊME NOTE : à 1 h d'écart, le 15/07 affichait
+        # 3,0/10 (matin) et 3,1/10 (hebdo) pour le même portefeuille. Si le
+        # matin a publié aujourd'hui, l'hebdo reprend sa note et ses axes.
+        try:
+            _mrep_q = mem.load_morning_report() or {}
+            _mh_q = _mrep_q.get("health_score") or {}
+            _mdate_q = str((_mrep_q.get("header") or {}).get("date") or "")
+            _today_q = datetime.now(TZ).strftime("%d/%m/%Y")
+            if (isinstance(_mh_q.get("score"), (int, float))
+                    and _today_q in _mdate_q):
+                _q_score = _mh_q["score"]
+                if isinstance(_mh_q.get("axes"), list) and _mh_q["axes"]:
+                    _q_axes = _mh_q["axes"]
+        except Exception as _mhq_exc:  # noqa: BLE001
+            logger.info("Reprise santé matin ignorée : %s", _mhq_exc)
         _q_prev = None
         for _s in reversed(snapshots[:-1] if snapshots else []):
             if _s.get("quality_score") is not None:
@@ -7282,6 +7786,15 @@ def run_weekly() -> int:
                     "WoW F&G : valeur stockée %s contredit la série 8j (%s) — "
                     "série retenue.", _pfg_w, _fg_7d_series)
                 _pfg_w = _fg_7d_series
+                # v30 (#63) — RÉCONCILIER LE STORE : la valeur divergente est
+                # écrasée par la série (sinon la même correction se rejoue à
+                # chaque hebdo sans jamais soigner la source). _prev_wk EST
+                # l'entrée de la liste `snapshots` → mutation + save.
+                try:
+                    _prev_wk["fear_greed"] = _fg_7d_series
+                    mem.save_weekly_snapshots(snapshots)
+                except Exception as _fgs_exc:  # noqa: BLE001
+                    logger.info("Réconciliation store F&G ignorée : %s", _fgs_exc)
             elif _pfg_w is None:
                 _pfg_w = _fg_7d_series
             if isinstance(_pfg_w, (int, float)) and isinstance(_fg_now_w, (int, float)):
@@ -7293,8 +7806,8 @@ def run_weekly() -> int:
             if (isinstance(_pdxy_w, (int, float)) and isinstance(_dxy_broad_w, (int, float))
                     and _pdxy_w > 0):
                 _wow_lines.append(
-                    f"Indice dollar élargi {_pdxy_w:.1f} → {_dxy_broad_w:.1f} "
-                    f"({_pct_fr_signed((_dxy_broad_w / _pdxy_w - 1) * 100)})")
+                    f"Indice dollar élargi {_pdxy_w:.1f} → {_dxy_broad_w:.1f} ".replace(".", ",")
+                    + f"({_pct_fr_signed((_dxy_broad_w / _pdxy_w - 1) * 100)})")
         if _wow_lines:
             # v28 (W-A16) — DATER le point de comparaison : le 07/07, « +0,4%
             # depuis hebdo précédent » côtoyait « +6,1% sem » (fenêtre 7 j
@@ -7491,7 +8004,23 @@ def run_weekly() -> int:
                     or _wk_active_pre)
         _tot_src = len(_ALL_SOURCES_LIST)
         _conf_pct = round(min(100, (_avg_src / _tot_src * 100))) if _tot_src else None
+        # v30 (#58) — « Confiance 92% (élevée) » cohabitait avec 19 corrections
+        # de garde, ETF 7j/7 KO et on-chain J-1 : l'indice intègre désormais le
+        # nombre de corrections nécessaires (2 pts chacune, plafonné à 20) et
+        # la fraîcheur on-chain (−5 si différé).
+        _pen_conf = 0
+        try:
+            _pen_conf = min(20, 2 * len(_wg_fixes))
+            # v30.1 (ré-audit #58) — pénalité UNIQUEMENT si l'on-chain est
+            # réellement périmé (flag stale) : as_of est posé à chaque run
+            # (simple date de la donnée), l'ancien test pénalisait de 5 pts
+            # tous les hebdos même à J-1.
+            if bool((_onchain_assets_w.get("BTC") or {}).get("stale")):
+                _pen_conf += 5
+        except Exception:  # noqa: BLE001
+            _pen_conf = 0
         if _conf_pct is not None:
+            _conf_pct = max(0, _conf_pct - _pen_conf)
             _grade = ("\u00e9lev\u00e9e" if _conf_pct >= 70 else
                       "correcte" if _conf_pct >= 50 else "partielle")
             _onc_fresh = (payload.get("onchain_extras", {}).get("as_of")
@@ -7510,6 +8039,11 @@ def run_weekly() -> int:
     # n'est pas g\u00e9n\u00e9r\u00e9 (matplotlib absent / < 3 points), le template retombe sur les
     # barres HTML.
     from src.reporting import charts as _charts
+    # v30 (#56) — la FENÊTRE du graphe (historique des snapshots, ≥ 2
+    # semaines) est libellée pour ne plus être lue comme le P&L 7j du header.
+    payload["ptf_evolution_window_label"] = (
+        f"fenêtre du graphique : {max(len(ptf_evolution) - 1, 1)} semaine(s) "
+        "(≠ P&L 7 j du header)") if len(ptf_evolution) >= 2 else None
     _evo_png = _charts.portfolio_evolution_png(ptf_evolution, btc_points=_evo_btc)
     _wk_charts = {"ptf_evolution": _evo_png} if _evo_png else {}
     # v28 (3.B, décision Omar 07/07) — TEMPLATE V25 STRICT : UN SEUL graphique,
@@ -7550,7 +8084,7 @@ def run_weekly() -> int:
                 "faible — bonne indépendance des positions")
             payload["correlation_summary_line"] = (
                 f"Corrélation moyenne entre positions (30 j) : "
-                f"{_avg_corr:.2f} — {_lvl_corr}.")
+                f"{_avg_corr:.2f}".replace(".", ",") + f" — {_lvl_corr}.")
     except Exception as _exc_corr28:  # noqa: BLE001
         logger.info("Phrase corrélation indisponible : %s", _exc_corr28)
     html = _render(payload, "weekly", charts=_wk_charts)

@@ -240,9 +240,9 @@ def test_ws6_cluster_pct_uses_full_portfolio_denominator():
     assert out["available"]
     # Cluster {A,B,C} = 300 $ sur un PTF de 1000 $ → 30%, PAS 100% (ancien bug).
     assert out["max_cluster_pct"] == 30.0
-    assert "30.0% du portefeuille" in out["concentration_reading"]
+    assert "30,0% du portefeuille" in out["concentration_reading"]
     # Métrique désormais DÉFINIE : base de corrélation explicitée (M-A7).
-    assert "0.70" in out["concentration_reading"] and "30j" in out["concentration_reading"]
+    assert "0,70" in out["concentration_reading"] and "30j" in out["concentration_reading"]
 
 
 # --------------------------------------------------------------------------- #

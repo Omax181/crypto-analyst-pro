@@ -46,7 +46,9 @@ def _to_float(token: Any) -> Optional[float]:
 
 def _fmt_pct_fr(v: float, nd: int = 1) -> str:
     """−9,2% / +3,1% — virgule décimale, moins typographique."""
-    s = f"{abs(round(v, nd)):.{nd}f}".rstrip("0").rstrip(".")
+    s = f"{abs(round(v, nd)):.{nd}f}"
+    if "." in s:  # nd=0 : jamais de rstrip sur un entier (« 100 » → « 1 »)
+        s = s.rstrip("0").rstrip(".")
     return ("+" if v >= 0 else "−") + s.replace(".", ",") + "%"
 
 
@@ -138,13 +140,18 @@ def fix_active_addresses(
 # ── MA4 — un seul qualificatif dollar par mail ────────────────────────────
 
 def dxy_qualifier(delta_points: Any) -> Optional[str]:
-    """Qualificatif canonique du dollar depuis le delta DXY du jour (points)."""
+    """Qualificatif canonique du dollar depuis le delta DXY du jour (points).
+
+    v30 (#73) — seuil ±0.15 pt (≈0,15%) : le 15/07, un recul RÉEL de −0,28 pt
+    (tuile soir ▼) était qualifié « stable » par l'ancien seuil ±0.3 — la
+    garde imposait alors un faux « dollar stable » contre le mouvement réel.
+    """
     d = _to_float(delta_points)
     if d is None:
         return None
-    if d > 0.3:
+    if d > 0.15:
         return "en hausse"
-    if d < -0.3:
+    if d < -0.15:
         return "en baisse"
     return "stable"
 
@@ -159,10 +166,12 @@ def fix_dxy_wording(node: Any, qualifier: Optional[str]) -> tuple[Any, list[str]
     fixes: list[str] = []
     if qualifier not in ("stable", "en hausse", "en baisse"):
         return node, fixes
+    # v30 (#73) — motif élargi : le 15/07, la prose disait « dollar affaibli »
+    # et « DXY ferme » selon les sections — seuls fort/faible étaient couverts.
     ok_words = {"stable": ("stable",),
-                "en hausse": ("fort", "en hausse"),
-                "en baisse": ("faible", "en baisse")}[qualifier]
-    pat = re.compile(r"(?i)\b(dollar|DXY)\s+(fort|faible)\b")
+                "en hausse": ("fort", "en hausse", "ferme", "raffermi"),
+                "en baisse": ("faible", "en baisse", "affaibli", "en repli")}[qualifier]
+    pat = re.compile(r"(?i)\b(dollar|DXY)\s+(fort|faible|ferme|affaibli|raffermi)\b")
 
     def _fn(text: str) -> str:
         def _sub(m: re.Match) -> str:
@@ -465,7 +474,40 @@ _SPECULATIVE = re.compile(
     r"potentiellement|deviendra-t-il|reste à confirmer)\b")
 
 
-def downgrade_speculative_actionable(items: Any) -> list[str]:
+_OVERSOLD_WORDS = re.compile(r"(?i)\bsurvendu(?:e|es|s)?\b|\bsurvente\b")
+
+
+def fix_oversold_claims(
+    node: Any, rsi: Any, asset: str = "?"
+) -> tuple[Any, list[str]]:
+    """v30 (#78) — « survendu » interdit quand le RSI réel dit le contraire.
+
+    Le 15/07 : « configuration survendue » sur BTC (RSI 54) et ETH (RSI 61).
+    RSI ≥ 40 → le vocabulaire de survente devient « en consolidation ».
+    """
+    fixes: list[str] = []
+    r = _to_float(rsi)
+    if r is None or r < 40:
+        return node, fixes
+
+    def _repl(m: re.Match) -> str:
+        # nom (« survente ») → nom (« consolidation ») ; adjectif
+        # (« survendu(e) ») → locution (« en consolidation »).
+        return ("consolidation" if m.group(0).lower().startswith("survente")
+                else "en consolidation")
+
+    def _fn(text: str) -> str:
+        if not _OVERSOLD_WORDS.search(text):
+            return text
+        fixes.append(f"{asset} : « survendu » → « en consolidation » (RSI {r:.0f})")
+        return _OVERSOLD_WORDS.sub(_repl, text)
+
+    return walk_strings(node, _fn), fixes
+
+
+def downgrade_speculative_actionable(
+    items: Any, held_assets: Any = None
+) -> list[str]:
     """Dégrade le tag « actionnable » d'une news au conditionnel/spéculative.
 
     Le 10/07 : « Le dollar numérique … POURRAIT être interdit ce soir »
@@ -486,4 +528,384 @@ def downgrade_speculative_actionable(items: Any) -> list[str]:
             fixes.append(
                 f"news « {str(n.get('title'))[:45]}… » : actionnable → à suivre "
                 "(formulation spéculative)")
+            continue
+        # v30 (#34) — « actionnable » exige un LIEN avec une position détenue
+        # (le 14/07, une news Airbnb sans rapport avec le PTF était taguée
+        # actionnable). Sans actif détenu cité : « à suivre ».
+        if held_assets:
+            _held_hit = any(
+                re.search(rf"\b{re.escape(str(a))}\b", blob, re.IGNORECASE)
+                for a in held_assets if a)
+            if not _held_hit:
+                n["status"] = "à suivre"
+                fixes.append(
+                    f"news « {str(n.get('title'))[:45]}… » : actionnable → "
+                    "à suivre (aucune position du PTF concernée)")
     return fixes
+
+
+# ── v30 (#19/#21/#65) — le soir ne contredit plus une thèse LT active ─────
+
+_REDUCE_VERBS = re.compile(
+    r"(?i)\b(all[ée]ger|vendre|sortir|liquider|prendre\s+(?:les\s+)?profits?|"
+    r"prise\s+de\s+profits?|réduire|couper)\b")
+_INCREASE_VERBS = re.compile(
+    r"(?i)\b(renforcer|acheter|accumuler|moyenner|recharger)\b")
+_DEFINITIVE = re.compile(r"(?i)(100\s?%|définitiv|totalité|toute\s+la\s+position)")
+
+
+def _action_text(a: Any) -> str:
+    if isinstance(a, dict):
+        return " ".join(str(a.get(k) or "") for k in ("action", "rationale", "horizon"))
+    return str(a or "")
+
+
+def reconcile_evening_actions(
+    actions: Any, active_recos: Any
+) -> tuple[Optional[list[Any]], list[str]]:
+    """v30 — RÉCONCILIATION LT/CT : filtre les « actions à poser ce soir ».
+
+    Les 13-14/07, le soir ordonnait « Alléger 100% INJ · sortie définitive »
+    et « Alléger 25% TAO » pendant que le matin (moteur LT) disait RENFORCER
+    les mêmes actifs — INJ a rebondi de +7,1% le lendemain de sa « sortie
+    définitive ». Deux moteurs opposés sur le même actif en < 12 h = whipsaw.
+
+    Règles (déterministes, best-effort) :
+      * action de RÉDUCTION sur un actif porteur d'une reco OUVERTE
+        RENFORCER : si elle est « définitive »/100% → SUPPRIMÉE (le soir n'a
+        pas mandat pour clôturer une conviction LT) ; sinon → conservée mais
+        requalifiée « couverture tactique CT » avec mention explicite que la
+        thèse LT reste active ;
+      * action d'ACHAT sur un actif porteur d'une reco OUVERTE ALLÉGER →
+        même traitement symétrique.
+
+    Returns:
+        (liste filtrée ou None si vide, corrections pour le log).
+    """
+    fixes: list[str] = []
+    if not isinstance(actions, list) or not actions:
+        return (actions if isinstance(actions, list) else None), fixes
+    stance_by_asset: dict[str, str] = {}
+    for r in (active_recos or []):
+        if not isinstance(r, dict):
+            continue
+        if (r.get("status") or "in_progress") != "in_progress":
+            continue
+        a = str(r.get("asset") or "").upper()
+        act = (r.get("action") or "").upper()
+        if a and ("RENFORC" in act or "ALLÉG" in act or "ALLEG" in act):
+            stance_by_asset[a] = "RENFORCER" if "RENFORC" in act else "ALLEGER"
+    if not stance_by_asset:
+        return actions, fixes
+
+    kept: list[Any] = []
+    for a in actions:
+        text = _action_text(a)
+        # Le verbe décisif est celui de la ligne d'ACTION (pas la rationale,
+        # qui peut légitimement mentionner l'autre direction en contexte).
+        primary = str(a.get("action") or "") if isinstance(a, dict) else text
+        asset = next((sym for sym in stance_by_asset
+                      if re.search(rf"\b{re.escape(sym)}\b", primary)), None)
+        if asset is None:  # repli : texte complet (action sans ticker explicite)
+            asset = next((sym for sym in stance_by_asset
+                          if re.search(rf"\b{re.escape(sym)}\b", text)), None)
+        if not asset:
+            kept.append(a)
+            continue
+        stance = stance_by_asset[asset]
+        _red = _REDUCE_VERBS.search(primary)
+        _inc = _INCREASE_VERBS.search(primary)
+        conflict = ((stance == "RENFORCER" and _red and not _inc)
+                    or (stance == "ALLEGER" and _inc and not _red))
+        if not conflict:
+            kept.append(a)
+            continue
+        if _DEFINITIVE.search(text):
+            fixes.append(
+                f"action soir « {text[:50].strip()}… » SUPPRIMÉE : sortie "
+                f"définitive contraire à la thèse LT {stance} active ({asset})")
+            continue
+        note = (f"Couverture tactique CT — la thèse LT ({stance}) sur "
+                f"{asset} reste active : geste borné, pas une sortie.")
+        if isinstance(a, dict):
+            a["horizon"] = (f"{a.get('horizon')} · {note}"
+                            if a.get("horizon") else note)
+        else:
+            a = f"{a} — {note}"
+        kept.append(a)
+        fixes.append(f"action soir sur {asset} requalifiée « couverture "
+                     f"tactique CT » (thèse LT {stance} active)")
+    return (kept or None), fixes
+
+
+# ── v30 (#11/#29) — SEUIL DXY UNIQUE par rapport ──────────────────────────
+
+_DXY_LEVEL = re.compile(r"(?i)\bDXY\b[^.\d%]{0,40}?(\d{2,3}(?:[.,]\d{1,2})?)")
+
+
+def unify_dxy_thresholds(
+    node: Any, state: Optional[dict[str, Any]] = None
+) -> tuple[Any, list[str]]:
+    """Aligne tous les seuils DXY d'un même rapport sur le PREMIER cité.
+
+    Le 15/07 : « DXY < 101.0 » (liens chiffrés) vs « DXY > 101.2 »
+    (à surveiller) vs « 101.20 » (niveaux) dans le même mail. Un seul pivot
+    par run : la première valeur rencontrée devient canonique, toute valeur
+    ultérieure qui s'en écarte de < 1% est réécrite dessus (au-delà de 1%,
+    on considère qu'il s'agit d'un AUTRE niveau légitime, ex. 100.5 support
+    vs 101.2 résistance — non touché).
+
+    ``state`` : dict partagé entre plusieurs appels (sections différentes du
+    même mail) pour que l'ancre canonique soit VRAIMENT unique au rapport —
+    sans lui, chaque section repartirait avec sa propre ancre.
+    """
+    fixes: list[str] = []
+    if state is None:
+        state = {"canon": None, "canon_txt": None}
+
+    def _fix(text: str) -> str:
+        def _sub(m: re.Match) -> str:
+            raw = m.group(1)
+            val = _to_float(raw)
+            if val is None or not (80 <= val <= 130):
+                return m.group(0)
+            if state["canon"] is None:
+                state["canon"] = val
+                state["canon_txt"] = raw
+                return m.group(0)
+            if val != state["canon"] and abs(val - state["canon"]) / state["canon"] < 0.01:
+                fixes.append(f"seuil DXY {raw} → {state['canon_txt']} (pivot unique)")
+                return m.group(0).replace(raw, str(state["canon_txt"]))
+            return m.group(0)
+        return _DXY_LEVEL.sub(_sub, text)
+
+    return walk_strings(node, _fix), fixes
+
+
+# ── v30 (#72) — chiffre ETF sans source structurée : provenance annoncée ──
+
+_ETF_FIGURE = re.compile(
+    r"(?i)\bETF\b[^.\n]{0,80}?\d(?:[.,]\d+)?\s?(?:millions?|M\$|Mds?\$)")
+
+
+def flag_etf_news_provenance(items: Any, etf_available: bool) -> list[str]:
+    """Quand les flux ETF structurés (Farside/CoinGlass) sont KO, tout chiffre
+    ETF venu d'ailleurs (Telegram) est étiqueté comme NON RECOUPÉ.
+
+    Le 15/07 : un catalyseur titrait « ETF Bitcoin +173,7 M$ » pendant que le
+    pied du même mail listait « ⚠ Indisponibles · ETF flows » — illisible
+    sans étiquette de provenance.
+    """
+    fixes: list[str] = []
+    if etf_available or not isinstance(items, list):
+        return fixes
+    for n in items:
+        if not isinstance(n, dict):
+            continue
+        blob = f"{n.get('title') or ''} {n.get('impact') or ''}"
+        if _ETF_FIGURE.search(blob) and "non recoupé" not in blob:
+            note = (" (chiffre de canal Telegram — non recoupé : source "
+                    "structurée Farside/CoinGlass indisponible ce matin)")
+            if isinstance(n.get("impact"), str) and n["impact"].strip():
+                n["impact"] = n["impact"].rstrip(".") + "." + note
+            else:
+                n["impact"] = note.strip()
+            fixes.append("news ETF : provenance Telegram non recoupée étiquetée")
+    return fixes
+
+
+# ── v30 (#9) — chiffre macro cité LE JOUR de sa re-publication ────────────
+
+def mark_prepub_claims(
+    node: Any, metric_pattern: str, metric_label: str
+) -> tuple[Any, list[str]]:
+    """Marque « avant publication du jour » un chiffre macro re-publié à J0.
+
+    Le 14/07, le mail s'appuyait sur « CPI 4,3% » à 08h35 — le CPI du jour
+    sortait à 13h30 (et tombera à 3,5%). Le chiffre reste (c'est le dernier
+    connu) mais porte la mention explicite.
+    """
+    fixes: list[str] = []
+    pat = re.compile(metric_pattern)
+    done = {"n": 0}
+
+    def _fn(text: str) -> str:
+        if done["n"] or not pat.search(text):
+            return text
+
+        def _sub(m: re.Match) -> str:
+            if done["n"]:
+                return m.group(0)
+            done["n"] += 1
+            fixes.append(f"{metric_label} marqué « avant publication du jour »")
+            return m.group(0) + " (dernier connu — nouvelle publication aujourd'hui)"
+        return pat.sub(_sub, text, count=1)
+
+    return walk_strings(node, _fn), fixes
+
+
+# ── v30 (#2/#3) — ton du narratif plafonné quand l'action est gatée ───────
+
+_HYPERBOLE = [
+    (re.compile(r"(?i)\bexceptionnel(?:le)?s?\b"), "notable"),
+    (re.compile(r"(?i)\bopportunité\s+majeure\b"), "configuration à suivre"),
+    (re.compile(r"(?i)\bopportunité\s+historique\b"), "configuration rare"),
+    (re.compile(r"(?i)\bunique\b"), "rare"),
+    (re.compile(r"(?i)\bimmanquable\b"), "surveillée"),
+]
+
+
+def tone_down_gated_theses(theses: Any) -> list[str]:
+    """Plafonne le ton des fiches dont l'action a été REQUALIFIÉE par un gate.
+
+    Le 15/07, la fiche ETH (MAINTENIR — plafond de concentration) ouvrait sur
+    « profil d'accumulation exceptionnel » : le narratif vendait un achat que
+    l'action ne permettait pas. Sur une thèse gatée, les hyperboles de la
+    prose sont remplacées par des termes mesurés. Mutation in-place.
+    """
+    fixes: list[str] = []
+    if not isinstance(theses, list):
+        return fixes
+    for t in theses:
+        if not isinstance(t, dict) or not t.get("_gated"):
+            continue
+        asset = str(t.get("asset") or "?").upper()
+        for key in ("observation", "thesis", "summary"):
+            v = t.get(key)
+            if not isinstance(v, str):
+                continue
+            new = v
+            for pat, repl in _HYPERBOLE:
+                new = pat.sub(repl, new)
+            if new != v:
+                t[key] = new
+                fixes.append(f"{asset} : ton du narratif plafonné (action gatée)")
+    return fixes
+
+
+# ── v30 (#24) — les indices boursiers ne sont pas des montants en $ ───────
+
+_INDEX_DOLLAR = re.compile(
+    r"(?i)\b(S&P\s?500|Nasdaq(?:\s?100)?|Dow(?:\s?Jones)?|Euro\s?Stoxx\s?50|"
+    r"DAX|CAC\s?40|Nikkei\s?225|Russell\s?2000|VIX)"
+    r"([^.!?\n]{0,60}?\d(?:[   .,]?\d)*(?:[.,]\d+)?)\s?\$")
+
+
+def strip_index_dollar(node: Any) -> tuple[Any, list[str]]:
+    """Retire le « $ » collé aux NIVEAUX d'indices (points, pas des dollars).
+
+    Le 14/07 : « Le S&P 500 a gagné +32,28 points à 7 547,62 $ » — un indice
+    ne se libelle pas en dollars. Le montant est conservé, le symbole saute.
+    """
+    fixes: list[str] = []
+
+    def _fix(text: str) -> str:
+        def _sub(m: re.Match) -> str:
+            fixes.append(f"{m.group(1)} : « $ » retiré (niveau en points)")
+            return f"{m.group(1)}{m.group(2)} points"
+        return _INDEX_DOLLAR.sub(_sub, text)
+
+    return walk_strings(node, _fix), fixes
+
+
+# ── v30 (#22) — micro-prix en prose : précision unifiée (4 chiffres sig.) ──
+
+_MICRO_PRICE = re.compile(r"\b0[.,]0(\d{5,})(?=\s?\$)")
+
+
+def round_micro_prices(node: Any) -> tuple[Any, list[str]]:
+    """Arrondit les micro-prix de la PROSE à 4 chiffres significatifs.
+
+    Le 14/07, RSR apparaissait sous 3 précisions différentes dans les mails
+    (« 0.00123749 $ », « 0.001280 $ », « 0.001224 $ ») — même règle que les
+    tuiles (_fmt_price) : 4 chiffres significatifs, virgule FR.
+    """
+    fixes: list[str] = []
+
+    def _fix(text: str) -> str:
+        def _sub(m: re.Match) -> str:
+            raw = "0." + "0" + m.group(1)
+            v = _to_float(raw)
+            if v is None or v <= 0:
+                return m.group(0)
+            import math as _m
+            exp = _m.floor(_m.log10(v))
+            decimals = min(-exp + 3, 18)
+            rounded = f"{v:.{decimals}f}".rstrip("0").rstrip(".")
+            if rounded == raw:
+                return m.group(0)
+            fixes.append(f"micro-prix {m.group(0)} → {rounded.replace('.', ',')}")
+            return rounded.replace(".", ",")
+        return _MICRO_PRICE.sub(_sub, text)
+
+    return walk_strings(node, _fix), fixes
+
+
+# ── v30 (#28) — niveaux checklist alignés sur les niveaux CALCULÉS ────────
+
+_USD_LEVEL = re.compile(r"(\d{1,3}(?:[  ]\d{3})+|\d{4,6})(?:[.,]\d+)?\s?\$")
+
+
+def align_checklist_levels(
+    node: Any, canonical_levels: list[float]
+) -> tuple[Any, list[str]]:
+    """Réaligne un niveau « rond » LLM sur le niveau calculé le plus proche.
+
+    Le 13/07 : « Invalidation : BTC clôture sous 60 800 $ » (checklist) vs
+    « support 60 862 $ » (niveaux calculés) dans le même mail. Tout montant
+    en $ à < 0,6% d'un niveau canonique est réécrit dessus — un seul niveau
+    par zone de prix.
+    """
+    fixes: list[str] = []
+    levels = [float(v) for v in (canonical_levels or [])
+              if isinstance(v, (int, float)) and v > 0]
+    if not levels:
+        return node, fixes
+
+    def _fmt_lvl(v: float) -> str:
+        return (f"{v:,.0f}".replace(",", "\u202f") if v >= 1000
+                else f"{v:.2f}".rstrip("0").rstrip("."))
+
+    def _fix(text: str) -> str:
+        def _sub(m: re.Match) -> str:
+            val = _to_float(m.group(1).replace(" ", "").replace(" ", ""))
+            if val is None or val <= 0:
+                return m.group(0)
+            near = min(levels, key=lambda lv: abs(lv - val))
+            if val != near and abs(val - near) / near < 0.006:
+                fixes.append(f"niveau {m.group(1)} $ → {_fmt_lvl(near)} $ "
+                             "(aligné sur le niveau calculé)")
+                return f"{_fmt_lvl(near)} $"
+            return m.group(0)
+        return _USD_LEVEL.sub(_sub, text)
+
+    return walk_strings(node, _fix), fixes
+
+
+# ── v30 (#40) — décimales cassées « -48, 7% » réparées ────────────────────
+
+# Une virgule décimale suivie d'un espace parasite : « -48, 7% », « 4, 86 $ »,
+# « 1, 23 : », « 3, 18%/an ». On ne joint que si la partie fractionnaire est
+# immédiatement suivie d'une unité (%/$/€), d'un « : » ou de « /an » — jamais
+# une énumération légitime (« en 2024, 3 hausses » n'est pas touchée).
+# … et jamais après une ANNÉE (« en 2024, 15% des cas ») ni une DATE
+# (« le 14/07, 3% ») : lookbehinds d'exclusion.
+_BROKEN_DECIMAL = re.compile(
+    r"(\d)(?<!19\d\d)(?<!20\d\d)(?<!/\d\d),\s+(\d{1,2})(?=\s?(?:%|\$|€|/an|\s?:))")
+
+
+def fix_broken_decimals(node: Any) -> tuple[Any, list[str]]:
+    """Répare les décimales françaises cassées par un espace (« -48, 7% »).
+
+    L'hebdo du 15/07 en portait ~15 (tableau positions) : chaque nombre
+    paraissait coupé en deux. Origine LLM ; la réparation est déterministe.
+    """
+    fixes: list[str] = []
+
+    def _fix(text: str) -> str:
+        new, n = _BROKEN_DECIMAL.subn(r"\1,\2", text)
+        if n:
+            fixes.append(f"{n} décimale(s) « X, Y » recollée(s)")
+        return new
+
+    return walk_strings(node, _fix), fixes

@@ -174,15 +174,15 @@ def _compute_skew(
         out["atm_iv"] = round(best_atm[1], 1)
     if rr <= -_SKEW_THRESHOLD:
         out["skew_reading"] = (
-            f"Skew baissier ({rr:+.1f} pts de vol) — le marché paie cher la "
+            f"Skew baissier ({f'{rr:+.1f}'.replace('.', ',')} pts de vol) — le marché paie cher la "
             "protection à la baisse (couverture/prudence)")
     elif rr >= _SKEW_THRESHOLD:
         out["skew_reading"] = (
-            f"Skew haussier ({rr:+.1f} pts de vol) — appétit pour les calls "
+            f"Skew haussier ({f'{rr:+.1f}'.replace('.', ',')} pts de vol) — appétit pour les calls "
             "(optimisme/spéculation à la hausse)")
     else:
         out["skew_reading"] = (
-            f"Skew neutre ({rr:+.1f} pts de vol) — positionnement options "
+            f"Skew neutre ({f'{rr:+.1f}'.replace('.', ',')} pts de vol) — positionnement options "
             "équilibré")
     return out
 

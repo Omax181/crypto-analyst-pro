@@ -141,7 +141,9 @@ def handle_state_command(text: str) -> tuple[str, bool]:
 # --------------------------------------------------------------------------- #
 def _fmt_usd(v: Any) -> str:
     try:
-        return f"${float(v):,.2f}"
+        # v30.1 (ré-audit #67) — format FR (« 1 234,56 $ »), plus « $1,234.56 ».
+        return (f"{float(v):,.2f}".replace(",", " ")
+                .replace(".", ",") + " $")
     except (ValueError, TypeError):
         return "—"
 
@@ -180,14 +182,16 @@ def _cmd_portfolio() -> str:
         pnl_usd, pnl_pct = live.get("pnl_usd"), live.get("pnl_pct")
         if isinstance(pnl_usd, (int, float)) and isinstance(pnl_pct, (int, float)):
             arrow = "🟢" if pnl_usd >= 0 else "🔴"
-            header += (f"\n{arrow} P&L latent : {pnl_usd:+,.0f}$ ({pnl_pct:+.1f}%) "
-                       "vs PRU")
+            header += (f"\n{arrow} P&L latent : "
+                       + f"{pnl_usd:+,.0f}".replace(",", " ") + " $ ("
+                       + f"{pnl_pct:+.1f}".replace(".", ",") + "%) vs PRU")
         lines = [header + " :"]
         for r in rows[:12]:
             pct = r.get("weight_pct")
             ch = r.get("change_24h")
             pl = r.get("pnl_pct")
-            ch_txt = f" · {ch:+.1f}%/24h" if isinstance(ch, (int, float)) else ""
+            ch_txt = (f" · {ch:+.1f}%/24h".replace(".", ",")
+                      if isinstance(ch, (int, float)) else "")
             pct_txt = f" ({pct:.0f}%)" if isinstance(pct, (int, float)) else ""
             pl_txt = f" · PRU {pl:+.0f}%" if isinstance(pl, (int, float)) else ""
             lines.append(
@@ -290,7 +294,7 @@ def _cmd_macro() -> str:
         return "Pas de contexte macro récent. Pose ta question en langage naturel."
     bits = []
     if macro.get("btc_price") is not None:
-        bits.append(f"BTC ${macro['btc_price']:,.0f}")
+        bits.append("BTC " + f"{macro['btc_price']:,.0f}".replace(",", " ") + " $")
     if macro.get("fear_greed") is not None:
         bits.append(f"F&G {macro['fear_greed']}")
     if macro.get("dxy") is not None:
@@ -411,14 +415,15 @@ def _cmd_analyse(args: list[str]) -> str:
                 f"{sc['base']['probability_pct']}% · bear "
                 f"{sc['bear']['probability_pct']}% → {sc['bear']['level_label']}")
         if funding is not None:
-            lines.append(f"Funding {funding:+.1f}%/an")
+            lines.append(f"Funding {funding:+.1f}%/an".replace(".", ","))
         # Contexte PTF : position détenue ?
         try:
             from src.utils.portfolio_loader import load_portfolio
             pos = (load_portfolio().get("portfolio") or {}).get(sym)
             if pos and pos.get("pru"):
-                lines.append(("💼 En PTF · PRU "
-                              + f"{float(pos['pru']):,.4f} $").replace(",", " "))
+                lines.append("💼 En PTF · PRU "
+                             + f"{float(pos['pru']):,.4f}".replace(",", " ")
+                             .replace(".", ",") + " $")
             elif pos:
                 lines.append("💼 En portefeuille")
         except Exception:  # noqa: BLE001
@@ -511,8 +516,9 @@ def _cmd_suivi() -> str:
         try:
             ex = tk.compute_expectancy(90)
             if ex.get("available") and ex.get("expectancy_pct") is not None:
+                _exp_fr = f"{ex['expectancy_pct']:+.1f}".replace(".", ",")
                 lines.append(
-                    f"• Espérance : *{ex['expectancy_pct']:+.1f}%* / reco "
+                    f"• Espérance : *{_exp_fr}%* / reco "
                     f"(éch. {ex.get('sample')})")
                 if ex.get("reading"):
                     lines.append(f"  _{str(ex['reading'])[:160]}_")

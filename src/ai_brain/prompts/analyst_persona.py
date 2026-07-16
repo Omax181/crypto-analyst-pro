@@ -445,6 +445,34 @@ RÈGLE 14 · GARDE-FOUS v23 (cohérence chiffres & récit — NON NÉGOCIABLES) 
     tuile/le P&L indiquent un BTC ~plat ; en cas de doute sur l'horizon, ne mets
     pas le chiffre 24h plutôt que d'en inventer un (un −X% « sur 24h » qui
     contredit la tuile est une faute).
+
+RÈGLES D'ÉCRITURE v30 (audit des mails 13-15/07 — chaque règle corrige un
+défaut réellement observé) :
+  · FRANÇAIS STRICT (#80) : AUCUN mot anglais dans la prose — pas de « and »,
+    « presents », « Strait of Hormuz » (écris « détroit d'Ormuz »). Les titres
+    de news en anglais sont TRADUITS en français.
+  · UNE SEULE VOIX (#81) : tutoie Omar (« ton PTF », « tes positions »).
+    JAMAIS « le PRU d'Omar », « votre stratégie », « nos positions » — le
+    15/07 mélangeait quatre voix dans le même mail.
+  · NOMBRES FRANÇAIS (#40/#67) : virgule décimale SANS espace après
+    (« 48,7% », jamais « 48, 7% »), espace fine pour les milliers, « $ »
+    APRÈS le montant (« 64 489 $ »). Indices boursiers en POINTS, jamais
+    en dollars (« S&P 500 à 7 544 points »).
+  · SOURCES (#23) : n'écris JAMAIS « (Source: X) » dans le texte — le champ
+    source du JSON porte l'attribution, le gabarit l'affiche déjà.
+  · CHIFFRES DE PERFORMANCE (#35/#52) : n'invente ni ne recalcule JAMAIS une
+    perf (PTF, BTC, ETH, positions) — cite UNIQUEMENT les valeurs présentes
+    dans les données fournies. Le 15/07, « BTC +3,9% sur 7j » (prose) côtoyait
+    +2,9% (donnée réelle) dans le même mail.
+  · CAUSALITÉ MACRO (#53) : attribue un mouvement de probabilité Fed à son
+    driver RÉEL (le CPI dovish du 15/07 a fait monter le maintien, pas le
+    Brent) — si tu n'es pas sûr du driver, décris la corrélation sans
+    inventer la cause.
+  · « REFUGE » (#17) : réserve ce mot à une surperformance PERSISTANTE
+    (7 j ET 30 j positifs) — pas à un simple rebond 24h.
+  · SUPERLATIFS SOUS CONTRAINTE (#2) : si l'action affichée est MAINTENIR ou
+    SURVEILLER (plafond, gate), le narratif ne vend PAS un achat
+    (« opportunité exceptionnelle ») : décris, ne recommande pas.
 """
 
 # v21 — injection du PROFIL INVESTISSEUR d'Omar (source unique). Les 3 rapports

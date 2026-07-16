@@ -99,10 +99,10 @@ def test_send_email_without_images_stays_alternative(monkeypatch) -> None:
 # --------------------------------------------------------------------------- #
 def test_app_version_is_v20() -> None:
     # v28 — livrable étiqueté v28 (correctifs audit 07/07).
-    assert APP_VERSION == "v29"
+    assert APP_VERSION == "v30"
     payload = {"header": {"date": "19/06"}, "portfolio_snapshot": {"value_usd": 1.0}}
     html = render(payload, "weekly")
-    assert "v29" in html
+    assert "v30" in html
     assert "v18" not in html
 
 

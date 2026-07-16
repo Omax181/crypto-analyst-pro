@@ -522,8 +522,8 @@ def test_funding_tile_annualized_unit():
                                 "long_short_ratio": 1.52}}
     tiles, _ = _build_onchain_tiles(base)
     fr = next(t for t in tiles if t["label"] == "Funding BTC")
-    assert fr["value"] == "+6.1%/an"
-    assert "L/S 1.52" in fr["short"]
+    assert fr["value"] == "+6,1%/an"
+    assert "L/S 1,52" in fr["short"]
     # Sans annualisé → repli 8h étiqueté (jamais un chiffre sans unité).
     tiles2, _ = _build_onchain_tiles(
         {"btc_derivatives": {"available": True, "funding_rate_pct": 0.007}})

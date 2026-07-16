@@ -178,10 +178,17 @@ def compute_setup_stats(
     avg_fwd = sum(forward_returns) / len(forward_returns)
     wins = sum(1 for r in forward_returns if r > 0)
     win_rate = wins / len(forward_returns) * 100.0
+    # v30 (#78) — « survendue » mentait quand l'actif ne l'était pas (BTC
+    # RSI 54, ETH RSI 61 le 15/07) : le matcher accepte aussi les replis
+    # comparables. « Configuration comparable » est toujours vrai.
+    # v30 (#79) — n < 20 : échantillon statistiquement insuffisant, dit tel quel.
+    _sample_note = ("" if occurrences >= 20
+                    else f" Échantillon insuffisant (n={occurrences} < 20) — "
+                         "indicatif seulement, pas un signal.")
     summary = (
-        f"Sur ~{n}j d'historique, une configuration aussi survendue s'est "
-        f"présentée {occurrences} fois ; rendement moyen {avg_fwd:+.1f}% sur "
-        f"{forward_days}j, positif dans {win_rate:.0f}% des cas."
+        f"Sur ~{n}j d'historique, une configuration comparable s'est "
+        f"présentée {occurrences} fois ; rendement moyen {f'{avg_fwd:+.1f}'.replace('.', ',')}% sur "
+        f"{forward_days}j, positif dans {win_rate:.0f}% des cas.{_sample_note}"
     )
     return {
         "available": True,

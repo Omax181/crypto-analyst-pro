@@ -31,8 +31,8 @@ def _fmt(v: float) -> str:
     if abs(v) >= 1000:
         return f"{v:,.0f}".replace(",", " ") + " $"
     if abs(v) >= 1:
-        return f"{v:,.2f} $"
-    return f"{v:.4f} $"
+        return f"{v:,.2f}".replace(".", ",") + " $"
+    return f"{v:.4f}".replace(".", ",") + " $"
 
 
 def compute_liquidation_zones(
@@ -70,13 +70,15 @@ def compute_liquidation_zones(
         bias = "short_heavy"
         # Bornes citées dans le SENS du mouvement (proche → lointaine), comme
         # pour la purge des longs ci-dessous.
-        bias_note = (f"funding {fund:+.1f}%/an : shorts dominants — les zones "
+        _fund_fr = f"{fund:+.1f}".replace(".", ",")
+        bias_note = (f"funding {_fund_fr}%/an : shorts dominants — les zones "
                      "AU-DESSUS du prix sont les plus chargées (risque de "
                      "short squeeze vers "
                      f"{short_zones[1]['level_label']}–{short_zones[0]['level_label']})")
     elif (fund is not None and fund >= 15) or (ls is not None and ls >= 1.5):
         bias = "long_heavy"
-        _f = f"funding {fund:+.1f}%/an" if fund is not None else f"L/S {ls:.2f}"
+        _f = (f"funding {fund:+.1f}%/an".replace(".", ",")
+              if fund is not None else f"L/S {ls:.2f}".replace(".", ","))
         bias_note = (f"{_f} : longs dominants — les zones SOUS le prix sont "
                      "les plus chargées (risque de purge vers "
                      f"{long_zones[1]['level_label']}–{long_zones[0]['level_label']})")
@@ -88,7 +90,9 @@ def compute_liquidation_zones(
         "short_zones": short_zones,
         "bias": bias,
         "bias_note": bias_note,
-        "method_note": ("zones ESTIMÉES par leviers standards (10/25/50/100×) "
+        # v30 (#59) — la note cite les leviers RÉELLEMENT affichés (le
+        # « 100× » annoncé n'apparaissait nulle part dans les zones).
+        "method_note": ("zones ESTIMÉES par leviers standards (10/25/50×) "
                         "autour du prix courant — pas un carnet de "
                         "liquidations réel"),
     }

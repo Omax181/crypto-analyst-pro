@@ -45,7 +45,7 @@ def _fmt_usd(v: float) -> str:
     if v >= 100:
         return f"{v:.0f}{_NNBSP}$"
     if v >= 1:
-        return f"{v:.2f}{_NNBSP}$"
+        return f"{v:.2f}".replace(".", ",") + f"{_NNBSP}$"
     return f"{v:.4f}{_NNBSP}$"
 
 

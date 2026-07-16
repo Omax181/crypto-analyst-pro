@@ -128,7 +128,8 @@ def _fq(v: Optional[float]) -> str:
 
 
 def _fp(v: Optional[float]) -> str:
-    return f"${portfolio_editor._format_price(v)}" if v is not None else "—"
+    return ((portfolio_editor._format_price(v).replace(".", ",") + " $")
+            if v is not None else "—")
 
 
 def handle_edit(text: str) -> tuple[str, bool]:

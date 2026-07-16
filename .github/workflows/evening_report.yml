@@ -34,6 +34,9 @@ jobs:
           # choisit gemini-2.5-flash automatiquement. GEMINI_MODEL = pin manuel
           # OPTIONNEL (vide = défauts $0 du code).
           GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          # v30 (#84) — le soir peut router sa passe profonde comme le
+          # matin/hebdo (la variable manquait : passes 2.5-flash only).
+          GEMINI_MODEL_DEEP: ${{ secrets.GEMINI_MODEL_DEEP }}
           # v26 (audit final) — pause de l'ultime tentative Gemini, optionnelle
           # (vide = défaut 600 s du code, 0 = désactivée).
           GEMINI_LAST_CHANCE_PAUSE_S: ${{ secrets.GEMINI_LAST_CHANCE_PAUSE_S }}

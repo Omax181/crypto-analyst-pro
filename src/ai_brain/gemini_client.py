@@ -109,8 +109,12 @@ class GeminiClient:
         self.last_used_model: Optional[str] = None
         from google import genai
         self._client = genai.Client(api_key=api_key)
+        # v30 (#85) — le message d'init annonce le modèle PAR DÉFAUT ; le
+        # modèle réellement utilisé par passe (routage deep) est loggé par
+        # _with_fallback au moment de l'appel.
         logger.info(
-            "GeminiClient V2 initialisé (modèle %s%s) — retry 5x sur transitoire.",
+            "GeminiClient V2 initialisé (modèle par défaut %s%s) — retry 5x "
+            "sur transitoire.",
             self.model_name,
             f", repli {self.fallback_model}" if self.fallback_model else "")
 

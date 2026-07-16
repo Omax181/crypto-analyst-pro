@@ -86,12 +86,12 @@ def test_risk_dominant_axes_names_real_driver():
 def test_fmt_num_human():
     from src.reporting.email_html import _fmt_num_human
     assert _fmt_num_human(265492887109) == "265 Mds"
-    assert _fmt_num_human(2_400_000) == "2.4 M"
+    assert _fmt_num_human(2_400_000) == "2,4 M"
     assert _fmt_num_human(63000).replace("\u202f", " ") == "63 000"
-    assert _fmt_num_human(1.41) == "1.41"
+    assert _fmt_num_human(1.41) == "1,41"
     assert _fmt_num_human(0) == "0"
     assert _fmt_num_human(None) == "—"
-    assert _fmt_num_human(1_500_000_000_000) == "1.5 Bn"
+    assert _fmt_num_human(1_500_000_000_000) == "1,5 Bn"
     # préfixe $ optionnel
     assert _fmt_num_human(265492887109, "$") == "$265 Mds"
     # déjà formaté (string non numérique) → renvoyé tel quel

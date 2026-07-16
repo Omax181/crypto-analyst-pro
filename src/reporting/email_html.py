@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 # v15 — version produit UNIQUE, injectée dans les 3 footers (audit : « v13 »
 # en dur dans les templates). main.py la ré-exporte pour les logs.
-APP_VERSION = "v29"
+APP_VERSION = "v30"
 
 _COLORS = {
     "bg": "#fafaf6",
@@ -103,19 +103,24 @@ def _mdify(obj: Any) -> Any:
     return obj
 
 
+def _fr_number(anglo: str) -> str:
+    """« 64,489.00 » → « 64 489,00 » (milliers = espace fine insécable U+202F,
+    décimale = virgule). Brique commune des filtres v30."""
+    return anglo.replace(",", " ").replace(".", ",")
+
+
 def _fmt_price(value: Any) -> str:
-    """Formate un prix selon la spec H30 (cohérente partout).
+    """Formate un prix — FORMAT FRANÇAIS UNIQUE (v30, audit #67).
 
-    Règles :
-      - >= 1000      : 0 décimale, séparateur virgule  ($71,262)
-      - >= 1, < 1000 : 2 décimales                     ($8.98)
-      - >= 0.01, < 1 : 4 décimales                     ($0.0526)
+    L'audit v29 a montré la même valeur dans DEUX formats sur une page
+    (« $64,489 » tuile vs « 64 072 $ » prose) : la prose est française, les
+    filtres s'y alignent. Règles :
+      - >= 1000      : 0 décimale, milliers en espace fine   (64 489 $)
+      - >= 1, < 1000 : 2 décimales                           (8,98 $)
+      - >= 0.01, < 1 : 4 décimales                           (0,0526 $)
       - < 0.01       : 4 chiffres significatifs, zéros de fin retirés,
-                       jamais de notation scientifique  ($0.00523, $0.00000001)
-    Toujours préfixé par ``$``. Valeur absente / <= 0 → ``—``.
-
-    v18 (E-A12/E-A13) : les micro-prix passent de 6 à 4 chiffres significatifs.
-    « 0.00522973 $ » (faussement précis, illisible) devient « 0.00523 $ ».
+                       jamais de notation scientifique       (0,00523 $)
+    Toujours suffixé par `` $``. Valeur absente / <= 0 → ``—``.
     """
     import math
     from jinja2 import Undefined
@@ -131,27 +136,27 @@ def _fmt_price(value: Any) -> str:
     if not math.isfinite(v):
         return "—"
     if v >= 1000:
-        return f"${v:,.0f}"
+        return _fr_number(f"{v:,.0f}") + "\u202f$"
     if v >= 1:
-        return f"${v:,.2f}"
+        return _fr_number(f"{v:,.2f}") + "\u202f$"
     if v >= 0.01:
-        return f"${v:.4f}"
+        return _fr_number(f"{v:.4f}") + "\u202f$"
     # v < 0.01 : 4 chiffres significatifs, sans notation scientifique.
     exp = math.floor(math.log10(v))          # ex. 0.00523 -> -3 ; 1e-8 -> -8
     decimals = min(-exp + 3, 18)             # 4 sig figs, borné pour la sûreté
-    return f"${v:.{decimals}f}".rstrip("0").rstrip(".")
+    return _fr_number(f"{v:.{decimals}f}".rstrip("0").rstrip(".")) + "\u202f$"
 
 
 def _fmt_money(value: Any) -> str:
-    """Formate un montant, FORMAT UNIFIÉ avec ``_fmt_price`` (v23, audit C2).
+    """Formate un montant, FORMAT UNIFIÉ avec ``_fmt_price`` (v30, audit #67).
 
-    AVANT v23 : ce filtre rendait du FRANÇAIS (``1.570,00 $`` : point milliers,
-    virgule décimale, ``$`` suffixe) tandis que ``_fmt_price`` rendait de l'ANGLO
-    (``$60,314``). Deux conventions coexistaient dans le MÊME mail (tuiles vs
-    plans d'action) → incohérence relevée à l'audit. On unifie désormais sur la
-    convention anglo : ``$`` préfixe, virgule = milliers, point = décimale.
-      - >= 1    : 2 décimales (ex. ``$1,570.00``, ``$7.94``)
-      - >= 0.01 : 4 décimales (ex. ``$0.0526``)
+    Historique : v23 avait unifié tuiles et plans sur l'ANGLO (``$60,314``)…
+    mais la PROSE des trois mails est française — l'audit v29 (#67) a relevé
+    la même valeur dans les deux formats sur une même page. v30 unifie tout
+    sur le FRANÇAIS : espace fine pour les milliers, virgule décimale,
+    ``$`` suffixe.
+      - >= 1    : 2 décimales (ex. ``1 570,00 $``, ``7,94 $``)
+      - >= 0.01 : 4 décimales (ex. ``0,0526 $``)
       - < 0.01  : 4 chiffres significatifs, zéros de fin retirés
     Accepte un nombre OU une string déjà partiellement formatée (on tente de
     parser ; si échec, on renvoie la valeur telle quelle). Valeur absente → ``—``.
@@ -191,7 +196,7 @@ def _fmt_money(value: Any) -> str:
         except (ValueError, TypeError):
             return "—"
     if v == 0:
-        return "$0"
+        return "0\u202f$"
     if not math.isfinite(v):
         return "—"
     neg = v < 0
@@ -206,12 +211,12 @@ def _fmt_money(value: Any) -> str:
         exp = math.floor(math.log10(v))
         decimals = min(-exp + 3, 18)
         s = f"{v:,.{decimals}f}".rstrip("0").rstrip(".")
-    # v23 (C2) format anglo unifie ($ prefixe, virgule milliers, point decimale).
-    return f"{'−' if neg else ''}${s}"
+    # v30 (#67) — format FRANÇAIS unifié (cohérent avec la prose des mails).
+    return f"{'−' if neg else ''}{_fr_number(s)}\u202f$"
 
 
 def _fmt_vol(value: Any) -> str:
-    """Formate un volume : $2.4B / $142M / $890K / $12K."""
+    """Formate un volume, convention FR (v30 #67) : 2,4 Mds$ / 142 M$ / 890 k$."""
     from jinja2 import Undefined
 
     if value is None or isinstance(value, Undefined):
@@ -226,12 +231,12 @@ def _fmt_vol(value: Any) -> str:
     if not _m.isfinite(v):
         return "—"
     if v >= 1e9:
-        return f"${v / 1e9:.1f}B"
+        return f"{v / 1e9:.1f}".replace(".", ",") + "\u202fMds$"
     if v >= 1e6:
-        return f"${v / 1e6:.0f}M"
+        return f"{v / 1e6:.0f}\u202fM$"
     if v >= 1e3:
-        return f"${v / 1e3:.0f}K"
-    return f"${v:.0f}"
+        return f"{v / 1e3:.0f}\u202fk$"
+    return f"{v:.0f}\u202f$"
 
 
 _env.filters["fmt_price"] = _fmt_price
@@ -259,7 +264,8 @@ def _fmt_pct(value: Any) -> str:
         return "—"
     if round(v, 1) == 0:
         v = 0.0  # évite l'affichage "−0.0%" pour les micro-négatifs
-    return f"{v:+.1f}%".replace("-", "\u2212")  # hyphen-minus -> vrai signe moins
+    # v30 (#67) \u2014 d\u00e9cimale en VIRGULE (convention FR, align\u00e9e sur la prose).
+    return f"{v:+.1f}%".replace("-", "\u2212").replace(".", ",")
 
 
 def _pastille(status: Any) -> Any:
@@ -407,23 +413,40 @@ def _fmt_num_human(value: Any, prefix: str = "") -> str:
     if value is None or isinstance(value, Undefined):
         return "—"
     try:
-        v = float(str(value).replace(",", "").replace(" ", "").replace("$", ""))
+        if isinstance(value, str):
+            _c = (value.replace("$", "").replace("\u202f", "")
+                  .replace("\xa0", "").replace(" ", "").strip())
+            if "." in _c and "," in _c:
+                if _c.rfind(",") > _c.rfind("."):
+                    _c = _c.replace(".", "").replace(",", ".")
+                else:
+                    _c = _c.replace(",", "")
+            elif "," in _c:
+                _h, _, _t = _c.rpartition(",")
+                if _t.isdigit() and len(_t) == 3 and _h and "," not in _h:
+                    _c = _c.replace(",", "")   # « 63,180 » : milliers US
+                else:
+                    _c = _c.replace(",", ".")  # « 4,3 » : décimale FR
+            v = float(_c)
+        else:
+            v = float(value)
     except (ValueError, TypeError):
         return str(value)  # déjà du texte formaté : on ne touche pas
     if not _m.isfinite(v):
         return "—"
     neg = v < 0
     v = abs(v)
+    # v30 (#67) — décimales en VIRGULE aussi ici (« 4,3 M », « 1,2 Bn »).
     if v >= 1e12:
-        s = f"{v / 1e12:.1f}".rstrip("0").rstrip(".") + " Bn"
+        s = f"{v / 1e12:.1f}".rstrip("0").rstrip(".").replace(".", ",") + " Bn"
     elif v >= 1e9:
         s = f"{v / 1e9:.0f} Mds"
     elif v >= 1e6:
-        s = f"{v / 1e6:.1f}".rstrip("0").rstrip(".") + " M"
+        s = f"{v / 1e6:.1f}".rstrip("0").rstrip(".").replace(".", ",") + " M"
     elif v >= 1000:
         s = f"{v:,.0f}".replace(",", "\u202f")  # espace fine insécable
     else:
-        s = f"{v:.2f}".rstrip("0").rstrip(".")
+        s = f"{v:.2f}".rstrip("0").rstrip(".").replace(".", ",")
     return f"{prefix}{'−' if neg else ''}{s}"
 
 
@@ -501,10 +524,11 @@ def render(payload: dict[str, Any], kind: str, charts: dict[str, bytes] | None =
 
 def _fallback_html(payload: dict[str, Any], kind: str) -> str:
     """HTML minimal de secours si le rendu Jinja échoue."""
+    from markupsafe import escape as _esc
     title = payload.get("title") or payload.get("header", {}).get("title", "Veille crypto")
     return (
         f"<html><body style='font-family:sans-serif;padding:16px;'>"
-        f"<h2>{title}</h2>"
+        f"<h2>{_esc(str(title))}</h2>"
         f"<p>Rapport {kind} — rendu simplifié (le rendu détaillé a échoué).</p>"
         f"<p style='color:#6b7280;font-size:12px;'>{DISCLAIMER}</p>"
         f"</body></html>"

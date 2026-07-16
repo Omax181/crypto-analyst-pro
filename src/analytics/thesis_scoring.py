@@ -186,8 +186,12 @@ def evaluate_thesis_eligibility(
 
     # ----- Catalyseurs calendrier (poids 2) -----
     if _is_num(upcoming_catalyst_days) and 0 <= upcoming_catalyst_days <= 7:
-        _sig(f"catalyseur calendrier dans {int(upcoming_catalyst_days)}j",
-             "catalyst", _W_CATALYST)
+        # v30 (#76) — libellé lisible (« aujourd'hui », plus « dans 0j ») et
+        # explicitement PROPRE À L'ACTIF (le caller ne transmet plus le macro).
+        _cat_lbl = ("catalyseur de l'actif aujourd'hui"
+                    if int(upcoming_catalyst_days) == 0
+                    else f"catalyseur de l'actif dans {int(upcoming_catalyst_days)}j")
+        _sig(_cat_lbl, "catalyst", _W_CATALYST)
     if token_unlock_soon:
         _sig("token unlock significatif imminent (risque baissier = signal ALLÉGER)",
              "catalyst", _W_CATALYST)

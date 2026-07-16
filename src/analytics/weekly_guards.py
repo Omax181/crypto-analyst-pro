@@ -33,11 +33,11 @@ def _to_float(token: str) -> Optional[float]:
 
 
 def _fmt_pct(v: float) -> str:
-    """Format canonique aligné sur les KPI du template (+3.8% / −0.25%)."""
+    """Format canonique FR aligné sur les KPI v30 (+3,8% / −0,25%)."""
     s = f"{v:+.2f}".rstrip("0").rstrip(".")
     if s in ("+", "-"):  # v == 0 arrondi
         s = "+0"
-    return s.replace("-", "−") + "%"
+    return s.replace("-", "−").replace(".", ",") + "%"
 
 
 def _bullet_text(b: Any) -> Optional[str]:
@@ -882,3 +882,193 @@ def sanitize_ath_in_payload_texts(
         if key in payload:
             payload[key] = _walk(payload[key])
     return fixes
+
+
+# ═══════════ v30 — gardes de l'audit des SORTIES RÉELLES (13-15/07) ═══════
+
+
+def _fmt_pct_fr(v: float, nd: int = 1) -> str:
+    """−9,2% / +3,1% — virgule décimale (même impl que daily_guards)."""
+    s = f"{abs(round(v, nd)):.{nd}f}"
+    if "." in s:  # nd=0 : jamais de rstrip sur un entier (« 100 » → « 1 »)
+        s = s.rstrip("0").rstrip(".")
+    return ("+" if v >= 0 else "−") + s.replace(".", ",") + "%"
+
+
+def fix_asset_7d_claims(
+    node: Any, real_7d_by_asset: dict[str, Any]
+) -> tuple[Any, list[str]]:
+    """v30 (#35/#36/#50) — les « SYM ±X% » 7j/hebdo suivent la heatmap réelle.
+
+    Le 15/07 : la prose disait « BTC +3,9% · ETH +7,6% sur 7j » quand les
+    tuiles donnaient +2,9%/+7,1%, et « LINK +2.46% » était… la perf du PTF
+    injectée à tort dans LINK (réel : +9,2%). Toute perf par actif citée en
+    contexte hebdo est réalignée sur le change_7d CoinGecko (> 0,6 pt d'écart).
+    """
+    fixes: list[str] = []
+    reals = {a: v for a, v in (real_7d_by_asset or {}).items()
+             if isinstance(v, (int, float))}
+    if not reals:
+        return node, fixes
+    _ctx = re.compile(r"(?i)7\s?j|semaine|hebdo")
+
+    def _fn(text: str) -> str:
+        if not _ctx.search(text):
+            return text
+        new = text
+        for asset, real in reals.items():
+            pat = re.compile(
+                rf"(\b{re.escape(asset)}\b[^0-9%+\-−]{{0,12}})"
+                rf"([+\-−]\s?\d{{1,3}}(?:[.,]\d+)?)(\s?%)")
+
+            def _sub(m: re.Match) -> str:
+                cited = _to_float(m.group(2).replace(" ", ""))
+                if cited is None or abs(cited - real) <= 0.6:
+                    return m.group(0)
+                fixes.append(f"{asset} 7j {m.group(2)}% → {_fmt_pct_fr(real)}")
+                return f"{m.group(1)}{_fmt_pct_fr(real).rstrip('%')}{m.group(3)}"
+
+            new = pat.sub(_sub, new)
+        return new
+
+    def _walk(n: Any) -> Any:
+        if isinstance(n, str):
+            return _fn(n)
+        if isinstance(n, list):
+            return [_walk(x) for x in n]
+        if isinstance(n, dict):
+            return {k: _walk(v) for k, v in n.items()}
+        return n
+
+    return _walk(node), fixes
+
+
+def gate_weekly_plan_reinforce(
+    items: Any, capped_assets: dict[str, float]
+) -> tuple[Any, list[str]]:
+    """v30 (#37) — le plan hebdo CONSOMME le gate de concentration.
+
+    Le 15/07 : « PRIORITÉ : renforcer le cœur (BTC, ETH, TAO) » et
+    « renforcer BTC de +3% » alors que le matin bloquait BTC/ETH (plafond) et
+    que l'hebdo lui-même écrivait « BTC 43% … alléger/diversifier ». Toute
+    action/puce « renforcer X » où X est AU PLAFOND est requalifiée en
+    conservation explicite. Traite weekly_action_plan (dicts), strategy_focus
+    (str/list) et watchlist (dicts).
+    """
+    fixes: list[str] = []
+    if not capped_assets or items is None:
+        return items, fixes
+
+    def _requalify(text: str) -> str:
+        new = text
+        for asset, w in capped_assets.items():
+            pat = re.compile(
+                rf"(?i)renforcer\s+(?:le\s+cœur\s*\([^)]*\b{re.escape(asset)}\b[^)]*\)"
+                rf"|(?:le\s+|la\s+)?{re.escape(asset)}\b)"
+                rf"(\s+de\s+\+?\d+(?:[.,]\d+)?\s?%(?:\s+du\s+portefeuille)?)?")
+
+            def _sub(m: re.Match) -> str:
+                fixes.append(
+                    f"plan hebdo : « renforcer {asset} » → conserver "
+                    f"(plafond de concentration, {w:.0f}% du PTF)")
+                return (f"conserver {asset} (plafond de concentration atteint "
+                        f"— {w:.0f}% du PTF, renfort bloqué)")
+
+            new = pat.sub(_sub, new, count=1)
+        return new
+
+    if isinstance(items, str):
+        return _requalify(items), fixes
+    if isinstance(items, list):
+        out = []
+        for it in items:
+            if isinstance(it, str):
+                out.append(_requalify(it))
+            elif isinstance(it, dict):
+                for k in ("action", "rationale", "trigger"):
+                    if isinstance(it.get(k), str):
+                        it[k] = _requalify(it[k])
+                out.append(it)
+            else:
+                out.append(it)
+        return out, fixes
+    return items, fixes
+
+
+_RR_SUPERLATIVE = re.compile(
+    r"(?i)\bexcellent(?:e)?\s+(?:ratio\s+)?risque[/\s-]r[ée]compense\b")
+
+
+def fix_rr_superlatives(
+    node: Any, rr_by_asset: dict[str, Any]
+) -> tuple[Any, list[str]]:
+    """v30 (#38) — « excellent ratio risque/récompense » vs R:R réel.
+
+    Le 15/07, l'hebdo qualifiait le renfort ETH d'« excellent ratio
+    risque/récompense » quand le matin affichait R:R 1,0:1 (faible). Si un
+    actif à R:R < 1,5 est cité dans la même phrase, le superlatif devient le
+    chiffre réel.
+    """
+    fixes: list[str] = []
+    weak = {a: v for a, v in (rr_by_asset or {}).items()
+            if isinstance(v, (int, float)) and v < 1.5}
+    if not weak:
+        return node, fixes
+
+    def _fn(text: str) -> str:
+        if not _RR_SUPERLATIVE.search(text):
+            return text
+        for asset, rr in weak.items():
+            if re.search(rf"\b{re.escape(asset)}\b", text):
+                new = _RR_SUPERLATIVE.sub(
+                    "ratio risque/récompense limité (R:R réel "
+                    f"{str(rr).replace('.', ',')}:1)", text)
+                fixes.append(f"{asset} : « excellent R:R » → R:R réel {rr}:1")
+                return new
+        return text
+
+    def _walk(n: Any) -> Any:
+        if isinstance(n, str):
+            return _fn(n)
+        if isinstance(n, list):
+            return [_walk(x) for x in n]
+        if isinstance(n, dict):
+            return {k: _walk(v) for k, v in n.items()}
+        return n
+
+    return _walk(node), fixes
+
+
+def append_watchlist_exits(
+    watchlist: Any, exit_candidates: list[dict[str, Any]]
+) -> tuple[Any, list[str]]:
+    """v30 (#60) — « Entrées/sorties surveillées » liste AUSSI des sorties.
+
+    Le 15/07, la section ne portait que 2 entrées (cohérent avec le biais
+    tout-accumulation #68). Les candidats déterministes à la sortie (recos
+    ALLÉGER actives, radar de sortie, poussières condamnées) y entrent avec
+    leur niveau quand il existe.
+    """
+    fixes: list[str] = []
+    wl = watchlist if isinstance(watchlist, list) else []
+    has_exit = any(
+        isinstance(w, dict)
+        and str(w.get("direction") or "").lower()
+        not in ("entrée", "entree", "achat", "buy", "in", "entry", "")
+        for w in wl)
+    if has_exit or not exit_candidates:
+        return watchlist, fixes
+    existing = {str(w.get("asset") or "").upper() for w in wl
+                if isinstance(w, dict)}
+    for c in exit_candidates[:3]:
+        a = str(c.get("asset") or "").upper()
+        if not a or a in existing:
+            continue
+        wl.append({
+            "asset": a, "direction": "sortie",
+            "trigger": c.get("trigger"),
+            "rationale": c.get("rationale") or "signal de sortie déterministe",
+        })
+        existing.add(a)
+        fixes.append(f"watchlist : sortie {a} ajoutée (déterministe)")
+    return wl, fixes

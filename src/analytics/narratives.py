@@ -201,10 +201,12 @@ def detect_hot_narratives(
     parts: list[str] = []
     if hot:
         parts.append("🔥 " + ", ".join(
-            f"{c['name']} {c['change_24h']:+.1f}%" for c in hot))
+            f"{c['name']} " + f"{c['change_24h']:+.1f}".replace(".", ",") + "%"
+            for c in hot))
     if cold:
         parts.append("🧊 " + ", ".join(
-            f"{c['name']} {c['change_24h']:+.1f}%" for c in cold))
+            f"{c['name']} " + f"{c['change_24h']:+.1f}".replace(".", ",") + "%"
+            for c in cold))
     return {
         "available": bool(hot or cold),
         "hot": _fmt(hot),

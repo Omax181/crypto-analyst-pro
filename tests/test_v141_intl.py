@@ -273,7 +273,7 @@ def test_fmt_money_idempotent_on_french_output():
     from src.reporting.email_html import _fmt_money
 
     once = _fmt_money(69637.63)
-    assert once == "$69,637.63"
+    assert once == "69\u202f637,63\u202f$"
     assert _fmt_money(once) == once          # re-formater ne casse plus
     assert _fmt_money("69.637,63") == once
 
@@ -354,7 +354,7 @@ def test_equity_crypto_digest_line():
     line = equity_crypto_line(links, quotes)
     assert "NVDA↔RENDER +0.62 (β 1.4)" in line
     assert "MSTR↔BTC +0.70" in line and "TSM" not in line
-    assert "NVDA +2.1%" in line and "MSTR -1.3%" in line
+    assert "NVDA +2,1%" in line and "MSTR -1,3%" in line
     assert equity_crypto_line({"available": False}, {}) == ""
 
 
@@ -471,7 +471,7 @@ def test_render_morning_intl_group_and_equity_cell():
     # Mail-safe : aucune grille/flex dans le rendu.
     assert "display:grid" not in html and "display:flex" not in html
     # Sous-label or : delta absolu converti en VRAI % (24/2400 = +1.0%).
-    assert "+1.0%" in html
+    assert "+1,0%" in html
     assert "None" not in html and "NaN" not in html
 
 

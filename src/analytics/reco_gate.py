@@ -95,7 +95,8 @@ def apply_reco_gate(payload: dict[str, Any]) -> list[str]:
             # négative mérite la même mention explicite que sur une conviction.
             if ev is not None and ev < 0:
                 t["ct_warning"] = (
-                    f"⚠ EV 30j −{abs(ev)}% — espérance court-terme négative : "
+                    f"⚠ EV 30j −{str(abs(ev)).replace('.', ',')}% — "
+                    "espérance court-terme négative : "
                     "conserver (plafond atteint), ce n'est pas un trade 30 j")
                 fixes.append(f"{asset} : MAINTENIR (plafond) + mention EV<0")
             continue
@@ -106,9 +107,11 @@ def apply_reco_gate(payload: dict[str, Any]) -> list[str]:
             continue
         _stats_bits = []
         if ev is not None:
-            _stats_bits.append(f"EV 30j {'+' if ev >= 0 else '−'}{abs(ev)}%")
+            _stats_bits.append(
+                f"EV 30j {'+' if ev >= 0 else '−'}"
+                f"{str(abs(ev)).replace('.', ',')}%")
         if rr is not None:
-            _stats_bits.append(f"R:R {rr}")
+            _stats_bits.append(f"R:R {str(rr).replace('.', ',')}")
         _stats = " · ".join(_stats_bits) or "stats CT indisponibles"
 
         if _thesis_type(t) == "tactical":
@@ -132,6 +135,66 @@ def apply_reco_gate(payload: dict[str, Any]) -> list[str]:
                 f"{LT_CONFIDENCE_CAP}% + mention CT ({_stats})")
     if fixes:
         logger.info("Reco gate v28 : %d ajustement(s) — %s",
+                    len(fixes), " | ".join(fixes))
+    return fixes
+
+
+def apply_stop_slide_gate(
+    payload: dict[str, Any],
+    active_recos: list[dict[str, Any]],
+    price_by_asset: dict[str, Any],
+) -> list[str]:
+    """v30 (#1/#68) — ANTI-GLISSEMENT DE STOP : pas de renfort sous un stop cassé.
+
+    Le 14/07, le stop TAO persisté (201,11 $) était FRANCHI (prix 199,14 $) et
+    le plan du jour recalculait un stop PLUS BAS (190 $) → le mail poussait
+    « RENFORCER TAO » en action n°1 à côté d'une alerte « invalidation
+    FRANCHIE ». Un stop qui glisse vers le bas après franchissement n'est pas
+    un stop : c'est le mécanisme du « couteau qui tombe ».
+
+    Règle : une thèse RENFORCER dont le stop de la reco OUVERTE (state) est
+    déjà franchi est DÉGRADÉE en SURVEILLER, avec note explicite. La reco
+    active reste ouverte avec son ANCIEN stop (l'alerte « franchie » reste
+    donc affichée, cohérente avec la posture SURVEILLER). Best-effort pur.
+    """
+    fixes: list[str] = []
+    theses = payload.get("thesis_of_the_day")
+    if not isinstance(theses, list) or not active_recos:
+        return fixes
+    open_by_asset: dict[str, dict[str, Any]] = {}
+    for r in active_recos:
+        if not isinstance(r, dict):
+            continue
+        if (r.get("status") or "in_progress") != "in_progress":
+            continue
+        a = str(r.get("asset") or "").upper()
+        if a and "RENFORC" in (r.get("action") or "").upper():
+            open_by_asset[a] = r
+    for t in theses:
+        if not isinstance(t, dict) or not _is_reinforce(t.get("action")):
+            continue
+        asset = str(t.get("asset") or "").upper()
+        reco = open_by_asset.get(asset)
+        if not reco:
+            continue
+        old_stop = _num(reco.get("stop_loss"))
+        price = _num(price_by_asset.get(asset))
+        if old_stop is None or price is None or old_stop <= 0 or price <= 0:
+            continue
+        if price > old_stop:
+            continue  # stop intact — rien à faire
+        _fmt = (f"{old_stop:,.0f}".replace(",", "\u202f") if old_stop >= 1000
+                else f"{old_stop:.2f}".replace(".", ",") if old_stop >= 1
+                else f"{old_stop:.4f}".replace(".", ","))
+        t["action"] = "SURVEILLER"
+        t["_gated"] = "stop_slide"
+        t["gate_note"] = (
+            f"stop précédent {_fmt} $ FRANCHI — renfort automatique bloqué "
+            "sous un stop cassé : statuer (réduction, ou nouvelle thèse avec "
+            "nouveau plan), ne pas moyenner par réflexe")
+        fixes.append(f"{asset} : RENFORCER → SURVEILLER (stop {_fmt} $ franchi)")
+    if fixes:
+        logger.info("Stop-slide gate v30 : %d blocage(s) — %s",
                     len(fixes), " | ".join(fixes))
     return fixes
 
