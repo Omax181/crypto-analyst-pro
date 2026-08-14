@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 
-from src.state import report_memory as mem
+from src.state import bot_memory as mem
 from src.telegram_bot import assistant, commands, portfolio_edit, telegram_api
 from src.telegram_bot.context_loader import load_full_context
 from src.utils.logger import get_logger

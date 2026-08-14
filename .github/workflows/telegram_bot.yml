@@ -55,14 +55,22 @@ jobs:
           # désactivée (aperçus seulement). Plus aucun défaut en dur dans le code.
           PORTFOLIO_EDIT_PASSWORD: ${{ secrets.PORTFOLIO_EDIT_PASSWORD }}
         run: python -m src.telegram_bot.bot
-      - name: Commit state changes (offset, history, reco actions, portfolio edits)
+      - name: Commit state changes (offset, history, dismissals, portfolio edits)
+        # « always() » est ICI volontaire, et c'est la SEULE exception au
+        # conditionnement au succès (I53). Raison : le décalage Telegram doit
+        # avancer même si un message échoue, faute de quoi le bot rejouerait
+        # indéfiniment les mêmes updates. Les écritures du bot sont par ailleurs
+        # atomiques et déjà acquittées à l'utilisateur au moment du commit.
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # state/ = offset/historique/recos ; config/portfolio.yaml = éditions de
-          # positions par le bot (/buy /sell /set) qui doivent persister entre runs.
-          git add -A state/ config/portfolio.yaml 2>/dev/null || true
+          # Périmètre RESTREINT : le bot ne committe que ce qu'il produit. Les
+          # résumés de run appartiennent aux workflows de rapport, qui les
+          # conditionnent à leur propre succès.
+          git add state/telegram_offset.json state/telegram_history.json \
+                  state/bot_memory.json state/book/ config/portfolio.yaml \
+                  2>/dev/null || true
           if git diff --cached --quiet; then
             echo "Aucun changement de state à committer."
             exit 0

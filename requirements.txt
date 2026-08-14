@@ -1,15 +1,14 @@
+# Dépendances V31 — strictement celles qui sont IMPORTÉES par le code.
+# Les paquets des sources supprimées (tradingview-ta, telethon,
+# youtube-transcript-api) et numpy/python-dotenv, qui n'étaient plus importés,
+# ont été retirés : une dépendance déclarée mais inutilisée est une surface
+# d'installation et de panne sans contrepartie.
 google-genai>=1.0.0
 requests>=2.31.0
 pyyaml>=6.0.1
-python-dotenv>=1.0.0
-tradingview-ta>=3.3.0
-youtube-transcript-api>=0.6.2
-beautifulsoup4>=4.12.0
 jinja2>=3.1.0
+markupsafe>=2.1.0
+beautifulsoup4>=4.12.0
 tenacity>=8.2.0
-pytest>=8.0.0
-telethon>=1.34.0
 matplotlib>=3.8.0
-# numpy est importé DIRECTEMENT (charts) : dépendance explicite plutôt que
-# transitive via matplotlib (audit final v26).
-numpy>=1.26.0
+pytest>=8.0.0

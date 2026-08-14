@@ -1,0 +1,53 @@
+{% import "_v31_macros.html.j2" as m %}
+{{ m.header(title, date_label, c) }}
+{{ m.banner(banner, c) }}
+
+{# Le soir est en LECTURE SEULE (SPEC §2.2). Aucune section « actions à poser
+   ce soir » : ce mail ne peut rien créer, rien réviser, rien clôturer. #}
+<div style="font-size:12px;color:{{ c.muted }};background:{{ c.card }};border:1px solid {{ c.border }};padding:10px 14px;margin-bottom:16px;line-height:1.6;">
+  Ce point du soir ne crée ni ne modifie aucun contrat. Les changements d'état
+  s'évaluent sur la clôture journalière, donc au rapport du matin.
+</div>
+
+{% if intraday %}
+{{ m.section("Franchissements observés en séance", c) }}
+{% for w in intraday %}
+<div style="border-left:3px solid {{ c.warn }};background:{{ c.card }};padding:10px 14px;margin-bottom:8px;font-size:13px;color:{{ c.text }};line-height:1.6;">
+  <strong>{{ w.asset }}</strong> — {{ w.kind }} franchie : niveau {{ w.level }}, cours {{ w.spot }}.
+  <div style="font-size:12px;color:{{ c.muted }};margin-top:3px;">{{ w.note }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+{{ m.section("Carnet en cours", c) }}
+{% if book.active %}
+{{ m.contract_table(book.active, c, False) }}
+{% else %}
+<div style="font-size:13px;color:{{ c.muted }};">Aucun contrat en cours.</div>
+{% endif %}
+
+{{ m.prose(authored.get("tracking_note"), c) }}
+
+{{ m.section("Lecture de la séance", c) }}
+{{ m.prose(authored.get("evening_reading"), c) }}
+
+{% if news %}
+{{ m.section("Actualités", c) }}
+{{ m.news_block(news, c) }}
+{{ m.prose(authored.get("news_impact"), c) }}
+{% endif %}
+
+{{ m.section("Portefeuille", c) }}
+{{ m.portfolio_block(portfolio, c) }}
+
+{% if authored.get("watch_comment") %}
+{{ m.section("À surveiller d'ici demain", c) }}
+{{ m.prose(authored.get("watch_comment"), c) }}
+{% endif %}
+
+{% if health %}
+{{ m.section("État des sources", c) }}
+{{ m.health_block(health, c) }}
+{% endif %}
+
+{{ m.footer(disclaimer, app_version, c) }}

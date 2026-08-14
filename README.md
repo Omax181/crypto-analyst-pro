@@ -1,88 +1,158 @@
-# 🤖 Crypto Analyst Pro · v30
+# Crypto Analyst Pro — V31
 
-Agent d'analyse crypto personnel et autonome. Analyste **multi-sources à voix
-critique** (et non plus résumeur monosource) : il croise jusqu'à 14 sources, un
-cerveau IA (Gemini), une mémoire inter-rapports et un tracking de ses propres
-prédictions, puis t'envoie par email :
-
-- ☀️ **Rapport du matin** (~08h30 Casablanca) · point d'entrée complet : histoire
-  du jour, contexte macro/on-chain, rotation sectorielle, thèses fondées.
-- 🌙 **Rapport du soir** (~19h30) · différentiel : ce qui a évolué depuis le matin,
-  suivi des recos, setup pour demain.
-- 📊 **Bilan hebdo** (dimanche ~11h30) · win rate, leçons, 3 scénarios, cibles LT.
-
-100 % gratuit, hébergé sur **GitHub Actions** (aucun serveur).
+Agent d'analyse crypto personnel. Trois rapports par jour (matin, soir,
+hebdomadaire), un carnet de recommandations falsifiable, un bot Telegram en
+lecture.
 
 ---
 
-## Principes de la V2
+## Ce que V31 change
 
-1. **Score sur 9 signaux pondérés** · technique, volume, on-chain, dérivés,
-   rotation, news 24h, social, fondamental, macro. Les commits GitHub pèsent
-   ≤ 10 % du raisonnement (fini les "pas de commit → alléger").
-2. **Seuils adaptatifs par tier** · BTC/ETH exigent 4+ signaux convergents,
-   Tier 1 : 3+, Tier 2-3 : 2+, poussières : jamais de reco ferme.
-3. **Confiance → taille d'action** · une confiance < 55 % ne produit jamais de
-   reco ferme, seulement de la surveillance.
-4. **Mémoire inter-rapports** · le soir complète le matin, l'hebdo agrège la
-   semaine (dossier `state/`, commité par les workflows).
-5. **Tracking des prédictions** · chaque reco est évaluée sur prix réels ; le win
-   rate s'affiche dans les rapports.
-6. **Garde-fou factuel** · un `coherence_checker` rétrograde avant envoi toute
-   reco mal fondée, corrige les ATH impossibles, refuse les sources vagues.
+V31 est une refonte du **noyau décisionnel**, pas un habillage. Cinq
+renversements structurent tout le reste.
+
+**1. Un contrat, pas une opinion.** Une recommandation est un objet à cycle de
+vie : `CANDIDATE → ACTIVE → {TARGET_HIT, INVALIDATED, EXPIRED, SUPERSEDED,
+CANCELLED}`. Le contrat scoré — entrée, cible, invalidation, échéance — est
+écrit une fois et n'est jamais modifié. Les révisions vivent dans un plan
+opérationnel versionné qui, lui, n'est jamais scoré. En v30, cinq modules
+maintenaient chacun leur définition d'« invalidation » ; il n'en reste qu'une,
+dans `core/book.py`.
+
+**2. Deux horizons, chacun avec son échelle.** `SWING` (30 j) sert les thèses
+techniques et de catalyseur ; `POSITION` (180 j) sert les thèses fondamentales
+et le cœur du portefeuille. L'horizon est déterminé par les **poids des signaux
+déterministes**, jamais par le LLM ni par le résultat économique recherché, et
+il fixe tout le reste : fenêtre de niveaux, échelle de volatilité, profondeur
+d'historique exigée, date d'expiration.
+
+> Une première intégration avait désactivé `POSITION` au motif d'une profondeur
+> « non fournie par le pipeline ». C'était une limite auto-infligée, et son
+> effet était l'inverse de la stratégie : un actif « sous PRU + drawdown
+> profond + MVRV bas » — le meilleur setup d'accumulation du profil — ne
+> pouvait produire aucun contrat, tandis qu'un simple rebond technique en
+> produisait un. Le pipeline fournit désormais les 365 clôtures que `POSITION`
+> exige ; un actif trop jeune reçoit un refus **chiffré**, pas catégorique.
+
+**3. Un geste doit valoir la peine, en devise.** Avant d'exister, un plan
+franchit quatre conditions :
+
+| | Condition |
+|---|---|
+| **V1** | l'avantage exigé sur le hasard, `Δ = c/(u+d)`, reste revendicable — et la revendication elle-même reste énonçable |
+| **V2** | cible et invalidation sortent du bruit de leur propre horizon (`k·σ_H`) |
+| **V3** | l'espérance nette après coûts atteint la référence de matérialité |
+| **V4** | le geste est exécutable (ticket minimum) |
+
+Sous une marche sans dérive à deux barrières, l'espérance vaut `−c` pour tout
+couple (u, d) : **tout geste émis revendique implicitement un avantage**. V1
+rend cette revendication explicite et la borne. C'est ce qui rend inexprimable
+le « acheter ETH à 2 000 $, cible 2 015 $ » de la v30.
+
+**4. Le LLM formule, il ne décide pas.** Chaque champ d'un rapport est
+`DERIVED` (Python), `AUTHORED` (LLM) ou `EXTERNAL` (citation). Un champ
+AUTHORED ne contient **aucun chiffre** : les nombres sont référencés par jeton
+`[[fact:id]]` pris dans un catalogue de faits construit avant l'appel. La
+validation se fait **par rejet, jamais par réparation** — une réparation
+prétend connaître l'intention de l'auteur.
+
+**5. Rien n'est publié sans son incertitude.** L'indice de confiance
+(`mail_confidence`) et le compteur « X/25 sources » sont supprimés : ils
+saturaient. À la place, une **matrice d'état par source** et un **bandeau de
+dégradation** qui ÉNUMÈRE ce qui est dégradé. Absence de bandeau = aucune
+dégradation détectée, jamais « rapport fiable ».
 
 ---
 
-## Architecture
+## Le carburant : `config/params.yaml`
 
-```
-src/
-├── data_sources/     # 14+ connecteurs (dégradation gracieuse totale)
-│   ├── coingecko, coinmarketcap, binance, tradingview, fear_greed
-│   ├── cryptopanic (news <24h), reddit, fred, econ_calendar
-│   ├── onchain_btc/eth/advanced, coinglass (dérivés)
-│   ├── prediction_markets (Polymarket), etf_flows (Farside)
-│   ├── telegram_channels (Telethon), youtube / youtube_cpt
-├── analytics/        # composite_score (9 signaux), tier_resolver,
-│                     #   fundamentals (ATH safe), coherence_checker, narratives
-├── ai_brain/         # gemini_client, decision_engine, prompts (persona +
-│                     #   morning/evening/weekly)
-├── state/            # report_memory (mémoire inter-rapports)
-├── tracking/         # prediction_scoring (win rate, leçons)
-├── reporting/        # email_html (dispatcher) + templates/*.j2 + email_sender
-└── main.py           # orchestrateur : morning / evening / weekly
-scripts/              # update_portfolio.py (mise à jour du PTF après un trade)
-config/               # portfolio, thresholds, sources, github_repos,
-                      #   youtube_channels, telegram_channels
-.github/workflows/    # morning, evening, weekly, heartbeat, update_portfolio
-state/                # JSON de mémoire (commités automatiquement)
-tests/                # analytics, data_sources, full_flow, v2_refactor
-```
+Les neuf paramètres qui conditionnent l'émission sont **renseignés**, et chacun
+porte sa provenance dans le fichier :
+
+| Nature | Sens | Paramètres |
+|---|---|---|
+| `[FAIT]` | observable ou public, vérifiable | `fee_rate` (barème Binance spot) |
+| `[PROFIL]` | déclaration de l'investisseur | `monthly_budget`, `ticket_min`, `materiality_reference` |
+| `[RISQUE]` | arbitrage d'aversion, assumé et instrumenté | `delta_claimable`, `p_target_max`, `p_stop_max`, `k3`, `liquidity_bands` |
+
+Deux protections, appliquées et non commentées :
+
+- **une valeur absente reste absente.** Le code n'invente jamais un budget ni un
+  barème : tout verdict devient `NON_EVALUABLE`, et le mail le dit.
+- **une valeur présente mais incohérente est traitée comme absente** —
+  `p_stop_max ≥ p_target_max`, ticket au-dessus du budget, probabilité hors
+  `]0,1[`… Elle n'est jamais « corrigée » au passage : la corriger reviendrait à
+  inventer un paramètre métier.
+
+Le couplage `k3 × monthly_budget` est explicité dans le fichier : il détermine
+l'amplitude minimale d'un contrat. Mesuré sur une grille de σ allant de 6 à
+25 %, le réglage livré retient **88 % des contrats structurellement valides** —
+il tranche la queue basse sans stériliser le moteur, et un test verrouille cette
+plage.
 
 ---
 
-## Démarrage
+## Les trois runs
 
-L'agent tourne dès maintenant avec **Gemini + Gmail**. Les autres sources sont
-optionnelles (sans leur clé, elles sont marquées "indisponibles" et n'empêchent
-rien). Voir **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** pour le pas-à-pas
-complet (secrets, Telegram, tests).
+| Run | Rôle | Écriture |
+|---|---|---|
+| **Matin** | collecte complète, transitions, émission | **seul run habilité** |
+| **Soir** | delta depuis le matin, franchissements EN SÉANCE | lecture seule |
+| **Hebdo** | contrats clôturés, mesures, enseignements | lecture seule |
+
+Les clôtures étant journalières UTC, matin et soir voient la même dernière
+clôture complète : seul le matin peut en observer une nouvelle. Le soir signale
+un franchissement intraday **sans transitionner** — la transition sera évaluée
+sur la clôture.
+
+Un contrat n'existe que s'il a été **communiqué** : la persistance intervient
+après un envoi réussi, et le commit d'état des workflows est conditionné au
+succès du job.
+
+---
+
+## Démarrer
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env   # remplir les clés
-python -m src.main morning     # test immédiat
-pytest -q                      # suite de tests
+cp .env.example .env        # renseigner les clés
+python -m src.main morning  # ou evening / weekly
 ```
+
+Migration depuis un état pré-V31 — `historical_treatment` vaut `purge` :
+
+```bash
+python -m scripts.migrate_v31          # simulation, n'écrit rien
+python -m scripts.migrate_v31 --apply  # archive l'ancien état, carnet vierge
+```
+
+**Rien n'est détruit** : l'ancien état est déplacé dans `state/pre_v31/`. Il
+n'est pas importé parce qu'il a été produit sous un régime de scoring
+incompatible (clôture sur délai, stop révisable, cinq définitions concurrentes
+de l'invalidation) — le mélanger aux mesures V31 les invaliderait. Un contrat
+hérité dont l'invalidation est du mauvais côté de l'entrée n'est de toute façon
+pas migrable : le corriger reviendrait à inventer un contrat jamais communiqué.
 
 ---
 
-## Coût
+## Bot Telegram
 
-**0 €.** Tous les services ont un free tier suffisant, GitHub Actions est gratuit
-pour les dépôts publics.
+`/carnet` `/ptf` `/sources` `/resume` `/memoire` `/aide`
 
-## Avertissement
+Le bot **lit** le carnet. Une seule commande écrit : `/dismiss ACTIF`, qui
+produit la transition `CANCELLED` — un contrat annulé sort du scoring, il ne
+compte ni en réussite ni en échec. `/validate` et `/snooze` sont supprimées :
+une issue ne se décrète pas, elle s'observe sur la clôture.
 
-Analyse **informative**, pas un conseil en investissement. Fais toujours tes
-propres recherches.
+---
+
+## Tests
+
+```bash
+python -m pytest tests -q
+```
+
+Les invariants critiques sont des tests, pas des commentaires : autorité
+d'écriture, carnet inchangé octet pour octet le soir, rejet du contenu sans
+réparation, locale française sur la sortie rendue, `NON_EVALUABLE` jamais
+assimilé à `VIABLE`.

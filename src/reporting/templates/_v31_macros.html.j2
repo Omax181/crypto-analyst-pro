@@ -1,0 +1,125 @@
+{# Macros partagées des trois mails V31.
+   Aucun filtre de formatage : toute valeur arrive DÉJÀ formatée par
+   core.formatter (autorité unique, I27). #}
+
+{% macro header(title, date_label, c) %}
+<div style="border-bottom:2px solid {{ c.accent }};padding-bottom:12px;margin-bottom:20px;">
+  <div style="font-size:22px;font-weight:700;color:{{ c.text }};letter-spacing:-0.3px;">{{ title }}</div>
+  <div style="font-size:12px;color:{{ c.muted }};margin-top:4px;">{{ date_label }}</div>
+</div>
+{% endmacro %}
+
+{% macro banner(text, c) %}
+{% if text %}
+<div style="background:#fdf6e3;border-left:3px solid {{ c.warn }};padding:10px 14px;margin-bottom:18px;font-size:13px;color:{{ c.text }};">
+  {{ text }}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro section(title, c) %}
+<div style="font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:{{ c.muted }};margin:26px 0 10px;">{{ title }}</div>
+{% endmacro %}
+
+{% macro prose(text, c) %}
+{% if text %}
+<div style="font-size:14px;line-height:1.65;color:{{ c.text }};margin-bottom:12px;">{{ text }}</div>
+{% endif %}
+{% endmacro %}
+
+{% macro card(c) %}{% endmacro %}
+
+{% macro contract_table(rows, c, show_state) %}
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px;">
+  <tr style="color:{{ c.muted }};font-size:11px;text-transform:uppercase;letter-spacing:0.6px;">
+    <td style="padding:6px 8px 6px 0;border-bottom:1px solid {{ c.border }};">Actif</td>
+    <td style="padding:6px 8px;border-bottom:1px solid {{ c.border }};">Entrée</td>
+    <td style="padding:6px 8px;border-bottom:1px solid {{ c.border }};">Cible</td>
+    <td style="padding:6px 8px;border-bottom:1px solid {{ c.border }};">Invalidation</td>
+    <td style="padding:6px 8px;border-bottom:1px solid {{ c.border }};">Cours</td>
+    <td style="padding:6px 0 6px 8px;border-bottom:1px solid {{ c.border }};text-align:right;">{% if show_state %}État{% else %}Écart{% endif %}</td>
+  </tr>
+  {% for r in rows %}
+  <tr>
+    <td style="padding:9px 8px 9px 0;border-bottom:1px solid {{ c.border }};font-weight:600;color:{{ c.text }};">
+      {{ r.asset }}
+      <div style="font-size:11px;font-weight:400;color:{{ c.muted }};">{{ r.direction }} · {{ r.horizon }} · {{ r.days }}</div>
+    </td>
+    <td style="padding:9px 8px;border-bottom:1px solid {{ c.border }};">{{ r.entry }}</td>
+    <td style="padding:9px 8px;border-bottom:1px solid {{ c.border }};color:{{ c.good }};">{{ r.target }}</td>
+    <td style="padding:9px 8px;border-bottom:1px solid {{ c.border }};color:{{ c.bad }};">{{ r.stop }}</td>
+    <td style="padding:9px 8px;border-bottom:1px solid {{ c.border }};">{{ r.current }}</td>
+    <td style="padding:9px 0 9px 8px;border-bottom:1px solid {{ c.border }};text-align:right;">
+      {% if show_state %}
+        <span style="color:{{ c.muted }};">{{ r.state }}</span>
+        {% if r.reason %}<div style="font-size:11px;color:{{ c.muted }};">{{ r.reason }}</div>{% endif %}
+        {% if r.realized != "—" %}<div style="font-size:11px;color:{{ c.muted }};">réalisé {{ r.realized }} · {{ r.realized_usd }}</div>{% endif %}
+      {% else %}
+        <span style="color:{% if r.delta_positive %}{{ c.good }}{% else %}{{ c.bad }}{% endif %};">{{ r.delta }}</span>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endmacro %}
+
+{% macro metrics_block(metrics, c) %}
+{% for m in metrics %}
+<div style="padding:10px 0;border-bottom:1px solid {{ c.border }};">
+  <div style="font-size:13px;color:{{ c.text }};font-weight:600;">{{ m.question }}</div>
+  {% if m.published %}
+  <div style="font-size:14px;color:{{ c.text }};margin-top:3px;">{{ m.value }}{% if m.bound %} · borne haute {{ m.bound }}{% endif %}</div>
+  <div style="font-size:11px;color:{{ c.muted }};margin-top:2px;">{{ m.window }} · n = {{ m.n }}</div>
+  {% else %}
+  <div style="font-size:12px;color:{{ c.muted }};margin-top:3px;">non publiée — {{ m.reason }} ({{ m.window }})</div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endmacro %}
+
+{% macro health_block(health, c) %}
+{% if health %}
+<ul style="margin:0;padding-left:18px;font-size:12px;color:{{ c.muted }};line-height:1.7;">
+  {% for h in health %}<li>{{ h }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% endmacro %}
+
+{% macro news_block(items, c) %}
+{% for n in items %}
+<div style="padding:8px 0;border-bottom:1px solid {{ c.border }};font-size:13px;color:{{ c.text }};">
+  {{ n.title }}
+  <div style="font-size:11px;color:{{ c.muted }};margin-top:2px;">{{ n.source }}{% if n.when %} · {{ n.when }}{% endif %}</div>
+</div>
+{% endfor %}
+{% endmacro %}
+
+{% macro portfolio_block(portfolio, c) %}
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:13px;">
+  <tr style="color:{{ c.muted }};font-size:11px;text-transform:uppercase;letter-spacing:0.6px;">
+    <td style="padding:6px 8px 6px 0;border-bottom:1px solid {{ c.border }};">Position</td>
+    <td style="padding:6px 8px;border-bottom:1px solid {{ c.border }};text-align:right;">Cours</td>
+    <td style="padding:6px 8px;border-bottom:1px solid {{ c.border }};text-align:right;">Valeur</td>
+    <td style="padding:6px 8px;border-bottom:1px solid {{ c.border }};text-align:right;">Poids</td>
+    <td style="padding:6px 0 6px 8px;border-bottom:1px solid {{ c.border }};text-align:right;">vs PRU</td>
+  </tr>
+  {% for r in portfolio.rows %}
+  <tr>
+    <td style="padding:7px 8px 7px 0;border-bottom:1px solid {{ c.border }};color:{{ c.text }};">
+      {% if r.is_core %}<span style="color:{{ c.warn }};">&#9733;</span> {% endif %}{{ r.asset }}
+    </td>
+    <td style="padding:7px 8px;border-bottom:1px solid {{ c.border }};text-align:right;">{{ r.price }}</td>
+    <td style="padding:7px 8px;border-bottom:1px solid {{ c.border }};text-align:right;">{{ r.value }}</td>
+    <td style="padding:7px 8px;border-bottom:1px solid {{ c.border }};text-align:right;color:{{ c.muted }};">{{ r.weight }}</td>
+    <td style="padding:7px 0 7px 8px;border-bottom:1px solid {{ c.border }};text-align:right;color:{% if r.pnl_positive %}{{ c.good }}{% else %}{{ c.bad }}{% endif %};">{{ r.pnl }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<div style="font-size:12px;color:{{ c.muted }};margin-top:8px;">Total {{ portfolio.total }} sur {{ portfolio.count }} position(s).</div>
+{% endmacro %}
+
+{% macro footer(disclaimer, app_version, c) %}
+<div style="margin-top:30px;padding-top:14px;border-top:1px solid {{ c.border }};font-size:11px;color:{{ c.muted }};line-height:1.6;">
+  {{ disclaimer }}<br>Crypto Analyst Pro {{ app_version }}
+</div>
+{% endmacro %}

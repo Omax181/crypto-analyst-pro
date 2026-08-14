@@ -1,0 +1,163 @@
+# =============================================================================
+# PARAMÈTRES MÉTIER — SPEC V31 §9
+# =============================================================================
+# RÈGLE ABSOLUE (§9.3) : un paramètre absent produit EXACTEMENT le comportement
+# du tableau §9.2. JAMAIS de valeur par défaut silencieuse. Une valeur PRÉSENTE
+# mais INCOHÉRENTE (§9.4) est traitée comme ABSENTE — jamais « corrigée ».
+#
+# PROVENANCE DE CHAQUE VALEUR. Trois natures, distinguées sans ambiguïté :
+#   [FAIT]     grandeur observable ou publique — vérifiable, non négociable
+#   [PROFIL]   déclaration de l'investisseur (voir investor_profile.py)
+#   [RISQUE]   arbitrage d'aversion — assumé, borné, et instrumenté par les
+#              métriques qui le challengent (§7)
+#
+# Aucune valeur n'est posée « parce qu'il en faut une » : celles qui relèvent
+# d'un arbitrage sont ancrées sur une contrainte structurelle vérifiable, et le
+# couplage entre elles est explicité plus bas.
+# =============================================================================
+
+# ── BLOQUANTS POUR L'ÉMISSION (§9.2) ──────────────────────────────────────────
+
+# [FAIT] Frais par jambe, en FRACTION. Binance spot, palier standard : 0,1 %.
+# C'est le barème public de l'exchange sur lequel le portefeuille est constitué
+# (config/portfolio.yaml : « pru = coût moyen pondéré, historique Binance »).
+# À corriger si le palier VIP change ou si l'exécution passe ailleurs.
+fee_rate: 0.001
+
+# [RISQUE, conservateur] Bandes de liquidité. Le CLASSEMENT d'un actif dans une
+# bande est DÉDUIT de son volume échangé ; les VALEURS de spread et de slippage
+# ne sont pas mesurées par le système — elles sont ESTIMÉES, et le verdict le
+# déclare (``cost_confidence: estimated``).
+#
+# Le sens du biais est choisi : ces valeurs SURESTIMENT le coût plutôt que de le
+# sous-estimer. Un coût surestimé rend le moteur plus exigeant ; un coût
+# sous-estimé fait passer des gestes qui perdent de l'argent en silence.
+# Poser ``measured: true`` uniquement sur des valeurs réellement relevées.
+liquidity_bands:
+  - min_daily_volume_usd: 500000000     # actifs très liquides (BTC, ETH…)
+    spread_pct: 0.02
+    slippage_pct: 0.02
+    measured: false
+  - min_daily_volume_usd: 50000000      # grandes capitalisations établies
+    spread_pct: 0.05
+    slippage_pct: 0.05
+    measured: false
+  - min_daily_volume_usd: 0             # satellites, petites capitalisations
+    spread_pct: 0.15
+    slippage_pct: 0.20
+    measured: false
+
+# [RISQUE] Avantage sur le hasard que le système s'autorise à REVENDIQUER tant
+# qu'il n'est pas mesuré (R9). En FRACTION : 0.05 = 5 points de pourcentage.
+#
+# Lecture : « je refuse un geste qui exige plus de 5 points d'avantage
+# systématique sur une marche sans dérive rien que pour atteindre l'équilibre ».
+# Ancrage : c'est une BORNE HAUTE de prétention, pas une performance espérée.
+# Un système sans historique ne peut pas revendiquer davantage ; la métrique
+# « Mon avantage est-il réel ? » (§7) mesure l'écart réalisé et le confronte à
+# cette borne dès que le plancher d'échantillon est atteint.
+delta_claimable: 0.05
+
+# [RISQUE] Probabilité maximale que la CIBLE soit touchée par le seul bruit.
+# 0,30 -> k2 = 1,036 sigma. Lecture : « une cible atteinte par pur hasard une
+# fois sur trois n'est pas une cible ».
+# Repères k = -Phi^-1(p/2) : 0,50 -> 0,674 · 0,32 -> 0,994 · 0,20 -> 1,282 ·
+#                            0,13 -> 1,514 · 0,05 -> 1,960
+p_target_max: 0.30
+
+# [RISQUE] Probabilité maximale qu'une thèse CORRECTE soit invalidée par le seul
+# bruit. 0,20 -> k2' = 1,282 sigma.
+# CONTRAINTE STRUCTURELLE VÉRIFIÉE AU CHARGEMENT : p_stop_max < p_target_max.
+# On tolère moins d'être sorti à tort d'une thèse juste que d'atteindre une
+# cible par chance — l'inverse rendrait le contrat perdant par construction.
+p_stop_max: 0.20
+
+# [PROFIL] Référence de matérialité (§4.4 V3). Trois valeurs admises :
+#   monthly_budget   — un mois d'apport      <- seule ancrée sur le profil
+#   ptf_daily_noise  — bruit journalier du portefeuille, en USD
+#   ticket_min       — ticket de référence d'exécution
+materiality_reference: monthly_budget
+
+# [RISQUE] Multiple de la référence : P&L net attendu >= k3 * RÉFÉRENCE.
+#
+# COUPLAGE EXPLICITE — à relire avant toute modification. Le seuil vaut
+# k3 * monthly_budget = 5 $. Avec un coût aller-retour c et un avantage
+# revendicable d, l'amplitude totale minimale d'un geste au notional N est
+#     (u + d)_min = ( k3 * budget * 100 / N + c ) / delta_claimable
+# soit, au notional plein (500 $) et c = 0,26 point : environ 25 %.
+# C'est l'ordre de grandeur NORMAL d'un contrat SWING sur satellite
+# (sigma_30 ~ 15 % -> cible ~ 1,04 sigma ~ 16 %, invalidation ~ 1,28 sigma
+# ~ 20 %, soit u + d ~ 36 %) : le gate est donc exigeant SANS être stérile.
+# Augmenter k3 réserve mécaniquement l'émission aux gestes de taille maximale.
+k3: 0.01
+
+# [PROFIL] Budget de RECOMMANDATION mensuel, en USD. Le système ne connaît pas
+# les exécutions réelles : ce plafond porte sur ce qu'il PROPOSE.
+# Source : profil investisseur, « budget ~500 $/mois ».
+monthly_budget: 500.0
+
+# [PROFIL] Ticket minimum d'exécution, en USD (§4.4 V4).
+# Source : profil investisseur, « petits tickets (40-50 $) ». Borne BASSE
+# retenue : c'est la moins susceptible d'écarter un geste par excès de zèle.
+ticket_min: 40.0
+
+
+# ── NON BLOQUANTS — désactivent une fonction périphérique (§9.2) ───────────────
+
+# Report du reliquat de budget d'un mois sur l'autre. Absent => pas de report.
+# Laissé absent : le budget est un rythme d'apport, pas une réserve à cumuler.
+budget_rollover: null
+
+# [FAIT statistique] Plancher d'échantillon des métriques (§7).
+# Ancrage : en dessous de dix issues binaires, la borne supérieure de Wilson à
+# 95 % couvre pratiquement tout l'intervalle utile — la statistique ne
+# DISCRIMINE plus rien et n'a donc rien à publier.
+n_min: 10
+
+# [DÉRIVÉ] Délai de refroidissement après INVALIDATED, contrainte (b) de §3.
+# Ancré sur la durée du contrat SWING (30 jours) : on ne ré-émet pas sur un
+# actif invalidé avant qu'un cycle complet se soit écoulé. Les contraintes
+# (a) « nouveau stop >= 1 sigma_H plus loin » et (c) « horizon différent »
+# restent actives indépendamment.
+cooldown_days: 30
+
+# [DÉRIVÉ] Fenêtre de rétention avant archivage d'un segment (§8).
+# Deux ans : couvre largement la fenêtre de scoring la plus longue
+# (POSITION, 180 jours) et un cycle de marché complet.
+retention_months: 24
+
+# [DÉCISION] Traitement de l'historique pré-V31 : purge | mark | reset.
+#
+# « purge » retenu. Motif : l'historique v30 a été produit sous un régime de
+# scoring INCOMPATIBLE (clôture sur délai de 30 jours, stop révisable, cinq
+# définitions concurrentes de l'invalidation). L'importer, même hors scoring,
+# n'apporterait aucune information exploitable et polluerait le carnet.
+# RIEN N'EST DÉTRUIT : le script de migration ARCHIVE l'ancien état dans
+# state/pre_v31/ avant de démarrer le carnet V31 à vide.
+historical_treatment: purge
+
+# [DÉRIVÉ] Chien de garde (§8). max_silence_hours ancré sur le cycle réel :
+# l'intervalle le plus long entre deux runs est matin -> matin, soit 24 h ;
+# 26 h laisse deux heures de marge d'exécution avant de crier au loup.
+watchdog:
+  max_silence_hours: 26
+  channel: telegram
+
+# [FAIT] Latence de publication déclarée par source, en jours (§6). La FRAÎCHEUR
+# se mesure en PUBLICATIONS MANQUÉES, déduites de la cadence ; la latence est le
+# délai normal entre la fin de la période couverte et sa mise à disposition.
+# Absent pour une source => cette source est traitée comme DEGRADED, jamais
+# comme fraîche.
+#
+# (market.spot, polymarket et news sont des flux CONTINUS : aucune cadence,
+#  donc aucune publication manquée possible — ils ne figurent pas ici.)
+publication_latency_days:
+  market.closes: 0      # clôture disponible dès la fin de journée UTC
+  market.ohlc: 0
+  fear_greed: 0         # recalculé quotidiennement
+  fred: 1               # séries publiées avec un jour de décalage
+  onchain: 1
+  etf_flows: 1          # flux de la veille, publiés le lendemain
+  macro_calendar: 0
+  derivatives: 0
+  equities: 1

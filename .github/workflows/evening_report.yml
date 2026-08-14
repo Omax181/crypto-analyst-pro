@@ -1,9 +1,8 @@
 name: Evening Crypto Report
 
+# Le run du SOIR est en LECTURE SEULE (SPEC §2.2) : il ne crée, ne révise et ne
+# clôture aucun contrat. Le commit d'état ne porte donc que le résumé de run.
 on:
-  # v15 — schedule GitHub natif RETIRÉ : cron-job.org déclenche déjà via
-  # repository_dispatch, et les deux tombaient ensemble → MAILS EN DOUBLE.
-  # Variantes underscore acceptées (un type non listé = 202 silencieux sans run).
   repository_dispatch:
     types: [evening, evening-report, evening_report, run-evening, run_evening]
   workflow_dispatch:
@@ -30,56 +29,28 @@ jobs:
       - name: Run evening report
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # v26 — palier GRATUIT : le soir est une tâche « rapide » → le code
-          # choisit gemini-2.5-flash automatiquement. GEMINI_MODEL = pin manuel
-          # OPTIONNEL (vide = défauts $0 du code).
           GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
-          # v30 (#84) — le soir peut router sa passe profonde comme le
-          # matin/hebdo (la variable manquait : passes 2.5-flash only).
-          GEMINI_MODEL_DEEP: ${{ secrets.GEMINI_MODEL_DEEP }}
-          # v26 (audit final) — pause de l'ultime tentative Gemini, optionnelle
-          # (vide = défaut 600 s du code, 0 = désactivée).
-          GEMINI_LAST_CHANCE_PAUSE_S: ${{ secrets.GEMINI_LAST_CHANCE_PAUSE_S }}
-          # v27 — notification push Telegram après le mail (best-effort). Sans ce
-          # passthrough, push_report_notification était INERTE en prod (« bot non
-          # configuré ») alors que le code l'appelle après chaque rapport.
+          GEMINI_FALLBACK_MODEL: ${{ secrets.GEMINI_FALLBACK_MODEL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
-          COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
-          COINMARKETCAL_API_KEY: ${{ secrets.COINMARKETCAL_API_KEY }}
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          LUNARCRUSH_API_KEY: ${{ secrets.LUNARCRUSH_API_KEY }}
-          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
-          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
-          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
-          TELEGRAM_SESSION_STRING: ${{ secrets.TELEGRAM_SESSION_STRING }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
-          # v14 fix : clés lues par le code mais jamais transmises par les
-          # workflows (secret defini cote repo = ignore sinon). Un secret
-          # absent s'evalue en chaine vide -> sans effet tant qu'il n'existe pas.
-          COINMETRICS_API_KEY: ${{ secrets.COINMETRICS_API_KEY }}
-          COINGLASS_PAID: ${{ secrets.COINGLASS_PAID }}
         run: python -m src.main evening
       - name: Commit state files
-        if: always()
+        if: success()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A state/ 2>/dev/null || true
-          # Rien à committer => sortie propre (ne fait pas échouer le job).
           if git diff --cached --quiet; then
             echo "Aucun changement de state à committer."
             exit 0
           fi
           git commit -m "chore: update state [skip ci]"
-          # Runs concurrents : rebase avant push pour ne pas écraser le state
-          # d'un autre run, avec quelques tentatives en cas de course.
           for i in 1 2 3; do
             git pull --rebase --autostash origin "${GITHUB_REF_NAME}" \
               && git push && { echo "State poussé."; break; }

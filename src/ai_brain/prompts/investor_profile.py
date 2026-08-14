@@ -1,8 +1,15 @@
 """Profil investisseur d'Omar — SOURCE DE VÉRITÉ UNIQUE (v21).
 
 Ce profil est injecté à la fois dans :
-  - le persona des 3 rapports mail (via analyst_persona.ANALYST_PERSONA),
+  - les prompts des 3 rapports mail (via ai_brain.prompts.v31_prompts),
   - le prompt système du bot Telegram (assistant.py).
+
+V31 — PORTÉE STRICTEMENT ÉDITORIALE. Ce texte oriente la VOIX et les
+préférences, jamais un calcul. Les grandeurs métier qu'il évoque en prose
+(budget mensuel, taille de ticket) ne sont PAS lues par le moteur : celui-ci
+les prend exclusivement dans ``config/params.yaml``, et reste NON_EVALUABLE si
+elles y sont absentes. Un champ AUTHORED ne pouvant contenir aucun chiffre, ces
+montants ne peuvent pas non plus fuiter dans un rapport.
 
 Objectif : que TOUT le système (recos du matin, analyses du soir, bilan hebdo,
 conversations du bot) respecte exactement le style, les règles de vente, les

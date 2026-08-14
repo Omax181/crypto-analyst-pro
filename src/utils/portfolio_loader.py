@@ -147,15 +147,22 @@ def _main() -> None:
     if args.update:
         update_portfolio_from_text(args.update)
     elif args.show:
+        # Même une sortie de console passe par l'autorité de formatage (I27) :
+        # une seconde convention numérique, fût-elle « seulement pour le dev »,
+        # est exactement ce qui a produit deux formats sur une même page en v29.
+        from src.core import formatter as fmt
+
         data = load_portfolio()
         total = total_value_usd(data)
-        print(f"Portfolio : {len(data['portfolio'])} actifs · total ~${total:,.2f}")
+        print(f"Portfolio : {fmt.integer(len(data['portfolio']))} actifs · "
+              f"total {fmt.usd(total)}")
         for sym, info in sorted(
             data["portfolio"].items(),
             key=lambda kv: kv[1].get("value_usd", 0),
             reverse=True,
         ):
-            print(f"  T{info['tier']}  {sym:<8} ${info.get('value_usd', 0):>10,.2f}")
+            print(f"  T{info['tier']}  {sym:<8} "
+                  f"{fmt.usd(info.get('value_usd')):>14}")
     else:
         parser.print_help()
 

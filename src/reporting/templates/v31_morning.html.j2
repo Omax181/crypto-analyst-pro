@@ -1,0 +1,107 @@
+{% import "_v31_macros.html.j2" as m %}
+{{ m.header(title, date_label, c) }}
+{{ m.banner(banner, c) }}
+
+{# ── LE GESTE — DÉRIVÉ. Le LLM ne choisit ni l'actif, ni l'ordre (§4.5). ── #}
+{{ m.section("Le geste du jour", c) }}
+{% if top_action %}
+<div style="background:{{ c.card }};border:1px solid {{ c.border }};border-left:3px solid {{ c.good }};padding:16px;">
+  <div style="font-size:17px;font-weight:700;color:{{ c.text }};">
+    {{ top_action.direction }} {{ top_action.asset }} — {{ top_action.notional }}
+  </div>
+  <div style="font-size:13px;color:{{ c.text }};margin-top:8px;line-height:1.7;">
+    Entrée {{ top_action.entry }} · cible {{ top_action.target }} · invalidation {{ top_action.stop }}
+  </div>
+  <div style="font-size:12px;color:{{ c.muted }};margin-top:8px;line-height:1.7;">
+    Espérance nette après coûts {{ top_action.net_pnl }}.
+    Ce geste revendique {{ top_action.delta_required }} d'avantage sur le hasard ;
+    il devient perdant sous {{ top_action.p_breakeven }} de réussite.
+  </div>
+</div>
+{% else %}
+<div style="background:{{ c.card }};border:1px solid {{ c.border }};padding:16px;font-size:14px;color:{{ c.text }};line-height:1.7;">
+  {{ nothing_to_do }}
+</div>
+{% endif %}
+
+{% if emissions %}
+{{ m.section("Contrats émis ce matin", c) }}
+{% for e in emissions %}
+<div style="border:1px solid {{ c.border }};padding:14px;margin-bottom:10px;">
+  <div style="font-size:15px;font-weight:600;color:{{ c.text }};">
+    {{ e.asset }} — {{ e.action }} <span style="font-weight:400;color:{{ c.muted }};">({{ e.direction }} · {{ e.horizon }})</span>
+  </div>
+  <div style="font-size:13px;color:{{ c.text }};margin-top:6px;line-height:1.7;">
+    Entrée {{ e.entry }} · cible {{ e.target }} ({{ e.target_basis }}) · invalidation {{ e.stop }} ({{ e.stop_basis }}) · taille {{ e.notional }}
+  </div>
+  <div style="font-size:12px;color:{{ c.muted }};margin-top:6px;line-height:1.7;">
+    Bruit de l'horizon {{ e.sigma_h }} ({{ e.sigma_estimator }}{% if e.sigma_degraded %}, repli{% endif %}) ·
+    cible à {{ e.target_sigma }} · invalidation à {{ e.stop_sigma }} ·
+    coût aller-retour {{ e.cost }} · avantage exigé {{ e.delta_required }} ·
+    point neutre {{ e.p_null }} · espérance nette {{ e.net_pnl }} ·
+    contrainte de taille : {{ e.binding }}, poids visé {{ e.weight_after }}
+  </div>
+  {% if e.cid in charts %}
+  <img src="cid:{{ e.cid }}" alt="{{ e.asset }}" style="width:100%;max-width:640px;margin-top:10px;border:1px solid {{ c.border }};">
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if transitions %}
+{{ m.section("Ce qui a changé d'état", c) }}
+{% for t in transitions %}
+<div style="font-size:13px;color:{{ c.text }};padding:7px 0;border-bottom:1px solid {{ c.border }};">
+  {{ t.asset }} — {{ t.to }} <span style="color:{{ c.muted }};">({{ t.cause }}, clôture {{ t.close }})</span>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if book.active %}
+{{ m.section("Carnet en cours", c) }}
+{{ m.contract_table(book.active, c, False) }}
+{% endif %}
+
+{% if rejections %}
+{{ m.section("Écartés, et pourquoi", c) }}
+{% for r in rejections %}
+<div style="font-size:13px;color:{{ c.text }};padding:7px 0;border-bottom:1px solid {{ c.border }};">
+  <span style="font-weight:600;">{{ r.asset }}</span>
+  <span style="color:{{ c.muted }};"> — {{ r.reason }}{% if r.failed %} [{{ r.failed }}]{% endif %}</span>
+</div>
+{% endfor %}
+{% endif %}
+
+{{ m.section("Lecture du marché", c) }}
+{{ m.prose(authored.get("macro_reading"), c) }}
+{{ m.prose(authored.get("macro_implication"), c) }}
+{{ m.prose(authored.get("observation"), c) }}
+{{ m.prose(authored.get("reasoning_signals"), c) }}
+{{ m.prose(authored.get("onchain_reading"), c) }}
+{{ m.prose(authored.get("asset_comment"), c) }}
+
+{% if authored.get("counter_thesis") %}
+{{ m.section("Contre-thèse", c) }}
+{{ m.prose(authored.get("counter_thesis"), c) }}
+{% endif %}
+
+{% if news %}
+{{ m.section("Actualités", c) }}
+{{ m.news_block(news, c) }}
+{{ m.prose(authored.get("news_impact"), c) }}
+{% endif %}
+
+{{ m.section("Portefeuille", c) }}
+{{ m.portfolio_block(portfolio, c) }}
+
+{% if authored.get("self_critique") %}
+{{ m.section("Ce qui est faible aujourd'hui", c) }}
+{{ m.prose(authored.get("self_critique"), c) }}
+{% endif %}
+
+{% if health %}
+{{ m.section("État des sources", c) }}
+{{ m.health_block(health, c) }}
+{% endif %}
+
+{{ m.footer(disclaimer, app_version, c) }}

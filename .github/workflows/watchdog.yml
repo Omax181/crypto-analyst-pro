@@ -1,0 +1,43 @@
+name: Watchdog
+
+# CHIEN DE GARDE — SPEC V31 §10 (R10-1).
+#
+# Deux différences essentielles avec le « heartbeat » de la v30, supprimé :
+#   1. il utilise le SCHEDULE GITHUB NATIF. Un chien de garde déclenché par le
+#      même cron externe que les rapports ne peut pas détecter la panne de ce
+#      cron : il tombe avec lui.
+#   2. il n'ENVOIE AUCUN RAPPORT. Il vérifie le silence et alerte, rien d'autre.
+#      Un chien de garde qui produit un mail est un quatrième run déguisé.
+#
+# Le verdict est produit par ``core.runlog.watchdog_verdict``. Si le paramètre
+# métier ``watchdog`` est absent de config/params.yaml, la fonction est
+# DÉSACTIVÉE explicitement : rien n'est inventé, et le job le dit.
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install dependencies
+        run: pip install pyyaml requests
+      - name: Check for silence
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m scripts.watchdog

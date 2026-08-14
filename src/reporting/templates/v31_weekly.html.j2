@@ -1,0 +1,60 @@
+{% import "_v31_macros.html.j2" as m %}
+{{ m.header(title, date_label, c) }}
+{{ m.banner(banner, c) }}
+
+{# L'hebdo est en LECTURE SEULE (SPEC §2.3). Aucun « plan d'action de la
+   semaine » : ce mail ne crée aucun contrat et n'ouvre aucune surface
+   d'émission parallèle à celle du matin. #}
+<div style="font-size:12px;color:{{ c.muted }};background:{{ c.card }};border:1px solid {{ c.border }};padding:10px 14px;margin-bottom:16px;line-height:1.6;">
+  Ce bilan ne crée ni ne modifie aucun contrat. Il rend compte de ce qui s'est
+  passé et de ce que le carnet contient aujourd'hui.
+</div>
+
+{% if book.closed_recent %}
+{{ m.section("Contrats clôturés sur trente jours", c) }}
+{{ m.contract_table(book.closed_recent, c, True) }}
+{% else %}
+{{ m.section("Contrats clôturés sur trente jours", c) }}
+<div style="font-size:13px;color:{{ c.muted }};">Aucun contrat clôturé sur la période.</div>
+{% endif %}
+
+{{ m.section("Carnet en cours", c) }}
+{% if book.active %}
+{{ m.contract_table(book.active, c, False) }}
+{% else %}
+<div style="font-size:13px;color:{{ c.muted }};">Aucun contrat en cours.</div>
+{% endif %}
+{{ m.prose(authored.get("tracking_note"), c) }}
+
+{{ m.section("Ce que mesure le système", c) }}
+{{ m.metrics_block(metrics, c) }}
+
+{{ m.section("Lecture de la semaine", c) }}
+{{ m.prose(authored.get("macro_reading"), c) }}
+{{ m.prose(authored.get("combined_reading"), c) }}
+{{ m.prose(authored.get("sector_comment"), c) }}
+
+{{ m.section("Portefeuille", c) }}
+{{ m.portfolio_block(portfolio, c) }}
+
+{% if news %}
+{{ m.section("Actualités de la semaine", c) }}
+{{ m.news_block(news, c) }}
+{% endif %}
+
+{% if authored.get("weekly_lesson") %}
+{{ m.section("L'enseignement de la semaine", c) }}
+{{ m.prose(authored.get("weekly_lesson"), c) }}
+{% endif %}
+
+{% if authored.get("self_critique") %}
+{{ m.section("Ce qui reste faible", c) }}
+{{ m.prose(authored.get("self_critique"), c) }}
+{% endif %}
+
+{% if health %}
+{{ m.section("État des sources", c) }}
+{{ m.health_block(health, c) }}
+{% endif %}
+
+{{ m.footer(disclaimer, app_version, c) }}

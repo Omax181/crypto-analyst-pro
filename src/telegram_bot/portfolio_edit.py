@@ -184,7 +184,7 @@ def handle_edit(text: str) -> tuple[str, bool]:
 
     # Mémoire durable (déterministe) : trace la décision pour la continuité.
     try:
-        from src.state import report_memory as mem
+        from src.state import bot_memory as mem
         memo = (f"{verb} {_fq(qty)} {asset}"
                 + (f" @ {_fp(price)}" if price is not None else "")
                 + f" — qté {_fq(summ['old_qty'])}→{_fq(summ['new_qty'])}")

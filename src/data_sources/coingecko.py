@@ -167,16 +167,13 @@ def get_categories() -> dict[str, Any]:
     return {"available": True, "categories": cats}
 
 
-def get_ohlc(symbol: str, days: int = 90) -> Optional[list[dict[str, float]]]:
-    """Récupère les bougies OHLC via CoinGecko (remplace Binance, non géo-bloqué).
+def get_ohlc_raw(symbol: str, days: int = 30) -> Optional[list[list[float]]]:
+    """Bougies OHLC BRUTES, horodatage CONSERVÉ : ``[ts_ms, o, h, l, c]``.
 
-    Args:
-        symbol: ticker du portfolio (ex. ``"BTC"``).
-        days: profondeur d'historique (1/7/14/30/90/180/365).
-
-    Returns:
-        Liste de dicts ``{open, high, low, close}`` (granularité ~4j pour
-        days>=31, ~4h pour 3-30j) ou ``None`` si indisponible.
+    L'horodatage est indispensable à l'agrégation journalière (SPEC V31 §4.2) :
+    la granularité renvoyée dépend de ``days`` (~4h pour 3-30j, ~4j au-delà).
+    Toute consommation pour un calcul de volatilité DOIT passer par
+    ``src.pipeline.market.daily_bars``, qui impose days=30 puis agrège.
     """
     cg_id = _CG_IDS.get(symbol)
     if not cg_id:
@@ -193,11 +190,16 @@ def get_ohlc(symbol: str, days: int = 90) -> Optional[list[dict[str, float]]]:
     raw = CACHE.get_or_compute(f"cg:ohlc:{cg_id}:{days}", 1800, _fetch)
     if not isinstance(raw, list) or not raw:
         return None
-    return [
-        {"open": float(c[1]), "high": float(c[2]), "low": float(c[3]), "close": float(c[4])}
-        for c in raw
-        if len(c) >= 5
-    ]
+    out: list[list[float]] = []
+    for c in raw:
+        if not isinstance(c, (list, tuple)) or len(c) < 5:
+            continue
+        try:
+            out.append([float(c[0]), float(c[1]), float(c[2]),
+                        float(c[3]), float(c[4])])
+        except (TypeError, ValueError):
+            continue
+    return out or None
 
 
 def get_price_volume_series(
