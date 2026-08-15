@@ -73,7 +73,9 @@ def test_evening_and_weekly_collect_partially(monkeypatch):
     monkeypatch.setattr(collect, "equities", lambda: sr.empty("equities"))
     monkeypatch.setattr(collect.registry, "mark_dead", lambda *a, **k: None)
     partial = collect.context(["BTC"], full=False)
-    assert set(partial) == {"fear_greed", "news", "equities"}
+    # `equities` a été retirée de la collecte (audit du 15/08/2026) : elle ne
+    # produisait ni fait ni contenu, et pouvait pourtant dégrader le bandeau.
+    assert set(partial) == {"fear_greed", "news"}
     assert "macro_calendar" not in partial
 
 

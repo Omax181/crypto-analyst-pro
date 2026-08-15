@@ -14,7 +14,7 @@ agrège explicitement en bougies journalières (``aggregate_to_daily``).
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from src.core import source_result as sr
 from src.core.horizon import SPECS
@@ -39,12 +39,31 @@ _OHLC_WINDOW_DAYS = 30
 # désactivé. C'était une limite auto-infligée : le pipeline dictait la SPEC au
 # lieu de la servir.
 #
-# La demande dépasse volontairement le maximum : CoinGecko tronque à
-# l'historique réellement disponible, et une marge évite qu'un unique jour
-# manquant fasse basculer un actif sous son ``depth_min``.
+# PLAFOND DU FOURNISSEUR — MESURÉ, PAS SUPPOSÉ.
+#
+# La v31.0 demandait ``max(depth_min) + 35 = 400`` en supposant que « CoinGecko
+# tronque à l'historique réellement disponible ». C'ÉTAIT FAUX. Le palier
+# gratuit REFUSE : au premier run réel du 15/08/2026, les 29 actifs ont reçu un
+# 401 et le rapport n'a porté AUCUNE analyse. Vérifié ensuite sans clé :
+#
+#     days=365 -> HTTP 200, 366 points
+#     days=366 -> HTTP 401, error_code 10012
+#                 « Your request exceeds the allowed time range. »
+#
+# La frontière est donc exactement 365, et 365 SUFFIT : 366 points couvrent le
+# ``depth_min`` de POSITION (365). Il n'y a en revanche AUCUNE marge — un actif
+# plus jeune que 365 jours reçoit un refus chiffré, ce qui est le comportement
+# voulu, jamais un silence.
+#
+# Sources plus profondes écartées, mesures à l'appui : Binance est géo-bloqué
+# (451) depuis les runners GitHub US — cf. ``binance_futures`` et son repli
+# OKX ; OKX ne sert que 22 des 29 actifs et n'a que 47 bougies sur TAO, ce qui
+# rendrait σ et niveaux non comparables d'un actif à l'autre.
+_PROVIDER_MAX_DAYS = 365
 _DEPTH_MARGIN_DAYS = 35
-DAILY_SERIES_DAYS = max(s.depth_min for s in SPECS.values()
-                        if s.enabled) + _DEPTH_MARGIN_DAYS
+_DEPTH_WANTED = max(s.depth_min for s in SPECS.values()
+                    if s.enabled) + _DEPTH_MARGIN_DAYS
+DAILY_SERIES_DAYS = min(_DEPTH_WANTED, _PROVIDER_MAX_DAYS)
 
 # Au-delà de 90 jours, CoinGecko sert du JOURNALIER automatiquement : le
 # paramètre ``interval`` devient inutile, et l'omettre supprime une dépendance
@@ -58,6 +77,27 @@ def _utc(ts: Optional[float]) -> Optional[datetime]:
     return datetime.fromtimestamp(float(ts), tz=timezone.utc)
 
 
+def _utc_ms(ts: Any) -> Optional[datetime]:
+    """Epoch en MILLISECONDES (format CoinGecko) -> datetime UTC."""
+    if not isinstance(ts, (int, float)) or ts <= 0:
+        return None
+    try:
+        return datetime.fromtimestamp(float(ts) / 1000.0, tz=timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def _jour_utc(jour: Any) -> Optional[datetime]:
+    """« AAAA-MM-JJ » -> minuit UTC de ce jour."""
+    if not isinstance(jour, str) or not jour:
+        return None
+    try:
+        return datetime.strptime(jour[:10], "%Y-%m-%d").replace(
+            tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
 def daily_closes(symbol: str, *, days: int = DAILY_SERIES_DAYS) -> sr.SourceResult:
     """Série de clôtures JOURNALIÈRES.
 
@@ -65,6 +105,9 @@ def daily_closes(symbol: str, *, days: int = DAILY_SERIES_DAYS) -> sr.SourceResu
     elle est imposée explicitement. On ne demande jamais ``interval`` sans en
     avoir besoin : c'est une option restreinte sur le palier gratuit.
     """
+    # Garde de dernier recours : un appelant ne peut pas demander au-delà de ce
+    # que le palier gratuit sert. Dépasser ne « tronque » pas, ça REFUSE (401).
+    days = min(int(days), _PROVIDER_MAX_DAYS)
     interval = None if days > _AUTO_DAILY_ABOVE_DAYS else "daily"
     try:
         raw = coingecko.get_price_volume_series(symbol, days=days,
@@ -79,9 +122,12 @@ def daily_closes(symbol: str, *, days: int = DAILY_SERIES_DAYS) -> sr.SourceResu
               if isinstance(c, (int, float)) and c > 0]
     if not closes:
         return sr.empty(SOURCE_CLOSES)
+    # FRAÎCHEUR de la série : l'horodatage du dernier point. Les clôtures sont
+    # une source BLOQUANTE ; sans `as_of`, le système ne pouvait pas savoir
+    # s'il décidait sur une série périmée.
     return sr.ok(SOURCE_CLOSES,
                  {"closes": closes, "volumes": raw.get("volumes") or []},
-                 depth=len(closes))
+                 depth=len(closes), as_of=_utc_ms(raw.get("last_ts")))
 
 
 def daily_bars(symbol: str) -> sr.SourceResult:
@@ -99,13 +145,16 @@ def daily_bars(symbol: str) -> sr.SourceResult:
                               sr.Failure(exception_class="NoPayload",
                                          retryable=True))
     bars: list[DailyBar] = aggregate_to_daily(rows)
+    # `_utc(None)` valait INCONDITIONNELLEMENT None : du code qui avait l'air
+    # de dater la source sans jamais la dater. La dernière bougie porte
+    # pourtant son jour (`DailyBar.day`) — c'est lui, la fraîcheur.
+    as_of = _jour_utc(bars[-1].day) if bars else None
     if len(bars) < 20:
         return sr.degraded(
             SOURCE_OHLC, bars,
             f"seulement {len(bars)} bougies journalières agrégées",
-            depth=len(bars), fallback_rank=1)
-    return sr.ok(SOURCE_OHLC, bars, depth=len(bars),
-                 as_of=_utc(None))
+            depth=len(bars), fallback_rank=1, as_of=as_of)
+    return sr.ok(SOURCE_OHLC, bars, depth=len(bars), as_of=as_of)
 
 
 def spot_prices(symbols: list[str]) -> sr.SourceResult:

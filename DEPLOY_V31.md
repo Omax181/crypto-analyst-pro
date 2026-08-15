@@ -79,11 +79,11 @@ plus. Tout ce qui est **hors** de ces arbres est signalé mais jamais supprimé.
 | 2 | mise à jour fast-forward du checkout | oui si divergence |
 | 3 | branche de secours `backup-pre-v31-…` depuis `origin/<branche>` | non |
 | 4 | sauvegarde de `state/` et `config/portfolio.yaml` | oui |
-| 5 | extraction (chemins relatifs, 111 entrées, `state/` intouché) | oui |
+| 5 | extraction (chemins relatifs, 113 entrées, `state/` intouché) | oui |
 | 6 | purge des anciens chemins | oui |
 | 7 | restauration de l'état vivant | oui |
 | 8 | dépendances + relecture de `portfolio.yaml` et du carnet par V31 | oui |
-| 9 | `pytest tests -q` — **263 tests minimum** | oui |
+| 9 | `pytest tests -q` — **304 tests minimum** | oui |
 | 10 | invariants V31 (ci-dessous) | oui |
 | 11 | migration `historical_treatment: purge` | oui |
 | 12 | pyflakes, compileall, liste des secrets | non pour pyflakes |
@@ -92,7 +92,7 @@ Le contrôle md5 mérite un mot : il refuse tout ZIP qui ne serait pas le
 livrable audité. Sans lui, le script déploierait « un fichier nommé v31 »,
 pas la V31.
 
-Le seuil de 263 tests n'est pas décoratif. Une suite amputée passe au vert
+Le seuil de 304 tests n'est pas décoratif. Une suite amputée passe au vert
 sans rien prouver — c'est exactement ainsi qu'une régression traverse un
 déploiement.
 
@@ -191,5 +191,5 @@ git reset --hard backup-pre-v31-AAAAMMJJ-HHMMSS
 | Fichier | md5 | Rôle |
 |---|---|---|
 | `deploy_v31.sh` | — | le déploiement en douze étapes |
-| `cap-v31-COMPLETE.zip` | `7661fe2ce0d848a7343ecd98d3c7cf5d` | le livrable audité, 111 entrées |
+| `cap-v31-COMPLETE.zip` | `d401ddccd6f451af19e764e63cd1e24d` | le livrable audité, 113 entrées |
 | `DEPLOY_V31.md` | — | cette notice |

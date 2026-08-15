@@ -48,6 +48,10 @@ class RunContext:
     intraday_warnings: list[dict[str, Any]] = field(default_factory=list)
     rejections: list[content.Rejection] = field(default_factory=list)
     health: list[registry.SourceHealth] = field(default_factory=list)
+    # Actifs écartés sur erreur de traitement : {actif: classe d'exception}.
+    # Ils ne bloquent plus le run, mais ils ne disparaissent pas en silence —
+    # `finalize` les énumère dans le bandeau.
+    failed_assets: dict[str, str] = field(default_factory=dict)
 
     @property
     def writable(self) -> bool:
@@ -114,18 +118,34 @@ def evaluate_candidates(ctx: RunContext, specs: list[dict[str, Any]]) -> None:
             # n'engage aucun capital nouveau (SPEC §1.4, §4.3).
             already = ctx.book.committed_notional(
                 s["asset"], s.get("direction", Direction.LONG_INCREASE))
-            cand = plan_mod.build(
-                asset=s["asset"], direction=s.get("direction",
-                                                  Direction.LONG_INCREASE),
-                is_core=bool(s.get("is_core")), tier=s.get("tier"),
-                signal_scoring=s.get("signal_scoring") or {},
-                price=s.get("price"), closes=s.get("closes"),
-                daily_bars=s.get("daily_bars"),
-                ptf_value_usd=s.get("ptf_value_usd"),
-                current_weight_pct=s.get("weight_pct"),
-                position_value_usd=s.get("position_value_usd"),
-                daily_volume_usd=s.get("daily_volume_usd"),
-                budget_consumed_usd=max(0.0, budget_consumed - already))
+            # ISOLATION PAR ACTIF — un actif ne peut pas emporter les autres.
+            #
+            # Jusqu'ici cette boucle n'avait aucun garde : une donnée aberrante
+            # sur UN SEUL des 29 actifs (prix NaN ou infini, série corrompue)
+            # levait, `_run` avortait, et AUCUN des trois mails ne partait —
+            # 28 actifs sains perdus avec lui. Mesuré le 15/08/2026 : 0/29
+            # candidats évalués. La collecte, elle, isole chaque source depuis
+            # toujours (`collect._guarded`) ; le chemin de décision, non.
+            #
+            # L'actif écarté n'est jamais SILENCIEUX : il est journalisé et
+            # énuméré dans le bandeau de dégradation.
+            try:
+                cand = plan_mod.build(
+                    asset=s["asset"], direction=s.get("direction",
+                                                      Direction.LONG_INCREASE),
+                    is_core=bool(s.get("is_core")), tier=s.get("tier"),
+                    signal_scoring=s.get("signal_scoring") or {},
+                    price=s.get("price"), closes=s.get("closes"),
+                    daily_bars=s.get("daily_bars"),
+                    ptf_value_usd=s.get("ptf_value_usd"),
+                    current_weight_pct=s.get("weight_pct"),
+                    position_value_usd=s.get("position_value_usd"),
+                    daily_volume_usd=s.get("daily_volume_usd"),
+                    budget_consumed_usd=max(0.0, budget_consumed - already))
+            except Exception as exc:                        # noqa: BLE001
+                logger.exception("Actif %s écarté : %s", s.get("asset"), exc)
+                ctx.failed_assets[str(s.get("asset"))] = type(exc).__name__
+                continue
             out.append(cand)
             if cand.emittable:
                 # Le budget se consomme au fil des émissions du run. Une
@@ -340,7 +360,8 @@ def finalize(ctx: RunContext) -> dict[str, Any]:
             health_matrix=ctx.health, non_evaluable=non_eval,
             missing_params=params.missing_emission_params(),
             rejections=len(ctx.rejections),
-            sigma_degraded=sigma_degraded):
+            sigma_degraded=sigma_degraded,
+            failed_assets=ctx.failed_assets):
         ctx.summary.add_degradation(d)
 
     reasons: dict[str, int] = {}

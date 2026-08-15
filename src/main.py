@@ -66,6 +66,12 @@ def _signals(positions: list[Any], closes: dict[str, Any],
 
     out: dict[str, dict[str, Any]] = {}
     for p in positions:
+      # ISOLATION PAR ACTIF (audit du 15/08/2026). Le risque est réel et non
+      # théorique : `pru_gap` divise par `p.pru`, valeur que le bot Telegram
+      # et l'édition manuelle de portfolio.yaml peuvent rendre non numérique.
+      # Un actif sans signaux reste évalué — il recevra un refus CHIFFRÉ —
+      # au lieu d'emporter le rapport entier.
+      try:
         res = closes.get(p.cg_key)
         series = list((res.value or {}).get("closes") or []) \
             if res is not None and res.usable else []
@@ -89,6 +95,9 @@ def _signals(positions: list[Any], closes: dict[str, Any],
             mvrv=chain.get("mvrv"),
             active_addresses_trend_pct=chain.get("active_addresses_trend_pct"),
             fear_greed=fear_greed)
+      except Exception as exc:                              # noqa: BLE001
+        logger.exception("Signaux indisponibles pour %s : %s", p.symbol, exc)
+        out[p.symbol] = {}
     return out
 
 
@@ -151,7 +160,8 @@ def _run(kind: str) -> int:
             sig = _signals(positions, closes, spot, sources)
             specs = context_mod.candidate_specs(
                 positions, ptf_value=ptf_value, closes=closes, bars=bars,
-                spot=spot, signals_by_asset=sig)
+                spot=spot, signals_by_asset=sig,
+                failures=ctx.failed_assets)
             runs.evaluate_candidates(ctx, specs)
             runs.emit_viable(ctx)
             top = runs.top_action(ctx)
@@ -172,9 +182,15 @@ def _run(kind: str) -> int:
         # ── 10-11 — rédaction puis validation par REJET ───────────────────
         authored: dict[str, Any] = {}
         session = LLMSession(ctx.summary)
+        # `crypto_rss.get_news` renvoie {available, news:[…], sources_ok, …},
+        # PAS une liste. La v31.0 passait le dictionnaire entier à
+        # `news_view`, qui le tranchait : « unhashable type: slice », et
+        # AUCUN mail n'est parti au premier run réel. C'est la seule source du
+        # projet dont la charge était lue à la mauvaise racine — les autres
+        # (fred, onchain, etf_flows, spot, closes) l'étaient correctement.
         news_res = sources.get("news")
-        news_items = (news_res.value or []) if news_res is not None \
-            and news_res.usable else []
+        news_items = ((news_res.value or {}).get("news") or []) \
+            if news_res is not None and news_res.usable else []
         try:
             authored = session.compose(
                 kind, fact_context=ctx.store.llm_context(),

@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 import requests
 from tenacity import (
     retry,
-    retry_if_exception_type,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
 )
@@ -87,8 +87,24 @@ class TransientHTTPError(Exception):
     """Erreur HTTP considérée comme temporaire (à retenter)."""
 
 
+def _est_retentable(exc: BaseException) -> bool:
+    """Ne rejouer QUE ce qui peut changer d'avis.
+
+    ``requests.HTTPError`` descend de ``RequestException`` : l'ancien prédicat,
+    qui acceptait toute ``RequestException``, rejouait donc les 4xx définitifs
+    et annulait la distinction que ``TransientHTTPError`` existe pour porter.
+    Mesuré au premier run réel : 29 actifs × 3 tentatives sur un 401 permanent
+    = 310 s de collecte pour zéro donnée.
+    """
+    if isinstance(exc, TransientHTTPError):       # 429 / 5xx, levé plus bas
+        return True
+    if isinstance(exc, requests.HTTPError):       # 401, 403, 404… : définitif
+        return False
+    return isinstance(exc, requests.RequestException)   # réseau, timeout, DNS
+
+
 @retry(
-    retry=retry_if_exception_type((requests.RequestException, TransientHTTPError)),
+    retry=retry_if_exception(_est_retentable),
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
     reraise=True,

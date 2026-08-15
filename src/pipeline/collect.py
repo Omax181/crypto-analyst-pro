@@ -131,9 +131,22 @@ def fear_greed() -> sr.SourceResult:
                  empty_when=lambda p: p.get("value") is None)
 
 
+def _plus_recente(dates: Any) -> Optional[str]:
+    """Date la plus récente d'un ensemble, en ISO. None si aucune n'est lisible."""
+    valides = [d for d in dates if isinstance(d, str) and d]
+    return max(valides) if valides else None          # ISO -> ordre lexical
+
+
 def fred_macro() -> sr.SourceResult:
+    """FRED publie une date PAR SÉRIE ; la fraîcheur de l'ensemble est la plus
+    récente. La v31.0 n'extrayait rien : la source était donc déclarée périmée
+    à chaque run alors que la date était là (audit du 15/08/2026)."""
     from src.data_sources import fred as mod
     return _wrap("fred", mod.get_macro,
+                 extract_as_of=lambda p: _plus_recente(
+                     (s or {}).get("date")
+                     for s in ((p or {}).get("series") or {}).values()
+                     if isinstance(s, dict)),
                  empty_when=lambda p: not isinstance(p, dict) or not p)
 
 
@@ -158,8 +171,14 @@ def etf_flows() -> sr.SourceResult:
     """Flux ETF. Les deux replis partagent le même parseur (constat d'audit) :
     leur défaillance est CORRÉLÉE, ce que la matrice de santé rend visible."""
     from src.data_sources import etf_flows as mod
+    # La date est NICHÉE sous `btc`/`eth`, jamais à la racine : l'extracteur
+    # v31.0 (`p.get("date")`) renvoyait toujours None et la source passait
+    # pour périmée à chaque run (audit du 15/08/2026).
     return _wrap("etf_flows", mod.get_etf_flows,
-                 extract_as_of=lambda p: p.get("as_of") or p.get("date"),
+                 extract_as_of=lambda p: _plus_recente(
+                     [(p or {}).get("as_of")]
+                     + [((p or {}).get(c) or {}).get("date")
+                        for c in ("btc", "eth")]),
                  empty_when=lambda p: not p.get("available"))
 
 
@@ -214,8 +233,7 @@ def equities() -> sr.SourceResult:
 # ── orchestration ─────────────────────────────────────────────────────────
 
 CONTEXT_SOURCES: tuple[str, ...] = (
-    "fear_greed", "fred", "onchain", "etf_flows", "polymarket", "news",
-    "macro_calendar", "equities",
+    "fear_greed", "fred", "onchain", "etf_flows", "news",
 )
 
 
@@ -225,19 +243,26 @@ def context(symbols: list[str], *, full: bool) -> dict[str, sr.SourceResult]:
     Le périmètre partiel n'est pas un mode dégradé : le soir et l'hebdo n'ont
     structurellement pas besoin des entrées qui n'alimentent qu'un plan.
     """
+    # On ne collecte QUE ce qui atteint le rapport. Audit du 15/08/2026 :
+    # `polymarket`, `macro_calendar`, `derivatives` et `equities` étaient
+    # collectées à chaque matin sans produire UN SEUL fait ni UN SEUL octet de
+    # contenu — absentes des quatre gabarits, des 19 clés du payload et de
+    # tout ce qui atteint le LLM. Vestiges des rubriques v30 que V31 a
+    # supprimées. Elles coûtaient des appels réseau, une surface de panne, et
+    # surtout elles pouvaient DÉGRADER LE BANDEAU d'un rapport sur lequel
+    # elles n'avaient aucune influence — soit une information fausse.
+    # Le principe est celui que le projet applique déjà à requirements.txt :
+    # une dépendance déclarée mais inutilisée est une surface sans
+    # contrepartie. Les modules restent en place ; seule la collecte s'arrête.
     out: dict[str, sr.SourceResult] = {
         "fear_greed": fear_greed(),
         "news": news(),
-        "equities": equities(),
     }
     if full:
         out.update({
             "fred": fred_macro(),
             "onchain": onchain(),
             "etf_flows": etf_flows(),
-            "polymarket": prediction_markets(),
-            "macro_calendar": macro_calendar(),
-            "derivatives": derivatives(symbols[:6]),
         })
     for sid, res in out.items():
         if _is_newly_dead(res):

@@ -185,13 +185,13 @@ CATALOG: dict[str, SourceSpec] = {
         SourceSpec("market.spot", "Prix spot", None, "fact"),
         SourceSpec("fear_greed", "Fear & Greed", 1.0),
         SourceSpec("fred", "FRED", 1.0),
-        SourceSpec("onchain", "On-chain", 1.0),
         SourceSpec("etf_flows", "Flux ETF", 1.0),
-        SourceSpec("polymarket", "Polymarket", None),
+        # RELEVÉS INSTANTANÉS, pas des publications périodiques : leur
+        # fraîcheur EST l'instant de lecture. Leur imposer une cadence les
+        # déclarait « périmées » en permanence (audit du 15/08/2026), faute
+        # d'`as_of` à comparer — une erreur de catégorie, pas une dégradation.
+        SourceSpec("onchain", "On-chain", None),
         SourceSpec("news", "Actualités", None),
-        SourceSpec("macro_calendar", "Calendrier macro", 7.0),
-        SourceSpec("derivatives", "Dérivés", 0.34),
-        SourceSpec("equities", "Actions", 1.0),
     )
 }
 

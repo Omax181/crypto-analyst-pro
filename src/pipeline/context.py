@@ -227,6 +227,7 @@ def candidate_specs(
     positions: list[Position], *, ptf_value: float,
     closes: dict[str, sr.SourceResult], bars: dict[str, sr.SourceResult],
     spot: sr.SourceResult, signals_by_asset: dict[str, dict[str, Any]],
+    failures: Optional[dict[str, str]] = None,
 ) -> list[dict[str, Any]]:
     """Construit les entrées de ``runs.evaluate_candidates``.
 
@@ -238,12 +239,22 @@ def candidate_specs(
     quotes = (spot.value or {}) if spot.usable else {}
     specs: list[dict[str, Any]] = []
     for p in positions:
-        cl = closes.get(p.cg_key)
-        series = list((cl.value or {}).get("closes") or []) if cl and cl.usable \
-            else []
-        br = bars.get(p.cg_key)
-        daily: Optional[list[DailyBar]] = br.value if br and br.usable else None
-        q = quotes.get(p.cg_key) or {}
+        # ISOLATION PAR ACTIF (audit du 15/08/2026) : une position au format
+        # aberrant — portfolio.yaml édité à la main ou par le bot — ne doit
+        # pas priver les 28 autres actifs de leur rapport.
+        try:
+            cl = closes.get(p.cg_key)
+            series = list((cl.value or {}).get("closes") or []) \
+                if cl and cl.usable else []
+            br = bars.get(p.cg_key)
+            daily: Optional[list[DailyBar]] = \
+                br.value if br and br.usable else None
+            q = quotes.get(p.cg_key) or {}
+        except Exception as exc:                            # noqa: BLE001
+            logger.exception("Position %s illisible : %s", p.symbol, exc)
+            if failures is not None:
+                failures[str(p.symbol)] = type(exc).__name__
+            continue
         specs.append({
             "asset": p.symbol,
             "direction": Direction.LONG_INCREASE,

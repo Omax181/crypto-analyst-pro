@@ -28,6 +28,13 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# RESTE « v31 », délibérément. La révision du 15/08/2026 (câblage des
+# actualités, plafond CoinGecko à 365 jours, chien de garde muet, rejeu des
+# 4xx) aurait mérité « v31.1 » — mais cette chaîne finit dans le HTML rendu,
+# où I60 interdit le décimal à l'anglaise, et le contrôle de locale ne peut
+# pas distinguer une version d'un nombre. On n'affaiblit pas un invariant pour
+# un confort d'affichage : la révision exacte est identifiée par l'empreinte
+# du livrable et par le commit, qui sont des ancres plus sûres qu'une chaîne.
 APP_VERSION = "v31"
 
 DISCLAIMER = ("Analyse personnelle automatisée. Aucune de ces lignes n'est un "
@@ -269,7 +276,23 @@ def metrics_view(metrics: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def news_view(items: Any) -> list[dict[str, Any]]:
-    """Actualités : EXTERNAL. Titre et source cités, jamais promus en fait."""
+    """Actualités : EXTERNAL. Titre et source cités, jamais promus en fait.
+
+    Une vue ne doit JAMAIS tuer le run. Au premier run réel de la v31.0, cette
+    fonction a reçu le dictionnaire complet de ``get_news`` au lieu de sa clé
+    ``news`` ; le découpage a levé « unhashable type: slice » et les trois
+    mails sont morts pour une liste d'actualités décorative. Le câblage est
+    corrigé en amont ; ici on refuse de faire tomber un rapport pour ça — et
+    on le DIT dans les logs plutôt que d'absorber la faute en silence.
+    """
+    if isinstance(items, dict):
+        logger.warning("news_view a reçu un dictionnaire : la charge de "
+                       "get_news doit être lue à la clé « news ».")
+        items = items.get("news")
+    if items is not None and not isinstance(items, (list, tuple)):
+        logger.warning("news_view : forme inattendue (%s), actualités "
+                       "ignorées.", type(items).__name__)
+        return []
     out = []
     for it in (items or [])[:10]:
         if not isinstance(it, dict):

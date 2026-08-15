@@ -183,8 +183,15 @@ def test_missing_latency_makes_freshness_unknown():
 
 
 def test_ok_source_with_missed_publication_becomes_degraded(no_params):
-    spec = registry.CATALOG["onchain"]
-    res = sr.ok("onchain", {"mvrv": 1.2},
+    """L'invariant porte sur `assess`, pas sur une source en particulier.
+
+    Le véhicule était `onchain` ; il ne peut plus l'être depuis que l'audit du
+    15/08/2026 l'a reclassé en flux CONTINU (hashrate et gas sont des relevés
+    instantanés, pas des publications périodiques). On le remplace par `fred`,
+    qui publie bien à cadence — l'invariant, lui, est inchangé.
+    """
+    spec = registry.CATALOG["fred"]
+    res = sr.ok("fred", {"available": True, "series": {}},
                 as_of=datetime.now(UTC) - timedelta(days=4))
     h = registry.assess(spec, res)
     assert h.status is sr.SourceStatus.DEGRADED

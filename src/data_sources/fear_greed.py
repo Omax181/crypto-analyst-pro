@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from src.data_sources.http import get_json
@@ -53,6 +54,18 @@ def get_fear_greed() -> dict[str, Any]:
         "delta": value - yesterday,
         "history": history,
     }
+    # FRAÎCHEUR — l'API publie un `timestamp` epoch que la v31.0 jetait. Le
+    # collecteur le cherchait pourtant (`p.get("timestamp")`) : l'extracteur
+    # visait une clé que le producteur n'écrivait jamais, et la source était
+    # donc déclarée périmée à CHAQUE run (audit du 15/08/2026). On le publie
+    # en ISO 8601 UTC, forme que `collect._as_of` sait lire.
+    horodatage = today.get("timestamp")
+    if horodatage is not None:
+        try:
+            out["timestamp"] = datetime.fromtimestamp(
+                int(horodatage), tz=timezone.utc).isoformat()
+        except (TypeError, ValueError):
+            pass
     if value_7d is not None:
         out["value_7d_ago"] = value_7d
         out["delta_7d"] = value - value_7d

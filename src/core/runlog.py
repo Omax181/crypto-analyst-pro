@@ -145,7 +145,8 @@ def degradation_banner(summary: RunSummary) -> Optional[str]:
 
 def build_degradations(*, health_matrix: list[Any], non_evaluable: int,
                        missing_params: list[str], rejections: int,
-                       sigma_degraded: Any = None) -> list[str]:
+                       sigma_degraded: Any = None,
+                       failed_assets: Any = None) -> list[str]:
     """Construit l'énumération à partir des faits OBSERVÉS du run.
 
     ``sigma_degraded`` est une table ``{actif: motif}``. Le motif est REPRIS
@@ -157,6 +158,14 @@ def build_degradations(*, health_matrix: list[Any], non_evaluable: int,
     for h in health_matrix:
         if getattr(h, "degraded", False):
             out.append(h.describe())
+    # Un actif écarté sur erreur de traitement DOIT être dit : il ne figure ni
+    # dans les candidats ni dans les rejets, et sans cette ligne il
+    # disparaîtrait du rapport sans laisser de trace lisible.
+    if failed_assets:
+        noms = sorted(failed_assets) if isinstance(failed_assets, dict) \
+            else sorted(failed_assets)
+        out.append(f"{len(noms)} actif(s) écarté(s) sur erreur de "
+                   f"traitement : {', '.join(noms)}")
     if non_evaluable:
         out.append(f"{non_evaluable} recommandation(s) non évaluable(s)")
     if missing_params:

@@ -35,7 +35,12 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
       - name: Install dependencies
-        run: pip install pyyaml requests
+        # `tenacity` n'est pas décoratif : le chemin d'alerte Telegram passe
+        # par data_sources.http, qui l'importe. Sans lui, le chien de garde
+        # DÉTECTE le silence et ne peut pas le dire — mesuré au run #1 du
+        # 15/08/2026 : « Alerte non transmise : No module named 'tenacity' ».
+        # Un chien de garde muet est un chien de garde absent.
+        run: pip install pyyaml requests tenacity
       - name: Check for silence
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

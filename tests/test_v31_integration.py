@@ -113,9 +113,17 @@ def wired(isolated, monkeypatch):
             "fear_greed": sr.ok("fear_greed",
                                 {"value": 18, "classification": "Extreme Fear"},
                                 as_of=datetime.now(UTC)),
-            "news": sr.ok("news", [{"title": "ETF spot : collecte nette",
-                                    "source": "CoinDesk",
-                                    "published_label": "il y a 2 h"}]),
+            # FORME RÉELLE de crypto_rss.get_news : un dict, pas une liste.
+            # Cette fixture servait une LISTE — la même erreur que le
+            # consommateur. Producteur et consommateur étaient d'accord entre
+            # eux et faux tous les deux : le défaut a traversé 263 tests verts
+            # et n'est tombé qu'au premier run réel.
+            "news": sr.ok("news", {
+                "available": True,
+                "news": [{"title": "ETF spot : collecte nette",
+                          "source": "CoinDesk",
+                          "published_label": "il y a 2 h"}],
+                "sources_ok": ["CoinDesk"], "sources_down": [], "count": 1}),
             "equities": sr.empty("equities"),
         }
         return sources, spot, closes, bars

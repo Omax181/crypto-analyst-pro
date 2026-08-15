@@ -240,11 +240,18 @@ def get_price_volume_series(
     raw = CACHE.get_or_compute(cache_key, 1800, _fetch)
     if not isinstance(raw, dict):
         return None
-    prices = [p[1] for p in raw.get("prices", []) if len(p) >= 2]
+    paires = [p for p in raw.get("prices", []) if len(p) >= 2]
+    prices = [p[1] for p in paires]
     volumes = [v[1] for v in raw.get("total_volumes", []) if len(v) >= 2]
     if not prices:
         return None
-    return {"closes": prices, "volumes": volumes, "prices": prices}
+    # `last_ts` (epoch ms du dernier point) : la SEULE information de fraîcheur
+    # de la série. Sans elle, `market.daily_closes` ne pouvait produire aucun
+    # `as_of`, et les clôtures — source BLOQUANTE, la seule qui alimente un
+    # gate de viabilité — passaient pour périmées à chaque run tout en étant
+    # utilisées pour décider (audit du 15/08/2026).
+    return {"closes": prices, "volumes": volumes, "prices": prices,
+            "last_ts": paires[-1][0]}
 
 
 def get_dated_closes(symbol: str, days: int = 35) -> dict[str, float]:
