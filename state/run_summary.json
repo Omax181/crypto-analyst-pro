@@ -1,18 +1,27 @@
 {
-  "run_id": "evening-20260817T190109Z",
-  "kind": "evening",
-  "started_at": "2026-08-17T19:01:09.892803+00:00",
-  "ended_at": "2026-08-17T19:02:48.613433+00:00",
+  "run_id": "morning-20260818T073100Z",
+  "kind": "morning",
+  "started_at": "2026-08-18T07:31:00.223161+00:00",
+  "ended_at": "2026-08-18T07:34:01.810076+00:00",
   "status": "success",
   "phase_durations": {
-    "collect": 73.51,
+    "collect": 155.25,
     "transitions": 0.0,
-    "facts": 0.01,
-    "llm": 22.52,
+    "viability": 0.02,
+    "emission": 0.0,
+    "facts": 0.0,
+    "llm": 23.42,
     "render": 0.04,
-    "send": 1.71
+    "send": 1.85
   },
   "source_matrix": [
+    {
+      "source": "etf_flows",
+      "status": "EMPTY",
+      "tier": "primary",
+      "missed": null,
+      "note": null
+    },
     {
       "source": "fear_greed",
       "status": "OK",
@@ -21,7 +30,21 @@
       "note": null
     },
     {
+      "source": "fred",
+      "status": "OK",
+      "tier": "primary",
+      "missed": 0,
+      "note": null
+    },
+    {
       "source": "market.closes",
+      "status": "OK",
+      "tier": "primary",
+      "missed": 0,
+      "note": null
+    },
+    {
+      "source": "market.ohlc",
       "status": "OK",
       "tier": "primary",
       "missed": 0,
@@ -40,24 +63,34 @@
       "tier": "primary",
       "missed": 0,
       "note": null
+    },
+    {
+      "source": "onchain",
+      "status": "OK",
+      "tier": "primary",
+      "missed": 0,
+      "note": null
     }
   ],
   "models_used": [
     {
-      "pass": "evening",
+      "pass": "morning",
       "model": "gemini-2.5-flash"
     }
   ],
   "counters": {
-    "candidates": 0,
+    "candidates": 29,
     "emitted": 0,
-    "non_viable": 0,
+    "non_viable": 26,
     "non_evaluable": 0,
     "authored_rejections": 0,
     "transitions": 0
   },
   "degradations": [
-    "modèle : aucun modèle de repli configuré"
+    "Flux ETF sans donnée",
+    "volatilité estimée sur 31 bougies pour une fenêtre de 180 — horizon extrapolé — ACH, ADA, ANKR, AR, ARB, ATOM, BTC, CFX, CKB, ETH, FET, GRT, HBAR, IMX, INJ, JASMY, LINK, NOT, QNT, RNDR, RSR, STX, TAO, XRP, ZK",
+    "modèle : aucun modèle de repli configuré",
+    "6 champs éditoriaux écartés"
   ],
   "disabled_features": []
 }
