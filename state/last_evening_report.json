@@ -1,177 +1,139 @@
 {
   "header": {
-    "date": "mardi 18 août 2026 · 20:03 Casablanca",
-    "time_casablanca": "mardi 18 août 2026 · 20:03 Casablanca",
-    "hours_since_morning": 131,
+    "date": "mercredi 19 août 2026 · 20:04 Casablanca",
+    "time_casablanca": "mercredi 19 août 2026 · 20:04 Casablanca",
+    "hours_since_morning": 11,
     "morning_time_label": "08h37",
-    "since_morning_label": "il y a 131h",
+    "since_morning_label": "il y a 11h",
     "win_rate_30d": null,
     "win_rate_total": "0/0",
     "win_rate_calibration": "0/5",
     "evening_time_label": "20h02",
-    "timing_line": "rapport lancé à 20h02",
+    "timing_line": "matin 08h37 · soir 20h02 · Δ11h",
     "is_evening_slot": true,
     "closing_greeting": "Bonne soirée.",
     "levels_window_label": "Niveaux à surveiller cette nuit",
     "checklist_title": "Demain matin · check list",
     "us_market_open": true,
     "us_session_label": "fin de séance (en cours)",
-    "ptf_value_delta_since_morning": 0.0,
-    "ptf_value_pct_since_morning": 0.0
+    "ptf_value_delta_since_morning": 160.13,
+    "ptf_value_pct_since_morning": 5.99
   },
   "portfolio_snapshot": {
-    "value_usd": 2680.15,
-    "change_since_morning_pct": 0.0
+    "value_usd": 2833.8,
+    "change_since_morning_pct": 5.99
   },
   "market_changes": [
     {
       "status": "new",
       "tag": "Macro",
       "importance": 5,
-      "description": "Le S&P 500 a chuté de 46,91 points et le Nasdaq de 345,898 points depuis la clôture du matin, marquant un net virage vers le risk-off après le régime risk-on observé ce matin. Les actions liées à la crypto comme MARA (-7,87%), AMD (-5,08%) et MSTR (-4,67%) ont fortement corrigé.",
-      "source": "Yahoo Finance, 20h00"
+      "description": "Le régime macro penche vers le risk-on. Le DXY (indice dollar) a cassé sous 99 points pour s'établir à 98,842 (−0,6% depuis ce matin), tandis que le S&P 500 a gagné 24,64 points et le Nasdaq 51,51 points. Le VIX a reculé à 15,07 (−0,77), signalant une détente sur la peur du marché.",
+      "source": "Yahoo Finance"
     },
     {
       "status": "new",
-      "tag": "Sentiment",
-      "importance": 3,
-      "description": "Le Fear & Greed Index est passé de 29 (ce matin) à 41 (Peur), soit une hausse de 12 points. Cela indique une légère détente du sentiment des investisseurs malgré la correction des marchés actions.",
-      "source": "Alternative.me, 20h00"
+      "tag": "Catalyseur",
+      "importance": 4,
+      "description": "Les actions liées aux cryptos ont fortement rebondi : COIN a bondi de 9,14%, MSTR de 12,01% et MARA de 5,75%, agissant comme des proxys haussiers pour le Bitcoin.",
+      "source": "Yahoo Finance"
     },
     {
       "status": "new",
       "tag": "Info",
       "importance": 3,
-      "description": "Des rapports contradictoires de Stocktwits (16h07) signalent des sorties d'ETF Bitcoin de 6,4 milliards de dollars, tandis que d'autres (15h39) indiquent une accumulation de 2,9 milliards de dollars par les baleines sur 60 jours.",
-      "source": "Stocktwits"
+      "description": "Les flux ETF Bitcoin montrent une demande institutionnelle nette positive, avec IBIT attirant 143,6 millions $ malgré la liquidation de 14,7 millions $ par Hashdex.",
+      "source": "CryptoSlate 19h40"
     },
     {
-      "status": "new",
-      "tag": "Risque",
-      "importance": 4,
-      "description": "La SEC a proposé de nouvelles règles pour les contrats d'investissement en crypto-actifs, introduisant une incertitude réglementaire sur le marché.",
-      "source": "Investing.com, 18h54"
+      "status": "confirmed",
+      "tag": "Sentiment",
+      "importance": 2,
+      "description": "L'indice Fear & Greed a progressé de 5 points depuis ce matin, passant de 41 à 46, mais reste en zone de 'Peur'.",
+      "source": "Fear & Greed Index"
     }
   ],
   "news_today": [
     {
-      "title": "La SEC américaine propose de nouvelles règles pour les actifs crypto",
-      "source": "Investing.com",
-      "time": "18h54",
-      "impact": "Cette proposition de la SEC introduit une incertitude réglementaire, potentiellement négative pour l'appétit au risque sur les marchés crypto.",
-      "status": "à suivre"
+      "title": "Les minutes du FOMC révèlent un biais hawkish de la Fed sur l'inflation",
+      "source": "Investing.com / Financial Times / MarketWatch",
+      "time": "19h27-19h40",
+      "impact": "Les minutes de la Fed indiquent que de nombreux décideurs voient des hausses de taux probables si l'inflation ne diminue pas, mais le marché a absorbé cette nouvelle sans panique, le DXY baissant et les actions rebondissant.",
+      "status": "intégré"
     },
     {
-      "title": "Les minutes de la Fed arrivent, plus cruciales que jamais",
-      "source": "MarketWatch",
-      "time": "18h19",
-      "impact": "La publication des minutes du FOMC demain soir est un événement macroéconomique majeur qui pourrait influencer la politique monétaire future et la liquidité globale, impactant directement les actifs risqués.",
-      "status": "à suivre"
+      "title": "Protocole Maya interrompu suite à une faille de sécurité de 1,4 million $",
+      "source": "Decrypt",
+      "time": "19h20",
+      "impact": "Un exploit de six bugs a forcé l'arrêt du protocole Maya, entraînant le vol de 1,4 million $ en Bitcoin. Cela souligne les risques persistants dans l'écosystème DeFi, mais n'impacte pas directement ton portefeuille.",
+      "status": "intégré"
     }
   ],
   "levels_tonight": [
     {
       "asset": "BTC",
-      "level": "63 674 $",
+      "level": "67 912 $",
       "type": "support",
-      "trigger": "Sous 63 674 $ (pivot + MM50) → risque de test du support clé à 62 247 $."
+      "trigger": "Sous ce niveau, risque de retour vers 66 293 $ (MM100) et invalidation du rebond."
     },
     {
       "asset": "BTC",
-      "level": "66 293 $",
+      "level": "69 000 $",
       "type": "resistance",
-      "trigger": "Au-dessus de 66 293 $ (pivot + MM100) → potentiel de rebond vers 68 058 $ (Fibo 50%)."
+      "trigger": "Au-dessus, confirmation de la force haussière et cible 70 118 $."
     },
     {
       "asset": "ETH",
-      "level": "1 871 $",
+      "level": "2 064 $",
       "type": "support",
-      "trigger": "Sous 1 871 $ (pivot) → risque de glisser vers 1 841 $ (pivot + MM100)."
+      "trigger": "Sous ce niveau, risque de repli vers 1 994 $ (Bollinger + seuil rond)."
     },
     {
       "asset": "ETH",
-      "level": "1 952 $",
+      "level": "2 100 $",
       "type": "resistance",
-      "trigger": "Au-dessus de 1 952 $ (pivot) → objectif psychologique à 2 000 $."
+      "trigger": "Au-dessus, confirmation de la poursuite du rallye vers 2 132 $."
     },
     {
       "asset": "DXY",
-      "level": "100,01",
-      "type": "critical",
-      "trigger": "Au-dessus de 100,01 → invaliderait la stabilisation du marché crypto et pousserait BTC sous les 60 000 $."
+      "level": "98,50",
+      "type": "support",
+      "trigger": "Sous ce niveau, accélération de la faiblesse du dollar, favorable aux actifs risqués."
+    },
+    {
+      "asset": "DXY",
+      "level": "99,00",
+      "type": "resistance",
+      "trigger": "Un retour au-dessus de ce seuil invaliderait la détente macro et remettrait la pression sur le marché crypto."
+    },
+    {
+      "asset": "INJ",
+      "level": "4,49 $",
+      "type": "resistance",
+      "trigger": "Ce niveau correspond à l'ancienne invalidation. Un franchissement confirmerait un rebond plus solide."
     }
   ],
   "actions_tonight": [
     {
-      "action": "Alléger 30% de LINK à 9,50 $",
-      "rationale": "La cible court terme de 9,19 $ a été dépassée (prix actuel 9,52 $), générant un gain de 14,2% depuis l'entrée à 8,32 $. Le mouvement est fort et justifie une prise de profit partielle.",
-      "rebuy": "Viser un rachat entre 8,80 $ et 9,00 $ sur un repli, idéalement au test de l'ancienne résistance devenue support.",
-      "horizon": "Geste tactique de prise de profit, la conviction long terme sur LINK reste intacte."
+      "action": "Alléger 50% de INJ à 4,41 $",
+      "rationale": "La position a franchi son stop loss à 4,49 $ ce matin et la thèse est invalidée. Le rebond de +8,7% sur 24h permet de réduire l'exposition sur une position satellite invalidée, conformément à ta stratégie de prise de profit sur les pumps.",
+      "rebuy": null,
+      "horizon": "Réduction tactique sur invalidation d'une position satellite. · Couverture tactique CT — la thèse LT (RENFORCER) sur INJ reste active : geste borné, pas une sortie."
+    },
+    {
+      "action": "Alléger 10% de ETH à 2 090 $",
+      "rationale": "Le RSI daily à 75 indique une surchauffe et le prix bute sur la résistance psychologique des 2 100 $. C'est une prise de profit tactique sur la force, conformément à ta stratégie contrarienne.",
+      "rebuy": "Racheter vers 1 990-2 000 $ après un repli, au niveau du support Bollinger et du seuil rond.",
+      "horizon": "Geste tactique court terme, conviction long terme ETH inchangée."
     }
   ],
   "tomorrow_checklist": {
-    "calendar": [
-      {
-        "label": "CPI y/y (UK)",
-        "date": "2026-08-19",
-        "when": "demain",
-        "days_ahead": 1,
-        "source": "ForexFactory",
-        "importance": "high",
-        "weekday_label": "mercredi",
-        "date_label": "mercredi 19 août",
-        "time": "07:00"
-      },
-      {
-        "label": "ECB President Lagarde Speaks (Zone euro)",
-        "date": "2026-08-19",
-        "when": "demain",
-        "days_ahead": 1,
-        "source": "ForexFactory",
-        "importance": "medium",
-        "weekday_label": "mercredi",
-        "date_label": "mercredi 19 août",
-        "time": "08:10"
-      },
-      {
-        "label": "FOMC Meeting Minutes (US)",
-        "date": "2026-08-19",
-        "when": "demain",
-        "days_ahead": 1,
-        "source": "ForexFactory",
-        "importance": "high",
-        "weekday_label": "mercredi",
-        "date_label": "mercredi 19 août",
-        "time": "19:00"
-      },
-      {
-        "label": "Philly Fed Manufacturing Index (US)",
-        "date": "2026-08-20",
-        "when": "dans 2j",
-        "days_ahead": 2,
-        "source": "ForexFactory",
-        "importance": "medium",
-        "weekday_label": "jeudi",
-        "date_label": "jeudi 20 août",
-        "time": "13:30"
-      },
-      {
-        "label": "Unemployment Claims (US)",
-        "date": "2026-08-20",
-        "when": "dans 2j",
-        "days_ahead": 2,
-        "source": "ForexFactory",
-        "importance": "medium",
-        "weekday_label": "jeudi",
-        "date_label": "jeudi 20 août",
-        "time": "13:30"
-      }
-    ],
-    "checks": "Surveiller la réaction du marché aux minutes du FOMC à 19h00 Casablanca. Vérifier si le support BTC à 63 674 $ tient en cas de pression baissière. Observer la clôture des actions US (S&P 500, Nasdaq) et des proxys crypto (COIN, MSTR, MARA) pour confirmer le biais de risque.",
-    "scenario": "Le marché crypto pourrait consolider autour des niveaux actuels, avec une volatilité accrue à l'approche des minutes du FOMC, en l'absence de catalyseur haussier fort.",
-    "invalidation": "BTC clôture sous 62 247 $ ou DXY repasse au-dessus de 100,01 $, signalant une pression baissière accrue."
+    "calendar": "Jeudi 20 août : Philly Fed Manufacturing Index (US) à 13h30, Unemployment Claims (US) à 13h30. Vendredi 21 août : Flash Manufacturing & Services PMI (UK, Zone euro), Retail Sales m/m (UK).",
+    "checks": "Le DXY maintient-il sa cassure sous 99 points ? · Le BTC tient-il au-dessus de 67 912 $ après la clôture US ? · Les positions allégées (RSR, INJ) confirment-elles leur invalidation ou rebondissent-elles davantage ?",
+    "scenario": "Le marché crypto pourrait consolider après le rallye post-FOMC, avec une pression haussière latente si le DXY continue de baisser et que les données macro de demain ne surprennent pas négativement.",
+    "invalidation": "Un retour du DXY au-dessus de 99 $ ou une cassure du BTC sous 66 293 $ (MM100) invaliderait le rebond actuel et signalerait un retour au régime risk-off."
   },
-  "blind_spots": "Les flux ETF Bitcoin et Ethereum restent indisponibles, limitant notre visibilité sur l'activité institutionnelle.",
+  "blind_spots": "Absence de données sur les flux ETF Bitcoin et Ethereum ce soir, limitant la visibilité sur la demande institutionnelle spot.",
   "footer": {
     "next_morning_time": "08h30",
     "next_report_at": "demain 08h30"
@@ -182,142 +144,114 @@
     "reason": "Espérance mathématique disponible dès 5 recos clôturées avec niveaux (actuellement 0)."
   },
   "daily_pnl": {
-    "value_usd": 2680.15,
-    "day_change_usd": 0.0,
-    "day_change_pct": 0.0,
-    "day_change_label": "neutre",
+    "value_usd": 2833.8,
+    "day_change_usd": 160.13,
+    "day_change_pct": 5.99,
+    "day_change_label": null,
     "top_movers": [
       {
-        "symbol": "IMX",
-        "change": -6.9,
-        "pnl_usd": -0.8,
-        "value_usd": 11.66
+        "symbol": "ETH",
+        "change": 9.3,
+        "pnl_usd": 58.41,
+        "value_usd": 628.03
       },
       {
-        "symbol": "JASMY",
-        "change": -5.8,
-        "pnl_usd": -2.87,
-        "value_usd": 49.56
+        "symbol": "INJ",
+        "change": 8.7,
+        "pnl_usd": 3.86,
+        "value_usd": 44.41
       },
       {
-        "symbol": "CFX",
-        "change": -2.4,
-        "pnl_usd": -0.67,
-        "value_usd": 27.88
+        "symbol": "RSR",
+        "change": 6.9,
+        "pnl_usd": 3.61,
+        "value_usd": 52.3
       },
       {
-        "symbol": "TAO",
-        "change": -2.0,
-        "pnl_usd": -6.13,
-        "value_usd": 306.61
+        "symbol": "XRP",
+        "change": 6.9,
+        "pnl_usd": 2.61,
+        "value_usd": 37.79
       },
       {
-        "symbol": "QNT",
-        "change": -1.9,
-        "pnl_usd": -0.7,
-        "value_usd": 36.63
+        "symbol": "BTC",
+        "change": 5.7,
+        "pnl_usd": 70.61,
+        "value_usd": 1238.81
       }
     ]
   },
   "reco_bilan": [
     {
-      "asset": "LINK",
-      "action": "RENFORCER",
-      "confidence": 69.0,
-      "entry": 8.75,
-      "target": 9.189567,
-      "current": 9.52,
-      "delta_pct": 8.8,
-      "status": "on_track",
-      "reason": "au-dessus de l'entrée · invalidation 8,53 $"
-    },
-    {
-      "asset": "TAO",
-      "action": "RENFORCER",
-      "confidence": 69.0,
-      "entry": 199.96,
-      "target": 215.358769,
-      "current": 191.63,
-      "delta_pct": -4.17,
-      "status": "under_pressure",
-      "reason": "repli sous l'entrée · invalidation 191,27 $"
-    },
-    {
       "asset": "RENDER",
       "action": "RENFORCER",
-      "confidence": 69.0,
+      "confidence": 67.0,
       "entry": 1.27,
-      "target": 1.474738,
-      "current": 1.27,
-      "delta_pct": 0.0,
-      "status": "stable",
-      "reason": "proche de l'entrée (bruit court terme) · invalidation 1,20 $"
-    },
-    {
-      "asset": "INJ",
-      "action": "RENFORCER",
-      "confidence": 69.0,
-      "entry": 4.63,
-      "target": 4.855899,
-      "current": 4.07,
-      "delta_pct": -12.1,
-      "status": "invalidated",
-      "reason": "stop 4,49 $ franchi"
+      "target": 1.407116,
+      "current": 1.32,
+      "delta_pct": 3.94,
+      "status": "on_track",
+      "reason": "au-dessus de l'entrée · invalidation 1,21 $"
     }
   ],
   "polymarket_facts": {
     "fed_bars": {
-      "cut_pct": 0.9,
-      "hold_pct": 70.6,
-      "hike_pct": 28.5,
+      "cut_pct": 1.4,
+      "hold_pct": 70.2,
+      "hike_pct": 28.4,
       "dominant": "maintien",
-      "dominant_pct": 70.6,
+      "dominant_pct": 70.2,
       "meeting_hint": "réunion septembre 2026"
     },
     "extra_markets": [
       {
-        "question": "Will Bitcoin dip to $45,000 by December 31, 2026?",
-        "probability_pct": 22,
-        "volume_usd": 4821477,
-        "end_date": "2027-01-01T05:00:00Z"
-      },
-      {
         "question": "Will Bitcoin reach $70,000 in August?",
-        "probability_pct": 12,
-        "volume_usd": 418710,
+        "probability_pct": 64,
+        "volume_usd": 759833,
         "end_date": "2026-09-01T04:00:00Z"
       },
       {
-        "question": "Bitcoin Up or Down on August 19?",
-        "probability_pct": 44,
-        "volume_usd": 147350,
-        "end_date": "2026-08-19T16:00:00Z",
-        "outcome": "Up"
+        "question": "Will Bitcoin dip to $62,500 in August?",
+        "probability_pct": 14,
+        "volume_usd": 713570,
+        "end_date": "2026-09-01T04:00:00Z"
       },
       {
-        "question": "Will the price of Bitcoin be above $66,000 on August 19?",
-        "probability_pct": 5,
-        "volume_usd": 95498,
-        "end_date": "2026-08-19T16:00:00Z"
+        "question": "Will Bitcoin reach $75,000 in August?",
+        "probability_pct": 13,
+        "volume_usd": 637439,
+        "end_date": "2026-09-01T04:00:00Z"
+      },
+      {
+        "question": "Will Bitcoin reach $72,500 in August?",
+        "probability_pct": 29,
+        "volume_usd": 569044,
+        "end_date": "2026-09-01T04:00:00Z"
       }
     ]
   },
-  "derivatives_flows_line": "Funding BTC +0,7%/an · L/S 1,38",
+  "since_morning_facts": {
+    "available": true,
+    "window_label": "depuis le matin (08h37)",
+    "line": "BTC 64 297 $ → 68 367 $ (+6,3%) · ETH 1 916 $ → 2 091 $ (+9,1%) · F&G 46 → 46 (stable) · DXY 99,49 → 98,84 (−0,6%) · Fed maintien 70,9% → 70,2% (−0,7 pts)"
+  },
+  "derivatives_flows_line": "Funding BTC +10,9%/an · L/S 1,15",
   "levels_readout": {
-    "BTC": "RSI 56 (neutre) · MACD haussier · Bollinger médiane · ATR 0,6% (≈388 $/j) · +1,5% vs MM50 · volume 7j −18% vs 30j",
-    "ETH": "RSI 57 (neutre) · MACD baissier · Bollinger médiane · ATR 0,6% (≈12,26 $/j) · +3,6% vs MM50 · volume 7j −27% vs 30j"
+    "BTC": "RSI 71 (surchauffe) · MACD haussier · Bollinger bande haute · ATR 0,9% (≈608 $/j) · +6,9% vs MM50 · volume 7j −11% vs 30j",
+    "ETH": "RSI 75 (surchauffe) · MACD haussier · Bollinger bande haute · ATR 1,1% (≈21,95 $/j) · +12,4% vs MM50 · volume 7j −10% vs 30j",
+    "INJ": "RSI 46 (neutre) · MACD baissier · Bollinger médiane · ATR 3,0% (≈0.1300 $/j) · −7,5% vs MM50 · volume 7j +6% vs 30j"
   },
   "risk_score": {
-    "score": 3.1,
+    "score": 3.6,
     "level": "maîtrisé",
     "level_color": "#3B6D11",
     "factors": [
-      "concentration L1 70%"
+      "concentration L1 71%"
     ],
     "components": [
       {
         "label": "Drawdown 7j",
-        "pts": 0.3,
+        "pts": 0.4,
         "max": 3.0
       },
       {
@@ -327,7 +261,7 @@
       },
       {
         "label": "Volatilité 24h",
-        "pts": 0.3,
+        "pts": 0.7,
         "max": 2.0
       },
       {
@@ -345,9 +279,9 @@
       },
       {
         "label": "Volatilité 24h",
-        "pts": 0.3,
+        "pts": 0.7,
         "max": 2.0,
-        "ratio_pct": 15
+        "ratio_pct": 35
       }
     ],
     "holdings_snapshot": [
@@ -383,74 +317,69 @@
     ]
   },
   "risk_score_readout": {
-    "driver": "Score tiré par Concentration (2.5/2.5) et Volatilité 24h (0.3/2.0).",
+    "driver": "Score tiré par Concentration (2.5/2.5) et Volatilité 24h (0.7/2.0).",
     "reco": "Diversifier hors du secteur dominant pour réduire la concentration.",
     "caveat": "Note indicative et déterministe (concentration, drawdown, volatilité, sentiment) : elle ne capte ni le risque spécifique projet ni les corrélations cachées ou chocs exogènes."
   },
-  "risk_unchanged_since_morning": {
-    "active": true,
-    "morning_score": 3.0,
-    "note": "Risque stable depuis ce matin (3.0/10 → 3.1/10) — composition du portefeuille non modifiée à ce jour (actions tactiques proposées plus bas)"
-  },
   "health_score": {
-    "score": 3.0,
+    "score": 2.8,
     "level": "à risque",
     "level_color": "#A32D2D",
     "axes": [
       {
         "label": "Diversification",
-        "score": 1.0,
+        "score": 0.9,
         "max": 10.0,
-        "detail": "top secteur 70% du PTF"
+        "detail": "top secteur 71% du PTF"
       },
       {
         "label": "Momentum vs BTC",
-        "score": 5.0,
+        "score": 4.4,
         "max": 10.0,
-        "detail": "+0,1 pts vs BTC 7j"
+        "detail": "-1,2 pts vs BTC 7j"
       },
       {
         "label": "Solidité (vs ATH)",
-        "score": 3.1,
+        "score": 3.2,
         "max": 10.0,
         "detail": "drawdown -65% vs ATH"
       }
     ],
-    "driver": "Portée par Momentum vs BTC (5.0/10), pénalisée par Diversification (1.0/10).",
-    "improve": "Alléger le secteur dominant sur rebond et étaler sur d'autres narratifs (axe Diversification à 1.0/10 ce jour). Tout renfort du jour doit respecter les plafonds de concentration — ne pas aggraver l'axe faible."
+    "driver": "Moins pénalisée par Momentum vs BTC (4.4/10), pénalisée par Diversification (0.9/10).",
+    "improve": "Alléger le secteur dominant sur rebond et étaler sur d'autres narratifs (axe Diversification à 0.9/10 ce jour). Tout renfort du jour doit respecter les plafonds de concentration — ne pas aggraver l'axe faible."
   },
   "health_unchanged_since_morning": {
     "active": true,
-    "note": "Santé stable depuis ce matin (3.1/10 → 3.0/10) — composition du portefeuille non modifiée à ce jour (actions tactiques proposées plus bas)"
+    "note": "Santé stable depuis ce matin (2.9/10 → 2.8/10) — composition du portefeuille non modifiée à ce jour (actions tactiques proposées plus bas)"
   },
   "evening_macro": {
-    "btc_price": 64736,
-    "btc_change_24h": 0.7,
-    "eth_price": 1915.25,
-    "eth_change_24h": 0.5,
-    "fear_greed": 41,
-    "fear_greed_label": "Peur",
-    "fear_greed_delta": 10,
-    "gold_usd": 4409.4,
-    "gold_delta": -64.30000000000018,
-    "sp500": 7698.15,
-    "sp500_delta": -46.910000000000764,
-    "nasdaq": 26299.012,
-    "nasdaq_delta": -345.89800000000105,
-    "vix": 15.66,
-    "vix_delta": 0.47000000000000064,
-    "brent_usd": 91.03,
-    "brent_delta": 0.1599999999999966,
-    "dxy": 99.665,
+    "btc_price": 68367,
+    "btc_change_24h": 5.7,
+    "eth_price": 2090.66,
+    "eth_change_24h": 9.3,
+    "fear_greed": 46,
+    "fear_greed_label": "Neutre",
+    "fear_greed_delta": 0,
+    "gold_usd": 4550.8,
+    "gold_delta": 130.19999999999982,
+    "sp500": 7716.4,
+    "sp500_delta": 24.639999999999418,
+    "nasdaq": 26341.215,
+    "nasdaq_delta": 51.50500000000102,
+    "vix": 15.07,
+    "vix_delta": -0.7699999999999996,
+    "brent_usd": 91.5,
+    "brent_delta": 0.480000000000004,
+    "dxy": 98.842,
     "dxy_broad": 118.9028,
-    "dxy_ice": 99.665,
-    "dxy_delta": 0.028000000000005798,
-    "nikkei": 67460.73,
-    "nikkei_delta": -1759.520000000004,
-    "stoxx50": 6468.17,
-    "stoxx50_delta": -62.279999999999745,
-    "eur_usd": 1.1578,
-    "usd_jpy": 159.594,
+    "dxy_ice": 98.842,
+    "dxy_delta": -0.8149999999999977,
+    "nikkei": 65326.42,
+    "nikkei_delta": -2134.3099999999977,
+    "stoxx50": 6444.46,
+    "stoxx50_delta": -23.710000000000036,
+    "eur_usd": 1.1678,
+    "usd_jpy": 158.326,
     "ecb_deposit_rate": 2.25,
     "boj_rate": 0.841
   },
@@ -474,43 +403,10 @@
   },
   "tomorrow_macro_events": [
     {
-      "label": "CPI y/y (UK)",
-      "date": "2026-08-19",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "mercredi",
-      "date_label": "mercredi 19 août",
-      "time": "07:00"
-    },
-    {
-      "label": "ECB President Lagarde Speaks (Zone euro)",
-      "date": "2026-08-19",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "medium",
-      "weekday_label": "mercredi",
-      "date_label": "mercredi 19 août",
-      "time": "08:10"
-    },
-    {
-      "label": "FOMC Meeting Minutes (US)",
-      "date": "2026-08-19",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "mercredi",
-      "date_label": "mercredi 19 août",
-      "time": "19:00"
-    },
-    {
       "label": "Philly Fed Manufacturing Index (US)",
       "date": "2026-08-20",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "jeudi",
@@ -520,40 +416,117 @@
     {
       "label": "Unemployment Claims (US)",
       "date": "2026-08-20",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "jeudi",
       "date_label": "jeudi 20 août",
       "time": "13:30"
+    },
+    {
+      "label": "Flash Manufacturing PMI (UK)",
+      "date": "2026-08-21",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 21 août",
+      "time": "09:30"
+    },
+    {
+      "label": "Flash Services PMI (UK)",
+      "date": "2026-08-21",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 21 août",
+      "time": "09:30"
+    },
+    {
+      "label": "French Flash Manufacturing PMI (Zone euro)",
+      "date": "2026-08-21",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 21 août",
+      "time": "08:15"
+    },
+    {
+      "label": "French Flash Services PMI (Zone euro)",
+      "date": "2026-08-21",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 21 août",
+      "time": "08:15"
+    },
+    {
+      "label": "German Flash Manufacturing PMI (Zone euro)",
+      "date": "2026-08-21",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 21 août",
+      "time": "08:30"
+    },
+    {
+      "label": "German Flash Services PMI (Zone euro)",
+      "date": "2026-08-21",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 21 août",
+      "time": "08:30"
+    },
+    {
+      "label": "Retail Sales m/m (UK)",
+      "date": "2026-08-21",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 21 août",
+      "time": "07:00"
     }
   ],
   "intraday_news": [
     {
-      "title": "US SEC proposes new rules for crypto assets",
+      "title": "Wall Street mostly higher as yields slide; Fed minutes hint at need for rate hikes",
       "source": "Investing.com",
-      "timestamp": "19h54"
+      "timestamp": "19h52"
     },
     {
-      "title": "SEC proposes new rules for crypto asset investment contracts",
+      "title": "U.S. steel stocks drop on Canada tariff reduction report",
+      "source": "Investing.com",
+      "timestamp": "19h44"
+    },
+    {
+      "title": "Dollar hits three-month low as Treasury buybacks sink yields, Fed flags inflation",
       "source": "Investing.com",
       "timestamp": "19h41"
     },
     {
-      "title": "The Fed minutes are coming —and they’re more crucial now as Warsh limits his communication",
-      "source": "MarketWatch",
-      "timestamp": "19h19"
+      "title": "Hashdex liquidates $14.7 million Bitcoin ETF as IBIT draws $143.6 million",
+      "source": "CryptoSlate",
+      "timestamp": "19h40"
     },
     {
-      "title": "Investors Slam SEC Plan to Remove Best-Price Rule",
-      "source": "Barron's",
-      "timestamp": "17h30"
-    },
-    {
-      "title": "Bitcoin falls below $60K as retail traders exit and ETFs see $6.4B outflows amid Fed hawkishness and tech rotation. - Pluang",
-      "source": "Stocktwits",
-      "timestamp": "17h07"
+      "title": "Many policymakers see rate hikes likely if inflation does not fall - Fed minutes",
+      "source": "Investing.com",
+      "timestamp": "19h40"
     }
   ],
   "market_regime": {
@@ -561,18 +534,16 @@
     "regime": "range",
     "label_fr": "RANGE",
     "reasons": [
-      "prix −6,4% vs MM200",
-      "MM50 −7,9% vs MM200",
-      "pente MM50 14j +0,6%"
+      "prix −1,0% vs MM200",
+      "MM50 −7,5% vs MM200",
+      "pente MM50 14j +0,9%"
     ],
-    "price_vs_ma200_pct": -6.4,
-    "ma50_vs_ma200_pct": -7.9,
-    "ma50_slope_14d_pct": 0.6,
+    "price_vs_ma200_pct": -1.0,
+    "ma50_vs_ma200_pct": -7.5,
+    "ma50_slope_14d_pct": 0.9,
     "since": "2026-08-18",
-    "changed": true,
-    "previous": "bear",
-    "previous_label_fr": "BAISSIER",
-    "days_in_regime": 0
+    "changed": false,
+    "days_in_regime": 1
   },
-  "_saved_at": "2026-08-18T19:03:39.137280+00:00"
+  "_saved_at": "2026-08-19T19:04:08.255940+00:00"
 }
