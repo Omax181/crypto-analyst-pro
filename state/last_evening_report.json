@@ -1,78 +1,106 @@
 {
   "header": {
-    "date": "dimanche 23 août 2026 · 20:02 Casablanca",
-    "time_casablanca": "dimanche 23 août 2026 · 20:02 Casablanca",
+    "date": "lundi 24 août 2026 · 20:06 Casablanca",
+    "time_casablanca": "lundi 24 août 2026 · 20:06 Casablanca",
     "hours_since_morning": 11,
-    "morning_time_label": "08h38",
+    "morning_time_label": "08h42",
     "since_morning_label": "il y a 11h",
     "win_rate_30d": 100,
     "win_rate_total": "3/3",
     "win_rate_calibration": "3/5",
-    "evening_time_label": "20h01",
-    "timing_line": "matin 08h38 · soir 20h01 · Δ11h",
+    "evening_time_label": "20h02",
+    "timing_line": "matin 08h42 · soir 20h02 · Δ11h",
     "is_evening_slot": true,
     "closing_greeting": "Bonne soirée.",
     "levels_window_label": "Niveaux à surveiller cette nuit",
     "checklist_title": "Demain matin · check list",
-    "us_market_open": false,
-    "us_session_label": null,
-    "ptf_value_delta_since_morning": 114.77,
-    "ptf_value_pct_since_morning": 3.58
+    "us_market_open": true,
+    "us_session_label": "fin de séance (en cours)",
+    "ptf_value_delta_since_morning": 45.59,
+    "ptf_value_pct_since_morning": 1.38
   },
   "portfolio_snapshot": {
-    "value_usd": 3322.9,
-    "change_since_morning_pct": 3.58
+    "value_usd": 3354.74,
+    "change_since_morning_pct": 1.38
   },
   "market_changes": [
     {
-      "status": "confirmed",
-      "tag": "Info",
-      "importance": 5,
-      "description": "Ton portefeuille a rebondi de +3,58% depuis ce matin, effaçant le drawdown de la nuit et se positionnant à 3 322,90 $. Ce mouvement est principalement tiré par les rebonds des actifs tactiques.",
-      "source": "Calcul interne"
-    },
-    {
-      "status": "confirmed",
+      "status": "new",
       "tag": "Catalyseur",
-      "importance": 4,
-      "description": "TAO (+8,9% à 239,62 $), RSR (+10,3% à 0,001515 $) et INJ (+9,4% à 5,33 $) ont fortement rebondi depuis ce matin, repassant au-dessus de leurs seuils d'invalidation franchis ou menacés ce matin.",
+      "importance": 5,
+      "description": "INJ a bondi de +8,4% depuis ce matin, atteignant 5,82 $, ce qui en fait le principal mouvement haussier de ton portefeuille aujourd'hui.",
       "source": "CoinGecko"
     },
     {
+      "status": "new",
+      "tag": "Macro",
+      "importance": 4,
+      "description": "Le Bitcoin a continué sa progression, passant de 77 555 $ à 78 911 $ (+1,7%) depuis le matin, signalant une persistance de la demande.",
+      "source": "since_morning_facts"
+    },
+    {
       "status": "confirmed",
+      "tag": "Risque",
+      "importance": 4,
+      "description": "La position RSR reste sous surveillance critique à 0,001456 $, très proche de son stop loss à 0,001446 $.",
+      "source": "CoinGecko"
+    },
+    {
+      "status": "new",
       "tag": "Macro",
       "importance": 3,
-      "description": "Les actions Coinbase (COIN +8,2%) et MicroStrategy (MSTR +6,1%) affichent une forte hausse sur la séance américaine, signalant un regain d'appétit pour le risque sur les actifs liés au Bitcoin.",
+      "description": "Le S&P 500 a reculé de -16,09 points depuis le matin, s'établissant à 7 658,28 points, inversant une partie de sa progression matinale.",
       "source": "Yahoo Finance"
     },
     {
-      "status": "unchanged",
+      "status": "new",
+      "tag": "Macro",
+      "importance": 3,
+      "description": "Les probabilités d'un maintien des taux de la Fed en septembre ont légèrement diminué de 1,2 point, passant de 67,4% à 66,2% sur Polymarket.",
+      "source": "since_morning_facts · Polymarket"
+    },
+    {
+      "status": "new",
       "tag": "Macro",
       "importance": 2,
-      "description": "Le DXY (99,00), le VIX (15,13) et le taux de la BoJ (0,841%) sont restés stables depuis le matin, confirmant un régime de transition sans nouvelle tension majeure sur la liquidité globale.",
-      "source": "Yahoo Finance"
+      "description": "Le DXY a légèrement progressé de +0,1% depuis le matin pour atteindre 99,02, renforçant la pression sur les actifs risqués.",
+      "source": "since_morning_facts"
+    },
+    {
+      "status": "unchanged",
+      "tag": "Sentiment",
+      "importance": 1,
+      "description": "L'indice Fear & Greed est resté stable à 73 (Avidité) depuis le matin.",
+      "source": "Fear & Greed Index"
     }
   ],
   "news_today": [
     {
-      "title": "Réglementation crypto est là: État de la crypto",
-      "source": "CoinDesk",
-      "time": "18h30",
-      "impact": "La publication d'un rapport sur l'état de la réglementation crypto signale une maturation du secteur, potentiellement favorable à long terme pour l'adoption institutionnelle.",
-      "status": "intégré"
+      "title": "Trump menace de droits de douane de 50% sur les voitures canadiennes",
+      "source": "Investing.com · Financial Times",
+      "time": "18h48 UTC",
+      "impact": "Ces menaces de guerre commerciale avec le Canada augmentent l'incertitude géopolitique et pourraient soutenir le dollar (DXY), défavorable aux actifs risqués.",
+      "status": "à suivre"
     },
     {
-      "title": "Kashkari de la Fed ne s'inquiète pas de la hausse des rendements du Trésor américain",
-      "source": "Seeking Alpha",
-      "time": "16h41",
-      "impact": "Les déclarations d'un membre de la Fed minimisant l'impact des rendements obligataires peuvent tempérer les craintes d'un resserrement monétaire excessif, mais Kashkari n'est pas un membre votant.",
-      "status": "intégré"
-    },
-    {
-      "title": "YouTube interdit les streams publics de graphiques crypto, passe à l'accès réservé aux abonnés",
+      "title": "Une baleine ouvre 71,8 M$ de positions courtes sur BTC et ETH sur Hyperliquid",
       "source": "Stocktwits",
-      "time": "16h26",
-      "impact": "Cette restriction pourrait réduire la visibilité et l'accès à l'analyse technique pour le grand public, mais son impact sur les prix est marginal et déjà intégré.",
+      "time": "15h38 UTC",
+      "impact": "Ce positionnement baissier significatif d'un acteur majeur pourrait augmenter la volatilité et exercer une pression vendeuse à court terme.",
+      "status": "à suivre"
+    },
+    {
+      "title": "Le prix du Bitcoin atteint 80 000 $ alors que les liquidations de shorts dépassent 220 M$",
+      "source": "Cointelegraph · Bitcoin Magazine",
+      "time": "17h48 UTC",
+      "impact": "La montée rapide du Bitcoin, confirmée par un short squeeze, valide la force actuelle du marché mais signale une potentielle surchauffe à surveiller.",
+      "status": "intégré"
+    },
+    {
+      "title": "Les ETF Bitcoin et Ethereum ont vu leurs AUM augmenter de 23 Md$ la semaine dernière, dont seulement 2,6 Md$ de nouveaux capitaux",
+      "source": "Decrypt",
+      "time": "17h07 UTC",
+      "impact": "Cette nouvelle nuance l'impact des ETF, montrant qu'une grande partie de la croissance des actifs sous gestion est due à l'appréciation des prix, et non à un afflux massif de nouveaux fonds.",
       "status": "intégré"
     }
   ],
@@ -81,113 +109,72 @@
       "asset": "BTC",
       "level": "81 437 $",
       "type": "resistance",
-      "trigger": "Si franchie, ouvre la voie vers 85 000 $. RSI daily à 80 (surchauffe) suggère une prudence accrue."
+      "trigger": "Au-dessus de 81 437 $ → accélération haussière vers de nouveaux sommets, mais risque de correction si RSI > 85."
     },
     {
       "asset": "BTC",
-      "level": "75 478 $",
+      "level": "77 258 $",
       "type": "support",
-      "trigger": "Sous ce niveau, risque de retour vers 70 839 $ et invalidation du rebond de l'après-midi."
+      "trigger": "Sous 77 258 $ → signal de faiblesse, potentiel retour vers 75 478 $."
     },
     {
       "asset": "ETH",
-      "level": "2 463 $",
+      "level": "2 519 $",
       "type": "resistance",
-      "trigger": "Cassure confirmerait une poursuite vers 2 500 $. Le RSI daily à 79 (surchauffe) indique une zone de vigilance."
+      "trigger": "Au-dessus de 2 519 $ → poursuite de la hausse, mais RSI 79 (surchauffe) suggère une prise de profit tactique."
     },
     {
       "asset": "ETH",
       "level": "2 400 $",
       "type": "support",
-      "trigger": "Rupture de ce seuil invaliderait le rebond court terme et ouvrirait la voie vers 2 361 $."
-    },
-    {
-      "asset": "DXY",
-      "level": "99,00",
-      "type": "resistance",
-      "trigger": "Au-dessus de ce seuil psychologique, pression accrue sur les actifs risqués et le marché crypto."
-    },
-    {
-      "asset": "IMX",
-      "level": "0.1411 $",
-      "type": "resistance",
-      "trigger": "Point de prise de profit tactique après +8,8% sur 24h, correspondant à une résistance Fibonacci et un seuil rond."
-    },
-    {
-      "asset": "TAO",
-      "level": "240,00 $",
-      "type": "resistance",
-      "trigger": "Zone d'allègement tactique après le rebond de +8,9% depuis le matin, correspondant à la cible court terme initiale."
-    },
-    {
-      "asset": "RSR",
-      "level": "0.001614 $",
-      "type": "resistance",
-      "trigger": "Zone d'allègement tactique après le rebond de +10,3%, correspondant à la cible court terme initiale."
+      "trigger": "Sous 2 400 $ → cassure du support psychologique, risque de test du pivot à 2 361 $."
     },
     {
       "asset": "INJ",
-      "level": "5,136 $",
+      "level": "5,87 $",
       "type": "resistance",
-      "trigger": "Dépassée par le rebond de +9,4%, cette zone est propice à la prise de profit sur ce satellite."
+      "trigger": "Butée sur 5,87 $ (Fibo 38,2%) avec RSI 71 (surchauffe) → opportunité d'allègement tactique."
+    },
+    {
+      "asset": "INJ",
+      "level": "5,80 $",
+      "type": "support",
+      "trigger": "Sous 5,80 $ → signal de faiblesse après le pump, retour vers le pivot à 5,66 $."
+    },
+    {
+      "asset": "RSR",
+      "level": "0,001446 $",
+      "type": "critical",
+      "trigger": "Sous 0,001446 $ → déclenchement du stop loss, sortie de position."
+    },
+    {
+      "asset": "DXY",
+      "level": "99,5",
+      "type": "resistance",
+      "trigger": "Au-dessus de 99,5 → renforcement du dollar, pression accrue sur les cryptos."
     }
   ],
   "actions_tonight": [
     {
-      "action": "Alléger 30% de TAO à 239,62 $",
-      "rationale": "Rebond de +8,9% depuis l'invalidation du matin (220,01 $) et atteinte de la cible court terme (240 $) avec un RSI daily 70 (surchauffe).",
-      "rebuy": "Racheter vers 225-230 $ si retour sur support ou RSI daily < 55.",
-      "horizon": "Geste tactique de prise de profit, conviction long terme sur TAO inchangée. · Couverture tactique CT — la thèse LT (RENFORCER) sur TAO reste active : geste borné, pas une sortie."
+      "action": "Alléger 30% de TAO à 240,62 $",
+      "rationale": "TAO a atteint et légèrement dépassé sa cible court terme de 240,0 $. Le marché est en zone d'avidité (F&G 73) et des actifs IA comme INJ montrent des signes de surchauffe (RSI 71).",
+      "rebuy": "Racheter vers 225-230 $ sur un repli, zone de support et proche de l'entrée initiale, après un retour du RSI sous 55.",
+      "horizon": "Geste tactique de prise de profit sur une position de conviction long terme, la thèse LT sur TAO reste intacte. · Couverture tactique CT — la thèse LT (RENFORCER) sur TAO reste active : geste borné, pas une sortie."
     },
     {
-      "action": "Alléger 20% de RSR à 0,001515 $",
-      "rationale": "Rebond de +10,3% depuis l'invalidation du matin (0,001373 $) et approche de la cible court terme (0,001614 $).",
-      "rebuy": null,
-      "horizon": "Geste tactique de liquidation partielle sur un satellite, pas de thèse long terme. · Couverture tactique CT — la thèse LT (RENFORCER) sur RSR reste active : geste borné, pas une sortie."
-    },
-    {
-      "action": "Alléger 20% de INJ à 5,33 $",
-      "rationale": "Rebond de +9,4% depuis le seuil d'invalidation du matin (4,86 $) et dépassement de la cible court terme (5,136 $).",
-      "rebuy": null,
-      "horizon": "Geste tactique de liquidation partielle sur un satellite, pas de thèse long terme."
-    },
-    {
-      "action": "Alléger 20% de IMX à 0,1347 $",
-      "rationale": "Forte hausse de +8,8% sur 24h, atteignant la bande haute de Bollinger et la résistance à 0,1411 $.",
-      "rebuy": null,
-      "horizon": "Geste tactique de liquidation partielle sur un satellite, pas de thèse long terme."
+      "action": "Alléger 50% de INJ à 5,82 $",
+      "rationale": "INJ a connu un pump de +9,2% sur 24h, atteignant la bande haute de Bollinger et butant sur la résistance à 5,87 $ avec un RSI daily à 71 (surchauffe).",
+      "rebuy": "N/A",
+      "horizon": "Geste tactique de sortie sur force, INJ étant une position satellite que tu souhaites alléger sur les pumps. · Couverture tactique CT — la thèse LT (RENFORCER) sur INJ reste active : geste borné, pas une sortie."
     }
   ],
   "tomorrow_checklist": {
-    "calendar": [
-      {
-        "label": "Treasury Sec Bessent Speaks (US)",
-        "date": "2026-08-24",
-        "when": "demain",
-        "days_ahead": 1,
-        "source": "ForexFactory",
-        "importance": "medium",
-        "weekday_label": "lundi",
-        "date_label": "lundi 24 août",
-        "time": "19:00"
-      },
-      {
-        "label": "CB Consumer Confidence (US)",
-        "date": "2026-08-25",
-        "when": "dans 2j",
-        "days_ahead": 2,
-        "source": "ForexFactory",
-        "importance": "medium",
-        "weekday_label": "mardi",
-        "date_label": "mardi 25 août",
-        "time": "15:00"
-      }
-    ],
-    "checks": "Le rebond de TAO, RSR et INJ se maintient-il au-dessus de leurs anciens niveaux d'invalidation ? · BTC consolide-t-il au-dessus de 77 000 $ avec un RSI qui se normalise ? · Les actions COIN et MSTR confirment-elles leur force à l'ouverture US ?",
-    "scenario": "Le marché crypto devrait consolider les gains de l'après-midi, avec une pression haussière modérée si les proxies BTC maintiennent leur élan et que le DXY reste stable.",
-    "invalidation": "BTC sous 75 478 $ et DXY au-dessus de 99,00 $ invalideraient le scénario haussier court terme, signalant un retour du risque."
+    "calendar": "Mardi 25 août : CB Consumer Confidence (US) à 15h00. Mercredi 26 août : Core PCE Price Index m/m (US) et Prelim GDP q/q (US) à 13h30.",
+    "checks": "INJ maintient-il son niveau au-dessus de 5,80 $ après le pump ? · RSR tient-il son support critique à 0,001446 $ ? · Le DXY reste-t-il sous la résistance de 99,5 ?",
+    "scenario": "Le marché crypto pourrait consolider autour des niveaux actuels, avec une légère pression baissière si les indices US continuent de corriger et si le DXY se renforce.",
+    "invalidation": "BTC sous 77 258 $ ou DXY au-dessus de 99,5, signalant un retour du risk-off."
   },
-  "blind_spots": "L'absence de données fraîches sur les flux ETF institutionnels limite la visibilité sur la demande des grands acteurs.",
+  "blind_spots": "Les données fraîches sur les flux ETF institutionnels restent indisponibles, limitant la visibilité sur la demande des grands acteurs.",
   "footer": {
     "next_morning_time": "08h30",
     "next_report_at": "demain 08h30"
@@ -198,124 +185,102 @@
     "reason": "Espérance mathématique disponible dès 5 recos clôturées avec niveaux (actuellement 3)."
   },
   "daily_pnl": {
-    "value_usd": 3322.9,
-    "day_change_usd": 114.77,
-    "day_change_pct": 3.58,
+    "value_usd": 3354.74,
+    "day_change_usd": 45.59,
+    "day_change_pct": 1.38,
     "day_change_label": null,
     "top_movers": [
       {
-        "symbol": "IMX",
-        "change": 8.8,
-        "pnl_usd": 1.38,
-        "value_usd": 15.73
+        "symbol": "INJ",
+        "change": 9.2,
+        "pnl_usd": 5.42,
+        "value_usd": 58.61
+      },
+      {
+        "symbol": "ATOM",
+        "change": -4.3,
+        "pnl_usd": -1.04,
+        "value_usd": 24.29
       },
       {
         "symbol": "STX",
-        "change": 7.8,
-        "pnl_usd": 4.22,
-        "value_usd": 54.11
+        "change": -4.1,
+        "pnl_usd": -2.14,
+        "value_usd": 51.98
       },
       {
-        "symbol": "INJ",
-        "change": 7.3,
-        "pnl_usd": 3.92,
-        "value_usd": 53.67
-      },
-      {
-        "symbol": "TAO",
-        "change": 6.1,
-        "pnl_usd": 23.39,
-        "value_usd": 383.39
+        "symbol": "ARB",
+        "change": -4.1,
+        "pnl_usd": -0.41,
+        "value_usd": 10.04
       },
       {
         "symbol": "RSR",
-        "change": 4.2,
-        "pnl_usd": 2.72,
-        "value_usd": 64.69
+        "change": -3.9,
+        "pnl_usd": -2.42,
+        "value_usd": 62.18
       }
     ]
   },
   "reco_bilan": [
     {
-      "asset": "TAO",
+      "asset": "INJ",
       "action": "RENFORCER",
-      "confidence": 69.0,
-      "entry": 220.93,
-      "target": 240.0,
-      "current": 239.62,
-      "delta_pct": 8.46,
+      "confidence": 74.0,
+      "entry": 5.37,
+      "target": 5.576413,
+      "current": 5.82,
+      "delta_pct": 8.38,
       "status": "on_track",
-      "reason": "au-dessus de l'entrée · invalidation 222,62 $"
-    },
-    {
-      "asset": "LINK",
-      "action": "RENFORCER",
-      "confidence": 64.0,
-      "entry": 11.85,
-      "target": 12.0,
-      "current": 11.59,
-      "delta_pct": -2.19,
-      "status": "under_pressure",
-      "reason": "repli sous l'entrée · invalidation 10,06 $"
-    },
-    {
-      "asset": "RSR",
-      "action": "RENFORCER",
-      "confidence": 69.0,
-      "entry": 0.00148831,
-      "target": 0.001614,
-      "current": 0.00151499,
-      "delta_pct": 1.79,
-      "status": "on_track",
-      "reason": "au-dessus de l'entrée · invalidation 0,001446 $"
+      "reason": "au-dessus de l'entrée · invalidation 5,25 $"
     }
   ],
   "polymarket_facts": {
     "fed_bars": {
-      "cut_pct": 1.5,
-      "hold_pct": 68.5,
-      "hike_pct": 0.4,
+      "cut_pct": 1.4,
+      "hold_pct": 66.2,
+      "hike_pct": 32.4,
       "dominant": "maintien",
-      "dominant_pct": 68.5,
+      "dominant_pct": 66.2,
       "meeting_hint": "réunion septembre 2026"
     },
     "extra_markets": [
       {
-        "question": "Will Bitcoin dip to $45,000 by December 31, 2026?",
-        "probability_pct": 8,
-        "volume_usd": 5332995,
-        "end_date": "2027-01-01T05:00:00Z"
+        "question": "Will Bitcoin reach $82,500 in August?",
+        "probability_pct": 47,
+        "volume_usd": 923387,
+        "end_date": "2026-09-01T04:00:00Z"
       },
       {
-        "question": "Will Bitcoin dip to $50,000 by December 31, 2026?",
-        "probability_pct": 12,
-        "volume_usd": 3070547,
-        "end_date": "2027-01-01T05:00:00Z"
-      },
-      {
-        "question": "Will Ethereum dip to $1,500 by December 31, 2026?",
-        "probability_pct": 11,
-        "volume_usd": 2441855,
-        "end_date": "2027-01-01T05:00:00Z"
-      },
-      {
-        "question": "Will Ethereum dip to $1,000 by December 31, 2026?",
+        "question": "Will Ethereum reach $3,000 in August?",
         "probability_pct": 6,
-        "volume_usd": 1952379,
-        "end_date": "2027-01-01T05:00:00Z"
+        "volume_usd": 888329,
+        "end_date": "2026-09-01T04:00:00Z"
+      },
+      {
+        "question": "Will Bitcoin reach $85,000 in August?",
+        "probability_pct": 25,
+        "volume_usd": 793169,
+        "end_date": "2026-09-01T04:00:00Z"
+      },
+      {
+        "question": "Will Bitcoin reach $90,000 in August?",
+        "probability_pct": 7,
+        "volume_usd": 355110,
+        "end_date": "2026-09-01T04:00:00Z"
       }
     ]
   },
   "since_morning_facts": {
     "available": true,
-    "window_label": "depuis le matin (08h38)",
-    "line": "BTC 76 226 $ → 77 313 $ (+1,4%) · ETH 2 393 $ → 2 448 $ (+2,3%) · F&G 66 → 66 (stable) · DXY 98,84 → 98,84 (+0,0%) · Fed maintien 68,5% → 68,5%"
+    "window_label": "depuis le matin (08h42)",
+    "line": "BTC 77 555 $ → 78 911 $ (+1,7%) · ETH 2 461 $ → 2 475 $ (+0,6%) · F&G 73 → 73 (stable) · DXY 98,90 → 99,02 (+0,1%) · Fed maintien 67,4% → 66,2% (−1,2 pts)"
   },
-  "derivatives_flows_line": "Funding BTC +10,9%/an · L/S 1,16",
+  "derivatives_flows_line": "Funding BTC +8,3%/an · L/S 1,0",
   "levels_readout": {
-    "BTC": "RSI 80 (surchauffe) · MACD haussier · Bollinger bande haute · ATR 1,8% (≈1 376 $/j) · +18,7% vs MM50 · volume 7j +62% vs 30j",
-    "ETH": "RSI 79 (surchauffe) · MACD haussier · Bollinger médiane · ATR 2,4% (≈59,49 $/j) · +27,5% vs MM50 · volume 7j +100% vs 30j",
-    "IMX": "RSI 70 (neutre) · MACD haussier · Bollinger bande haute · ATR 2,8% (≈0.0000 $/j) · +12,1% vs MM50 · volume 7j +70% vs 30j"
+    "BTC": "RSI 82 (surchauffe) · MACD haussier · Bollinger médiane · ATR 1,8% (≈1 413 $/j) · +20,5% vs MM50 · volume 7j +71% vs 30j",
+    "ETH": "RSI 79 (surchauffe) · MACD haussier · Bollinger médiane · ATR 2,4% (≈58,65 $/j) · +27,9% vs MM50 · volume 7j +110% vs 30j",
+    "INJ": "RSI 71 (surchauffe) · MACD haussier · Bollinger bande haute · ATR 3,5% (≈0.2100 $/j) · +20,8% vs MM50 · volume 7j +70% vs 30j"
   },
   "risk_score": {
     "score": 2.9,
@@ -398,64 +363,64 @@
     "caveat": "Note indicative et déterministe (concentration, drawdown, volatilité, sentiment) : elle ne capte ni le risque spécifique projet ni les corrélations cachées ou chocs exogènes."
   },
   "health_score": {
-    "score": 3.3,
-    "level": "à risque",
-    "level_color": "#A32D2D",
+    "score": 3.5,
+    "level": "fragile",
+    "level_color": "#BA7517",
     "axes": [
       {
         "label": "Diversification",
-        "score": 1.1,
+        "score": 1.0,
         "max": 10.0,
         "detail": "top secteur 70% du PTF"
       },
       {
         "label": "Momentum vs BTC",
-        "score": 5.0,
+        "score": 5.4,
         "max": 10.0,
-        "detail": "+0,0 pts vs BTC 7j"
+        "detail": "+0,8 pts vs BTC 7j"
       },
       {
         "label": "Solidité (vs ATH)",
-        "score": 3.9,
+        "score": 4.0,
         "max": 10.0,
-        "detail": "drawdown -58% vs ATH"
+        "detail": "drawdown -57% vs ATH"
       }
     ],
-    "driver": "Portée par Momentum vs BTC (5.0/10), pénalisée par Diversification (1.1/10).",
-    "improve": "Alléger le secteur dominant sur rebond et étaler sur d'autres narratifs (axe Diversification à 1.1/10 ce jour). Tout renfort du jour doit respecter les plafonds de concentration — ne pas aggraver l'axe faible."
+    "driver": "Portée par Momentum vs BTC (5.4/10), pénalisée par Diversification (1.0/10).",
+    "improve": "Alléger le secteur dominant sur rebond et étaler sur d'autres narratifs (axe Diversification à 1.0/10 ce jour). Tout renfort du jour doit respecter les plafonds de concentration — ne pas aggraver l'axe faible."
   },
   "health_unchanged_since_morning": {
     "active": true,
-    "note": "Santé stable depuis ce matin (3.3/10 → 3.3/10) — composition du portefeuille non modifiée à ce jour (actions tactiques proposées plus bas)"
+    "note": "Santé stable depuis ce matin (3.5/10 → 3.5/10) — composition du portefeuille non modifiée à ce jour (actions tactiques proposées plus bas)"
   },
   "evening_macro": {
-    "btc_price": 77313,
-    "btc_change_24h": 0.0,
-    "eth_price": 2448.2,
-    "eth_change_24h": 0.9,
-    "fear_greed": 66,
+    "btc_price": 78911,
+    "btc_change_24h": 2.01962,
+    "eth_price": 2474.54,
+    "eth_change_24h": 1.06124,
+    "fear_greed": 73,
     "fear_greed_label": "Avidité",
     "fear_greed_delta": 0,
-    "gold_usd": 4680.6,
-    "gold_delta": 109.20000000000073,
-    "sp500": 7674.37,
-    "sp500_delta": 33.210000000000036,
-    "nasdaq": 26180.455,
-    "nasdaq_delta": 113.25500000000102,
-    "vix": 15.13,
-    "vix_delta": -0.8800000000000008,
-    "brent_usd": 94.39,
-    "brent_delta": 0.6099999999999994,
-    "dxy": 98.839,
+    "gold_usd": 4690.3,
+    "gold_delta": 9.699999999999818,
+    "sp500": 7658.28,
+    "sp500_delta": -16.090000000000146,
+    "nasdaq": 26033.514,
+    "nasdaq_delta": -146.94100000000253,
+    "vix": 15.73,
+    "vix_delta": 0.5999999999999996,
+    "brent_usd": 92.28,
+    "brent_delta": -2.1099999999999994,
+    "dxy": 99.017,
     "dxy_broad": 118.9028,
-    "dxy_ice": 98.839,
-    "dxy_delta": 0.03900000000000148,
-    "nikkei": 66016.36,
-    "nikkei_delta": -200.44000000000233,
-    "stoxx50": 6462.22,
-    "stoxx50_delta": 40.159999999999854,
-    "eur_usd": 1.1678,
-    "usd_jpy": 158.94,
+    "dxy_ice": 99.017,
+    "dxy_delta": 0.21699999999999875,
+    "nikkei": 65528.09,
+    "nikkei_delta": -488.2700000000041,
+    "stoxx50": 6447.98,
+    "stoxx50_delta": -14.240000000000691,
+    "eur_usd": 1.1667,
+    "usd_jpy": 159.174,
     "ecb_deposit_rate": 2.25,
     "boj_rate": 0.841
   },
@@ -479,53 +444,64 @@
   },
   "tomorrow_macro_events": [
     {
-      "label": "Treasury Sec Bessent Speaks (US)",
-      "date": "2026-08-24",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "medium",
-      "weekday_label": "lundi",
-      "date_label": "lundi 24 août",
-      "time": "19:00"
-    },
-    {
       "label": "CB Consumer Confidence (US)",
       "date": "2026-08-25",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "mardi",
       "date_label": "mardi 25 août",
       "time": "15:00"
+    },
+    {
+      "label": "Core PCE Price Index m/m (US)",
+      "date": "2026-08-26",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "high",
+      "weekday_label": "mercredi",
+      "date_label": "mercredi 26 août",
+      "time": "13:30"
+    },
+    {
+      "label": "Prelim GDP q/q (US)",
+      "date": "2026-08-26",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "high",
+      "weekday_label": "mercredi",
+      "date_label": "mercredi 26 août",
+      "time": "13:30"
     }
   ],
   "intraday_news": [
     {
-      "title": "Regulation Crypto is here: State of Crypto",
-      "source": "CoinDesk",
-      "timestamp": "19h30"
-    },
-    {
-      "title": "Turkey’s central bank to restart one-week repo auctions",
+      "title": "Trump threatens 50% tariffs on all cars and trucks from Canada amid trade fight",
       "source": "Investing.com",
-      "timestamp": "19h02"
+      "timestamp": "19h48"
     },
     {
-      "title": "Ethereum’s ‘Netflix Moment’ Could Send ETH To $10K By 2029 As Bitcoin Eyes $81K - Stocktwits",
-      "source": "Stocktwits",
-      "timestamp": "18h15"
+      "title": "Trump says US to increase tariffs on Canadian cars to 50%",
+      "source": "Financial Times",
+      "timestamp": "18h53"
     },
     {
-      "title": "Fed's Kashkari not worried about rising US Treasury yields",
-      "source": "Seeking Alpha",
-      "timestamp": "17h41"
+      "title": "Bitcoin price hits $80K as 24-hour crypto short liquidations pass $220M",
+      "source": "Cointelegraph",
+      "timestamp": "18h48"
     },
     {
-      "title": "Fed’s Kashkari says rising Treasury yields not a concern",
-      "source": "Investing.com",
-      "timestamp": "17h37"
+      "title": "Bitcoin, Ethereum ETFs Grew $23 Billion Last Week—Only $2.6 Billion Was New Money",
+      "source": "Decrypt",
+      "timestamp": "18h07"
+    },
+    {
+      "title": "Bitcoin Rally Accelerates, With $80,000 in Sight After ETFs Have Stellar Week",
+      "source": "Bitcoin Magazine",
+      "timestamp": "17h18"
     }
   ],
   "market_regime": {
@@ -533,16 +509,16 @@
     "regime": "range",
     "label_fr": "RANGE",
     "reasons": [
-      "prix +12,1% vs MM200",
-      "MM50 −5,9% vs MM200",
-      "pente MM50 14j +2,5%"
+      "prix +14,4% vs MM200",
+      "MM50 −5,5% vs MM200",
+      "pente MM50 14j +2,9%"
     ],
-    "price_vs_ma200_pct": 12.1,
-    "ma50_vs_ma200_pct": -5.9,
-    "ma50_slope_14d_pct": 2.5,
+    "price_vs_ma200_pct": 14.4,
+    "ma50_vs_ma200_pct": -5.5,
+    "ma50_slope_14d_pct": 2.9,
     "since": "2026-08-18",
     "changed": false,
-    "days_in_regime": 5
+    "days_in_regime": 6
   },
-  "_saved_at": "2026-08-23T19:02:28.015322+00:00"
+  "_saved_at": "2026-08-24T19:06:14.758985+00:00"
 }
