@@ -1,162 +1,203 @@
 {
   "header": {
-    "date": "dimanche 13 septembre 2026 · 20:03 Casablanca",
-    "time_casablanca": "dimanche 13 septembre 2026 · 20:03 Casablanca",
+    "date": "lundi 14 septembre 2026 · 20:04 Casablanca",
+    "time_casablanca": "lundi 14 septembre 2026 · 20:04 Casablanca",
     "hours_since_morning": 11,
-    "morning_time_label": "08h38",
+    "morning_time_label": "08h36",
     "since_morning_label": "il y a 11h",
     "win_rate_30d": 80,
     "win_rate_total": "4/5",
     "win_rate_calibration": "5/5",
-    "evening_time_label": "20h02",
-    "timing_line": "matin 08h38 · soir 20h02 · Δ11h",
+    "evening_time_label": "20h03",
+    "timing_line": "matin 08h36 · soir 20h03 · Δ11h",
     "is_evening_slot": true,
     "closing_greeting": "Bonne soirée.",
     "levels_window_label": "Niveaux à surveiller cette nuit",
     "checklist_title": "Demain matin · check list",
-    "us_market_open": false,
-    "us_session_label": null,
-    "ptf_value_delta_since_morning": 12.04,
-    "ptf_value_pct_since_morning": 0.36
+    "us_market_open": true,
+    "us_session_label": "fin de séance (en cours)",
+    "ptf_value_delta_since_morning": 54.4,
+    "ptf_value_pct_since_morning": 1.62
   },
   "portfolio_snapshot": {
-    "value_usd": 3360.99,
-    "change_since_morning_pct": 0.36
+    "value_usd": 3411.28,
+    "change_since_morning_pct": 1.62
   },
   "market_changes": [
     {
-      "status": "unchanged",
+      "status": "new",
       "tag": "Macro",
       "importance": 5,
-      "description": "La probabilité d'une hausse de taux de la Fed en septembre a légèrement reculé de 1,2 point, passant de 79,2% à 78,0% sur Polymarket, sans altérer le biais restrictif dominant.",
+      "description": "La probabilité d'une hausse des taux de la Fed en septembre a augmenté de 6,3 points, passant de 79,0% à 85,3% (Polymarket). Cela renforce le biais hawkish et la pression sur les actifs risqués.",
       "source": "Polymarket"
     },
     {
-      "status": "unchanged",
-      "tag": "Info",
-      "importance": 2,
-      "description": "Le Bitcoin a légèrement progressé de 0,3% depuis le matin à 77 319 $, tandis que l'Ethereum a reculé de 0,2% à 2 509 $, les deux consolidant leurs niveaux.",
-      "source": "CoinGecko"
+      "status": "new",
+      "tag": "Catalyseur",
+      "importance": 4,
+      "description": "Le Bitcoin a réalisé un rebond de 2,0% depuis ce matin, atteignant 79 224 $. Ce mouvement est soutenu par des flux de détail et la performance positive des proxies boursiers comme COIN (+8,15%) et MSTR (+4,11%).",
+      "source": "CryptoQuant · Yahoo Finance"
     },
     {
-      "status": "unchanged",
+      "status": "new",
+      "tag": "Risque",
+      "importance": 4,
+      "description": "Les actions du secteur technologique et de l'IA sont sous pression en séance US, avec NVDA en baisse de 2,65%, AMD de 3,62% et TSM de 2,11%. Cela pourrait peser sur les tokens IA du portefeuille.",
+      "source": "Yahoo Finance"
+    },
+    {
+      "status": "confirmed",
+      "tag": "Macro",
+      "importance": 3,
+      "description": "Les indices mondiaux continuent de montrer une faiblesse, le Nikkei ayant clôturé en baisse de 518 points et l'Euro Stoxx 50 de 64,75 points, confirmant la divergence avec la résilience des actions US.",
+      "source": "Yahoo Finance"
+    },
+    {
+      "status": "new",
       "tag": "Info",
-      "description": "Marchés US fermés à l'heure du rapport : chiffres actions = clôture de la dernière séance — rien de neuf depuis ce matin."
+      "importance": 3,
+      "description": "L'or a reculé de 62,8 $ à 4 346,1 $, suggérant une légère détente sur les actifs refuges traditionnels malgré la nervosité générale du marché.",
+      "source": "Yahoo Finance"
     }
   ],
   "news_today": [
     {
-      "title": "Options sur indice Bitcoin Nasdaq approuvées par la SEC",
-      "source": "Stocktwits",
-      "time": "12h03",
-      "impact": "Signal positif pour l'intégration institutionnelle du Bitcoin, bien que des obstacles subsistent.",
-      "status": "intégré"
-    },
-    {
-      "title": "Réglementation des portefeuilles crypto : 24h pour alerter en cas de faille",
-      "source": "CryptoSlate",
-      "time": "12h45",
-      "impact": "Renforce la pression réglementaire sur les développeurs de wallets, potentiellement positif pour la sécurité des utilisateurs à long terme.",
-      "status": "à suivre"
-    },
-    {
-      "title": "Un économiste estime que la hausse des taux de la Fed vise Wall Street, pas l'inflation",
-      "source": "CoinDesk",
-      "time": "14h00",
-      "impact": "Renforce le narratif d'une Fed focalisée sur la stabilité financière plutôt que sur l'économie réelle, maintenant un biais restrictif.",
-      "status": "intégré"
-    },
-    {
-      "title": "UBS suggère aux banques centrales de privilégier les anticipations d'inflation du marché",
+      "title": "Les États-Unis ciblent la banque russe VTB avec des sanctions liées à l'Iran",
       "source": "Investing.com",
-      "time": "17h05",
-      "impact": "Une adoption de cette approche pourrait rendre la politique monétaire plus réactive aux sentiments de marché, potentiellement moins rigide à terme.",
+      "time": "18h43",
+      "impact": "Risque géopolitique accru, pouvant peser sur l'appétit global pour le risque et la liquidité.",
       "status": "à suivre"
+    },
+    {
+      "title": "Les flux de détail BTC dépassent ceux des baleines de 106% avant la réunion de la Fed",
+      "source": "Stocktwits",
+      "time": "16h13",
+      "impact": "Indique un soutien continu du Bitcoin par les investisseurs individuels, renforçant sa résilience face aux incertitudes macro.",
+      "status": "actionnable"
+    },
+    {
+      "title": "Les banques intensifient la lutte pour les récompenses de stablecoins alors que le Sénat prépare un vote sur le Clarity Act",
+      "source": "CoinDesk",
+      "time": "17h51",
+      "impact": "Potentielle clarification réglementaire pour les stablecoins, mais aussi une pression concurrentielle sur les rendements DeFi.",
+      "status": "intégré"
     }
   ],
   "levels_tonight": [
     {
       "asset": "BTC",
-      "level": "76 555 $",
+      "level": "79 000 $",
       "type": "support",
-      "trigger": "sous 76 555 $ → risque de test du support majeur à 75 478 $."
+      "trigger": "Sous 79 000 $ → retour vers le pivot à 77 550 $."
     },
     {
       "asset": "BTC",
-      "level": "77 550 $",
+      "level": "80 268 $",
       "type": "resistance",
-      "trigger": "au-dessus de 77 550 $ → ouverture vers 80 268 $."
+      "trigger": "Au-dessus de 80 268 $ → potentiel de continuation vers 81 265 $."
     },
     {
       "asset": "ETH",
-      "level": "2 438 $",
+      "level": "2 511 $",
       "type": "support",
-      "trigger": "sous 2 438 $ → risque de glissade vers 2 391 $."
+      "trigger": "Sous 2 511 $ → risque de retour sur le pivot à 2 438 $."
     },
     {
       "asset": "ETH",
-      "level": "2 547 $",
+      "level": "2 553 $",
       "type": "resistance",
-      "trigger": "au-dessus de 2 547 $ → test du seuil psychologique de 2 600 $."
+      "trigger": "Au-dessus de 2 553 $ → test du seuil psychologique de 2 600 $ (probabilité de 82% sur Polymarket)."
     },
     {
       "asset": "DXY",
-      "level": "99,00",
+      "level": "99,5 points",
+      "type": "critical",
+      "trigger": "Au-dessus de 99,5 points → accentuation de la pression baissière sur les actifs risqués."
+    },
+    {
+      "asset": "XRP",
+      "level": "1,45 $",
       "type": "support",
-      "trigger": "sous 99,00 → soulagement pour les actifs risqués, potentiel rebond altcoins."
+      "trigger": "Sous 1,45 $ → invalidation du rebond récent et retour vers 1,40 $."
     },
     {
-      "asset": "DXY",
-      "level": "99,50",
+      "asset": "XRP",
+      "level": "1,50 $",
       "type": "resistance",
-      "trigger": "au-dessus de 99,50 → pression accrue sur les actifs à forte duration."
-    },
-    {
-      "asset": "ANKR",
-      "level": "0,0048 $",
-      "type": "resistance",
-      "trigger": "au-dessus de 0,0048 $ → poursuite du momentum haussier, mais RSI 72 (surchauffe) appelle à la prudence."
-    },
-    {
-      "asset": "ANKR",
-      "level": "0,0047 $",
-      "type": "support",
-      "trigger": "sous 0,0047 $ → risque de correction rapide après le pump de 10%."
-    },
-    {
-      "asset": "AR",
-      "level": "2,90 $",
-      "type": "resistance",
-      "trigger": "au-dessus de 2,90 $ → test de la résistance à 3,03 $."
-    },
-    {
-      "asset": "AR",
-      "level": "2,80 $",
-      "type": "support",
-      "trigger": "sous 2,80 $ → risque de retour vers 2,52 $."
+      "trigger": "Atteinte de 1,50 $ → opportunité de prise de profit tactique après la forte hausse du jour."
     }
   ],
   "actions_tonight": [
     {
-      "action": "Alléger 20% de RENDER à 1,40 $",
-      "rationale": "L'invalidation technique à 1,47 $ a été franchie, signalant une rupture de la structure haussière court terme. Le prix actuel de 1,40 $ est sous ce niveau critique.",
-      "rebuy": "Vise un rachat entre 1,25 $ et 1,30 $ (support Fibonacci 61,8% / bas de Bollinger) si le RSI daily descend sous 30.",
-      "horizon": "Geste tactique de gestion du risque, la conviction long terme sur RENDER reste forte. · Couverture tactique CT — la thèse LT (RENFORCER) sur RENDER reste active : geste borné, pas une sortie."
-    },
-    {
-      "action": "Alléger 30% de ANKR à 0,0047 $",
-      "rationale": "Le gain de +10% sur 24h a poussé le RSI à 72 (surchauffe) et le prix sur la bande haute de Bollinger, signalant une opportunité tactique de prise de profit.",
-      "rebuy": "",
-      "horizon": "Geste tactique de prise de profit sur une position satellite. L'objectif est de dégager du capital sur la force."
+      "action": "Alléger 30% de XRP à 1,50 $.",
+      "rationale": "Forte hausse de 8,9% sur 24h, le prix approche la résistance psychologique de 1,50 $ et le pivot technique à 1,52 $. Le RSI est à 62 (neutre mais en hausse), mais le MACD reste baissier, signalant une divergence potentielle.",
+      "rebuy": "Racheter vers 1,40 $-1,42 $ si le prix corrige et teste le support pivot à 1,40 $.",
+      "horizon": "Geste tactique de prise de profit sur un satellite, la conviction long terme reste à évaluer."
     }
   ],
   "tomorrow_checklist": {
-    "calendar": "Pas d'événement macro majeur dans les 48h.",
-    "checks": "Le Bitcoin maintient-il sa consolidation au-dessus de 76 555 $ ? · RENDER : le prix se stabilise-t-il au-dessus de 1,35 $ après l'allègement ? · Les proxies crypto (MARA, COIN) confirment-ils leur momentum haussier à l'ouverture US ?",
-    "scenario": "Le marché crypto devrait consolider autour des niveaux actuels, avec un biais légèrement haussier pour BTC si les actions US maintiennent leur vigueur et que la probabilité de hausse de la Fed continue de s'éroder.",
-    "invalidation": "Une cassure de BTC sous 76 555 $ et un DXY au-dessus de 99,50 invalideraient le scénario haussier, signalant un retour à la pression baissière."
+    "calendar": [
+      {
+        "label": "Average Earnings Index 3m/y (UK)",
+        "date": "2026-09-15",
+        "when": "demain",
+        "days_ahead": 1,
+        "source": "ForexFactory",
+        "importance": "medium",
+        "weekday_label": "mardi",
+        "date_label": "mardi 15 septembre",
+        "time": "07:00"
+      },
+      {
+        "label": "Claimant Count Change (UK)",
+        "date": "2026-09-15",
+        "when": "demain",
+        "days_ahead": 1,
+        "source": "ForexFactory",
+        "importance": "high",
+        "weekday_label": "mardi",
+        "date_label": "mardi 15 septembre",
+        "time": "07:00"
+      },
+      {
+        "label": "CPI y/y (UK)",
+        "date": "2026-09-16",
+        "when": "dans 2j",
+        "days_ahead": 2,
+        "source": "ForexFactory",
+        "importance": "high",
+        "weekday_label": "mercredi",
+        "date_label": "mercredi 16 septembre",
+        "time": "07:00"
+      },
+      {
+        "label": "Core Retail Sales m/m (US)",
+        "date": "2026-09-16",
+        "when": "dans 2j",
+        "days_ahead": 2,
+        "source": "ForexFactory",
+        "importance": "medium",
+        "weekday_label": "mercredi",
+        "date_label": "mercredi 16 septembre",
+        "time": "13:30"
+      },
+      {
+        "label": "Décision FOMC (taux Fed)",
+        "date": "2026-09-16",
+        "when": "dans 2j",
+        "days_ahead": 2,
+        "source": "Calendrier Fed officiel",
+        "importance": "high",
+        "weekday_label": "mercredi",
+        "date_label": "mercredi 16 septembre",
+        "time": null
+      }
+    ],
+    "checks": "Le Bitcoin maintient-il son rebond au-dessus de 79 000 $ ? · Le DXY reste-t-il sous 99,5 points malgré le biais hawkish de la Fed ? · Les actions tech (NVDA, AMD) continuent-elles de peser sur le sentiment général ?",
+    "scenario": "Le marché crypto pourrait consolider autour des niveaux actuels, avec un biais haussier pour BTC si le soutien retail persiste, mais sous la pression macro d'une Fed plus hawkish.",
+    "invalidation": "Une clôture du BTC sous 77 550 $ (pivot) ou une cassure du DXY au-dessus de 99,5 points invaliderait le potentiel de rebond des altcoins."
   },
-  "blind_spots": "L'absence de données sur les flux ETF Bitcoin et Ethereum limite la visibilité sur l'engagement institutionnel à court terme.",
+  "blind_spots": "Les flux ETF structurés (Farside/CoinGlass) sont indisponibles, limitant la visibilité sur la demande institutionnelle.",
   "footer": {
     "next_morning_time": "08h30",
     "next_report_at": "demain 08h30"
@@ -171,40 +212,40 @@
     "reading": "Sur 5 recos clôturées : gain moyen +3,4% (4 gagnantes), perte moyenne +5,7% (1 perdantes) → espérance +3,8% par reco. Stratégie statistiquement gagnante."
   },
   "daily_pnl": {
-    "value_usd": 3360.99,
-    "day_change_usd": 12.04,
-    "day_change_pct": 0.36,
+    "value_usd": 3411.28,
+    "day_change_usd": 54.4,
+    "day_change_pct": 1.62,
     "day_change_label": null,
     "top_movers": [
       {
-        "symbol": "ANKR",
-        "change": 10.0,
-        "pnl_usd": 6.33,
-        "value_usd": 63.4
-      },
-      {
-        "symbol": "AR",
-        "change": 9.8,
-        "pnl_usd": 1.12,
-        "value_usd": 11.5
-      },
-      {
-        "symbol": "CKB",
-        "change": 6.7,
-        "pnl_usd": 4.0,
-        "value_usd": 59.79
+        "symbol": "XRP",
+        "change": 8.9,
+        "pnl_usd": 4.63,
+        "value_usd": 52.32
       },
       {
         "symbol": "RSR",
-        "change": 5.8,
-        "pnl_usd": 3.84,
-        "value_usd": 66.12
+        "change": -5.1,
+        "pnl_usd": -3.17,
+        "value_usd": 62.79
       },
       {
-        "symbol": "ACH",
-        "change": 4.3,
-        "pnl_usd": 0.82,
-        "value_usd": 18.87
+        "symbol": "INJ",
+        "change": 3.4,
+        "pnl_usd": 2.17,
+        "value_usd": 64.25
+      },
+      {
+        "symbol": "BTC",
+        "change": 2.5,
+        "pnl_usd": 35.25,
+        "value_usd": 1435.54
+      },
+      {
+        "symbol": "ADA",
+        "change": 2.3,
+        "pnl_usd": 0.25,
+        "value_usd": 10.74
       }
     ]
   },
@@ -212,70 +253,52 @@
     {
       "asset": "INJ",
       "action": "RENFORCER",
-      "confidence": 75.0,
-      "entry": 5.87,
+      "confidence": 70.0,
+      "entry": 6.1,
       "target": 6.410983,
-      "current": 6.17,
-      "delta_pct": 5.11,
+      "current": 6.38,
+      "delta_pct": 4.59,
       "status": "on_track",
       "reason": "au-dessus de l'entrée · invalidation 5,69 $"
-    },
-    {
-      "asset": "RSR",
-      "action": "RENFORCER",
-      "confidence": 75.0,
-      "entry": 0.001512,
-      "target": 0.0016,
-      "current": 0.00154854,
-      "delta_pct": 2.42,
-      "status": "on_track",
-      "reason": "au-dessus de l'entrée · invalidation 0,001478 $"
     }
   ],
   "polymarket_facts": {
     "fed_bars": {
-      "cut_pct": 0.4,
-      "hold_pct": 21.6,
-      "hike_pct": 78.0,
+      "cut_pct": 0.2,
+      "hold_pct": 14.5,
+      "hike_pct": 85.3,
       "dominant": "hausse",
-      "dominant_pct": 78.0,
+      "dominant_pct": 85.3,
       "meeting_hint": "réunion septembre 2026"
     },
     "extra_markets": [
       {
-        "question": "Will Ethereum reach $3,200 in September?",
-        "probability_pct": 6,
-        "volume_usd": 258168,
-        "end_date": "2026-10-01T04:00:00Z"
-      },
-      {
         "question": "Will Ethereum reach $2,600 in September?",
-        "probability_pct": 72,
-        "volume_usd": 85575,
+        "probability_pct": 82,
+        "volume_usd": 173968,
         "end_date": "2026-10-01T04:00:00Z"
       },
       {
-        "question": "Israel closes its airspace by September 30?",
-        "probability_pct": 97,
-        "volume_usd": 2901316,
-        "end_date": "2026-10-01T03:59:00Z"
+        "question": "Will United Russia (ER) gain the most seats in the next Russian parliamentary election?",
+        "probability_pct": 78,
+        "volume_usd": 10060941,
+        "end_date": "2026-09-30T00:00:00Z"
       }
     ]
   },
   "since_morning_facts": {
     "available": true,
-    "window_label": "depuis le matin (08h38)",
-    "line": "BTC 77 126 $ → 77 319 $ (+0,3%) · ETH 2 514 $ → 2 509 $ (−0,2%) · F&G 61 → 61 (stable) · DXY 99,09 → 99,09 (+0,0%) · Fed hausse 79,2% → 78,0% (−1,2 pts)"
+    "window_label": "depuis le matin (08h36)",
+    "line": "BTC 77 685 $ → 79 224 $ (+2,0%) · ETH 2 520 $ → 2 539 $ (+0,8%) · F&G 57 → 57 (stable) · DXY 99,44 → 99,41 (−0,0%) · Fed hausse 79,0% → 85,3% (+6,3 pts) · ⚠ proba hausse taux 79,0% → 85,3% (+6,3 pts — repricing hawkish)"
   },
-  "derivatives_flows_line": "Funding BTC +10,7%/an · L/S 1,7",
+  "derivatives_flows_line": "Funding BTC +6,7%/an · L/S 1,27",
   "levels_readout": {
-    "BTC": "RSI 55 (neutre) · MACD baissier · Bollinger médiane · ATR 1,2% (≈920 $/j) · +8,6% vs MM50 · volume 7j −10% vs 30j",
-    "ETH": "RSI 62 (neutre) · MACD baissier · Bollinger médiane · ATR 1,5% (≈38,13 $/j) · +14,7% vs MM50 · volume 7j −4% vs 30j",
-    "ANKR": "RSI 72 (surchauffe) · MACD haussier · Bollinger bande haute · ATR 2,6% (≈0.0000 $/j) · +25,8% vs MM50 · volume 7j −29% vs 30j",
-    "AR": "RSI 65 (neutre) · MACD baissier · Bollinger médiane · ATR 4,3% (≈0.1200 $/j) · +34,6% vs MM50 · volume 7j −10% vs 30j"
+    "BTC": "RSI 61 (neutre) · MACD baissier · Bollinger médiane · ATR 1,3% (≈1 054 $/j) · +10,9% vs MM50 · volume 7j −9% vs 30j",
+    "ETH": "RSI 63 (neutre) · MACD baissier · Bollinger médiane · ATR 1,6% (≈41,13 $/j) · +15,5% vs MM50 · volume 7j −3% vs 30j",
+    "XRP": "RSI 62 (neutre) · MACD baissier · Bollinger médiane · ATR 2,5% (≈0.0400 $/j) · +20,4% vs MM50 · volume 7j −29% vs 30j"
   },
   "risk_score": {
-    "score": 3.4,
+    "score": 2.8,
     "level": "maîtrisé",
     "level_color": "#3B6D11",
     "factors": [
@@ -284,7 +307,7 @@
     "components": [
       {
         "label": "Drawdown 7j",
-        "pts": 0.4,
+        "pts": 0.0,
         "max": 3.0
       },
       {
@@ -294,7 +317,7 @@
       },
       {
         "label": "Volatilité 24h",
-        "pts": 0.5,
+        "pts": 0.3,
         "max": 2.0
       },
       {
@@ -312,9 +335,9 @@
       },
       {
         "label": "Volatilité 24h",
-        "pts": 0.5,
+        "pts": 0.3,
         "max": 2.0,
-        "ratio_pct": 25
+        "ratio_pct": 15
       }
     ],
     "holdings_snapshot": [
@@ -350,19 +373,19 @@
     ]
   },
   "risk_score_readout": {
-    "driver": "Score tiré par Concentration (2.5/2.5) et Volatilité 24h (0.5/2.0).",
+    "driver": "Score tiré par Concentration (2.5/2.5) et Volatilité 24h (0.3/2.0).",
     "reco": "Diversifier hors du secteur dominant pour réduire la concentration.",
     "caveat": "Note indicative et déterministe (concentration, drawdown, volatilité, sentiment) : elle ne capte ni le risque spécifique projet ni les corrélations cachées ou chocs exogènes."
   },
   "risk_unchanged_since_morning": {
     "active": true,
-    "morning_score": 3.3,
-    "note": "Risque stable depuis ce matin (3.3/10 → 3.4/10) — composition du portefeuille non modifiée à ce jour (actions tactiques proposées plus bas)"
+    "morning_score": 2.8,
+    "note": "Risque stable depuis ce matin (2.8/10 → 2.8/10) — composition du portefeuille non modifiée à ce jour (actions tactiques proposées plus bas)"
   },
   "health_score": {
-    "score": 3.6,
-    "level": "fragile",
-    "level_color": "#BA7517",
+    "score": 3.3,
+    "level": "à risque",
+    "level_color": "#A32D2D",
     "axes": [
       {
         "label": "Diversification",
@@ -372,9 +395,9 @@
       },
       {
         "label": "Momentum vs BTC",
-        "score": 5.7,
+        "score": 4.8,
         "max": 10.0,
-        "detail": "+1,4 pts vs BTC 7j"
+        "detail": "-0,5 pts vs BTC 7j"
       },
       {
         "label": "Solidité (vs ATH)",
@@ -383,41 +406,41 @@
         "detail": "drawdown -57% vs ATH"
       }
     ],
-    "driver": "Portée par Momentum vs BTC (5.7/10), pénalisée par Diversification (1.0/10).",
+    "driver": "Moins pénalisée par Momentum vs BTC (4.8/10), pénalisée par Diversification (1.0/10).",
     "improve": "Alléger le secteur dominant sur rebond et étaler sur d'autres narratifs (axe Diversification à 1.0/10 ce jour). Tout renfort du jour doit respecter les plafonds de concentration — ne pas aggraver l'axe faible."
   },
   "health_unchanged_since_morning": {
     "active": true,
-    "note": "Santé stable depuis ce matin (3.6/10 → 3.6/10) — composition du portefeuille non modifiée à ce jour (actions tactiques proposées plus bas)"
+    "note": "Santé stable depuis ce matin (3.2/10 → 3.3/10) — composition du portefeuille non modifiée à ce jour (actions tactiques proposées plus bas)"
   },
   "evening_macro": {
-    "btc_price": 77319,
-    "btc_change_24h": 0.25153,
-    "eth_price": 2508.67,
-    "eth_change_24h": -0.51091,
-    "fear_greed": 61,
+    "btc_price": 79224,
+    "btc_change_24h": 2.45557,
+    "eth_price": 2538.81,
+    "eth_change_24h": 1.18304,
+    "fear_greed": 57,
     "fear_greed_label": "Avidité",
     "fear_greed_delta": 0,
-    "gold_usd": 4408.9,
-    "gold_delta": 1.5999999999994543,
-    "sp500": 7656.98,
-    "sp500_delta": 65.27999999999975,
-    "nasdaq": 26333.035,
-    "nasdaq_delta": 251.33499999999913,
-    "vix": 15.84,
-    "vix_delta": -2.0,
-    "brent_usd": 104.61,
-    "brent_delta": -3.019999999999996,
-    "dxy": 99.095,
+    "gold_usd": 4346.1,
+    "gold_delta": -62.79999999999927,
+    "sp500": 7631.54,
+    "sp500_delta": -25.4399999999996,
+    "nasdaq": 26260.125,
+    "nasdaq_delta": -72.90999999999985,
+    "vix": 16.76,
+    "vix_delta": 0.9200000000000017,
+    "brent_usd": 104.91,
+    "brent_delta": 0.29999999999999716,
+    "dxy": 99.406,
     "dxy_broad": 118.0732,
-    "dxy_ice": 99.095,
-    "dxy_delta": -0.027000000000001023,
-    "nikkei": 64011.34,
-    "nikkei_delta": -1259.560000000005,
-    "stoxx50": 6325.13,
-    "stoxx50_delta": 56.159999999999854,
-    "eur_usd": 1.1601,
-    "usd_jpy": 153.554,
+    "dxy_ice": 99.406,
+    "dxy_delta": 0.284000000000006,
+    "nikkei": 63492.99,
+    "nikkei_delta": -518.3499999999985,
+    "stoxx50": 6260.38,
+    "stoxx50_delta": -64.75,
+    "eur_usd": 1.1561,
+    "usd_jpy": 154.09,
     "ecb_deposit_rate": 2.25,
     "boj_rate": 0.841
   },
@@ -427,7 +450,7 @@
     "wti_usd": "confirmed",
     "sp500": "confirmed",
     "nasdaq": "confirmed",
-    "vix": "single",
+    "vix": "confirmed",
     "us_10y": "confirmed",
     "dxy_ice": "single",
     "dxy": "single",
@@ -443,8 +466,8 @@
     {
       "label": "Average Earnings Index 3m/y (UK)",
       "date": "2026-09-15",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "mardi",
@@ -454,40 +477,73 @@
     {
       "label": "Claimant Count Change (UK)",
       "date": "2026-09-15",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "high",
       "weekday_label": "mardi",
       "date_label": "mardi 15 septembre",
       "time": "07:00"
+    },
+    {
+      "label": "CPI y/y (UK)",
+      "date": "2026-09-16",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "high",
+      "weekday_label": "mercredi",
+      "date_label": "mercredi 16 septembre",
+      "time": "07:00"
+    },
+    {
+      "label": "Core Retail Sales m/m (US)",
+      "date": "2026-09-16",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "mercredi",
+      "date_label": "mercredi 16 septembre",
+      "time": "13:30"
+    },
+    {
+      "label": "Décision FOMC (taux Fed)",
+      "date": "2026-09-16",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "Calendrier Fed officiel",
+      "importance": "high",
+      "weekday_label": "mercredi",
+      "date_label": "mercredi 16 septembre",
+      "time": null
     }
   ],
   "intraday_news": [
     {
-      "title": "Trump says he is lifting tariffs on Irish whiskey",
+      "title": "US targets Russia’s VTB Bank with Iran-related sanctions",
       "source": "Investing.com",
-      "timestamp": "19h00"
+      "timestamp": "19h43"
     },
     {
-      "title": "Central banks should favor market inflation expectations when setting policy - UBS",
-      "source": "Investing.com",
-      "timestamp": "16h05"
+      "title": "The Fed may be on the verge of a serious mistake, prominent economists warn",
+      "source": "MarketWatch",
+      "timestamp": "19h37"
     },
     {
-      "title": "Fed rate hike is about Wall Street, not inflation, says economist",
+      "title": "Banks escalate stablecoin rewards fight as Senate prepares for a Clarity Act vote",
       "source": "CoinDesk",
-      "timestamp": "14h00"
+      "timestamp": "18h51"
     },
     {
-      "title": "Crypto wallet creators now have just 24 hours to alert regulators when flaws are exploited",
+      "title": "Inflation is sinking your high-yield savings account’s returns. Here’s one way to fight it.",
+      "source": "MarketWatch",
+      "timestamp": "18h46"
+    },
+    {
+      "title": "Bitcoin exchanges can reduce quantum exposure before a network upgrade",
       "source": "CryptoSlate",
-      "timestamp": "12h45"
-    },
-    {
-      "title": "Nasdaq Bitcoin Index Options Win SEC Approval, But One Hurdle Remains - Yellow.com",
-      "source": "Stocktwits",
-      "timestamp": "12h03"
+      "timestamp": "17h50"
     }
   ],
   "market_regime": {
@@ -495,17 +551,17 @@
     "regime": "transition",
     "label_fr": "TRANSITION",
     "reasons": [
-      "prix +10,3% vs MM200",
-      "MM50 +1,2% vs MM200",
+      "prix +12,8% vs MM200",
+      "MM50 +1,5% vs MM200",
       "pente MM50 14j +5,8%",
       "croisement MM50/MM200 ≤ 14 j"
     ],
-    "price_vs_ma200_pct": 10.3,
-    "ma50_vs_ma200_pct": 1.2,
+    "price_vs_ma200_pct": 12.8,
+    "ma50_vs_ma200_pct": 1.5,
     "ma50_slope_14d_pct": 5.8,
     "since": "2026-09-09",
     "changed": false,
-    "days_in_regime": 4
+    "days_in_regime": 5
   },
-  "_saved_at": "2026-09-13T19:03:08.695509+00:00"
+  "_saved_at": "2026-09-14T19:04:47.934848+00:00"
 }
