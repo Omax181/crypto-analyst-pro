@@ -97,12 +97,20 @@ def enforce_summary_figures(
         r"(?i)\b(BTC|ETH|bitcoin|ethereum|solana|S\s?&\s?P|nasdaq|dax|nikkei|"
         r"gold|dominance)\b")
     _fg_prefix = r"(?:F\s?&\s?G|Fear\s*(?:&|and)\s*Greed)"
-    # v28 — le lookahead négatif épargne la 1re borne d'une évolution « X → Y »
-    # (sinon la garde v26 aurait cassé « F&G 15 → 27 » en « 27 → 27 »).
+    # v32 (3.1) — CONNECTEURS D'ÉVOLUTION : flèches ET prose française.
+    # La v28 ne connaissait que les flèches. Le 24/08/2026 l'hebdo écrivait
+    # « L'indice Fear & Greed bondit de 31 à 73 points en une semaine » :
+    # forme PROSE, invisible pour _fg_evo_re, et non protégée par le
+    # lookahead de _fg_re. La garde « une seule valeur autorisée » a donc
+    # réécrit la borne de DÉPART et publié « bondit de 73 à 73 points […]
+    # marquant un passage brutal de la peur à l'avidité ». Une garde de
+    # cohérence qui fabrique une phrase absurde est pire que pas de garde :
+    # elle a détruit une phrase qui était JUSTE.
+    _fg_conn = r"(?:\s*(?:→|->|—>)\s*|\s+(?:à|a|vers|puis)\s+)"
     _fg_re = re.compile(
-        rf"(?i)({_fg_prefix}[^0-9%]{{0,20}})(\d{{1,3}})\b(?!\s*(?:→|->|—>)\s*\d)")
+        rf"(?i)({_fg_prefix}[^0-9%]{{0,20}})(\d{{1,3}})\b(?!{_fg_conn}\d)")
     _fg_evo_re = re.compile(
-        rf"(?i)({_fg_prefix}[^0-9%]{{0,20}})(\d{{1,3}})(\s*(?:→|->|—>)\s*)(\d{{1,3}})\b")
+        rf"(?i)({_fg_prefix}[^0-9%]{{0,25}})(\d{{1,3}})({_fg_conn})(\d{{1,3}})\b")
     _fg_pts_re = re.compile(
         r"(?i)(rebondi|remonté|gagné|repris|progressé|bondi|grimpé|perdu|chuté|"
         r"cédé|reculé)\s+de\s+(\d{1,3})\s*(points?|pts)")
@@ -563,7 +571,10 @@ def _dedupe_segments(text: str) -> str:
     les segments normalisés (casse/espaces) : doublon exact OU préfixe l'un de
     l'autre → une seule occurrence, la plus informative, à la 1re position.
     """
-    parts = [p.strip() for p in text.split(",")]
+    # Audit 01/10 — une virgule DÉCIMALE (entre deux chiffres) n'est pas un
+    # séparateur de segments : « MVRV à 1,58 » ressortait « 1, 58 » à chaque
+    # hebdo (depuis la v28, V30 comprise).
+    parts = [p.strip() for p in re.split(r"(?<!\d),|,(?!\d)", text)]
     if len(parts) < 2:
         return text
     kept: list[str] = []
@@ -804,9 +815,11 @@ def fix_dust_advice(
         fixes.append(
             f"conseil poussière incohérent corrigé ({', '.join(sorted(near))} : "
             "frais > valeur → abandon, pas de vente)")
+        # Audit 02/10 (liste INFORMATIVE, décision d'Omar) : le fait, sans
+        # consigne (« ligne à ABANDONNER » en était une).
         return _LIQUIDATE_NOW.sub(
-            "les frais de transaction dépasseraient la valeur résiduelle : "
-            "ligne à ABANDONNER (sortie du suivi), ne pas payer pour vendre. ",
+            "les frais de transaction dépasseraient la valeur résiduelle de "
+            "la ligne. ",
             text).strip()
 
     def _walk(n: Any) -> Any:
@@ -943,100 +956,10 @@ def fix_asset_7d_claims(
     return _walk(node), fixes
 
 
-def gate_weekly_plan_reinforce(
-    items: Any, capped_assets: dict[str, float]
-) -> tuple[Any, list[str]]:
-    """v30 (#37) — le plan hebdo CONSOMME le gate de concentration.
-
-    Le 15/07 : « PRIORITÉ : renforcer le cœur (BTC, ETH, TAO) » et
-    « renforcer BTC de +3% » alors que le matin bloquait BTC/ETH (plafond) et
-    que l'hebdo lui-même écrivait « BTC 43% … alléger/diversifier ». Toute
-    action/puce « renforcer X » où X est AU PLAFOND est requalifiée en
-    conservation explicite. Traite weekly_action_plan (dicts), strategy_focus
-    (str/list) et watchlist (dicts).
-    """
-    fixes: list[str] = []
-    if not capped_assets or items is None:
-        return items, fixes
-
-    def _requalify(text: str) -> str:
-        new = text
-        for asset, w in capped_assets.items():
-            pat = re.compile(
-                rf"(?i)renforcer\s+(?:le\s+cœur\s*\([^)]*\b{re.escape(asset)}\b[^)]*\)"
-                rf"|(?:le\s+|la\s+)?{re.escape(asset)}\b)"
-                rf"(\s+de\s+\+?\d+(?:[.,]\d+)?\s?%(?:\s+du\s+portefeuille)?)?")
-
-            def _sub(m: re.Match) -> str:
-                fixes.append(
-                    f"plan hebdo : « renforcer {asset} » → conserver "
-                    f"(plafond de concentration, {w:.0f}% du PTF)")
-                return (f"conserver {asset} (plafond de concentration atteint "
-                        f"— {w:.0f}% du PTF, renfort bloqué)")
-
-            new = pat.sub(_sub, new, count=1)
-        return new
-
-    if isinstance(items, str):
-        return _requalify(items), fixes
-    if isinstance(items, list):
-        out = []
-        for it in items:
-            if isinstance(it, str):
-                out.append(_requalify(it))
-            elif isinstance(it, dict):
-                for k in ("action", "rationale", "trigger"):
-                    if isinstance(it.get(k), str):
-                        it[k] = _requalify(it[k])
-                out.append(it)
-            else:
-                out.append(it)
-        return out, fixes
-    return items, fixes
-
-
-_RR_SUPERLATIVE = re.compile(
-    r"(?i)\bexcellent(?:e)?\s+(?:ratio\s+)?risque[/\s-]r[ée]compense\b")
-
-
-def fix_rr_superlatives(
-    node: Any, rr_by_asset: dict[str, Any]
-) -> tuple[Any, list[str]]:
-    """v30 (#38) — « excellent ratio risque/récompense » vs R:R réel.
-
-    Le 15/07, l'hebdo qualifiait le renfort ETH d'« excellent ratio
-    risque/récompense » quand le matin affichait R:R 1,0:1 (faible). Si un
-    actif à R:R < 1,5 est cité dans la même phrase, le superlatif devient le
-    chiffre réel.
-    """
-    fixes: list[str] = []
-    weak = {a: v for a, v in (rr_by_asset or {}).items()
-            if isinstance(v, (int, float)) and v < 1.5}
-    if not weak:
-        return node, fixes
-
-    def _fn(text: str) -> str:
-        if not _RR_SUPERLATIVE.search(text):
-            return text
-        for asset, rr in weak.items():
-            if re.search(rf"\b{re.escape(asset)}\b", text):
-                new = _RR_SUPERLATIVE.sub(
-                    "ratio risque/récompense limité (R:R réel "
-                    f"{str(rr).replace('.', ',')}:1)", text)
-                fixes.append(f"{asset} : « excellent R:R » → R:R réel {rr}:1")
-                return new
-        return text
-
-    def _walk(n: Any) -> Any:
-        if isinstance(n, str):
-            return _fn(n)
-        if isinstance(n, list):
-            return [_walk(x) for x in n]
-        if isinstance(n, dict):
-            return {k: _walk(v) for k, v in n.items()}
-        return n
-
-    return _walk(node), fixes
+# v30 (#38) — fix_rr_superlatives : RETIRÉE (audit 02/10). Elle réécrivait
+# « excellent ratio risque/récompense » avec le R:R du plan V30, critère
+# écarté par Omar ; la phrase est désormais retirée par
+# prose_guard.METRIQUE_V30.
 
 
 def append_watchlist_exits(

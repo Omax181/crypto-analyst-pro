@@ -123,8 +123,11 @@ def test_narratives_source_label_is_honest():
     from src import main as m
     assert "Narratifs (CoinGecko)" in m._ALL_SOURCES_LIST
     assert "Kaito" not in m._ALL_SOURCES_LIST
-    src = inspect.getsource(m._active_sources)
-    assert "Narratifs (CoinGecko)" in src
+    # v32 (5.5) — la table de correspondance a été hissée hors de la fonction
+    # pour qu'un test puisse verrouiller sa synchronisation avec le catalogue.
+    # On interroge donc la table elle-même, pas le source de la fonction.
+    assert m._SOURCE_LABELS["narratives"] == "Narratifs (CoinGecko)"
+    assert not any("Kaito" in v for v in m._SOURCE_LABELS.values())
     # v29 (audit) — le drapeau « narratifs » est branché sur la VRAIE source
     # (hot_narratives / CoinGecko), plus sur la sortie du module Kaito mort.
     col = inspect.getsource(m._collect_morning_data)

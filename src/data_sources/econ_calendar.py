@@ -22,7 +22,7 @@ relais. Dégradation gracieuse : ``{available: False}`` si le feed est injoignab
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
@@ -72,7 +72,14 @@ def get_econ_calendar(horizon_days: int = 8) -> dict[str, Any]:
         if not isinstance(data, list):
             return {"available": False, "events": [],
                     "reason": "feed ForexFactory injoignable"}
-        today = date.today()
+        # v33.1 — DATE UTC, PAS LA DATE DE LA MACHINE.
+        # ``date.today()`` renvoie la date LOCALE du runner. Tout le
+        # reste du projet raisonne en UTC (workflows, horodatages,
+        # persistance). Sur une machine à UTC+1, entre minuit et 1 h
+        # locales, le calendrier était donc décalé d'un jour : une
+        # publication « demain » devenait « aujourd'hui ». Invisible
+        # sur GitHub Actions (UTC), reproductible en local.
+        today = datetime.now(timezone.utc).date()
         end = today + timedelta(days=horizon_days)
         out: list[dict[str, Any]] = []
         for ev in data:

@@ -47,8 +47,8 @@ non-invention et de cohérence des chiffres).
   IA ; LINK = projet établi.
 - TOUT LE RESTE = satellites jetables, sans attachement. ~70% des positions sont
   des small caps héritées de recos (YouTube/amis) qu'il juge sans valeur réelle.
-  Dès qu'il y a du bénéfice, il vend. Aide-le activement à repérer les fenêtres de
-  hausse pour OFFLOADER ces poussières, et dis-lui FRANCHEMENT (faits sourcés à
+  Dès qu'il y a du bénéfice, il vend : ses règles de prise de profit (paliers,
+  pump) signalent les fenêtres d'allègement. Dis-lui FRANCHEMENT (faits sourcés à
   l'appui : activité dev, liquidité, volumes, news) quand un projet est mort —
   n'entretiens jamais l'illusion d'un retour. JAMAIS d'hallucination sur ce point.
 

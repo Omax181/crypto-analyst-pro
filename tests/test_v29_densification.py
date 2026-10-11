@@ -77,17 +77,20 @@ def test_mb3_macro_fused_no_coherence_in_fiche():
 
 
 def test_mb4_thesis_card_8_blocks():
-    """MB4 — fiche : « Ce qui me ferait tort » (auto-critique + contre-thèse
-    fusionnées), « Niveaux & scénarios » (cibles + bull/base/bear), DCA dans le
-    plan."""
-    html = render({"header": {"date": "x"},
-                   "thesis_of_the_day": [_detailed_thesis()]}, "morning")
+    """MB4 → v33 : « Ce qui me ferait tort » reste la seule contre-thèse ; la
+    fiche porte la décision du moteur, plus les blocs V30 (scénarios bull/
+    base/bear, espérance, DCA)."""
+    from tests.test_v32_redteam import _these_moteur
+    t = dict(_detailed_thesis())
+    t.update({k: v for k, v in _these_moteur().items()
+              if k in ("engine_view", "v33_decision", "action", "_expand")})
+    t.pop("asset_plan", None)
+    html = render({"header": {"date": "x"}, "thesis_of_the_day": [t]}, "morning")
     assert "Ce qui me ferait tort" in html
     assert "auto-critique" in html.lower() and "invaliderait la structure" in html
-    assert "Niveaux &amp; scénarios" in html
-    assert "Bull 23%" in html and "Espérance 30j" in html
-    assert "DCA en 3 tranches" in html and "40% immédiat" in html
-    # plus les anciens titres séparés.
+    assert "Décision du moteur" in html and "Succès jugé à 12 mois" in html
+    assert "Niveaux &amp; scénarios" not in html and "Espérance 30j" not in html
+    assert "DCA en 3 tranches" not in html
     assert "Mon auto-critique" not in html
     assert "Contre-thèse (ce qui me ferait tort)" not in html
 

@@ -18,6 +18,7 @@ Couvre les nouveautés v15 SANS réseau :
 from __future__ import annotations
 
 import datetime as dt
+from src.reporting.email_html import APP_VERSION
 
 # --------------------------------------------------------------------------- #
 # Calendrier macro consolidé
@@ -134,7 +135,10 @@ def _mem_with_store(monkeypatch):
     import src.state.report_memory as rm
     store: dict = {}
     monkeypatch.setattr(rm, "_read",
-                        lambda f, default: store.get(f, default if default is not None else []))
+                        # RT-6 : la doublure suit la signature de _read
+                        # (parametre `elements`), sinon elle ment sur le vrai I/O.
+                        lambda f, default, elements=None: store.get(
+                            f, default if default is not None else []))
     monkeypatch.setattr(rm, "_write", lambda f, data: store.__setitem__(f, data))
     return rm, store
 
@@ -209,25 +213,32 @@ def test_build_scoring_detail_dedup_and_fields(monkeypatch):
 # --------------------------------------------------------------------------- #
 # Filets thèses (R:R, SL) + compteur header
 # --------------------------------------------------------------------------- #
-def _merged(theses):
+def _v33_firm(*assets, size_pct=5.0):
+    """Décision FERME du moteur v33 pour les actifs nommés.
+
+    Depuis v33, le moteur est souverain sur l'action : sans décision de sa
+    part, aucune thèse ne reste ferme, quel que soit ce que le modèle de
+    langage a écrit. Les tests qui vérifient qu'une thèse SAINE est CONSERVÉE
+    doivent donc fournir la décision — sinon ils ne testent que l'abstention.
+    """
+    firm = [{"asset": a, "action": "RENFORCER", "decided": True,
+             "channel": "conviction", "reason": f"décision moteur {a}",
+             "size": {"pct": size_pct, "usd": 143.0, "band_label": "normale",
+                      "kind": "core"}} for a in assets]
+    return {"available": True, "decisions": list(firm), "firm": firm,
+            "reduce_firm": [], "count": len(firm)}
+
+
+def _merged(theses, opportunity=None):
     from src.main import _merge_python_facts
     payload = {"thesis_of_the_day": theses}
-    return _merge_python_facts(payload, {"eligible_theses": []}, "11/06 08:30")
+    data = {"eligible_theses": []}
+    if opportunity is not None:
+        data["opportunity"] = opportunity
+    return _merge_python_facts(payload, data, "11/06 08:30")
 
 
-def test_thesis_gate_rr_over_8_demoted():
-    out = _merged([{
-        "asset": "STX", "action": "RENFORCER", "action_type": "bullish",
-        "confidence": 78,
-        "action_plan": {"entry": 100, "stop_loss": 99.4,
-                        "take_profit": {"30pct": 108}, "rr": "13:1"},
-    }])
-    t = out["thesis_of_the_day"][0]
-    assert t["action"] == "SURVEILLER"
-    assert t["demoted_by_python"] is True
-    assert "action_plan" not in t
-    assert out["header"]["firm_theses_count"] == 0
-    assert out["header"]["watch_theses_count"] == 1
+# v33 (audit 01/10) — « test_thesis_gate_rr_over_8_demoted » retiré : le filet stop/R:R V15 a été retiré : il ne pouvait plus agir que contre des décisions du moteur (code mort)
 
 
 def test_thesis_gate_sl_wrong_side_demoted():
@@ -240,17 +251,7 @@ def test_thesis_gate_sl_wrong_side_demoted():
     assert out["thesis_of_the_day"][0]["action"] == "SURVEILLER"
 
 
-def test_thesis_gate_healthy_plan_kept():
-    out = _merged([{
-        "asset": "BTC", "action": "RENFORCER", "action_type": "bullish",
-        "confidence": 78,
-        "action_plan": {"entry": 63000, "stop_loss": 60500,
-                        "take_profit": {"30pct": 68200}, "rr": "2.7:1"},
-    }])
-    t = out["thesis_of_the_day"][0]
-    assert t["action"] == "RENFORCER"
-    assert t["rr_favorable"] is True
-    assert out["header"]["firm_theses_count"] == 1
+# v33 (audit 01/10) — « test_thesis_gate_healthy_plan_kept » retiré : le filet stop/R:R V15 a été retiré : il ne pouvait plus agir que contre des décisions du moteur (code mort)
 
 
 def test_thesis_confidence_below_75_filtered():
@@ -441,17 +442,23 @@ def test_render_morning_v15_blocks():
     }, "morning")
     assert "1 nouvelle reco · 9 en suivi" in html
     assert "EN BREF" in html and "1 renforcement BTC" in html
-    assert "maintien" in html and "99.2%" in html
+    # RED TEAM (RT-14) — assertion qui VERROUILLAIT la décimale anglaise.
+    assert "maintien" in html and "99,2%" in html
+    assert "99.2%" not in html
     # v19/V18-M4 : 2e valeur DXY discrète. v28 (M-A20) : « DXY (ICE) » sur la
     # tuile + « indice élargi (Fed) » — les deux indices nommés sans note ².
-    assert "indice élargi (Fed) · 120.08" in html
+    # v32 (3.7/5.17) — décimale FRANÇAISE : « 120.08 » sortait en format
+    # anglais à côté d'une prose entièrement française, dans les deux mails.
+    assert "indice élargi (Fed) · 120,08" in html
+    # …et aucune étiquette de fraîcheur tant que la donnée n'est pas périmée.
+    assert "· au " not in html.split("indice élargi (Fed)")[1][:40]
     assert "DXY (ICE)" in html
     assert "+12 autres" in html and "moy." in html  # v16 : case agrégée %PTF
-    assert "12.9% du PTF" in html                    # v16 : poids agrégat
+    assert "12,9% du PTF" in html                    # v16 : poids agrégat
     assert "réseau sain" in html                     # v16 : grille on-chain horizontale
     assert "Bilan on-chain : neutre" in html         # v16 : verdict-first
     assert "DXY &gt; 101" in html or "DXY > 101" in html
-    assert "Crypto Analyst Pro · v30" in html
+    assert f"Crypto Analyst Pro · {APP_VERSION}" in html
     # v29 (MB6) — « À surveiller » + « invalider » fusionnés en « À surveiller ·
     # seuils d'invalidation », AVANT l'auto-critique (qui reste séparée).
     assert html.index("seuils d'invalidation") < html.index("Auto-critique de l'analyse")
@@ -476,15 +483,17 @@ def test_render_evening_v15_blocks():
                                           "dominant_pct": 99.2}},
     }, "evening")
     assert "matin 10h14 · soir 19h32 · Δ9h" in html
-    assert "+0.04%" in html and "journée neutre" in html
-    assert "+$1.00" in html                    # $ adaptatif < 10 $
+    # RED TEAM (RT-14) — idem : le rendu FR est « +0,04% ».
+    assert "+0,04%" in html and "journée neutre" in html
+    assert "+0.04%" not in html
+    assert "+$1,00" in html                    # $ adaptatif < 10 $
     assert "Actions à poser ce soir" in html and "ordre limite BTC" in html
     # v29 (ZB5) — International du soir allégé : USD/JPY (carry) conservé,
     # Nikkei/Stoxx/EUR-USD retirés (déjà couverts le matin).
     assert "USD/JPY" in html and "carry trade yen" in html
     assert "Nikkei 225" not in html and "Stoxx 50" not in html
-    assert "maintien" in html and "99.2%" in html
-    assert "Crypto Analyst Pro · v30" in html
+    assert "maintien" in html and "99,2%" in html
+    assert f"Crypto Analyst Pro · {APP_VERSION}" in html
 
 
 def test_render_weekly_v15_blocks():
@@ -530,7 +539,7 @@ def test_render_weekly_v15_blocks():
                                         "detail": "drawdown pondéré -50% vs ATH"}]},
         "week_ahead": [{"label": "Décision FOMC (taux Fed)", "date": "2026-06-17",
                         "when": "dans 5j", "importance": "high",
-                        "polymarket_note": "Polymarket : maintien 99.2%"}],
+                        "polymarket_note": "Polymarket : maintien 99,2%"}],
         "positions_review": [
             {"asset": "ETH", "conviction": True, "current_price": 1655.39,
              "pru_pct": -8.0, "h30": {"reco": "RENFORCER", "delta_pct": 6.2,
@@ -566,8 +575,13 @@ def test_render_weekly_v15_blocks():
     assert "Corrélation entre tes positions" not in html
     # v16 — solidité affiche un détail réel (plus de « n/d »).
     assert "drawdown pondéré -50% vs ATH" in html
-    assert "Santé du portefeuille" in html and "4.2" in html
-    assert "Polymarket : maintien 99.2%" in html
+    # RED TEAM (RT-14) — cette assertion VERROUILLAIT le défaut : elle
+    # exigeait « 4.2 », c'est-à-dire la décimale ANGLAISE que le bilan hebdo
+    # réellement produit affichait (« Santé du portefeuille 4.9 /10 »). Le
+    # test passait au vert précisément parce que le rendu était faux.
+    assert "Santé du portefeuille" in html and "4,2" in html
+    assert "4.2" not in html and "5.6/10" not in html
+    assert "Polymarket : maintien 99,2%" in html
     # v23.x — ATH/description retirés ; le tableau fusionné montre phase de cycle
     # + action déterministe (couleurs logiques).
     assert "Accumulation" in html and "Capitulation" in html
@@ -578,6 +592,43 @@ def test_render_weekly_v15_blocks():
     assert "→ Renforcer" not in html    # dédup WB6
     assert "Stratégie de la semaine" in html
     assert "1\u202f773" in html or "1,773" in html or "1 773" in html  # fenêtre P&L
-    assert "Crypto Analyst Pro · v30" in html
+    assert f"Crypto Analyst Pro · {APP_VERSION}" in html
     # Ordre : la vue PTF arrive avant le fil rouge macro (P3-1).
     assert html.index("Portfolio · vue d'ensemble") < html.index("Fil rouge macro")
+
+
+def test_v33_sans_decision_du_moteur_une_these_saine_est_refusee():
+    """Preuve d'ATTEIGNABILITÉ inverse du test précédent.
+
+    Même thèse, même plan sain, mais le moteur n'a rien décidé : elle DOIT
+    être ramenée à SURVEILLER. Sans ce test, on ne saurait pas si le premier
+    passe grâce au moteur ou malgré lui.
+    """
+    out = _merged([{
+        "asset": "BTC", "action": "RENFORCER", "action_type": "bullish",
+        "confidence": 78,
+        "action_plan": {"entry": 63000, "stop_loss": 60500,
+                        "take_profit": {"30pct": 68200}, "rr": "2.7:1"},
+    }])
+    t = out["thesis_of_the_day"][0]
+    assert t["action"] == "SURVEILLER"
+    assert t["_v33_gated"] == "moteur_indisponible"
+    assert out["header"]["firm_theses_count"] == 0
+
+
+def test_v33_le_moteur_ne_peut_pas_etre_contourne_par_le_llm():
+    """Le modèle de langage ne crée pas une reco que le moteur a refusée."""
+    refus = {"available": True, "count": 0, "firm": [], "reduce_firm": [],
+             "decisions": [{"asset": "BTC", "decided": False,
+                            "condition_failed": "C4",
+                            "reason": "potentiel mesuré sous le requis"}]}
+    out = _merged([{
+        "asset": "BTC", "action": "RENFORCER", "action_type": "bullish",
+        "confidence": 99,
+        "action_plan": {"entry": 63000, "stop_loss": 60500,
+                        "take_profit": {"30pct": 68200}, "rr": "2.7:1"},
+    }], opportunity=refus)
+    t = out["thesis_of_the_day"][0]
+    assert t["action"] == "SURVEILLER"
+    assert t["_v33_gated"] == "C4"
+    assert "potentiel mesuré sous le requis" in t["gate_note"]

@@ -410,9 +410,20 @@ def test_macro_context_intl_range_guard():
 
 
 def test_active_sources_catalogue_includes_intl():
-    from src.main import _ALL_SOURCES_LIST, _active_sources
+    from src.main import _ALL_SOURCES_LIST, _CLES_SOURCES, _active_sources
 
-    assert len(_ALL_SOURCES_LIST) == 25
+    # v32 (5.5) — on verrouille l'INVARIANT, pas un nombre. Un compteur figé
+    # « == 25 » ne dit rien sur la cohérence : c'est justement parce que le
+    # catalogue et la table de correspondance vivaient séparément que
+    # CoinMarketCal a pu échouer chaque matin sans jamais apparaître, ni comme
+    # active ni comme indisponible. Le mail affichait « 23 / 25 » avec une
+    # source du périmètre morte depuis des semaines.
+    tous = _active_sources(**{k: True for k in _CLES_SOURCES})
+    assert sorted(tous) == sorted(_ALL_SOURCES_LIST), (
+        "catalogue et table de correspondance désynchronisés : "
+        f"catalogue seul {sorted(set(_ALL_SOURCES_LIST) - set(tous))} · "
+        f"mapping seul {sorted(set(tous) - set(_ALL_SOURCES_LIST))}")
+
     out = _active_sources(intl_markets=True, equity_links=True)
     assert "Marchés internationaux (BCE · BoJ · Nikkei · Stoxx)" in out
     assert "Actions ↔ crypto (NVDA · COIN · MSTR…)" in out
@@ -454,7 +465,7 @@ def _rich_morning_payload() -> dict:
                                    "change_pct": 2.1}},
         "equity_crypto_links": {
             "available": True,
-            "summary_line": "NVDA↔RENDER corr 30j +0.62 · β 1.40 — demande GPU / calcul IA",
+            "summary_line": "NVDA↔RENDER corr 30j +0,62 · β 1.40 — demande GPU / calcul IA",
         },
         "footer": {"next_report_at": "ce soir 20h00"},
     }
@@ -466,7 +477,7 @@ def test_render_morning_intl_group_and_equity_cell():
     # (plus de tuiles « BCE · dépôt » / « BoJ · taux » séparées).
     for needle in ("International · Europe", "Euro Stoxx 50", "Nikkei 225",
                    "Taux directeurs", "BCE dépôt", "BoJ", "NVDA · IA/GPU",
-                   "Actions ↔ crypto", "NVDA↔RENDER corr 30j +0.62"):
+                   "Actions ↔ crypto", "NVDA↔RENDER corr 30j +0,62"):
         assert needle in html, f"manque : {needle}"
     # Mail-safe : aucune grille/flex dans le rendu.
     assert "display:grid" not in html and "display:flex" not in html

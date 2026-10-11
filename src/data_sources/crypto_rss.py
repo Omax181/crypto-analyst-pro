@@ -50,9 +50,21 @@ CRYPTO_FEEDS: dict[str, str] = {
 
 # Flux RSS macro/finance publics. label -> url.
 MACRO_FEEDS: dict[str, str] = {
-    # Reuters a coupé son RSS officiel (404 depuis mars 2026). On le reconstitue
-    # via Google News filtré sur reuters.com — fiable, gratuit, sans clé.
-    "Reuters": "https://news.google.com/rss/search?q=when:24h+allinurl:reuters.com+business&ceid=US:en&hl=en-US&gl=US",
+    # v32 (5.12) — REUTERS RETIRÉ, remplacé par les deux flux CNBC.
+    #
+    # Reuters avait coupé son RSS officiel (mars 2026) ; la v-précédente le
+    # reconstituait via Google News filtré sur `allinurl:reuters.com`. MESURÉ le
+    # 25/08/2026 : ce flux répond HTTP 200 avec ZÉRO item — Google News ne sert
+    # plus ce filtre. Il échouait donc silencieusement aux dix runs fournis
+    # (« 8/9 flux » le matin, « 14/15 » le soir, à chaque fois), en coûtant un
+    # appel réseau pour rien. `feeds.reuters.com` ne résout même plus.
+    #
+    # Remplaçants MESURÉS le même jour, sans clé : CNBC Economy (30 items,
+    # macro : « Bessent could tap near $1 trillion Treasury General Account »)
+    # et CNBC Markets (30 items). Deux voix distinctes de MarketWatch et
+    # Investing.com, déjà présents.
+    "CNBC Economy": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+    "CNBC Markets": "https://www.cnbc.com/id/15839069/device/rss/rss.html",
     "MarketWatch": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
     "MarketWatch Markets": "https://feeds.content.dowjones.io/public/rss/mw_marketpulse",
     "Investing.com": "https://www.investing.com/rss/news.rss",

@@ -64,7 +64,7 @@ def test_m_a16_btc_tile_shows_numeric_delta():
                           "dxy": 99.9, "polymarket_fed_cut_pct": 0.2},
     }
     html = render(p, "morning")
-    assert "+2.2%" in html  # 2.17 arrondi à 1 décimale
+    assert "+2,2%" in html  # 2.17 arrondi à 1 décimale
 
 
 def test_m_a18_movers_section_removed_from_morning():
@@ -186,8 +186,8 @@ def test_m_b9_central_bank_rates_inline():
     }
     html = render(p, "morning")
     assert "Taux directeurs" in html
-    assert "BCE dépôt 2.00%" in html
-    assert "BoJ 0.50%" in html
+    assert "BCE dépôt 2,00%" in html
+    assert "BoJ 0,50%" in html
 
 
 def test_m_b12_macro_guardrail_active_and_inactive():
@@ -428,7 +428,7 @@ def test_w_b15_sector_cells_render():
          "sector_exposure_cells": cells},
         "weekly",
     )
-    assert "61.1%" in html
+    assert "61,1%" in html
     assert "Autres secteurs (3)" in html
 
 

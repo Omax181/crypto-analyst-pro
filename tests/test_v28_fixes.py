@@ -11,6 +11,7 @@ Les phases suivantes (P2…P11) ajoutent leurs verrous dans ce même fichier.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from tests.conftest import il_y_a
 
 
 # --------------------------------------------------------------------------- #
@@ -320,21 +321,19 @@ def test_rotation_grt_merged_into_infra_and_tiles_shared():
 
 def test_tracking_target_fallback_from_plan(monkeypatch):
     """M-A13 (repro INJ 07/07) : reco legacy sans cible → cible 30j du plan du
-    jour, étiquetée fallback."""
+    jour, étiquetée fallback.
+
+    Audit 02/10 — le repli est RETIRÉ : la cible 30 j du plan V30 n'est plus
+    publiée nulle part en v33. Une reco sans cible affiche « — » (voir
+    test_v33_heritage)."""
     from src.tracking import prediction_scoring as ps
 
     reco = {"asset": "INJ", "action": "RENFORCER", "status": "in_progress",
-            "created_at": "2026-07-02T08:00:00+00:00", "entry_price": 4.54}
+            "created_at": il_y_a(54), "entry_price": 4.54}
     monkeypatch.setattr(ps.mem, "load_active_recommendations", lambda: [reco])
-    tracker = ps.PredictionTracker()
-    rows = tracker.active_for_display({"INJ": 4.75},
-                                      target_fallbacks={"INJ": 4.96})
-    inj = rows[0]
-    assert inj["ct_target"] == 4.96 and inj["ct_target_fallback"] is True
-    # Sans fallback : comportement inchangé (cible absente).
-    rows2 = tracker.active_for_display({"INJ": 4.75})
+    rows2 = ps.PredictionTracker().active_for_display({"INJ": 4.75})
     assert rows2[0]["ct_target"] is None
-    assert rows2[0]["ct_target_fallback"] is False
+    assert rows2[0]["legacy"] is True
 
 
 def test_whale_small_flow_is_neutral():
@@ -416,96 +415,33 @@ def _thesis(asset, action="RENFORCER", ttype="tactical", ev=2.0, rr=1.6,
     }
 
 
-def test_gate_cap_reached_becomes_maintenir():
-    """M-A1/A2 (repro 07/07) : sizing 0% (plafond) → MAINTENIR, jamais
-    « RENFORCER · Taille +0.0% »."""
-    from src.analytics.reco_gate import apply_reco_gate
-
-    p = {"thesis_of_the_day": [_thesis("TAO", ttype="conviction", size_pct=0.0)]}
-    fixes = apply_reco_gate(p)
-    t = p["thesis_of_the_day"][0]
-    assert t["action"] == "MAINTENIR"
-    assert "plafond" in t["gate_note"]
-    assert fixes
+# v33 (audit 01/10) — « test_gate_cap_reached_becomes_maintenir » retiré : la porte v28 (plafond → MAINTENIR, EV/R:R → SURVEILLER, confiance plafonnée) est retirée : critères écartés par Omar (pas de hard cap, pas de probabilité inventée) et sans effet sur une décision du moteur
 
 
-def test_gate_tactical_negative_ev_becomes_surveiller():
-    """M-A3/A4 (repro BTC 07/07) : tactique avec R:R 1.0 → SURVEILLER."""
-    from src.analytics.reco_gate import apply_reco_gate
-
-    p = {"thesis_of_the_day": [_thesis("BTC", ttype="tactical", ev=0.1, rr=1.0)]}
-    apply_reco_gate(p)
-    t = p["thesis_of_the_day"][0]
-    assert t["action"] == "SURVEILLER"
-    assert "défavorables" in t["gate_note"]
+# v33 (audit 01/10) — « test_gate_tactical_negative_ev_becomes_surveiller » retiré : la porte v28 (plafond → MAINTENIR, EV/R:R → SURVEILLER, confiance plafonnée) est retirée : critères écartés par Omar (pas de hard cap, pas de probabilité inventée) et sans effet sur une décision du moteur
 
 
-def test_gate_conviction_keeps_renforcer_with_warning():
-    """M-A3 (repro ETH 07/07) : conviction LT à EV −0.7% → RENFORCER conservé
-    (DCA) mais confiance ≤ 70 et mention CT frontale."""
-    from src.analytics.reco_gate import apply_reco_gate
-
-    p = {"thesis_of_the_day": [
-        _thesis("ETH", ttype="conviction", ev=-0.7, rr=0.7, confidence=78)]}
-    apply_reco_gate(p)
-    t = p["thesis_of_the_day"][0]
-    assert t["action"] == "RENFORCER"          # la thèse LT survit
-    assert t["confidence"] == 70               # plafonnée
-    assert "défavorables" in t["ct_warning"]   # mention frontale
+# v33 (audit 01/10) — « test_gate_conviction_keeps_renforcer_with_warning » retiré : la porte v28 (plafond → MAINTENIR, EV/R:R → SURVEILLER, confiance plafonnée) est retirée : critères écartés par Omar (pas de hard cap, pas de probabilité inventée) et sans effet sur une décision du moteur
 
 
-def test_gate_healthy_reco_untouched():
-    from src.analytics.reco_gate import apply_reco_gate
-
-    p = {"thesis_of_the_day": [_thesis("TAO", ev=2.3, rr=1.6, size_pct=1.0)]}
-    fixes = apply_reco_gate(p)
-    t = p["thesis_of_the_day"][0]
-    assert t["action"] == "RENFORCER" and not fixes
-    assert "ct_warning" not in t and t["confidence"] == 75
+# v33 (audit 01/10) — « test_gate_healthy_reco_untouched » retiré : la porte v28 (plafond → MAINTENIR, EV/R:R → SURVEILLER, confiance plafonnée) est retirée : critères écartés par Omar (pas de hard cap, pas de probabilité inventée) et sans effet sur une décision du moteur
 
 
-def test_top_action_skips_non_executable_and_says_nothing_to_do():
-    """M-A1 (repro 07/07) : le « one thing » ne pousse plus un actif plafonné ;
-    aucun geste exécutable → « Ne rien faire aujourd'hui »."""
-    from src.main import _compute_top_action
-    from src.analytics.reco_gate import apply_reco_gate
-
-    # Cas 07/07 : TAO plafonné (meilleur R:R), ETH conviction EV<0, BTC tactique R:R 1.0.
-    p = {"thesis_of_the_day": [
-        _thesis("TAO", ttype="conviction", ev=2.3, rr=1.6, size_pct=0.0),
-        _thesis("ETH", ttype="conviction", ev=-0.7, rr=0.7),
-        _thesis("BTC", ttype="tactical", ev=0.1, rr=1.0),
-    ]}
-    apply_reco_gate(p)
-    _compute_top_action(p)
-    assert p["top_action"]["is_nothing"] is True
-    assert "Ne rien faire aujourd'hui" in p["top_action"]["line"]
-    # Un candidat sain existe → il gagne, pas le « ne rien faire ».
-    p2 = {"thesis_of_the_day": [
-        _thesis("TAO", size_pct=0.0),
-        _thesis("LINK", ev=1.8, rr=1.5, size_pct=1.0),
-    ]}
-    apply_reco_gate(p2)
-    _compute_top_action(p2)
-    assert p2["top_action"].get("is_nothing") is None
-    assert p2["top_action"]["asset"] == "LINK"
+# v33 (audit 01/10) — « test_top_action_skips_non_executable_and_says_nothing_to_do » retiré : la porte v28 (plafond → MAINTENIR, EV/R:R → SURVEILLER, confiance plafonnée) est retirée : critères écartés par Omar (pas de hard cap, pas de probabilité inventée) et sans effet sur une décision du moteur
 
 
 def test_morning_template_renders_maintenir_and_nothing_to_do():
+    """v33 — MAINTENIR n'est plus une posture ferme (aucun plafond ne la
+    produit) ; la ligne « Ne rien faire » reste rendue."""
     from src.reporting import email_html
 
     t = _thesis("TAO", ttype="conviction", size_pct=0.0)
     t["action"] = "MAINTENIR"
-    t["gate_note"] = "déjà 13% du PTF (plafond 12%) — renfort non suggéré"
     payload = {"thesis_of_the_day": [t],
                "top_action": {"is_nothing": True, "line": "Ne rien faire aujourd'hui — test."}}
     html = email_html.render(payload, "morning")
-    assert "MAINTENIR" in html
-    assert "renfort non suggéré" in html
-    # L'apostrophe est échappée en HTML (&#39;) par le filtre markdown : on
-    # vérifie le fragment sans apostrophe + l'icône ⏸ du bloc « rien à faire ».
     assert "Ne rien faire" in html and "⏸" in html
-    assert "+0.0% du portefeuille" not in html  # l'incohérence du 07/07 a disparu
+    assert "+0.0% du portefeuille" not in html
 
 
 # --------------------------------------------------------------------------- #
@@ -544,29 +480,20 @@ def test_evening_derivatives_line_annualized():
 
 
 def test_positions_review_uses_deterministic_cycle_targets():
-    """W-A11 : la cible LT du tableau hebdo = fourchette asset_plan (source du
-    matin), la cible LLM divergente ne sert plus que de repli."""
+    """W-A11 → v33 : une seule source déterministe, la fourchette 12 mois ; ni
+    la cible du modèle (3 500) ni la fourchette « fib 0,618 → ATH »."""
     from src.main import _build_positions_review
 
     portfolio = {"ETH": {"pru": 3100.0, "value_usd": 500.0}}
     market = {"ETH": {"price": 1777.0}}
     long_term = [{"asset": "ETH", "status": "accumulation",
                   "target_price": 3500.0, "analysis": "thèse LT"}]
-    plans = {"ETH": {"available": True, "target_cycle": {
-        "low": 3736.0, "high": 4946.0, "upside_pct": 178.0, "kind": "6-12m"}}}
     rows = _build_positions_review(long_term, [], portfolio, market,
-                                   ath_facts={"ETH": {"from_ath_pct": -64.2,
-                                                      "ath": 4946.0}},
-                                   asset_plans=plans)
+                                   vols={"ETH": 2.9})
     eth = rows[0]
-    assert eth["lt_target_low"] == 3736.0 and eth["lt_target_high"] == 4946.0
-    assert eth["lt_target_pct"] == 178.0
-    assert eth["lt_target"] is None  # la cible LLM (3500) n'est plus affichée
-    # Sans plan → repli LLM v26 (cap ATH) inchangé.
-    rows2 = _build_positions_review(long_term, [], portfolio, market,
-                                    ath_facts={"ETH": {"from_ath_pct": -64.2,
-                                                       "ath": 4946.0}})
-    assert rows2[0]["lt_target"] == 3500.0
+    assert eth["lt_target_kind"] == "fourchette"
+    assert eth["lt_target_low"] < 1777.0 < eth["lt_target_high"] < 4946.0
+    assert eth["lt_target"] is None
 
 
 def test_win_rate_headers_show_calibration_under_5():

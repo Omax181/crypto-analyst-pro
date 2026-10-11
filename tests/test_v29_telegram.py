@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 
 from src.telegram_bot import notify
+from tests.conftest import il_y_a
 
 
 # --------------------------------------------------------------------------- #
@@ -202,10 +203,7 @@ def test_morning_verdict_adapts_to_action():
     assert "Rien à exécuter" not in d
 
 
-def test_morning_gate_and_ct_warning_rendered():
-    d = notify._build_digest(_morning(), "morning")
-    assert "*TAO* — on garde : plafond de concentration atteint" in d
-    assert "*ETH* (conv. 70%) — on accumule (DCA)" in d
+# v33 (audit 01/10) — « test_morning_gate_and_ct_warning_rendered » retiré : la porte v28 (plafond → MAINTENIR, EV/R:R → SURVEILLER, confiance plafonnée) est retirée : critères écartés par Omar (pas de hard cap, pas de probabilité inventée) et sans effet sur une décision du moteur
 
 
 def test_morning_market_narrative_reuses_ai_synthesis():
@@ -219,7 +217,8 @@ def test_morning_theses_evolution_full_card():
     → lecture courte. La conviction AFFICHE SON ÉVOLUTION quand elle a changé."""
     d = notify._build_digest(_morning(), "morning")
     assert "📊 *Évolution des thèses énoncées*" in d
-    assert "*INJ* (conv. 62% → 70%) · émise 05/07" in d
+    # v33 — la confiance du modèle (« conv. ») n'est plus publiée.
+    assert "*INJ* · émise 05/07" in d and "conv." not in d
     assert "4,54 $ → 4,75 $ (+4,4%) · cible 4,96 $" in d
     assert "→ 🟢 En bonne voie — 48% du chemin vers la cible." in d
     # Anciens libellés retirés.
@@ -230,7 +229,7 @@ def test_morning_conviction_stable_no_arrow():
     p = _morning()
     p["active_recommendations_tracking"][0]["prev_confidence"] = None
     d = notify._build_digest(p, "morning")
-    assert "*INJ* (conv. 70%) · émise 05/07" in d
+    assert "*INJ* · émise 05/07" in d and "conv." not in d
     assert "62%" not in d
 
 
@@ -285,7 +284,8 @@ def test_commands_line_is_personalized():
 def test_evening_calm_no_thesis_rows():
     d = notify._build_digest(_evening(), "evening")
     assert "⚡ *Aucune thèse touchée aujourd'hui.*" in d
-    assert "🎯 *Action ce soir*" in d
+    # Audit 02/10 — le bloc est le SUIVI des recos, pas une action.
+    assert "🎯 *Suivi des recos ce soir*" in d
     assert "Rien à faire : aucun stop ni cible touché (1 thèse suivie)" in d
     # La ligne détaillée ETH (stable) n'est PAS rendue le soir.
     assert "1 777 $ → 1 768 $" not in d
@@ -297,7 +297,11 @@ def test_evening_stop_hit_renders_action():
                                "delta_pct": -9.97, "reason": "stop $1,621 franchi"})
     d = notify._build_digest(p, "evening")
     assert "⚡ *ETH : stop franchi, thèse invalidée.*" in d
-    assert "🔴 stop $1,621 franchi : thèse invalidée, on ne renforce plus." in d
+    assert "🔴 stop $1,621 franchi : thèse invalidée, plus de renfort sur ce motif." in d
+    # v33 — dans le sens de la reco : un ALLÉGER invalidé ne dit pas « renforce ».
+    p["reco_bilan"][0]["action"] = "ALLÉGER"
+    d = notify._build_digest(p, "evening")
+    assert "thèse invalidée, on n'allège pas sur ce motif." in d and "renfort" not in d
 
 
 def test_evening_target_hit_renders_action():
@@ -306,7 +310,9 @@ def test_evening_target_hit_renders_action():
                                "delta_pct": 10.3})
     d = notify._build_digest(p, "evening")
     assert "⚡ *ETH : cible touchée.*" in d
-    assert "✅ cible 1 950 $ touchée : prise de profit partielle à envisager." in d
+    # v33 — une cible touchée valide la reco ; elle ne prescrit pas de vente.
+    assert "✅ cible 1 950 $ touchée : reco validée (aucune vente déclenchée par une cible)." in d
+    assert "prise de profit" not in d
 
 
 def test_evening_pressure_renders_action():
@@ -369,7 +375,7 @@ def test_weekly_action_block_conditional_wording():
 def test_weekly_theses_evolution_from_tracker():
     d = notify._build_digest(_weekly(), "weekly")
     assert "📊 *Évolution des thèses énoncées*" in d
-    assert "*ETH* (conv. 72% → 78%) · émise 28/06" in d
+    assert "*ETH* · émise 28/06" in d and "conv." not in d
     assert "1 980 $ → 1 850 $ (−6,6%) · cible 6-12m 3 746 $–4 946 $" in d
     assert "→ Accumulation — MVRV 0,89 : capitulation historique." in d
     # RSR : cible du positions_review (zéros superflus retirés).
@@ -511,9 +517,9 @@ def test_clip_never_cuts_mid_number():
 
 
 def test_conv_note_evolution():
-    assert notify._conv_note(78, 72) == "conv. 72% → 78%"
-    assert notify._conv_note(78, None) == "conv. 78%"
-    assert notify._conv_note(78, 78) == "conv. 78%"
+    # v33 — plus aucune « conviction » (confiance du modèle) publiée.
+    assert notify._conv_note(78, 72) is None
+    assert notify._conv_note(78, None) is None
     assert notify._conv_note(None, 72) is None
 
 
@@ -541,7 +547,7 @@ def test_reissue_records_prev_confidence(tmp_path, monkeypatch):
 
     base = {"id": "ETH-2026-07-01-RENFORCER", "asset": "ETH",
             "action": "RENFORCER", "confidence": 72, "entry_price": 1980.0,
-            "created_at": "2026-07-01T08:00:00+00:00", "status": "in_progress"}
+            "created_at": il_y_a(55), "status": "in_progress"}
     mem.add_recommendation(dict(base))
     # Ré-émission avec conviction REVUE À LA HAUSSE → prev_confidence gardée.
     mem.add_recommendation({**base, "confidence": 78})
@@ -561,7 +567,7 @@ def test_active_for_display_exposes_confidence(tmp_path, monkeypatch):
     mem.save_active_recommendations([
         {"id": "ETH-2026-07-01-RENFORCER", "asset": "ETH", "action": "RENFORCER",
          "confidence": 78, "prev_confidence": 72, "entry_price": 1980.0,
-         "ct_target": 2178.0, "created_at": "2026-07-01T08:00:00+00:00",
+         "ct_target": 2178.0, "created_at": il_y_a(55),
          "status": "in_progress"}])
     rows = ps.PredictionTracker().active_for_display({"ETH": 1850.0})
     assert rows[0]["confidence"] == 78
@@ -575,7 +581,7 @@ def test_scoring_detail_exposes_confidence_and_target(tmp_path, monkeypatch):
     mem.save_active_recommendations([
         {"id": "ETH-2026-07-01-RENFORCER", "asset": "ETH", "action": "RENFORCER",
          "confidence": 78, "prev_confidence": 72, "entry_price": 1980.0,
-         "ct_target": 2178.0, "created_at": "2026-07-01T08:00:00+00:00",
+         "ct_target": 2178.0, "created_at": il_y_a(55),
          "status": "in_progress"}])
     detail = ps.PredictionTracker().build_scoring_detail({"ETH": 1850.0}, 7)
     row = [r for r in detail if r["asset"] == "ETH"][0]

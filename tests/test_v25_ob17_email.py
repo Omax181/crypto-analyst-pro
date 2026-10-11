@@ -34,13 +34,15 @@ def test_no_exit_signals_no_section():
 
 
 def test_calibration_note_shown_when_active():
+    """v33 — la ligne « Calibration auto » est RETIRÉE : elle annonçait une
+    réduction de confiance qui n'était plus appliquée, sur une confiance qui
+    n'est plus ni affichée ni décisionnelle."""
     payload = {"header": {"date": "05/07"},
                "confidence_calibration": {
                    "available": True, "multiplier": 0.85,
                    "reason": "sur-confiance historique → confiance réduite ×0.85"}}
     html = render(payload, "morning")
-    assert "Calibration auto" in html
-    assert "×0.85" in html
+    assert "Calibration auto" not in html
 
 
 def test_calibration_note_hidden_when_neutral():

@@ -105,6 +105,15 @@ def _check_thesis(thesis: dict[str, Any]) -> list[str]:
     asset = thesis.get("asset", "?")
     action = (thesis.get("action") or "").upper()
 
+    # v33 (audit zero-trust 01/10) — une posture DÉTERMINISTE (décision du
+    # moteur, règle de prise de profit du radar) ne relève pas des règles des
+    # recos rédigées par le modèle : elle n'a, par construction, ni confiance
+    # ni stop/TP. La règle 6 la rétrogradait en SURVEILLER APRÈS la fusion —
+    # rejeu réel avec BTC décidé : « 1 recommandation » dans le bloc moteur,
+    # « Aucune recommandation » dans le tableau, rien au carnet de suivi.
+    if thesis.get("engine_view") or thesis.get("v33_trigger"):
+        return problems
+
     if _is_firm_action(action):
         # RÈGLE 4 : confiance < 55 interdit pour une reco ferme.
         conf = thesis.get("confidence")

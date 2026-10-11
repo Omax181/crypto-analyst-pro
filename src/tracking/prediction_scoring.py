@@ -1,7 +1,9 @@
 """Tracking et scoring des recommandations passées.
 
 Critères de réussite (déterministes, vérifiables sur prix réels) :
-- RENFORCER : succès si prix >= entry * 1.10 dans les 30 jours.
+- RENFORCER : succès si prix >= entry * 1.10 dans les 30 jours (recos V30) ;
+  décision du moteur v33 : succès si le cours couvre le RENDEMENT REQUIS de la
+  décision dans son horizon (365 j), sans plafond.
 - ALLEGER   : succès si prix <= signal_price * 0.92 dans les 14 jours.
 - SURVEILLER / MAINTENIR : neutres (non scorés).
 
@@ -16,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from src.state import report_memory as mem
+from src.utils import numfmt as _numfmt
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -37,6 +40,108 @@ def _parse(ts: Optional[str]) -> Optional[datetime]:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
 
+
+
+def _fmt_niveau(v: Any) -> str:
+    """Prix au format FR, autorité unique (RT-2 : lisible dans un commentaire)."""
+    f = _numfmt.to_float(v)
+    return _numfmt.fr_num(f, thin=False) + " $" if f is not None else "—"
+
+
+def niveaux_publiables(reco: dict[str, Any]) -> tuple[Optional[float], Optional[float]]:
+    """``(cible, stop)`` d'une reco — chacun écarté s'il est du MAUVAIS CÔTÉ.
+
+    Audit 02/10 — la reco V30 RSR ALLÉGER du 18/09 (état de production) porte
+    une cible AU-DESSUS de son point de vente (0,001521 $ > 0,001464 $) et un
+    stop EN DESSOUS (0,001332 $) : les niveaux d'un plan d'ACHAT. Le scoring
+    les ignorait déjà (``_target_hit_level`` ne retient qu'une cible « qui va
+    dans le bon sens »), mais le suivi du matin publiait « ✅ Cible atteinte »
+    pendant que le cours MONTAIT contre l'allègement, et l'alerte
+    « invalidation FRANCHIE » sortait depuis le jour d'émission. Un niveau
+    incohérent n'est pas une information : il n'est pas publié.
+
+    Règles : RENFORCER — cible au-dessus de l'entrée, stop sous la cible (un
+    stop relevé au-dessus de l'entrée reste un stop suiveur valide) ; ALLÉGER —
+    cible sous le point de vente, stop au-dessus.
+    """
+    action = (reco.get("action") or "").upper()
+    vente = action in ("ALLEGER", "ALLÉGER", "SORTIR", "SELL")
+    ref = _numfmt.to_float(
+        (reco.get("signal_price") or reco.get("entry_price")) if vente
+        else reco.get("entry_price"))
+    cible = _numfmt.to_float(reco.get("ct_target") or reco.get("target_price"))
+    stop = _numfmt.to_float(reco.get("stop_loss"))
+    cible = cible if cible is not None and cible > 0 else None
+    stop = stop if stop is not None and stop > 0 else None
+    if ref is None or ref <= 0:
+        return cible, stop
+    if vente:
+        if cible is not None and cible >= ref:
+            cible = None
+        if stop is not None and stop <= ref:
+            stop = None
+    else:
+        if cible is not None and cible <= ref:
+            cible = None
+        if stop is not None and cible is not None and stop >= cible:
+            stop = None
+    return cible, stop
+
+
+def _target_hit_level(reco: dict[str, Any], ref: float, action: str) -> float:
+    """Niveau qui CLÔTURE la reco en succès.
+
+    v32 (1.3 / 5.1) — DEUX définitions de « cible atteinte » coexistaient :
+      • le mail affichait « Cible 1,43 $ · 100 % · ✅ Cible atteinte » en
+        comparant le prix à ``target_price``, la cible RÉELLEMENT publiée ;
+      • le moteur, lui, ne validait qu'à ``entry × 1,10``.
+    Le 21/08/2026, RENDER et INJ étaient donc simultanément « cible atteinte »
+    dans le tableau de suivi ET « en cours » pour le scoring. Conséquence en
+    chaîne : le win rate ne se remplissait jamais et le seuil « affiché dès
+    5 recos clôturées » restait hors d'atteinte.
+
+    On retient désormais la cible publiée quand elle existe et qu'elle va dans
+    le bon sens — c'est la promesse faite au lecteur. Le multiplicateur fixe
+    reste le repli quand aucune cible n'a été publiée, et il PLAFONNE la cible
+    publiée pour qu'une cible extravagante ne rende pas la reco inclôturable.
+    """
+    # RED TEAM (RT-1) — LA CIBLE PUBLIÉE S'APPELLE ``ct_target`` DANS LE CARNET.
+    # ``target_price`` n'est écrit NULLE PART sur une reco : c'est un champ des
+    # thèses long terme de l'hebdo. Les recos persistées par le matin portent
+    # ``ct_target`` (main.py, « v26 (A12/B6) — persister la CIBLE 30j »), et les
+    # cinq autres consommateurs lisent bien ``ct_target or target_price``.
+    # Lire ``target_price`` seul rendait ce correctif INOPÉRANT en production :
+    # ``cible`` valait toujours None, on retombait sur le multiplicateur fixe,
+    # et la divergence que 1.3/5.1 prétendait supprimer restait entière. Les
+    # tests ne pouvaient pas le voir : ils fabriquaient ``target_price``.
+    cible = reco.get("ct_target")
+    if cible is None:
+        cible = reco.get("target_price")
+    try:
+        cible = float(cible) if cible is not None else None
+    except (TypeError, ValueError):
+        cible = None
+    # ── v33 — DÉCISION DU MOTEUR : le succès est le RENDEMENT REQUIS qu'elle
+    # devait couvrir, persisté sous ``ct_target`` (entrée × (1 + requis)). Le
+    # plafond ×1,10 des recos tactiques V30 ne s'applique pas : il validerait à
+    # +10 % une décision dont la barre est, par construction, plus haute.
+    if reco.get("engine") and action == "RENFORCER":
+        if cible is not None and cible > ref:
+            return cible
+        req = reco.get("required_pct")
+        try:
+            return ref * (1.0 + float(req) / 100.0)
+        except (TypeError, ValueError):
+            return ref * _RENFORCER_TARGET
+    if action == "RENFORCER":
+        plafond = ref * _RENFORCER_TARGET
+        if cible is not None and ref < cible <= plafond:
+            return cible
+        return plafond
+    plancher = ref * _ALLEGER_TARGET
+    if cible is not None and plancher <= cible < ref:
+        return cible
+    return plancher
 
 def latest_open_reco_by_asset(recos: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """v18 (M-A2 / W-A7 / W-B5) — SOURCE DE VÉRITÉ UNIQUE des recos actives.
@@ -103,9 +208,18 @@ class PredictionTracker:
             entry = reco.get("entry_price")
             if not entry:
                 return "in_progress"
-            if current_price >= entry * _RENFORCER_TARGET:
+            if current_price >= _target_hit_level(reco, entry, "RENFORCER"):
                 return "validated"
-            if now - created > timedelta(days=_RENFORCER_WINDOW_DAYS):
+            # v33 — une décision du moteur est jugée sur SON horizon (365 j),
+            # pas sur la fenêtre de 30 j des recos tactiques V30 : à 30 jours,
+            # le moteur déclare explicitement ne rien prévoir.
+            fenetre = _RENFORCER_WINDOW_DAYS
+            if reco.get("engine"):
+                try:
+                    fenetre = int(float(reco.get("horizon_days") or 365))
+                except (TypeError, ValueError):
+                    fenetre = 365
+            if now - created > timedelta(days=fenetre):
                 return "invalidated"
             return "in_progress"
 
@@ -113,7 +227,7 @@ class PredictionTracker:
             signal = reco.get("signal_price") or reco.get("entry_price")
             if not signal:
                 return "in_progress"
-            if current_price <= signal * _ALLEGER_TARGET:
+            if current_price <= _target_hit_level(reco, signal, "ALLEGER"):
                 return "validated"
             if now - created > timedelta(days=_ALLEGER_WINDOW_DAYS):
                 return "invalidated"
@@ -373,8 +487,17 @@ class PredictionTracker:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         validated = invalidated = neutral = 0
         for p in history:
-            created = _parse(p.get("created_at"))
-            if created is None or created < cutoff:
+            # v32 (5.1) — fenêtre ancrée sur la CLÔTURE, pas sur l'émission.
+            # Avec l'ancrage sur ``created_at`` et une fenêtre de 30 j égale à
+            # ``_RENFORCER_WINDOW_DAYS``, une reco qui EXPIRE à J+30 sortait de
+            # la fenêtre à l'instant même où elle y entrait : les perdantes
+            # disparaissaient du dénominateur (biais haussier), le compteur
+            # « en calibration (N/5) » RECULAIT (3 le 22/08, 2 le 23/08, 3 le
+            # 24/08 — un cumul ne recule pas) et le seuil de 5 restait
+            # structurellement hors d'atteinte. Le repli sur ``created_at``
+            # couvre l'historique antérieur à v32, sans ``closed_at``.
+            ref = _parse(p.get("closed_at")) or _parse(p.get("created_at"))
+            if ref is None or ref < cutoff:
                 continue
             status = p.get("status")
             if status == "validated":
@@ -390,6 +513,7 @@ class PredictionTracker:
         # matin montrait « — » et l'hebdo « 0% » pour la même absence d'historique.
         win_rate = round((validated / total) * 100) if total else None
         return {
+            "window_days": days,          # v32 (5.1) : le chiffre porte sa fenêtre
             "total": total,
             "validated": validated,
             "invalidated": invalidated,
@@ -485,7 +609,11 @@ class PredictionTracker:
                 return
             if is_active and anchor is None:
                 return
-            key = (asset, action)
+            # v33 (audit 02/10) — le drapeau moteur fait partie de la clé : une
+            # reco V30 héritée clôturée APRÈS l'émission d'une décision du
+            # moteur sur le même (actif, action) la masquait (« la plus récente
+            # prime »), et la revue hebdo perdait la décision en cours.
+            key = (asset, action, bool(reco.get("engine")))
             prev = rows.get(key)
             prev_anchor = prev.get("_anchor") if prev else None
             if prev_anchor is not None and anchor <= prev_anchor:
@@ -520,6 +648,9 @@ class PredictionTracker:
                 "confidence": reco.get("confidence"),
                 "prev_confidence": reco.get("prev_confidence"),
                 "ct_target": reco.get("ct_target") or reco.get("target_price"),
+                # v33 (audit 02/10) — décision du MOTEUR ou reco V30 héritée :
+                # la revue hebdo ne dit « renforcer » que pour la première.
+                "engine": bool(reco.get("engine")),
                 "_anchor": anchor,
             }
 
@@ -540,7 +671,6 @@ class PredictionTracker:
 
     def active_for_display(
         self, price_lookup: dict[str, float],
-        target_fallbacks: Optional[dict[str, float]] = None,
     ) -> list[dict[str, Any]]:
         """v17 (T-DEDUP / M-A2) — recos actives DÉDUPLIQUÉES pour le rendu matin.
 
@@ -576,17 +706,11 @@ class PredictionTracker:
             status = reco.get("status") or "in_progress"
             _color = {"validated": "#3B6D11", "invalidated": "#A32D2D"}.get(
                 status, "#BA7517")
-            _ct = reco.get("ct_target") or reco.get("target_price")
-            # v28 (M-A13) — reco legacy SANS cible persistée (INJ « cible n/d »
-            # le 07/07) : repli sur la cible 30 j du PLAN DU JOUR, étiquetée
-            # comme telle (le rendu dit « cible act. » et non une cible d'époque).
-            _ct_fallback = False
-            if not _ct and target_fallbacks:
-                _fb = target_fallbacks.get(asset)
-                if isinstance(_fb, (int, float)) and _fb > 0:
-                    _ct = _fb
-                    _ct_fallback = True
-            _sl = reco.get("stop_loss")
+            # Audit 02/10 — niveaux du mauvais côté de l'entrée tus (RSR ALLÉGER).
+            _ct, _sl = niveaux_publiables(reco)
+            # v28 (M-A13) — le repli sur la cible 30 j du plan V30 du jour
+            # (recos legacy sans cible persistée) est retiré (audit 02/10) :
+            # cette méthode n'est plus publiée nulle part en v33.
             # v26 (A12/B6) — PROGRESSION VERS LA CIBLE : % du chemin entrée →
             # cible réellement parcouru (0% = à l'entrée, 100% = cible touchée).
             # C'est LA mesure honnête du badge — « Sur objectif » à +3% quand la
@@ -615,10 +739,45 @@ class PredictionTracker:
             _comment = None
             if status == "validated":
                 _health, _health_color = "✅ Cible atteinte", "#3B6D11"
-                _comment = "Objectif touché — envisager prise de profit partielle."
+                # v33 (audit 01/10) — une cible touchée VALIDE la reco ; elle
+                # ne prescrit pas de vente (Omar : « aucun seuil ne déclenche
+                # une vente »). L'allègement suit les règles de prise de profit.
+                _comment = ("Objectif touché — reco validée (aucune vente "
+                            "n'est déclenchée par une cible).")
+                # ── RED TEAM (RT-2) — LE BADGE NOMME LE SEUIL QUI A CLÔTURÉ.
+                # Arbitrage d'Omar (26/08/2026) : le plafond ×1,10 / ×0,92 reste,
+                # mais il se DIT.
+                #
+                # Sans cela, une reco entrée à 100 $ avec une cible publiée à
+                # 125 $ se cloture « validée » dès 110 $, et la MÊME ligne du
+                # tableau affiche « ✅ Cible atteinte · Objectif touché » à côté
+                # de « Cible d'origine 125,00 $ · reste +11,6 % · 48 % du
+                # chemin ». Deux affirmations opposées, au même endroit — la
+                # contradiction exacte que 1.3/5.1 devait faire disparaître.
+                _seuil = None
+                if _path_pct is not None and _path_pct < 100 and _ct:
+                    _ref_s = (entry if action == "RENFORCER"
+                              else (reco.get("signal_price") or entry))
+                    try:
+                        _seuil = _target_hit_level(
+                            reco, float(_ref_s),
+                            "RENFORCER" if action == "RENFORCER" else "ALLEGER")
+                    except (TypeError, ValueError):
+                        _seuil = None
+                if _seuil is not None:
+                    _pc_seuil = ("+10 %" if action == "RENFORCER" else "−8 %")
+                    _health = "✅ Seuil de succès atteint"
+                    _comment = (
+                        f"Clôturée au seuil de succès ({_pc_seuil} depuis "
+                        f"l'entrée, {_fmt_niveau(_seuil)}) ; la cible publiée "
+                        f"{_fmt_niveau(_ct)} n'est PAS atteinte "
+                        f"({_path_pct:.0f} % du chemin).")
             elif status == "invalidated":
                 _health, _health_color = "🔴 Invalidée", "#A32D2D"
-                _comment = "Seuil d'invalidation franchi — thèse caduque."
+                _comment = ("Horizon écoulé sans atteindre le rendement requis — "
+                            "décision non validée."
+                            if reco.get("engine") else
+                            "Seuil d'invalidation franchi — thèse caduque.")
             elif progress is not None:
                 # Distance au stop (si connu) en % du prix courant.
                 _near_stop = False
@@ -636,7 +795,8 @@ class PredictionTracker:
                     _comment = "Proche du seuil d'invalidation — surveiller de près."
                 elif _path_pct is not None and _path_pct >= 100:
                     _health, _health_color = "✅ Cible atteinte", "#3B6D11"
-                    _comment = "Cible CT touchée — envisager prise de profit partielle."
+                    _comment = ("Cible touchée — reco validée (aucune vente "
+                                "n'est déclenchée par une cible).")
                 elif _path_pct is not None:
                     if _path_pct >= 40:
                         _health, _health_color = "🟢 En bonne voie", "#3B6D11"
@@ -711,7 +871,9 @@ class PredictionTracker:
                 "progress_pct": progress,
                 "ct_target": _ct,
                 # v28 (M-A13) — True si la cible vient du plan du jour (repli).
-                "ct_target_fallback": _ct_fallback,
+                # Audit 02/10 — reco V30 héritée (décidée par le modèle de
+                # langage) : étiquetée au suivi, comme à l'hebdo et au bot.
+                "legacy": not reco.get("engine"),
                 "stop_loss": _sl,
                 # v27 (RE5) — fiche de vie compacte.
                 "days_open": _days_open,
@@ -752,7 +914,6 @@ class PredictionTracker:
 
     def check_invalidations(
         self, price_lookup: dict[str, float],
-        stop_overrides: Optional[dict[str, float]] = None,
     ) -> list[dict[str, Any]]:
         """v27 (TH1) — invalidations FRANCHIES ou MENACÉES des recos actives.
 
@@ -762,28 +923,23 @@ class PredictionTracker:
         structurée ``{asset, status, condition, implication}`` prête pour le
         bloc « Ce que je surveille pour invalider mon scénario ».
 
-        v30 (#1/#66) — ``stop_overrides`` : SOURCE UNIQUE d'invalidation. Le
-        14/07, « à surveiller » lisait le stop d'HIER (TAO 201,11 $, state)
-        pendant que la thèse affichait le stop du JOUR (190 $, asset_plan) →
-        « invalidation FRANCHIE » à côté d'un RENFORCER actif. Quand le run a
-        déjà calculé les plans du jour, il passe ``{asset: stop_du_jour}`` et
-        l'alerte est évaluée sur le MÊME niveau que celui rendu dans le mail.
+        v33 (audit 01/10) — l'alerte INFORME, elle ne prescrit plus : « statuer
+        (sortie ou réduction) » faisait d'un niveau de prix un déclencheur de
+        vente (Omar : « aucun seuil ne déclenche une vente »), et l'inverse de
+        ce qu'il fallait sur un ALLÉGER invalidé (le cours monte : la thèse
+        d'allègement tombe). Le niveau est celui persisté avec la reco.
         """
         def _fmt(v: float) -> str:
-            if abs(v) >= 1000:
-                return f"{v:,.0f}".replace(",", " ") + " $"
-            if abs(v) >= 1:
-                return f"{v:,.2f}".replace(".", ",") + " $"
-            return f"{v:.4f}".replace(".", ",") + " $"
+            # v32 (5.6) — autorité unique. La troncature à 4 décimales
+            # publiait « à 0,4 % de l'invalidation 0,0014 $ » pour un stop
+            # réel à 0,001446 $ (matin 24/08 et « Leçon de la semaine » hebdo).
+            return _numfmt.fr_num(v, thin=False) + " $"
 
         active = mem.load_active_recommendations()
         selected = latest_open_reco_by_asset(active)
         out: list[dict[str, Any]] = []
         for asset, reco in selected.items():
-            sl = reco.get("stop_loss")
-            # v30 (#1/#66) — le stop du plan du jour PRIME sur le stop persisté.
-            if stop_overrides and stop_overrides.get(asset):
-                sl = stop_overrides[asset]
+            sl = niveaux_publiables(reco)[1]
             cur = price_lookup.get(asset) or reco.get("current_price")
             action = (reco.get("action") or "").upper()
             try:
@@ -803,8 +959,11 @@ class PredictionTracker:
                     "level": sl_f, "current": cur_f,
                     "condition": (f"{asset} : invalidation {_fmt(sl_f)} "
                                   f"FRANCHIE (prix {_fmt(cur_f)})"),
-                    "implication": ("thèse caduque — statuer (sortie ou "
-                                    "réduction), ne pas laisser dériver"),
+                    "implication": (
+                        "thèse d'allègement caduque — ne pas alléger sur ce motif"
+                        if bearish_exit else
+                        "thèse d'achat caduque — plus de renfort sur ce motif ; "
+                        "aucun niveau de prix ne déclenche de vente"),
                 })
             elif abs(dist_pct) <= 2.5:
                 out.append({
@@ -874,8 +1033,12 @@ class PredictionTracker:
         for label, lo, hi in bucket_defs:
             validated = invalidated = 0
             for p in history:
-                created = _parse(p.get("created_at"))
-                if created is None or created < cutoff:
+                # v32 (5.1) — MÊME ancrage que compute_win_rate : les deux
+                # chiffres portent sur la même population, donc le mail ne peut
+                # plus afficher « échantillon 15 » et « 3 recos clôturées »
+                # comme s'ils décrivaient la même chose.
+                ref = _parse(p.get("closed_at")) or _parse(p.get("created_at"))
+                if ref is None or ref < cutoff:
                     continue
                 conf = p.get("confidence")
                 if conf is None or not (lo <= conf < hi):
@@ -907,15 +1070,19 @@ class PredictionTracker:
             return {"available": False}
 
         # Lecture globale.
+        # Audit 02/10 — seules les recos V30 portaient une confiance (le moteur
+        # n'en publie aucune) : la lecture est un BILAN de ces recos, au passé,
+        # et ne prescrit plus de sizing (« Réduire le sizing sur les
+        # convictions moyennes » : une taille décidée hors du moteur).
         if total_over >= max(1, total_buckets // 2):
             reading = (
-                "Tendance à la sur-confiance : les % annoncés dépassent le taux "
-                "réalisé. Réduire le sizing sur les convictions moyennes."
+                "Recos V30 : tendance à la sur-confiance — les % annoncés "
+                "dépassaient le taux réalisé."
             )
         else:
             reading = (
-                "Calibration globalement correcte : les % de confiance annoncés "
-                "sont cohérents avec les résultats observés."
+                "Recos V30 : calibration globalement correcte — les % de "
+                "confiance annoncés étaient cohérents avec les résultats observés."
             )
         return {"available": True, "buckets": buckets_data, "reading": reading}
 
@@ -954,16 +1121,20 @@ class PredictionTracker:
                     "reason": (f"{len(sq_errors)}/5 recos clôturées avec "
                                "confiance — Brier disponible dès 5")}
         brier = round(sum(sq_errors) / len(sq_errors), 3)
+        # Audit 02/10 — bilan des recos V30 (seules à porter une confiance ;
+        # la V33 n'annonce plus de probabilité) : au passé, sans consigne.
         if brier <= 0.18:
             grade, reading = "bien calibré", (
-                "les probabilités annoncées reflètent fidèlement la réalité")
+                "les probabilités annoncées par les recos V30 reflétaient "
+                "fidèlement la réalité")
         elif brier <= 0.25:
             grade, reading = "acceptable", (
-                "calibration proche du hasard informé — resserrer les % annoncés")
+                "les probabilités annoncées par les recos V30 étaient proches "
+                "du hasard informé")
         else:
             grade, reading = "mal calibré", (
-                "les % de confiance annoncés desservent la décision — "
-                "les revoir à la baisse")
+                "les % de confiance annoncés par les recos V30 desservaient "
+                "la décision")
         return {"available": True, "brier": brier, "n": len(sq_errors),
                 "grade": grade, "reading": reading}
 

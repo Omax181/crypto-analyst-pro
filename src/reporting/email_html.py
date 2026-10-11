@@ -10,6 +10,7 @@ Point d'entrée : ``render(payload, kind)`` où kind ∈
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,7 @@ logger = get_logger(__name__)
 
 # v15 — version produit UNIQUE, injectée dans les 3 footers (audit : « v13 »
 # en dur dans les templates). main.py la ré-exporte pour les logs.
-APP_VERSION = "v30"
+APP_VERSION = "v32"
 
 _COLORS = {
     "bg": "#fafaf6",
@@ -395,7 +396,54 @@ def _num(value: Any, default: Any = None) -> Any:
     return default
 
 
+def _note(value: Any, default: str = "—") -> str:
+    """Note sur 10 au format français : ``5.0`` → ``5,0``.
+
+    RED TEAM (RT-14) — la note de santé du portefeuille et ses trois axes
+    étaient injectés BRUTS dans les gabarits (``{{health_score.score}}``,
+    ``{{ax.score}}``, ``{{_q.delta_wow}}``). Le float Python se rend avec un
+    POINT : le bilan hebdo réellement produit affichait « Santé du portefeuille
+    4.9 /10 · Diversification 5.0/10 · Momentum vs BTC 5.0/10 ». C'est le
+    défaut que ``numfmt`` avait supprimé sur les PRIX, resté intact sur le
+    chiffre le plus visible du bloc.
+
+    ``fr_num`` ne convient pas ici : il donnerait « 5,00 » là où le mail
+    affiche « 5,0 » depuis toujours. On garde la précision d'origine (1
+    décimale) et on ne corrige QUE le séparateur.
+    """
+    v = _num(value, None)
+    if v is None:
+        return default
+    return f"{v:.1f}".replace(".", ",")
+
+
+NNBSP_HTML = "\u202f"
 _env.filters["num"] = _num
+_env.filters["note"] = _note
+
+
+def _virgule(value: Any) -> str:
+    """Décimale FRANÇAISE sur une chaîne DÉJÀ formatée : « 36.6 » → « 36,6 ».
+
+    RED TEAM (RT-14) — les gabarits composent leurs nombres avec
+    ``'%.1f'|format(x)``, qui produit une décimale ANGLAISE. Mesuré sur le
+    rendu réel : « BTC — 36.6% PTF », « ~5.2 paris EFFECTIFs », « Santé du
+    portefeuille 4.9 /10 ». Un seul endroit sur trente appliquait déjà
+    ``|replace('.', ',')`` : la règle existait, elle n'était pas appliquée.
+
+    Ce filtre ne touche NI la précision NI l'arrondi — uniquement le
+    séparateur. Il s'applique après le format, jamais avant.
+    """
+    return str(value).replace(".", ",")
+
+
+def _milliers(value: Any) -> str:
+    """Milliers en espace fine insécable : « 1,234 » → « 1 234 » (U+202F)."""
+    return str(value).replace(",", NNBSP_HTML)
+
+
+_env.filters["virgule"] = _virgule
+_env.filters["milliers"] = _milliers
 
 
 def _fmt_num_human(value: Any, prefix: str = "") -> str:
@@ -516,10 +564,45 @@ def render(payload: dict[str, Any], kind: str, charts: dict[str, bytes] | None =
         context.setdefault(key, [])
 
     try:
-        return template.render(**context)
+        return decimales_francaises(template.render(**context))
     except Exception as exc:  # noqa: BLE001
         logger.exception("Échec rendu template %s : %s", kind, exc)
         return _fallback_html(payload, kind)
+
+
+_BALISE = re.compile(r"(<[^>]+>)")
+# Un nombre collé à un identifiant (« gemini-3.5-flash », « v1.2.3 ») n'est
+# pas une décimale : le tiret, la lettre, le point et la barre le protègent.
+_DECIMALE_EN = re.compile(r"(?<![\w/.:,\-])([-+−]?\d+)\.(\d+)(?![\w/.\-])")
+
+
+def decimales_francaises(html: str) -> str:
+    """Filet FINAL : aucune décimale anglaise dans le TEXTE visible du mail.
+
+    Audit 02/10 — RT-14 annonçait « aucune décimale anglaise », mais le scan
+    des mails réels rendus en trouvait encore une dizaine : « US 10Y 5.298 %
+    · courbe 0.37 », « corr 30j +0.39 · β 1.95 », « cons. 0.3 % · préc.
+    0.3 % » (agenda), « Hashrate 956.91 EH/s », « QNT -12.5 % » (top
+    mouvements du soir), « maintien 67.9 % » (hebdo). Chaque site a son
+    format ; plutôt que d'en oublier un de plus, la conversion se fait ici,
+    sur les nœuds TEXTE uniquement — jamais dans une balise, un attribut
+    (``width:12.5%``), un ``<style>`` ou un ``<script>``.
+    """
+    if not isinstance(html, str) or "." not in html:
+        return html
+    morceaux = _BALISE.split(html)
+    dans_code = False
+    for i, m in enumerate(morceaux):
+        if i % 2:                                   # balise
+            b = m.lower()
+            if b.startswith(("<style", "<script")):
+                dans_code = True
+            elif b.startswith(("</style", "</script")):
+                dans_code = False
+            continue
+        if not dans_code and m:
+            morceaux[i] = _DECIMALE_EN.sub(r"\1,\2", m)
+    return "".join(morceaux)
 
 
 def _fallback_html(payload: dict[str, Any], kind: str) -> str:

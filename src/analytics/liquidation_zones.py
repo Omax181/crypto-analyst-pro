@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from src.utils import numfmt as _numfmt
+
 _LEVERAGES = (10, 25, 50, 100)
 
 
@@ -28,11 +30,10 @@ def _num(v: Any) -> Optional[float]:
 
 
 def _fmt(v: float) -> str:
-    if abs(v) >= 1000:
-        return f"{v:,.0f}".replace(",", " ") + " $"
-    if abs(v) >= 1:
-        return f"{v:,.2f}".replace(".", ",") + " $"
-    return f"{v:.4f}".replace(".", ",") + " $"
+    """v32 (5.6) — délègue à l'autorité unique : la précision fixe à 4
+    décimales tronquait « 0,001446 $ » en « 0,0014 $ » (deux chiffres
+    significatifs perdus sur le niveau d'un actif réellement détenu)."""
+    return _numfmt.fr_num(v, thin=False) + " $"
 
 
 def compute_liquidation_zones(

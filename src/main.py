@@ -20,8 +20,10 @@ from zoneinfo import ZoneInfo
 
 from src.analytics.coherence_checker import check_report
 from src.analytics.composite_score import composite_score
+# v33 — ``apply_multiplier`` n'est plus importé : la confiance est persistée
+# BRUTE pour supprimer la circularité de calibration (elle mesurait sa propre
+# correction). Le multiplicateur reste calculé et PUBLIÉ, jamais appliqué.
 from src.analytics.confidence_calibration import (
-    apply_multiplier as _apply_conf_mult,
     compute_confidence_multiplier as _compute_conf_mult,
 )
 from src.analytics.exit_radar import compute_exit_signals
@@ -107,6 +109,22 @@ THESIS_CONFIDENCE_FLOOR = 75
 # Sources interrogées chaque run (catalogue de référence pour l'angle "X / N
 # sources actives ce matin" et le bilan hebdo des angles morts). Conserver
 # en sync avec ce qui est réellement tenté côté collecte.
+# v32 (5.5) — le libellé annonçait « 16 flux » alors que le catalogue en
+# déclare 15 (6 crypto + 9 macro) et que 14 seulement répondaient réellement
+# (Reuters via Google News échoue à tous les runs fournis). Trois nombres pour
+# une même chose. Le libellé se DÉRIVE désormais du catalogue : il ne peut plus
+# mentir sur ce qui est tenté.
+def _rss_label() -> str:
+    try:
+        from src.data_sources.crypto_rss import CRYPTO_FEEDS, MACRO_FEEDS
+        n = len(CRYPTO_FEEDS) + len(MACRO_FEEDS)
+    except Exception:  # noqa: BLE001
+        return "RSS news (crypto + macro)"
+    return f"RSS news (crypto + macro · {n} flux)"
+
+
+_RSS_LABEL = _rss_label()
+
 _ALL_SOURCES_LIST = [
     "CoinGecko", "Fear&Greed", "FRED", "On-chain", "Polymarket",
     # v26 (B5) — les flux ETF ont désormais 3 couches (Farside → CoinGlass →
@@ -116,9 +134,16 @@ _ALL_SOURCES_LIST = [
     # v29 (audit) — « Kaito » renommé : les narratifs viennent des catégories
     # CoinGecko depuis v25 (OB6) ; l'étiquette mentait sur la source réelle.
     "ETF flows", "Telegram", "DeFiLlama", "Narratifs (CoinGecko)", "Social trending",
+    # v32 (5.5) — CATALYSEURS CRYPTO datés (CoinMarketCal) ajoutés au catalogue.
+    # La source échouait à CHAQUE run du matin (hostname mort, cf.
+    # coinmarketcal._BASE) sans jamais apparaître : ni parmi les actives, ni
+    # parmi les « ⚠ Indisponibles ». Le compteur affichait donc sereinement
+    # « 23 / 25 » pendant qu'une source du périmètre était morte depuis des
+    # semaines, emportant avec elle « Token Unlocks » qui s'y replie.
+    "Catalyseurs crypto (CoinMarketCal)",
     "Token Unlocks", "News", "YouTube", "Géopolitique", "BTC Network",
     "Stablecoins", "Whale Tracking", "Yahoo Finance", "Calendrier macro",
-    "RSS news (crypto + macro · 16 flux)",
+    _RSS_LABEL,
     "On-chain avancé (Coin Metrics)", "Options (Deribit)", "Corrélations macro",
     # v14.1 — international + transmission actions → crypto.
     "Marchés internationaux (BCE · BoJ · Nikkei · Stoxx)",
@@ -179,25 +204,87 @@ def _fr_when(ts: Any) -> Optional[str]:
     return f"{local.strftime('%d/%m')} {hhmm}"
 
 
+# ── v33 (audit zero-trust 01/10) — LA SORTIE DU LLM EST RESTREINTE À SON SCHÉMA.
+# Rejeu du vrai payload du 30/09 : une clé ``top_action`` présente dans la
+# sortie du modèle survivait à la fusion quand le moteur ne retenait rien, et
+# le digest Telegram titrait « Action du jour → RENFORCER RENDER » sur un actif
+# que le moteur venait de refuser. Toute clé hors du schéma demandé au modèle
+# (``top_action``, ``firm_postures``, ``exit_signals``, ``opportunity_summary``…)
+# est PYTHON par définition : si elle arrive du modèle, elle est retirée avant
+# toute fusion. Seules passent les clés du schéma et celles que l'enveloppe
+# Python du modèle pose elle-même (mode dégradé, passe 1 macro).
+_CLES_ENVELOPPE_LLM = {"_degraded", "macro_regime_pass1", "essentiel",
+                       "win_rate", "weekly_narrative",
+                       "weekly_predictions_scoring"}
+_SCHEMA_CACHE: dict[str, set[str]] = {}
+
+
+def _cles_schema(kind: str) -> set[str]:
+    if kind not in _SCHEMA_CACHE:
+        import importlib
+        mod = importlib.import_module(f"src.ai_brain.prompts.{kind}_prompt")
+        schema = next((v for k, v in vars(mod).items()
+                       if k.endswith("_SCHEMA") and isinstance(v, str)), "")
+        _SCHEMA_CACHE[kind] = set(re.findall(r'^\s{2}"([a-z_0-9]+)"\s*:',
+                                             schema, flags=re.M))
+    return _SCHEMA_CACHE[kind]
+
+
+def _restreindre_au_schema(payload: Any, kind: str) -> dict[str, Any]:
+    """Ne garde de la sortie du modèle que les clés de SON schéma."""
+    if not isinstance(payload, dict):
+        return {}
+    autorisees = _cles_schema(kind) | _CLES_ENVELOPPE_LLM
+    retirees = sorted(k for k in payload if k not in autorisees)
+    if retirees:
+        logger.info("Sortie %s du modèle : %d clé(s) hors schéma retirée(s) — %s",
+                    kind, len(retirees), ", ".join(retirees[:12]))
+    return {k: v for k, v in payload.items() if k in autorisees}
+
+
+# ── Créneaux d'envoi, en UTC — SOURCE UNIQUE (audit zero-trust 01/10). ──
+# Les rapports sont déclenchés par cron-job.org à heure UTC fixe : mesuré sur
+# les commits d'état de production d'août-septembre 2026, 07:36–07:39 et
+# 19:02–19:10 UTC, sans changement au 20/09. Or le Maroc est repassé à UTC+0
+# permanent le 20/09/2026 (IANA tzdata 2026c). Les libellés « 08h30 / 20h00 »
+# codés en dur supposaient UTC+1 : depuis le 20/09, les mails partaient à
+# 07h3x et 19h0x heure de Casablanca en annonçant 08h30 et 20h00. L'heure
+# locale est désormais DÉRIVÉE du créneau UTC par la base de fuseaux.
+# L'hebdo garde le schedule GitHub natif (décision d'Omar, 02/10/2026) :
+# « 0 11 * * 0 » dans weekly_report.yml — GitHub le lance en pratique avec
+# 2 à 4 h de retard (mesuré : 13:52–15:28 UTC), d'où « à partir de ».
+_SLOTS_UTC = {"morning": (7, 30), "evening": (19, 0), "weekly": (11, 0)}
+
+
+def _slot_local(kind: str, ref: Optional[datetime] = None) -> datetime:
+    """Créneau d'envoi ``kind`` du jour de ``ref``, en heure de Casablanca."""
+    ref = ref or datetime.now(TZ)
+    hh, mm = _SLOTS_UTC[kind]
+    return datetime(ref.year, ref.month, ref.day, hh, mm,
+                    tzinfo=timezone.utc).astimezone(TZ)
+
+
 def _next_report_label(mode: str) -> str:
     """Libellé du prochain rapport (heure Casablanca), sensible à l'heure réelle.
 
-    B9 : un run matinal lancé à 01h ne doit pas annoncer « ce soir 20h » comme
-    s'il était 08h. On déduit le prochain créneau réel à partir de l'heure
-    courante : créneaux quotidiens à 08h30 (matin) et 20h00 (soir).
+    B9 : un run matinal lancé à 01h ne doit pas annoncer « ce soir » comme
+    s'il était l'heure du matin. On déduit le prochain créneau réel à partir de
+    l'heure courante et des créneaux UTC (``_SLOTS_UTC``).
     """
     now = datetime.now(TZ)
-    h = now.hour + now.minute / 60.0
-    morning_slot = "demain 08h30" if h >= 8.5 else "aujourd'hui 08h30"
-    evening_slot = "demain 20h00" if h >= 20.0 else "aujourd'hui 20h00"
+    _m, _e = _slot_local("morning", now), _slot_local("evening", now)
+    morning_slot = (("demain " if now >= _m else "aujourd'hui ")
+                    + f"{_m:%H}h{_m:%M}")
+    evening_slot = (("demain " if now >= _e else "aujourd'hui ")
+                    + f"{_e:%H}h{_e:%M}")
     if mode == "morning":
         # Après l'envoi du matin, le prochain rapport est celui du soir.
         return evening_slot
     if mode == "evening":
         # v28 (E-A1) — un soir lancé HORS créneau (rattrapage 09h46 le 07/07)
-        # annonçait « demain 08h30 » en ignorant le VRAI prochain créneau :
-        # 20h00 le jour même. Prochain rapport = le plus proche des deux.
-        if 8.5 <= h < 20.0:
+        # annonçait le matin suivant en ignorant le VRAI prochain créneau :
+        # le soir même. Prochain rapport = le plus proche des deux.
+        if _m <= now < _e:
             return evening_slot
         return morning_slot
     if mode == "weekly":
@@ -495,7 +582,7 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         onchain_cm,
         {s: v.get("price") for s, v in market.items() if isinstance(v, dict)},
     )
-    options_deribit = deribit.get_options_metrics()     # put/call · max pain · DVOL
+    options_deribit = deribit.get_options_metrics(_spots_options(market))     # put/call · max pain · DVOL
     macro_series = fred.get_macro_series(35)            # séries datées (corrélations)
     calendar_prints = fred.get_calendar_prints()        # derniers chiffres macro publiés
     # v15 — calendrier CONSOLIDÉ (FRED + Boursorama + banques centrales) : le
@@ -642,6 +729,12 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
 
     enriched: dict[str, dict[str, Any]] = {}
     eligible: list[dict[str, Any]] = []
+    # v33 — séries et volumes conservés pour le moteur d'opportunité : la
+    # volatilité y est MESURÉE sur les log-rendements, pas approximée par
+    # l'ATR (qui mélange amplitude intraday et gaps, et n'est donc pas
+    # comparable d'un actif à l'autre).
+    _v33_closes: dict[str, dict[str, float]] = {}
+    _v33_volumes: dict[str, float] = {}
     # Clôtures datées par actif (éligibles) : réutilisées pour l'analyse
     # historique (A11) ET la corrélation/bêta macro par actif (A5/C8).
     asset_dated_closes: dict[str, dict[str, float]] = {}
@@ -988,8 +1081,58 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
                 ),
                 "price": "live" if asset.get("price") is not None else None,
             }
+            # Moteur v33 : clôtures DATÉES (alignement par date, journées
+            # complètes). Les listes non datées décalaient les séries d'un jour
+            # (β BTC −0,05 le 30/09) — audit zero-trust 01/10.
+            if isinstance(asset_dated_closes.get(sym), dict):
+                _v33_closes[sym.upper()] = dict(asset_dated_closes[sym])
+            if asset.get("volume_24h") is not None:
+                _v33_volumes[sym.upper()] = asset["volume_24h"]
             eligible.append(entry)
     eligible.sort(key=lambda e: (e["tier"], -e["signals_count"]))
+
+    # ══ v33 · UNIVERS DU MOTEUR = TOUT LE PORTEFEUILLE ═══════════════════
+    # Audit zero-trust (01/10) : le moteur n'évaluait que les actifs retenus
+    # par l'éligibilité HÉRITÉE (comptage de signaux V30). HBAR, SXT et XRP
+    # n'étaient jamais évalués le 30/09 : une ancienne logique décidait, par
+    # exclusion, de ce que le moteur avait le droit de voir. L'éligibilité
+    # V30 reste la sélection des thèses RÉDIGÉES par le modèle de langage ;
+    # le moteur, lui, voit tout le portefeuille.
+    _v33_universe: list[dict[str, Any]] = list(eligible)
+    _v33_vus = {str(e.get("asset") or "").upper() for e in eligible}
+    for _sym_u in symbols:
+        if _sym_u.upper() in _v33_vus or _sym_u not in enriched:
+            continue
+        _a_u = enriched[_sym_u]
+        _comp_u = None
+        try:
+            if _a_u.get("thesis_eval"):
+                _comp_u = _thesis_completeness(_a_u)
+        except Exception:  # noqa: BLE001 — complétude best-effort
+            _comp_u = None
+        _cm_u = (((onchain_cm.get("assets") or {}).get(_sym_u) or {})
+                 if isinstance(onchain_cm, dict) else {})
+        _v33_universe.append({
+            "asset": _sym_u,
+            "price": _a_u.get("price"),
+            "value_usd": _a_u.get("value_usd"),
+            "market_cap": _a_u.get("market_cap"),
+            "valuation": (_a_u.get("valuation")
+                          if (_a_u.get("valuation") or {}).get("available") else None),
+            "tvl": _a_u.get("tvl") if (_a_u.get("tvl") or {}).get("available") else None,
+            "dev_activity": (_a_u.get("dev")
+                             if (_a_u.get("dev") or {}).get("available") else None),
+            "onchain_advanced": _cm_u or None,
+            "thesis_scoring": ({"completeness": _comp_u} if _comp_u else None),
+        })
+        try:
+            _dated_u = coingecko.get_dated_closes(_sym_u, 95)
+        except Exception:  # noqa: BLE001
+            _dated_u = None
+        if isinstance(_dated_u, dict) and _dated_u:
+            _v33_closes[_sym_u.upper()] = dict(_dated_u)
+        if _a_u.get("volume_24h") is not None:
+            _v33_volumes[_sym_u.upper()] = _a_u["volume_24h"]
 
     # v19/M-A18 — la liste ▲/▼ « Tes positions en hausse/baisse » doit être
     # COHÉRENTE avec la heatmap (même source CoinGecko, enriched) pour que les
@@ -1088,15 +1231,11 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     # v17 (T-DEDUP / M-A2) : version dédupliquée + enrichie pour le rendu matin
     # (1 ligne/actif, entry/Δ/cible) — le brut active_recos garde les doublons
     # legacy et sert aux calculs internes (_positions_summary, etc.).
-    # v28 (M-A13) — cibles de REPLI pour les recos legacy sans cible persistée
-    # (INJ « cible n/d » le 07/07) : la cible 30 j du plan déterministe du jour.
-    _target_fallbacks = {}
-    for _s_fb, _e_fb in enriched.items():
-        _t30 = ((_e_fb.get("asset_plan") or {}).get("target_30d") or {})
-        if isinstance(_t30.get("level"), (int, float)):
-            _target_fallbacks[_s_fb.upper()] = _t30["level"]
-    active_recos_display = tracker.active_for_display(
-        price_lookup, target_fallbacks=_target_fallbacks)
+    # v28 (M-A13) — les recos legacy sans cible persistée recevaient la cible
+    # 30 j du plan V30 du jour. Audit 02/10 : retiré — cette cible (Fibonacci /
+    # ATR) n'est plus publiée nulle part en v33 ; une reco sans cible cohérente
+    # affiche « — » plutôt qu'une cible d'une méthode abandonnée.
+    active_recos_display = tracker.active_for_display(price_lookup)
     win_rate = tracker.compute_win_rate(30)
     # V10 — boucle de feedback : performance par actif + erreurs récentes
     # (réinjectées dans le prompt pour que l'IA apprenne de ses échecs).
@@ -1105,7 +1244,8 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
 
     active_sources = _active_sources(
         market=market, fng=fng, macro=macro, onchain=onchain, polymarket=polymarket,
-        etf=etf, telegram=telegram, defi=defi, narratives=hot_narratives,
+        etf=etf, telegram=telegram, defi=defi, crypto_events=crypto_events,
+        narratives=hot_narratives,
         social=social_trending, unlocks=unlocks, news=bool(news_global_items),
         youtube=youtube_corpus, geopolitics=geopol,
         btc_network=btc_network, stablecoins=stablecoin_supply, whales=whale_inflows,
@@ -1139,6 +1279,21 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
     # record_source_health : le nom CANONIQUE reste stocké dans l'historique
     # santé (sinon le suffixe créerait un faux « down » dans les lacunes hebdo).
     active_sources_display = list(active_sources)
+    # v32 (5.5) — DÉGRADATION PARTIELLE VISIBLE. Le bloc RSS comptait pour UNE
+    # source active, que 15 flux sur 15 répondent ou 6 sur 15. Dans les huit
+    # runs fournis, Reuters (via Google News) a échoué à chaque fois : le mail
+    # annonçait « RSS news (crypto + macro · 16 flux) » pour 14 flux vivants sur
+    # 15 configurés — trois nombres différents pour une seule chose. Le libellé
+    # porte désormais le compte RÉEL.
+    try:
+        _ok = len((rss_news or {}).get("sources_ok") or [])
+        if _ok and _RSS_LABEL in active_sources_display:
+            from src.data_sources.crypto_rss import CRYPTO_FEEDS, MACRO_FEEDS
+            _tot = len(CRYPTO_FEEDS) + len(MACRO_FEEDS)
+            active_sources_display[active_sources_display.index(_RSS_LABEL)] = (
+                f"RSS news (crypto + macro · {_ok}/{_tot} flux)")
+    except Exception:  # noqa: BLE001
+        pass
     if "ETF flows" in active_sources_display:
         _etf_lbl = _etf_freshness_label(etf, datetime.now(TZ).date())
         if _etf_lbl:
@@ -1147,6 +1302,7 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
 
     # Portfolio snapshot calculé côté Python (Gemini n'a pas à l'inventer).
     snapshot = _portfolio_snapshot(portfolio, enriched)
+
     # v17 (T-7J / M-A7) : aligner la perf 7j du matin sur la MÊME méthode que le
     # weekly (variation de la valeur PTF vs snapshot d'il y a ~7j), quand un
     # snapshot hebdo est disponible. Évite les 3 valeurs 7j divergentes entre
@@ -1281,6 +1437,52 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         _exit_positions = []
     exit_signals = compute_exit_signals(_exit_positions)
 
+    # ══ v33 · MOTEUR D'OPPORTUNITÉ — décision DÉTERMINISTE ═══════════════
+    # Calculé AVANT tout appel au modèle de langage : le LLM reçoit la décision
+    # comme un FAIT à expliquer, pas comme un choix à faire. Placé APRÈS le
+    # radar de sortie : l'allègement du moteur EST le radar (règles de prise
+    # de profit d'Omar) — il en était privé, sous une clé qu'il ne produit pas.
+    _opportunity: dict[str, Any] = {"available": False}
+    try:
+        from src.analytics import opportunity as _opp
+        from src.analytics import opportunity_adapter as _oppa
+        from src.data_sources import coinmetrics as _cm_hist
+        from src.data_sources import defillama as _dl_peers
+        from src.ai_brain.prompts.investor_profile import CORE_ASSETS as _INTOUCH
+        _mvrv_hist = (_cm_hist.get_mvrv_history() or {}).get("assets") or {}
+        _completer_series_v33(_v33_closes, _mvrv_hist)
+        _peers: dict[str, dict[str, Any]] = {}
+        for _e_p in _v33_universe:
+            _tv_p = _e_p.get("tvl") if isinstance(_e_p.get("tvl"), dict) else {}
+            _mct_p = ((_e_p.get("valuation") or {}).get("metrics") or {}).get(
+                "mc_tvl_ratio") if isinstance(_e_p.get("valuation"), dict) else None
+            if _mct_p is not None and _tv_p.get("category"):
+                _peers[str(_e_p["asset"]).upper()] = _dl_peers.get_category_peers(
+                    _tv_p.get("category"), exclude_name=_tv_p.get("name"))
+        _v33_cands = _oppa.build_candidates(
+            _v33_universe, ptf_value_usd=snapshot.get("value_usd"),
+            closes_by_asset=_v33_closes, volume_by_asset=_v33_volumes,
+            mvrv_history=_mvrv_hist, peers_by_asset=_peers)
+        _exit_by_sym = {str(_s.get("symbol") or "").upper(): _s
+                        for _s in (exit_signals.get("signals") or [])
+                        if isinstance(_s, dict)}
+        _opportunity = _opp.decide_universe(
+            _v33_cands, ptf_value_usd=snapshot.get("value_usd"),
+            funding_case="A", exit_signals=_exit_by_sym,
+            intouchables=set(_INTOUCH))
+        _opportunity["coverage"] = _oppa.coverage_report(_v33_cands)
+        _opportunity["candidates"] = _v33_cands
+        logger.info(
+            "Moteur d'opportunité v33 : %d reco(s) ferme(s), %d arbitrage(s), "
+            "%d allègement(s) sur %d candidat(s) — potentiel mesurable sur %d",
+            _opportunity["count"], len(_opportunity.get("arbitrages") or []),
+            len(_opportunity.get("reduce_firm") or []), len(_v33_cands),
+            _opportunity.get("potential_measurable", 0))
+    except Exception as _oppexc:  # noqa: BLE001
+        logger.error("Moteur d'opportunité v33 indisponible : %s", _oppexc)
+        _opportunity = {"available": False, "error": str(_oppexc),
+                        "decisions": [], "firm": [], "count": 0}
+
     # V10 — DIGEST ANALYTIQUE COMPACT : lignes condensées (économie de tokens)
     # que l'IA exploite pour un raisonnement CROISÉ. Chaque ligne est vide si la
     # source correspondante est indisponible (jamais d'invention).
@@ -1381,6 +1583,8 @@ def _collect_morning_data(portfolio_data: dict[str, Any]) -> dict[str, Any]:
         # vit dans active_sources (compteurs, down_sources, santé hebdo).
         "active_sources": active_sources_display,
         "eligible_theses": eligible, "active_recommendations": active_recos,
+        # v33 — décisions déterministes du moteur d'opportunité.
+        "opportunity": _opportunity,
         "active_recommendations_display": active_recos_display,
         "reco_changes": reco_changes,
         "win_rate": win_rate,
@@ -2088,10 +2292,14 @@ def _compute_portfolio_risk_score(
 
 
 # Vocabulaire d'action par axe de risque (pour le readout déterministe M-B8).
+# v33 (audit zero-trust 01/10) — plus AUCUN geste d'achat ou de vente dans ces
+# lectures : elles sont déclenchées par des seuils de score, et « aucun seuil ne
+# déclenche une vente » (Omar, 01/10). Les gestes viennent du seul moteur
+# (renfort) et des règles de prise de profit (radar). Ce sont des INFORMATIONS.
 _RISK_AXIS_ACTION = {
-    "Concentration": "diversifier hors du secteur dominant pour réduire la concentration",
+    "Concentration": "concentration sectorielle élevée — information de risque, aucun seuil ne déclenche de vente",
     "Drawdown 7j": "surveiller les supports clés des positions en perte récente",
-    "Volatilité 24h": "alléger tactiquement les positions les plus volatiles si le risque global gêne",
+    "Volatilité 24h": "volatilité élevée sur 24 h — risque de parcours, aucun geste automatique",
     "Sentiment": "rester prudent tant que le sentiment de marché reste dégradé",
 }
 
@@ -2123,7 +2331,7 @@ def _build_risk_readout(risk: dict[str, Any]) -> dict[str, str]:
     driver = "Score tiré par " + " et ".join(parts) + "."
     # Reco : action liée à l'axe dominant n°1.
     top_label = dominant[0]["label"]
-    reco_action = _RISK_AXIS_ACTION.get(top_label, "réduire l'exposition sur l'axe le plus chargé")
+    reco_action = _RISK_AXIS_ACTION.get(top_label, "axe le plus chargé — information de risque")
     reco = reco_action[0].upper() + reco_action[1:] + "."
     caveat = ("Note indicative et déterministe (concentration, drawdown, "
               "volatilité, sentiment) : elle ne capte ni le risque spécifique "
@@ -2133,9 +2341,9 @@ def _build_risk_readout(risk: dict[str, Any]) -> dict[str, str]:
 
 # v23 — levier d'amélioration par axe de SANTÉ (readout déterministe, actionnable).
 _HEALTH_AXIS_IMPROVE = {
-    "Diversification": "alléger le secteur dominant sur rebond et étaler sur d'autres narratifs",
-    "Momentum vs BTC": "recentrer sur le cœur (BTC/ETH) et alléger les satellites qui sous-performent",
-    "Solidité (vs ATH)": "accumuler le cœur de conviction sur repli et offloader les poussières mortes",
+    "Diversification": "la diversification progresse par les renforts décidés hors du secteur dominant — aucun allègement n'est déclenché par ce seuil",
+    "Momentum vs BTC": "écart de performance vs BTC sur 7 jours — information, sans geste automatique",
+    "Solidité (vs ATH)": "drawdown pondéré élevé — information de cycle, pas un signal d'achat ni de vente",
 }
 
 
@@ -2197,17 +2405,33 @@ def _compute_portfolio_health(
     # « Portée par Momentum vs BTC (4,6/10) » présentait un score médiocre
     # comme un soutien. Sous 5/10, on dit « moins pénalisée par ».
     _carry = "Portée par" if strongest["score"] >= 5 else "Moins pénalisée par"
-    driver = (f"{_carry} {strongest['label']} ({strongest['score']}/10), "
-              f"pénalisée par {weakest['label']} ({weakest['score']}/10).")
-    _imp = _HEALTH_AXIS_IMPROVE.get(weakest["label"], "renforcer l'axe le plus faible")
+
+    def _note10(v: Any) -> str:
+        """Note /10 en décimale FRANÇAISE (RT-14) — « 5,8 », jamais « 5.8 »."""
+        return f"{float(v):.1f}".replace(".", ",")
+
+    if len(axes) == 1:
+        # RED TEAM (RT-13) — UN SEUL AXE NE SE PÉNALISE PAS LUI-MÊME.
+        # Quand deux des trois entrées manquent (secteurs absents, pas de
+        # comparaison 7 j vs BTC…), ``strongest`` et ``weakest`` désignent le
+        # MÊME axe et la phrase publiée devenait « Portée par Solidité (vs ATH)
+        # (5,8/10), pénalisée par Solidité (vs ATH) (5,8/10). » — le même axe
+        # porte et pénalise. On dit alors ce qui est vrai : la note ne repose
+        # que sur un axe, et c'est CELA que le lecteur doit savoir.
+        _seul = axes[0]
+        driver = (f"Note calculée sur un seul axe disponible : "
+                  f"{_seul['label']} ({_note10(_seul['score'])}/10) — "
+                  f"les autres données manquaient sur ce run.")
+    else:
+        driver = (f"{_carry} {strongest['label']} ({_note10(strongest['score'])}/10), "
+                  f"pénalisée par {weakest['label']} ({_note10(weakest['score'])}/10).")
+    _imp = _HEALTH_AXIS_IMPROVE.get(weakest["label"], "axe le plus faible — information, sans geste automatique")
     # v30 (#83) — le conseil cite le SCORE du jour de l'axe visé (fini le
-    # boilerplate mot pour mot identique matin/matin/hebdo) ; v30 (#18) — s'il
-    # vise la diversification, il rappelle la limite aux accumulations du jour.
+    # boilerplate mot pour mot identique matin/matin/hebdo). v33 — la phrase
+    # « tout renfort doit respecter les plafonds de concentration » est
+    # retirée : il n'existe plus de plafond (Omar, 01/10).
     _imp_txt = (f"{_imp[0].upper()}{_imp[1:]} "
-                f"(axe {weakest['label']} à {weakest['score']}/10 ce jour).")
-    if weakest["label"] == "Diversification":
-        _imp_txt += (" Tout renfort du jour doit respecter les plafonds de "
-                     "concentration — ne pas aggraver l'axe faible.")
+                f"(axe {weakest['label']} à {_note10(weakest['score'])}/10 ce jour).")
     return {"score": score, "level": level, "level_color": color,
             "axes": axes, "driver": driver,
             "improve": _imp_txt}
@@ -2329,6 +2553,21 @@ def _sanitize_macro_for_prompt(macro: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _lecture_backtest(h7: Optional[float], h30: Optional[float]) -> Optional[str]:
+    """Lecture de l'auto-backtest hebdo (« accumuler sous la MM50 », BTC).
+
+    Audit 02/10 — la lecture DÉCRIT ; elle ne prescrit plus. La v29 écrivait
+    « étaler le DCA, pas d'achat impulsif » ou « la patience prime sur
+    l'accumulation immédiate » : un conseil d'achat hors du moteur, seul à
+    décider RENFORCER.
+    """
+    if h7 is None or h7 > 40:
+        return None
+    return (f"Lecture : à 7 j, hausse dans {h7:.0f}% des cas"
+            + (f", contre {h30:.0f}% à 30 j" if h30 is not None else "")
+            + " — statistique, pas un signal d'achat.")
+
+
 def _fng_label_fr(value: Any) -> Optional[str]:
     """Traduit l'index Fear & Greed (0-100) en libellé français lisible.
 
@@ -2441,6 +2680,13 @@ def _macro_context(
                 else _vm("dxy", dxy["value"]),
         "dxy_is_broad_fallback": yq.get("dxy_ice") is None and dxy["value"] is not None,
         "dxy_broad": _vm("dxy", dxy["value"]),
+        # v32 (5.17) - FRAICHEUR DE L'INDICE ELARGI. DTWEXBGS est publie
+        # par la Fed avec du retard : la meme valeur peut couvrir plusieurs
+        # jours. Elle etait affichee SANS date, donc indistinguable d'une
+        # mesure du jour. On expose la date de publication reelle ; le rendu
+        # ne la montre que si elle est vraiment perimee (> 4 j), selon la
+        # convention deja en place pour les flux ETF et Coin Metrics.
+        "dxy_broad_as_of": dxy.get("date"),
         "dxy_delta": yd.get("dxy_ice") if yd.get("dxy_ice") is not None else dxy["delta"],
         # Conservé pour compat interne (égal à dxy quand Yahoo dispo).
         "dxy_ice": _vm("dxy_ice", yq.get("dxy_ice")),
@@ -2614,31 +2860,149 @@ def _etf_freshness_label(etf: Any, today: Any) -> Optional[str]:
     return None
 
 
+
+
+
+def _provenance_these(these: dict[str, Any], data: dict[str, Any],
+                      heure_collecte: str) -> str:
+    """Provenance RÉELLE d'une thèse : « CoinGecko 08h31 · Coin Metrics 23/08 ».
+
+    v32 (5.2) — le champ ``sources_timestamps`` était REMPLI PAR LE LLM, et le
+    prompt lui en donnait un exemple : « CoinGecko 08h12 · TradingView 08h15 ».
+    Le modèle recopiait l'exemple. Preuve : ces deux horodatages exacts
+    apparaissent à l'identique les 21, 23 et 24/08, et le 22/08 le modèle les a
+    simplement incrémentés d'une minute par fiche (08h10/08h15, 08h11/08h16,
+    08h12/08h17). Or 08h12 PRÉCÈDE le démarrage du run (08h31) : ces heures
+    n'ont jamais existé. Le mail affichait une fraîcheur de données inventée,
+    et citait « TradingView » alors que TradingView ne figure même pas parmi
+    les sources actives listées en pied de page.
+
+    On reconstruit donc la ligne à partir de ce qui a RÉELLEMENT servi :
+    l'heure de collecte du run pour les prix, la date de publication effective
+    pour les sources datées (Coin Metrics). Aucune source n'est citée si elle
+    n'a pas fourni de donnée pour CET actif.
+    """
+    sym = str(these.get("asset") or "").upper()
+    parts: list[str] = [f"CoinGecko {heure_collecte}"]
+
+    # Coin Metrics : date de publication réelle de l'actif, pas une heure.
+    _cm = ((data.get("onchain_advanced") or {}).get("assets") or {}).get(sym)
+    _as_of = (_cm or {}).get("as_of") or (_cm or {}).get("time")
+    _dd = _fr_ddmm(_as_of) if _as_of else None
+    if _dd:
+        parts.append(f"Coin Metrics {_dd}")
+
+    # Dérivés : la source qui a réellement répondu pour cet actif.
+    _der = None
+    for _e in (data.get("eligible_theses") or []):
+        if isinstance(_e, dict) and str(_e.get("asset") or "").upper() == sym:
+            _der = _e.get("derivatives") or {}
+            break
+    _src_der = (_der or {}).get("source")
+    if _src_der:
+        parts.append(f"{_src_der} {heure_collecte}")
+    return " · ".join(parts)
+
+
+def _remplacer_sur_place(cible: dict, neuf: Any) -> None:
+    """Recopie ``neuf`` DANS ``cible`` au lieu de rebinder un nom local.
+
+    v32 — piège attrapé par tests/test_v32_chaine_reelle.py. Les gardes de
+    prose renvoient une NOUVELLE structure (``walk_strings`` ne mute pas). Un
+    ``payload, fx = garde(payload)`` ne rebinde que la variable LOCALE ; comme
+    ``_apply_morning_guards`` ne renvoie que la liste des corrections, le
+    payload nettoyé était purement et simplement perdu. Le journal annonçait
+    alors « 4 correction(s) » sur un mail qui partait NON CORRIGÉ — un défaut
+    pire que celui qu'on prétendait réparer, puisqu'il se déclare corrigé.
+    """
+    # AUDIT ZERO-TRUST (01/10) — ALIAS. Une garde qui n'a rien à corriger
+    # renvoie souvent SON ENTRÉE (``flag_unsourced_etf_figures`` le fait dès que
+    # les flux ETF sont disponibles, c'est-à-dire presque tous les jours). Alors
+    # ``neuf is cible`` : ``clear()`` vidait les DEUX, et le mail partait avec
+    # un payload vide (mesuré sur le vrai payload du 30/09 : 6 434 octets au
+    # lieu de 67 812). On recopie donc d'abord, et l'identité est un no-op.
+    if isinstance(cible, dict) and isinstance(neuf, dict) and neuf is not cible:
+        copie = dict(neuf)
+        cible.clear()
+        cible.update(copie)
+
+
+def _fraicheur_si_perimee(iso_date: Any, jours: int = 4) -> Optional[str]:
+    """« · au 21/08 » si la donnee a plus de ``jours``, sinon None.
+
+    v32 (5.17) - une valeur macro affichee sans date est indistinguable d'une
+    mesure du jour. On ne surcharge pas le mail pour autant : l'etiquette
+    n'apparait QUE lorsque la donnee est reellement perimee, comme le fait
+    deja « ETF flows (J-1) ».
+    """
+    if not isinstance(iso_date, str) or len(iso_date) < 10:
+        return None
+    try:
+        d = datetime.strptime(iso_date[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    if (datetime.now(TZ).date() - d).days <= jours:
+        return None
+    return f" · au {d:%d/%m}"
+
+def _hhmm(valeur: Any) -> str:
+    """« 08:15 » → « 08:15 » ; absent/illisible → « 99:99 » (fin de journée).
+
+    v32 (1.5) — clé de tri horaire des événements macro. Une heure manquante ne
+    doit ni planter le tri ni remonter l'événement en tête : elle le renvoie en
+    fin de sa journée.
+    """
+    s = str(valeur or "").strip()
+    if len(s) >= 5 and s[2] == ":" and s[:2].isdigit() and s[3:5].isdigit():
+        return s[:5]
+    return "99:99"
+
+def _spots_options(market: dict[str, Any]) -> dict[str, float]:
+    """v32 (5.3) — spots BTC/ETH pour ancrer l'écart au max pain Deribit.
+
+    Deribit expose ``underlying_price`` = FORWARD de l'échéance de chaque
+    instrument. Comparer un max pain à un forward lointain produisait un écart
+    faux (jusqu'à 4 points) et, le 23/08/2026, un verdict INVERSÉ : max pain
+    76 500 $ au-dessus d'un spot 76 226 $ publié « −3,3 % · aimant baissier ».
+    On fournit donc le spot que le mail affiche : l'écart devient recalculable
+    par le lecteur à partir des deux nombres qu'il a sous les yeux.
+    """
+    out: dict[str, float] = {}
+    for sym in ("BTC", "ETH"):
+        px = (market.get(sym) or {}).get("price") if isinstance(market, dict) else None
+        if isinstance(px, (int, float)) and px > 0:
+            out[sym] = float(px)
+    return out
+
+# v32 (5.5) — table de correspondance HISSÉE au niveau module : le catalogue
+# (_ALL_SOURCES_LIST) et elle doivent rester synchronisés, et un test le
+# verrouille désormais. Leur désynchronisation silencieuse est ce qui a permis
+# à CoinMarketCal d'échouer chaque matin sans jamais apparaître nulle part.
+_SOURCE_LABELS: dict[str, str] = {
+    "market": "CoinGecko", "fng": "Fear&Greed", "macro": "FRED",
+    "onchain": "On-chain", "polymarket": "Polymarket", "etf": "ETF flows",
+    "telegram": "Telegram", "defi": "DeFiLlama",
+    "crypto_events": "Catalyseurs crypto (CoinMarketCal)",
+    "narratives": "Narratifs (CoinGecko)",
+    "social": "Social trending", "unlocks": "Token Unlocks", "news": "News",
+    "youtube": "YouTube", "geopolitics": "Géopolitique",
+    "btc_network": "BTC Network", "stablecoins": "Stablecoins",
+    "whales": "Whale Tracking",
+    "macro_news": "Yahoo Finance", "macro_calendar": "Calendrier macro",
+    "crypto_rss": _RSS_LABEL,
+    "onchain_adv": "On-chain avancé (Coin Metrics)",
+    "options": "Options (Deribit)",
+    "macro_corr": "Corrélations macro",
+    "intl_markets": "Marchés internationaux (BCE · BoJ · Nikkei · Stoxx)",
+    "equity_links": "Actions ↔ crypto (NVDA · COIN · MSTR…)",
+}
+_CLES_SOURCES = tuple(_SOURCE_LABELS)
+
+
 def _active_sources(**flags: Any) -> list[str]:
     """Liste lisible des sources réellement actives (anti-fabrication)."""
-    out: list[str] = []
-    mapping = {
-        "market": "CoinGecko", "fng": "Fear&Greed", "macro": "FRED",
-        "onchain": "On-chain", "polymarket": "Polymarket", "etf": "ETF flows",
-        # v29 (audit) — narratifs = catégories CoinGecko (OB6), plus Kaito.
-        "telegram": "Telegram", "defi": "DeFiLlama",
-        "narratives": "Narratifs (CoinGecko)",
-        "social": "Social trending", "unlocks": "Token Unlocks", "news": "News",
-        "youtube": "YouTube", "geopolitics": "Géopolitique",
-        "btc_network": "BTC Network", "stablecoins": "Stablecoins", "whales": "Whale Tracking",
-        "macro_news": "Yahoo Finance", "macro_calendar": "Calendrier macro",
-        "crypto_rss": "RSS news (crypto + macro · 16 flux)",
-        "onchain_adv": "On-chain avancé (Coin Metrics)",
-        "options": "Options (Deribit)",
-        "macro_corr": "Corrélations macro",
-        # v14.1 — international + transmission actions → crypto.
-        "intl_markets": "Marchés internationaux (BCE · BoJ · Nikkei · Stoxx)",
-        "equity_links": "Actions ↔ crypto (NVDA · COIN · MSTR…)",
-    }
-    for key, label in mapping.items():
-        if _is_truly_active(flags.get(key)):
-            out.append(label)
-    return out
+    return [label for cle, label in _SOURCE_LABELS.items()
+            if _is_truly_active(flags.get(cle))]
 
 
 def _is_truly_active(val: Any) -> bool:
@@ -3006,33 +3370,35 @@ def _build_onchain_tiles(data: dict[str, Any]) -> tuple[list[dict[str, Any]], Op
 def _apply_asset_plans_to_theses(
     payload: dict[str, Any], data: dict[str, Any]
 ) -> None:
-    """v27 (TH1/TH2/RE1/RE2/RE3/ES1/ES2/ES3) — plan déterministe → thèses.
+    """v27 → v33 — compléments déterministes des thèses.
 
-    Écrase l'``action_plan`` et les ``targets`` de chaque thèse ferme avec les
-    valeurs Python de ``asset_plan`` (invalidation chiffrée + basis, R:R, cible
-    30j en fourchette, cible cycle), et attache ``asset_plan`` complet
-    (scénarios bull/base/bear, EV, zone d'accu + DCA, plan_line) + catalyseurs
-    + delta de conviction, pour le rendu. Le sizing (RE1) N'utilise JAMAIS le
+    v33 : attache catalyseurs et delta de conviction, et donne sa taille à
+    l'allègement du radar de sortie. Le plan V30 (invalidation, R:R, cibles,
+    EV, scénarios) n'est plus ni appliqué ni attaché. Le sizing (RE1) N'utilise JAMAIS le
     cash comme contrainte. Le contenu ÉDITORIAL du LLM (observation,
     raisonnement, contre-thèse) est conservé.
     """
-    plans_by_asset = {
-        str(e.get("asset")).upper(): e.get("asset_plan")
-        for e in (data.get("eligible_theses") or [])
-        if isinstance(e.get("asset_plan"), dict) and e["asset_plan"].get("available")
-    }
     cats_by_asset = {
         str(e.get("asset")).upper(): e.get("catalysts")
         for e in (data.get("eligible_theses") or []) if e.get("catalysts")
     }
-    core_by_asset = {
-        str(e.get("asset")).upper(): bool(e.get("conviction"))
-        for e in (data.get("eligible_theses") or [])
-    }
+    # v33 — l'univers du radar est le portefeuille entier : la valeur et le
+    # statut cœur ne dépendent plus de l'éligibilité V30 (comptage de signaux,
+    # qui écartait par ex. TAO un jour de 429 CoinGecko). Candidats du moteur
+    # d'abord, entrées éligibles ensuite.
+    from src.analytics.exit_radar import _is_core as _radar_core
+    _cands_pl = ((data.get("opportunity") or {}).get("candidates") or []
+                 if isinstance(data.get("opportunity"), dict) else [])
     val_by_asset = {
+        str(c.get("asset")).upper(): (c.get("value_usd") or 0.0)
+        for c in _cands_pl if isinstance(c, dict)}
+    val_by_asset.update({
         str(e.get("asset")).upper(): (e.get("value_usd") or 0.0)
-        for e in (data.get("eligible_theses") or [])
-    }
+        for e in (data.get("eligible_theses") or []) if e.get("value_usd")})
+    core_by_asset = {a: _radar_core(a, None) for a in val_by_asset}
+    core_by_asset.update({
+        str(e.get("asset")).upper(): bool(e.get("conviction"))
+        for e in (data.get("eligible_theses") or [])})
     deltas = data.get("thesis_score_deltas") or {}
     ptf_val = (data.get("portfolio_snapshot") or {}).get("value_usd")
 
@@ -3042,137 +3408,206 @@ def _apply_asset_plans_to_theses(
         if not isinstance(t, dict):
             continue
         asset = str(t.get("asset") or "").upper()
-        plan = plans_by_asset.get(asset)
         # Delta de conviction (TH4) : toujours attaché si dispo.
         d = deltas.get(asset)
         if isinstance(d, dict) and d.get("delta") is not None:
             t["conviction_delta"] = d
         if cats_by_asset.get(asset):
             t["catalysts"] = cats_by_asset[asset]
-        if not plan:
-            continue
-        # Attache le plan complet (rendu du nouveau bloc + Telegram /pourquoi).
-        t["asset_plan"] = plan
-        t["plan_line"] = plan.get("plan_line")
         _act = (t.get("action") or "").upper()
-        _firm = any(k in _act for k in ("RENFORC", "ALLÉG", "ALLEG"))
-        if not _firm:
+        # ── v33 (audit zero-trust 01/10) — une décision du MOTEUR porte ses
+        # propres chiffres ; seul l'allègement du RADAR reçoit ici sa taille
+        # (50 % d'un satellite — règle V30 ; le cœur n'est jamais allégé). Le plan
+        # V30 (invalidation, cible 30 j sur résistance, cible cycle
+        # « reconquête ATH », R:R, EV à probabilité heuristique 0,30–0,70)
+        # n'est plus attaché ni appliqué : après le verrou fail-closed, aucune
+        # autre posture ferme n'existe, et /pourquoi relisait son plan_line.
+        if t.get("engine_view") or not t.get("v33_trigger"):
             continue
-        inv = plan.get("invalidation") or {}
-        tgt = plan.get("target_30d") or {}
-        ap = t.get("action_plan") if isinstance(t.get("action_plan"), dict) else {}
-        # Invalidation + R:R = source de vérité Python.
-        ap["stop_loss"] = inv.get("level")
-        ap["stop_loss_basis"] = inv.get("basis")
-        ap["rr"] = plan.get("rr_30d")
-        ap["invalidation_conditions"] = (
-            f"sous {inv.get('level_label')} ({inv.get('basis')})")
-        # Entrée : zone d'accumulation (RE3) si le LLM n'en a pas fourni.
-        if not ap.get("entry"):
-            _az = plan.get("accumulation_zone") or {}
-            ap["entry"] = _az.get("high") or plan.get("price")
-        # Sizing (RE1) — % PTF + $, cash jamais une contrainte.
-        _w = (val_by_asset.get(asset, 0.0) / ptf_val * 100.0
-              if ptf_val else None)
-        _sz = suggest_sizing(
-            action_type=("bearish" if "ALLÉG" in _act or "ALLEG" in _act
-                         else "bullish"),
-            weight_pct=_w, ptf_value_usd=ptf_val,
+        if not any(k in _act for k in ("ALLÉG", "ALLEG")):
+            continue
+        _w_al = (val_by_asset.get(asset, 0.0) / ptf_val * 100.0
+                 if ptf_val else None)
+        _sz_al = suggest_sizing(
+            action_type="bearish", weight_pct=_w_al, ptf_value_usd=ptf_val,
             is_core=core_by_asset.get(asset, False),
             position_value_usd=val_by_asset.get(asset))
-        if _sz:
-            if _sz.get("add_pct_ptf") is not None:
-                ap["position_size_pct"] = _sz["add_pct_ptf"]
-                ap["position_size_usd"] = _sz.get("add_usd")
-            elif _sz.get("trim_pct_position") is not None:
-                ap["position_size_pct"] = -_sz["trim_pct_position"]
-                ap["position_size_usd"] = _sz.get("trim_usd")
-            ap["sizing_note"] = _sz.get("note")
-        t["action_plan"] = ap
-        # Cibles (ES1/ES2) : 30j en fourchette + cycle.
-        # v29 (MA5/WA1) — les cibles Python ÉCRASENT les cibles LLM (fini le
-        # setdefault) : le 10/07, la cible 30j IA de BTC (70 401 $, +10.1%)
-        # dépassait son propre scénario BULL (67 145 $) et les bornes basses LT
-        # IA (BTC 87 666 $ / ETH 2 986 $ / TAO 420 $) divergeaient du weekly
-        # (mêmes actifs : 102 366 / 3 742 / 549 — fib 0.618 → ATH Python).
-        # Une seule source de vérité = asset_plan, la MÊME que le weekly ; la
-        # cible 30j (résistance ancrée) est par construction ≤ scénario bull
-        # (bull = cible + 1 ATR). La prose LLM reste libre, pas ses chiffres.
-        _tg = t.get("targets") if isinstance(t.get("targets"), dict) else {}
-        if tgt.get("level") is not None:
-            _tg["short_term_30d"] = tgt.get("level")
-            if tgt.get("low_label"):
-                _tg["short_term_note"] = (
-                    f"{_pct_fr_signed(tgt.get('upside_pct'))} · {tgt.get('basis')}"
-                    f" · fourchette {tgt.get('low_label')}–{tgt.get('high_label')}"
-                    if tgt.get("upside_pct") is not None and tgt.get("basis")
-                    else f"fourchette {tgt.get('low_label')}–{tgt.get('high_label')}")
-        _tg.setdefault("short_term_label", "Cible 30j (technique)")
-        _cyc = plan.get("target_cycle")
-        if _cyc:
-            if _cyc.get("low") is not None:
-                _tg["long_term_6_12m_low"] = _cyc.get("low")
-            if _cyc.get("high") is not None:
-                _tg["long_term_6_12m_high"] = _cyc.get("high")
-            if not _tg.get("long_term_note"):
-                _tg["long_term_note"] = (
-                    "reconquête ATH (cycle)" if _cyc.get("kind") == "cycle"
-                    else "objectif 6-12 mois")
-        t["targets"] = _tg
+        if _sz_al and _sz_al.get("trim_pct_position") is not None:
+            t["action_plan"] = {
+                "position_size_pct": -_sz_al["trim_pct_position"],
+                "position_size_usd": _sz_al.get("trim_usd"),
+                "sizing_note": _sz_al.get("note"),
+                "size_is_position_share": True,
+            }
+        t.pop("asset_plan", None)
+
+
+def _phrase_courte(texte: Any, limite: int = 190) -> str:
+    """Première proposition d'un motif du moteur, tronquée proprement."""
+    t = str(texte or "").strip()
+    for sep in (" · ", ". "):
+        if sep in t:
+            t = t.split(sep)[0]
+            break
+    return t if len(t) <= limite else t[:limite].rsplit(" ", 1)[0] + "…"
+
+
+def _completer_series_v33(closes: dict[str, Any], mvrv_hist: dict[str, Any]) -> None:
+    """Repli DATÉ pour BTC/ETH : clôtures Coin Metrics si CoinGecko a échoué.
+
+    BTC et ETH sont les seuls actifs au potentiel mesurable : leur volatilité
+    (modulation, fourchettes) ne doit pas dépendre d'un 429 CoinGecko. Les
+    clôtures viennent de la même requête que l'historique MVRV. Mutation
+    in-place de ``closes`` ; une série CoinGecko suffisante est conservée.
+    """
+    for sym, h in (mvrv_hist or {}).items():
+        cl = h.get("closes") if isinstance(h, dict) else None
+        if (isinstance(cl, dict) and len(cl) >= 60
+                and len(closes.get(str(sym).upper()) or {}) < 60):
+            closes[str(sym).upper()] = dict(cl)
+
+
+def _retirer_probabilites_scenarios(payload: dict[str, Any]) -> None:
+    """Retire toute probabilité des scénarios hebdo (inventée, non calibrée)."""
+    for scn in (payload.get("scenarios") or []):
+        if isinstance(scn, dict):
+            scn.pop("probability_pct", None)
+
+
+def _opportunity_brief(opp: Any) -> dict[str, Any]:
+    """Décisions du moteur, compactes, pour le prompt du modèle de langage."""
+    if not isinstance(opp, dict) or not opp.get("available"):
+        return {"available": False}
+    return {
+        "available": True,
+        "regle": ("Décisions FINALES du moteur déterministe. Tu les expliques ; "
+                  "tu ne recommandes aucun autre renfort ni allègement, ne fixes "
+                  "aucune taille et n'inventes aucune probabilité."),
+        "recommandations": [
+            {"asset": d.get("asset"), "action": d.get("action"),
+             "taille": (d.get("size") or {}).get("band"),
+             "motif": _phrase_courte(d.get("reason"), 260)}
+            for d in (opp.get("firm") or []) if isinstance(d, dict)],
+        "allegements_regles_profit": [
+            {"asset": r.get("asset"), "motif": r.get("reason")}
+            for r in (opp.get("reduce_firm") or []) if isinstance(r, dict)],
+        "refus": [
+            {"asset": d.get("asset"), "condition": d.get("condition_failed"),
+             "motif": _phrase_courte(d.get("reason"), 200)}
+            for d in (opp.get("decisions") or [])
+            if isinstance(d, dict) and not d.get("decided")],
+        "signalements": opp.get("signalements") or [],
+    }
+
+
+def _opportunity_summary(data: dict[str, Any]) -> dict[str, Any]:
+    """v33 — synthèse DÉTERMINISTE du moteur, rendue dans chaque mail du matin.
+
+    Audit zero-trust (01/10) : les signalements (« asymétrie non corroborable,
+    examen manuel »), le candidat le plus proche et la couverture étaient
+    calculés puis jamais rendus — annoncés comme « signalés » alors qu'aucun
+    lecteur ne pouvait les voir. Cette synthèse les porte jusqu'au mail.
+    """
+    opp = data.get("opportunity") if isinstance(data.get("opportunity"), dict) else {}
+    if not opp.get("available"):
+        return {"available": False}
+    from src.analytics import opportunity as _o
+    decisions = [d for d in (opp.get("decisions") or []) if isinstance(d, dict)]
+    mesurables = [str(d.get("asset")) for d in decisions
+                  if (d.get("potential") or {}).get("available")]
+    firm = [d for d in (opp.get("firm") or []) if isinstance(d, dict)]
+    closest = opp.get("closest_miss") if isinstance(opp.get("closest_miss"), dict) else None
+    # Audit 01/10 (sources coupées, chaîne rejouée) — « le plus proche » n'a de
+    # sens que pour un actif au potentiel MESURÉ. Sans aucun, le moteur
+    # désignait le premier par ordre alphabétique (« 1000SATS — preuve
+    # insuffisante ») : un faux candidat. Le motif général suffit alors.
+    if closest and not (closest.get("potential") or {}).get("available"):
+        closest = None
+    ref = _o._cfg("required_return_reference_pct")
+    cash = _o._cfg("cash_benchmark_annual_pct")
+    costs = _o._cfg("round_trip_cost_pct")
+    total = len(decisions)
+    out = {
+        "available": True,
+        "count": len(firm),
+        "total": total,
+        "measurable": len(mesurables),
+        "measurable_assets": mesurables,
+        "reference_pct": ref, "cash_pct": cash, "costs_pct": costs,
+        "costs_measured": bool(_o._cfg("cost_is_measured", False)),
+        "closest": ({"asset": closest.get("asset"),
+                     "reason": _phrase_courte(closest.get("reason"))}
+                    if closest and not firm else None),
+        "signalements": [s for s in (opp.get("signalements") or [])
+                         if isinstance(s, dict)],
+        "arbitrages": [{"buy": a.get("asset"), "sell": a.get("sell_asset"),
+                        "reason": _phrase_courte(a.get("reason"))}
+                       for a in (opp.get("arbitrages") or []) if isinstance(a, dict)],
+        "reductions": len(opp.get("reduce_firm") or []),
+    }
+    from src.analytics.forecast import _pct as _p
+    out["display"] = {"reference": _p(ref), "cash": _p(cash), "costs": _p(costs)}
+    for _sg in out["signalements"]:
+        _sg["display"] = {"ecart": _p(_sg.get("ecart_implique_pct"), signe=True),
+                          "borne": _p(_sg.get("borne_credible_pct"), signe=True)}
+    if firm:
+        out["empty_line"] = ""
+    else:
+        # Le bloc « Moteur d'allocation », rendu juste au-dessus, porte déjà la
+        # couverture et le candidat le plus proche : le motif ne les répète
+        # pas (le mail réel du 01/10 les donnait deux fois de suite).
+        _pk = ("" if mesurables else
+               " Aucun actif n'a été évalué ce matin (univers vide)." if not total else
+               f" Aucun des {total} actifs n'a aujourd'hui de potentiel mesurable.")
+        out["empty_line"] = (
+            "Aucune recommandation ce matin : aucun actif n'a un potentiel "
+            "MESURÉ qui couvre son rendement requis." + _pk
+            + " S'abstenir est une décision, pas un oubli.")
+    return out
 
 
 def _compute_top_action(payload: dict[str, Any]) -> None:
-    """v27 (RE4) — « Si tu ne fais qu'UNE chose » : meilleure thèse ferme.
+    """« Si tu ne fais qu'UNE chose » — v33 : la décision du MOTEUR.
 
-    Classe les thèses fermes par (R:R × EV positif), et expose la n°1 en une
-    ligne actionnable. Déterministe : survit à une panne IA.
-
-    v28 (M-A1) — seuls les gestes EXÉCUTABLES concourent (sizing > 0, EV ≥ 0,
-    R:R suffisant pour un tactique) : le 07/07, le « one thing » poussait
-    « RENFORCER TAO » avec « renfort non suggéré, concentration » dans la même
-    ligne. Aucun candidat → « Ne rien faire aujourd'hui » est affiché (décision
-    honnête plutôt qu'un geste incohérent ou un bloc absent).
+    La décision RENFORCER au plus fort excédent (potentiel − requis) ; sans
+    décision, la ligne d'abstention, toujours. L'ancien classement R:R × EV
+    (v27/v28) reposait sur une probabilité heuristique et ignorait le moteur.
+    Déterministe : identique que le modèle de langage parle ou se taise.
     """
-    from src.analytics.reco_gate import NOTHING_TO_DO_LINE, executable_for_top_action
+    from src.analytics.reco_gate import NOTHING_TO_DO_LINE
 
-    best = None
-    best_score = 0.0
-    had_firm = False
+    payload.pop("top_action", None)    # v33 : jamais hérité d'ailleurs
+    # ── v33 — « une seule chose » = la décision du MOTEUR au plus fort
+    # excédent (potentiel − requis). L'ancien classement R:R × EV reposait sur
+    # une probabilité heuristique et ignorait les décisions du moteur (qui
+    # n'ont ni R:R ni EV) : il affichait « Ne rien faire aujourd'hui » au-dessus
+    # d'une recommandation ferme.
+    _moteur = []
     for t in (payload.get("thesis_of_the_day") or []):
-        if not isinstance(t, dict):
-            continue
-        if any(k in (t.get("action") or "").upper()
-               for k in ("RENFORC", "ALLÉG", "ALLEG")):
-            had_firm = True
-        if not executable_for_top_action(t):
-            continue
-        plan = t.get("asset_plan") or {}
-        rr = plan.get("rr_30d")
-        ev = plan.get("ev_30d_pct")
-        if not isinstance(rr, (int, float)) or not isinstance(ev, (int, float)):
-            continue
-        score = rr * max(ev, 0.1)
-        if score > best_score:
-            best_score = score
-            ap = t.get("action_plan") or {}
-            _line = f"{t.get('action')} {t.get('asset')}"
-            if ap.get("sizing_note"):
-                _line += f" · {ap['sizing_note']}"
-            elif ap.get("entry"):
-                _line += f" ~{ap['entry']}"
-            if rr:
-                _line += f" · R:R {rr}"
-            best = {
-                "asset": t.get("asset"), "action": t.get("action"),
-                "line": _line, "rr": rr, "ev_pct": ev,
-                "invalidation": (plan.get("invalidation") or {}).get("level_label"),
-            }
-    if best:
-        payload["top_action"] = best
-    elif had_firm or (payload.get("thesis_of_the_day") or []):
-        # Des thèses existent mais aucune n'est exécutable → le dire.
-        # (« is_nothing » et non « none » : mot-clé Jinja, inaccessible en template.)
-        payload["top_action"] = {"is_nothing": True, "line": NOTHING_TO_DO_LINE}
+        _ev = t.get("engine_view") if isinstance(t, dict) else None
+        if (isinstance(_ev, dict) and (t.get("action") or "") == "RENFORCER"
+                and _ev.get("potential_pct") is not None
+                and _ev.get("required_pct") is not None):
+            _moteur.append((_ev["potential_pct"] - _ev["required_pct"], t, _ev))
+    if _moteur:
+        _exc, _t, _ev = max(_moteur, key=lambda x: x[0])
+        _band = _ev.get("size_band") or []
+        _line = (f"RENFORCER {_t.get('asset')} · potentiel "
+                 f"{_pct_fr_signed(_ev['potential_pct'])} vs requis "
+                 f"{_pct_fr(_ev['required_pct'])}")
+        if len(_band) == 2:
+            _line += (f" · bande {_ev.get('size_band_label')} "
+                      f"{_pct_fr(_band[0])}–{_pct_fr(_band[1])} du PTF")
+        payload["top_action"] = {"asset": _t.get("asset"), "action": "RENFORCER",
+                                 "line": _line, "rr": None, "ev_pct": None,
+                                 "invalidation": None, "from_engine": True}
+        return
+
+    # Aucune décision du moteur : la ligne d'abstention est TOUJOURS posée, quel
+    # que soit le contenu rédigé par le modèle (avant, elle n'apparaissait que
+    # si des thèses du modèle subsistaient — le modèle décidait donc de
+    # l'affichage du verdict).
+    payload["top_action"] = {"is_nothing": True, "line": NOTHING_TO_DO_LINE}
 
 
 def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp: str) -> dict[str, Any]:
@@ -3184,13 +3619,32 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
     # Header chiffré
     header = payload.setdefault("header", {})
     meta = data.get("header_meta", {})
-    header.setdefault("date", timestamp.split(" · ")[0] if " · " in timestamp else timestamp)
-    header.setdefault("time_casablanca", timestamp)
+    # v33 — date et heure sont des FAITS : posées par Python, jamais reprises
+    # de la sortie du modèle (rejeu du 30/09 : la date de la veille survivait).
+    header["date"] = timestamp.split(" · ")[0] if " · " in timestamp else timestamp
+    header["time_casablanca"] = timestamp
     header["active_sources_count"] = meta.get("active_sources_count")
     header["total_sources_count"] = meta.get("total_sources_count")
     header["win_rate_30d"] = meta.get("win_rate_30d_pct")
     header["win_rate_total"] = meta.get("win_rate_count")
     header["win_rate_calibration"] = meta.get("win_rate_calibration")
+
+    # v32 (5.17) - etiquette de fraicheur de l'indice dollar elargi (FRED),
+    # posee UNIQUEMENT si la donnee a plus de 4 jours.
+    _mc32 = payload.get("macro_context")
+    if isinstance(_mc32, dict):
+        _fr32 = _fraicheur_si_perimee((data.get("macro_context") or {})
+                                      .get("dxy_broad_as_of"))
+        if _fr32:
+            _mc32["dxy_broad_freshness"] = _fr32
+
+    # v32 (5.2) — PROVENANCE RÉÉCRITE : la ligne « Sources · … » des fiches est
+    # reconstruite depuis les horodatages réels. Le LLM ne peut plus la fournir
+    # (cf. _provenance_these).
+    _heure = datetime.now(TZ).strftime("%Hh%M")
+    for _th in (payload.get("thesis_of_the_day") or []):
+        if isinstance(_th, dict):
+            _th["sources_timestamps"] = _provenance_these(_th, data, _heure)
 
     # Snapshot et macro : remplacés par les chiffres Python
     snap = data.get("portfolio_snapshot") or {}
@@ -3237,6 +3691,7 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
     # PRÉCÉDENT (audits A11/A13). Zéro Gemini : rendu direct.
     _cal = data.get("upcoming_calendar") or {}
     _agenda_items: list[dict[str, Any]] = []
+    _now_hhmm = datetime.now(TZ).strftime("%H:%M")
     if isinstance(_cal, dict) and _cal.get("available"):
         for _ev in (_cal.get("events") or []):
             if not isinstance(_ev, dict):
@@ -3253,7 +3708,16 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
                 "forecast": _ev.get("forecast"),
                 "previous": _ev.get("previous"),
                 "estimated": bool(_ev.get("estimated")),
-                "_sort": (_da, 0 if _ev.get("importance") == "high" else 1),
+                # v32 (1.5) — l'HEURE entre dans la clé de tri. Sans elle, six
+                # événements du même jour restaient dans l'ordre arbitraire de
+                # la source : le 21/08 le mail listait 09:30, 09:30, 08:15,
+                # 08:15, 08:30, 08:30 sous un commentaire « Ordre
+                # CHRONOLOGIQUE ». On trie (jour, heure, importance) ; un
+                # événement sans heure passe en fin de journée plutôt que de
+                # rendre tout le tri instable.
+                "_sort": (_da, _hhmm(_ev.get("time")),
+                          0 if _ev.get("importance") == "high" else 1),
+                "_past": _da == 0 and _hhmm(_ev.get("time")) < _now_hhmm,
             })
         # Ordre CHRONOLOGIQUE (High avant Medium le même jour). Cap 6 lignes :
         # si trop d'événements, les Medium les plus lointains sautent d'abord
@@ -3268,7 +3732,13 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
                     _keep.append(x)
             _keep.sort(key=lambda x: x["_sort"])
             _agenda_items = _keep
+        # v32 (1.5) — un événement du jour DÉJÀ PUBLIÉ n'est plus annoncé
+        # comme à venir : le 21/08 le mail, parti à 08h38, listait quatre
+        # publications de 08h15 et 08h30 sous « Aujourd'hui ». L'hebdo savait
+        # déjà le dire (« ✓ déjà publié aujourd'hui ») ; le matin l'ignorait.
         for x in _agenda_items:
+            if x.pop("_past", False):
+                x["already_published"] = True
             x.pop("_sort", None)
     if _agenda_items:
         # NB : clé « events » (PAS « items ») — en Jinja, ``macro_agenda.items``
@@ -3434,6 +3904,34 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
     # M5 : hiérarchiser les thèses. action_type bullish/bearish = "action"
     # (décision à prendre), neutral = "watch" (surveillance). On trie pour
     # afficher les thèses actionnables en premier, puis par confiance décroissante.
+    # ══ v33 — LE MOTEUR EST APPLIQUÉ EN PREMIER (audit zero-trust 01/10) ═
+    # Avant, il passait APRÈS le plancher de confiance et le filet stop/R:R
+    # V15 : un RENFORCER du moteur que le modèle avait commenté sans stop était
+    # rétrogradé par l'ancien filet, puis réimposé par le moteur en gardant le
+    # bandeau « reco dégradée ». Désormais la décision est posée d'abord, et
+    # les filets historiques ne s'appliquent qu'à ce qui n'est pas décidé.
+    try:
+        from src.analytics.opportunity_adapter import apply_decisions_to_theses
+        apply_decisions_to_theses(payload, data)
+    except Exception as _v33_app_exc:  # noqa: BLE001
+        logger.error("Application du moteur v33 impossible : %s", _v33_app_exc)
+    # Verrou FAIL-CLOSED (audit 01/10) : si l'application ci-dessus a échoué
+    # en cours de route, les postures fermes écrites par le modèle restaient
+    # RENFORCER/ALLÉGER dans le mail. Une posture ferme n'existe que portée
+    # par le moteur (engine_view) ou par le radar de sortie (v33_trigger).
+    from src.analytics.opportunity_adapter import verrouiller_postures_fermes
+    verrouiller_postures_fermes(payload.get("thesis_of_the_day"))
+    payload["opportunity_summary"] = _opportunity_summary(data)
+    if payload["opportunity_summary"].get("available"):
+        # L'absence de reco s'explique par le MOTEUR, plus par un niveau de
+        # confiance du modèle ni par une « convergence de signaux » V30.
+        payload["thesis_empty_reason"] = payload["opportunity_summary"]["empty_line"]
+        payload.pop("thesis_empty_bullets", None)
+    else:
+        payload["thesis_empty_reason"] = (
+            "Moteur d'allocation indisponible ce matin — aucune recommandation "
+            "ferme ne peut être établie (le modèle de langage n'en décide pas).")
+        payload.pop("thesis_empty_bullets", None)
     theses = payload.get("thesis_of_the_day") or []
     if isinstance(theses, list):
         # v14 (point 1C) / v23.x — filet de sécurité : on n'affiche QUE les thèses
@@ -3441,112 +3939,49 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         # filtrer le bruit : seules les convictions FORTES et bien analysées passent).
         # Le prompt le demande déjà à Gemini ; ici on GARANTIT le seuil même si le
         # modèle le rate. Seuil unique = source de vérité.
+        # ══ v33 — LA CONFIANCE DU MODÈLE NE PEUT PLUS SUPPRIMER UNE
+        # DÉCISION DÉTERMINISTE ═══════════════════════════════════════════
+        # Trouvé au rendu de la chaîne réelle, invisible en test unitaire :
+        # le moteur décidait RENFORCER sur AAVE, le modèle avait écrit cette
+        # thèse avec 55 % de confiance, et le plancher à 75 % la retirait
+        # AVANT que la décision ne puisse s'exprimer. La recommandation
+        # disparaissait du mail sans trace. C'était exactement la « probabilité
+        # décisionnelle cachée » qu'Omar interdit : un nombre produit par le
+        # modèle qui annule silencieusement une décision arithmétique.
+        #
+        # Le plancher subsiste — il filtre le bruit narratif — mais il ne
+        # s'applique QU'AUX thèses sur lesquelles le moteur n'a rien décidé.
+        _v33_firm_assets: set[str] = set()
+        _v33_opp = data.get("opportunity") if isinstance(
+            data.get("opportunity"), dict) else {}
+        if _v33_opp.get("available"):
+            for _fd in (_v33_opp.get("firm") or []):
+                if isinstance(_fd, dict) and _fd.get("asset"):
+                    _v33_firm_assets.add(str(_fd["asset"]).upper())
+            for _rd in (_v33_opp.get("reduce_firm") or []):
+                if isinstance(_rd, dict) and _rd.get("asset"):
+                    _v33_firm_assets.add(str(_rd["asset"]).upper())
+
         def _conf_ok(t: Any) -> bool:
             if not isinstance(t, dict):
                 return False
+            if str(t.get("asset") or "").upper() in _v33_firm_assets:
+                return True          # décision du moteur : jamais filtrée
+            if t.get("_v33_gated"):
+                return True          # refus motivé du moteur : gardé (bot, état)
             c = _coerce_confidence(t.get("confidence"))
             return c is not None and c >= THESIS_CONFIDENCE_FLOOR
         filtered = [t for t in theses if _conf_ok(t)]
-        # Si Gemini avait produit des thèses mais TOUTES sont sous le seuil, on le
-        # respecte STRICTEMENT : aucune thèse affichée (ne pas présenter une thèse
-        # tiède comme « fondée »). On renseigne thesis_empty_reason pour que le
-        # rendu affiche un message honnête plutôt qu'un vide brut.
-        if not filtered and theses:
-            if not payload.get("thesis_empty_reason"):
-                # v18 (M-B11) : message explicite — on indique le niveau de
-                # conviction atteint et ce qui manque, plutôt qu'un vide brut.
-                _best = max((_coerce_confidence(t.get("confidence")) or 0)
-                            for t in theses)
-                _assets = ", ".join(
-                    str(t.get("asset")) for t in theses[:3] if t.get("asset")
-                )
-                payload["thesis_empty_reason"] = (
-                    f"Aucune thèse à conviction suffisante ce matin : les pistes "
-                    f"étudiées ({_assets}) plafonnent à {_best:.0f}% de confiance, "
-                    f"en dessous des {THESIS_CONFIDENCE_FLOOR}% requis pour une reco "
-                    f"ferme. Il manque une convergence plus nette (cassure de niveau "
-                    f"confirmée, signal on-chain franc ou catalyseur daté). "
-                    f"On surveille, on n'agit pas dans le bruit."
-                )
+        # v33 — le motif d'absence est TOUJOURS posé plus haut (moteur ou
+        # « moteur indisponible ») : l'ancien message « plafonnent à N % de
+        # confiance, en dessous des 75 % » est retiré avec le plancher.
         theses = filtered
-        # ── v15 (audit P0-4 / P1-8) — FILETS PYTHON sur les plans d'action.
-        # 1. R:R aberrant : un ratio > 8:1 vient toujours d'un SL collé à
-        #    l'entrée (-0,6% = trigeable par le bruit). RÈGLE 6 violée →
-        #    bascule SURVEILLER automatique, plan retiré, raison affichée.
-        # 2. SL incohérent : RENFORCER avec SL >= entrée (ou ALLÉGER avec
-        #    SL <= entrée), ou SL à moins de 1,5% de l'entrée → même bascule.
-        # 3. Action ferme SANS stop loss exploitable → bascule SURVEILLER
-        #    (règle métier : « plan d'action complet, SL sous swing low réel »).
-        _gated: list[dict[str, Any]] = []
-        for t in theses:
-            if not isinstance(t, dict):
-                continue
-            action_up = (t.get("action") or "").upper()
-            is_firm = any(k in action_up for k in ("RENFORC", "ALLÉG", "ALLEG"))
-            if not is_firm:
-                _gated.append(t)
-                continue
-            ap = t.get("action_plan") if isinstance(t.get("action_plan"), dict) else {}
-            entry = _parse_num(ap.get("entry"))
-            sl = _parse_num(ap.get("stop_loss"))
-            bearish = "ALLÉG" in action_up or "ALLEG" in action_up
-            demote_reason = None
-            if sl is None:
-                demote_reason = ("plan sans stop loss exploitable — règle "
-                                 "métier : SL ancré sous un swing low réel")
-            elif entry:
-                sl_dist_pct = abs(entry - sl) / entry * 100
-                wrong_side = (not bearish and sl >= entry) or (bearish and sl <= entry)
-                if wrong_side:
-                    demote_reason = ("stop loss du mauvais côté de l'entrée "
-                                     "(incohérence support/résistance)")
-                elif sl_dist_pct < 1.5:
-                    demote_reason = (f"SL à {sl_dist_pct:.1f}%".replace(".", ",")
-                                 + " de l'entrée — "
-                                     "trigeable par le bruit, pas un vrai swing low")
-            # R:R explicite fourni par Gemini ou calculable depuis TP/SL.
-            rr_val = None
-            rr_raw = ap.get("rr")
-            if rr_raw:
-                import re as _re_rr
-                m_rr = _re_rr.search(r"(\d+(?:[.,]\d+)?)\s*:\s*1", str(rr_raw))
-                if m_rr:
-                    try:
-                        rr_val = float(m_rr.group(1).replace(",", "."))
-                    except ValueError:
-                        rr_val = None
-            if rr_val is None and entry and sl:
-                tp_block = ap.get("take_profit")
-                tp1 = None
-                if isinstance(tp_block, dict):
-                    for v in tp_block.values():
-                        tp1 = _parse_num(v)
-                        if tp1:
-                            break
-                else:
-                    tp1 = _parse_num(tp_block)
-                risk = abs(entry - sl)
-                if tp1 and risk > 0:
-                    rr_val = abs(tp1 - entry) / risk
-            if demote_reason is None and rr_val is not None and rr_val > 8:
-                demote_reason = (f"R:R calculé {rr_val:.1f}:1 > 8:1 — SL "
-                                 "irréaliste, recalibrage requis")
-            if demote_reason:
-                t["action"] = "SURVEILLER"
-                t["action_type"] = "neutral"
-                t.pop("action_plan", None)
-                t["demoted_by_python"] = True
-                t["demotion_reason"] = demote_reason
-                _wt = t.get("watch_trigger")
-                t["watch_trigger"] = (_wt or
-                    "Reco dégradée en SURVEILLER par le garde-fou Python : "
-                    + demote_reason)
-            elif rr_val is not None:
-                # Sync badge (audit P2-12) : favorable seulement si 1.5–8.
-                t["rr_value"] = round(rr_val, 1)
-                t["rr_favorable"] = bool(1.5 <= rr_val <= 8)
-            _gated.append(t)
-        theses = _gated
+        # ── v15 (audit P0-4 / P1-8) — filet stop/R:R sur les plans d'action du
+        # modèle : RETIRÉ en v33 (audit zero-trust 01/10). Il rétrogradait une
+        # reco ferme du modèle au plan incohérent. Depuis que le moteur est
+        # appliqué en tête, une posture ferme est TOUJOURS une décision du
+        # moteur ou une règle du radar, sans plan du modèle : le filet ne
+        # pouvait plus agir que contre elles, à tort. Code mort, donc retiré.
         for t in theses:
             if not isinstance(t, dict):
                 continue
@@ -3556,10 +3991,13 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
             if not isinstance(t, dict):
                 return (2, 0)
             prio = 0 if t.get("priority") == "action" else 1
-            # Gemini renvoie parfois la confiance en string ("72%") :
-            # sans coercition, -conf lève TypeError et fait planter le tri.
-            conf = _coerce_confidence(t.get("confidence")) or 0
-            return (prio, -conf)
+            # v33 — l'ordre ne dépend plus de la confiance du modèle de langage
+            # mais de l'EXCÉDENT mesuré par le moteur (potentiel − requis).
+            _ev = t.get("engine_view") if isinstance(t.get("engine_view"), dict) else {}
+            _exc = None
+            if _ev.get("potential_pct") is not None and _ev.get("required_pct") is not None:
+                _exc = _ev["potential_pct"] - _ev["required_pct"]
+            return (prio, -(_exc if _exc is not None else -1e9))
         payload["thesis_of_the_day"] = _dedup_theses_by_asset(
             sorted(theses, key=_thesis_rank)
         )
@@ -3573,15 +4011,38 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         # prose complète que les 3 plus fortes convictions FERMES. Les SURVEILLER
         # ne sont jamais dépliées ni étoilées (mais restent dans thesis_of_the_day
         # pour le bot / l'état interne — suivi silencieux, comme demandé).
-        _firm_seen = 0
+        # ── v32 (1.7) — SÉLECTION HYBRIDE : cœur d'abord, puis par SCORE.
+        # Arbitrage d'Omar (25/08/2026).
+        #
+        # L'ancienne règle prenait les 3 PREMIÈRES thèses fermes dans l'ordre
+        # d'arrivée. Le 21/08, cela donnait ETH (score 6) et TAO (5) en fiche
+        # détaillée pendant qu'INJ (8) n'en avait pas — sous une légende
+        # annonçant « les 3 plus fortes convictions ». BTC et ETH pèsent 65 %
+        # du portefeuille : ils gardent leur place quand ils portent une thèse ;
+        # les fiches restantes vont aux meilleurs scores, pas au hasard de
+        # l'ordre.
+        _fermes = [_t for _t in payload["thesis_of_the_day"]
+                   if isinstance(_t, dict)
+                   and any(k in (_t.get("action") or "").upper()
+                           for k in ("RENFORC", "ALLÉG", "ALLEG"))]
+
+        def _score_these(_t: dict) -> float:
+            # v33 — l'ancien score de thèse V30 (comptage de signaux) ne choisit
+            # plus les fiches détaillées : c'est l'excédent du moteur.
+            _ev = (_t.get("engine_view")
+                   if isinstance(_t.get("engine_view"), dict) else {})
+            if _ev.get("potential_pct") is not None and _ev.get("required_pct") is not None:
+                return float(_ev["potential_pct"] - _ev["required_pct"])
+            return -1.0
+
+        _coeur = [_t for _t in _fermes
+                  if str(_t.get("asset") or "").upper() in _TIER0]
+        _autres = sorted([_t for _t in _fermes if _t not in _coeur],
+                         key=_score_these, reverse=True)
+        _retenues = (_coeur + _autres)[:3]
         for _t in payload["thesis_of_the_day"]:
-            if not isinstance(_t, dict):
-                continue
-            _is_firm = any(k in (_t.get("action") or "").upper()
-                           for k in ("RENFORC", "ALLÉG", "ALLEG"))
-            _t["_expand"] = bool(_is_firm and _firm_seen < 3)
-            if _is_firm:
-                _firm_seen += 1
+            if isinstance(_t, dict):
+                _t["_expand"] = _t in _retenues
         # v17 (T-FMT / M-A8) : filet — coercer en NOMBRE tous les champs prix des
         # thèses, au cas où Gemini renvoie une string pré-formatée (« 302,17 $ »).
         # Le rendu (fmt_money) reçoit ainsi toujours un float et formate de façon
@@ -3907,31 +4368,33 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         payload["exit_signals"] = _exs
     try:
         _apply_asset_plans_to_theses(payload, data)
-        # v28 (M-A1/A2/A3/A4) — GATE DE COHÉRENCE (décision Omar 07/07) : les
-        # actions affichées doivent suivre leurs propres preuves (sizing,
-        # EV 30j, R:R) AVANT le choix du « one thing ».
-        from src.analytics.reco_gate import apply_reco_gate, apply_stop_slide_gate
-        apply_reco_gate(payload)
-        # v30 (#1/#68) — ANTI-GLISSEMENT : un RENFORCER dont le stop persisté
-        # est déjà franchi est dégradé en SURVEILLER AVANT le choix du « one
-        # thing » (fini « RENFORCER TAO » en action n°1 sous un stop cassé).
+        # v33 — le moteur a déjà été appliqué en tête du traitement des thèses
+        # (avant le plancher de confiance et le filet stop/R:R historiques).
+
+        # v28 « gate de cohérence » et v30 « anti-glissement de stop » :
+        # RETIRÉS en v33 (voir src/analytics/reco_gate.py). Ils ne pouvaient
+        # plus agir que contre des décisions du moteur, sur des critères
+        # (plafond, EV heuristique, R:R, stop de prix) écartés par Omar.
         _price_by_asset_v30 = {
             str(r.get("asset") or "").upper(): r.get("price")
             for r in (data.get("all_positions_summary") or [])
             if isinstance(r, dict) and r.get("asset")
         }
-        apply_stop_slide_gate(
-            payload, mem.load_active_recommendations(), _price_by_asset_v30)
         _compute_top_action(payload)
         # v30 (#7/#46) — le TRACKING se réconcilie avec le gate DU JOUR : une
         # reco d'état RENFORCER dont la thèse du jour est MAINTENIR/SURVEILLER
         # porte la posture du jour (fini BTC « RENFORCER » au tracking et
         # « MAINTENIR » aux thèses dans le même mail).
+        # v33 — la posture du jour est celle du MOTEUR (décidé → RENFORCER,
+        # sinon SURVEILLER), pas celle des thèses que le modèle a choisi
+        # d'écrire : sans cela, l'affichage du suivi dépendait de sa prose.
         _stance_today: dict[str, str] = {}
-        for _tt in (payload.get("thesis_of_the_day") or []):
-            if isinstance(_tt, dict) and _tt.get("asset"):
-                _stance_today[str(_tt["asset"]).upper()] = (
-                    _tt.get("action") or "").upper()
+        _opp_st = data.get("opportunity") if isinstance(data.get("opportunity"), dict) else {}
+        if _opp_st.get("available"):
+            for _d_st in (_opp_st.get("decisions") or []):
+                if isinstance(_d_st, dict) and _d_st.get("asset"):
+                    _stance_today[str(_d_st["asset"]).upper()] = (
+                        "RENFORCER" if _d_st.get("decided") else "SURVEILLER")
         for _row in (payload.get("active_recommendations_tracking") or []):
             if not isinstance(_row, dict):
                 continue
@@ -3950,16 +4413,22 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
                 continue
             _ta = str(_tt.get("asset") or "").upper()
             _tact = (_tt.get("action") or "").upper()
-            if (not _ta or _ta in _tracked_syms
-                    or not any(k in _tact for k in ("RENFORC", "ALLÉG", "ALLEG"))):
+            # v33 — seules les décisions du MOTEUR entrent au suivi (ce sont les
+            # seules persistées) ; leur cible est la barre de succès, le
+            # rendement requis. Une règle de prise de profit du radar n'est pas
+            # suivie : l'afficher ici la ferait disparaître le lendemain.
+            _ev_new = (_tt.get("engine_view")
+                       if isinstance(_tt.get("engine_view"), dict) else None)
+            if (not _ta or _ta in _tracked_syms or not _ev_new
+                    or "RENFORC" not in _tact):
                 continue
-            _px_new = _price_by_asset_v30.get(_ta)
-            _tgt_new = (_parse_num((_tt.get("targets") or {}).get("short_term_30d"))
-                        if isinstance(_tt.get("targets"), dict) else None)
+            _px_new = _ev_new.get("price") or _price_by_asset_v30.get(_ta)
+            _tgt_new = _ev_new.get("required_price")
             _rows_trk = payload.setdefault("active_recommendations_tracking", [])
             _rows_trk.append({
                 "asset": _ta,
                 "action": "RENFORCER" if "RENFORC" in _tact else "ALLÉGER",
+                "legacy": False,      # décision du moteur (audit 02/10)
                 "issued_at": datetime.now(TZ).strftime("%d/%m"),
                 "days_open": 0,
                 "confidence": _coerce_confidence(_tt.get("confidence")),
@@ -3992,12 +4461,30 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         # le 10/07, « 7 nouvelles reco » comptait 3 RENFORCER requalifiés en
         # MAINTENIR (plafond) — un MAINTENIR n'est pas une nouvelle reco.
         _theses_post = payload.get("thesis_of_the_day") or []
+        _firm_all = [t for t in _theses_post if isinstance(t, dict)
+                     and any(k in (t.get("action") or "").upper()
+                             for k in ("RENFORC", "ALLÉG", "ALLEG"))]
+        # v32 (1.2) — « N NOUVELLE(S) RECO » doit compter les recos NOUVELLES.
+        # Le compteur comptait les thèses FERMES du jour, ce qui n'est pas la
+        # meme chose : le 21/08, l'en-tete annoncait « 3 nouvelles reco » alors
+        # que les logs du meme run disent « RENDER re-emise (n°6) » et « INJ
+        # re-emise (n°2) » — une seule reco etait reellement neuve (TAO). Une
+        # thèse ferme portant sur un actif déjà sous reco OUVERTE de MÊME sens
+        # est une RÉ-ÉMISSION : le contenu est rafraîchi, mais ni le prix
+        # d'entrée ni la date d'origine ne bougent (report_memory.add_
+        # recommendation), donc rien de neuf n'a été engagé.
+        _deja = set()
+        for _r in (data.get("active_recommendations") or []):
+            if isinstance(_r, dict) and (_r.get("status") or "in_progress") == "in_progress":
+                _deja.add((str(_r.get("asset") or "").upper(),
+                           (_r.get("action") or "").upper()[:7]))
         _firm_post = sum(
-            1 for t in _theses_post if isinstance(t, dict)
-            and any(k in (t.get("action") or "").upper()
-                    for k in ("RENFORC", "ALLÉG", "ALLEG")))
+            1 for t in _firm_all
+            if (str(t.get("asset") or "").upper(),
+                (t.get("action") or "").upper()[:7]) not in _deja)
         _hdr_post = payload.setdefault("header", {})
         _hdr_post["firm_theses_count"] = _firm_post
+        _hdr_post["reissued_theses_count"] = len(_firm_all) - _firm_post
         _hdr_post["watch_theses_count"] = max(0, len(_theses_post) - _firm_post)
     except Exception as _apexc:  # noqa: BLE001 — jamais bloquant
         logger.info("Application des plans v27 ignorée : %s", _apexc)
@@ -4011,42 +4498,35 @@ def _merge_python_facts(payload: dict[str, Any], data: dict[str, Any], timestamp
         _cal = _compute_conf_mult(PredictionTracker())
         payload["confidence_calibration"] = _cal
         _cmult = _cal.get("multiplier", 1.0)
+        # ── v33 — CIRCULARITÉ SUPPRIMÉE.
+        # Jusqu'ici, la confiance était CORRIGÉE ici puis PERSISTÉE corrigée
+        # par _persist_firm_recos : la calibration suivante mesurait donc sa
+        # propre sortie, et le score de Brier ne pouvait structurellement pas
+        # distinguer « modèle bien calibré » de « modèle mal calibré compensé
+        # par un multiplicateur ».
+        #
+        # Depuis v33, la confiance n'est plus une variable décisionnelle : le
+        # moteur décide, elle n'entre dans aucun gate. On la laisse donc BRUTE
+        # — la mesure redevient honnête — et le multiplicateur n'est plus
+        # qu'une information publiée dans payload["confidence_calibration"].
         if _cal.get("available") and isinstance(_cmult, (int, float)) and _cmult < 1.0:
-            for _th in (payload.get("thesis_of_the_day") or []):
-                if isinstance(_th, dict) and _th.get("confidence") is not None:
-                    _th["confidence"] = _apply_conf_mult(_th.get("confidence"), _cmult)
+            _cal["applied_to_theses"] = False
+            _cal["note_v33"] = (
+                "multiplicateur publié mais NON appliqué : la confiance est "
+                "persistée brute pour que la calibration ne mesure plus sa "
+                "propre correction")
     except Exception as _calexc:  # noqa: BLE001 — jamais bloquant
         logger.info("Calibration de confiance ignorée : %s", _calexc)
     # Fusion des invalidations DÉTERMINISTES (prix réel vs stop des recos
     # actives) avec le bloc invalidation_watch : les FRANCHIES/menacées Python
     # priment et passent en tête (le LLM ne peut pas les inventer ni les rater).
-    # v30 (#1/#66) — SOURCE UNIQUE : les alertes rendues sont RECALCULÉES avec
-    # les stops du JOUR (asset_plan, les mêmes que la table des thèses) pour
-    # les actifs re-émis non dégradés. Un actif dégradé par le stop-slide gate
-    # (pas d'override) garde l'alerte sur l'ancien stop — cohérent avec sa
-    # posture SURVEILLER. Repli : la valeur calculée en début de run.
+    # v33 (audit 01/10) — l'alerte n'est plus recalculée avec le « stop du
+    # jour » lu dans les thèses : ce stop venait du plan V30 ou du modèle, et
+    # une thèse MAINTENIR du modèle portant un stop au-dessus du cours
+    # suffisait à publier « invalidation FRANCHIE » sur une reco active. Seul
+    # le niveau persisté avec la reco fait foi (les décisions du moteur n'en
+    # ont pas : pas de stop de prix sur une conviction 6-12 mois).
     _inv_det = data.get("invalidations_deterministic") or []
-    try:
-        _stop_over_v30: dict[str, float] = {}
-        for _t30 in (payload.get("thesis_of_the_day") or []):
-            if not isinstance(_t30, dict) or _t30.get("_gated") == "stop_slide":
-                continue
-            _a30 = str(_t30.get("asset") or "").upper()
-            _ap30 = (_t30.get("action_plan")
-                     if isinstance(_t30.get("action_plan"), dict) else {})
-            _sl30 = _parse_num(_ap30.get("stop_loss"))
-            _act30 = (_t30.get("action") or "").upper()
-            if (_a30 and _sl30 and _sl30 > 0 and any(
-                    k in _act30 for k in ("RENFORC", "ALLÉG", "ALLEG", "MAINTENIR"))):
-                _stop_over_v30[_a30] = _sl30
-        _px30 = {str(r.get("asset") or "").upper(): r.get("price")
-                 for r in (data.get("all_positions_summary") or [])
-                 if isinstance(r, dict) and isinstance(r.get("price"), (int, float))}
-        if _stop_over_v30 and _px30:
-            _inv_det = PredictionTracker().check_invalidations(
-                _px30, stop_overrides=_stop_over_v30)
-    except Exception as _inv30_exc:  # noqa: BLE001 — jamais bloquant
-        logger.info("Recalcul invalidations v30 ignoré : %s", _inv30_exc)
     if _inv_det:
         _existing = payload.get("invalidation_watch")
         _existing = _existing if isinstance(_existing, list) else []
@@ -4089,93 +4569,85 @@ def _coerce_confidence(value: Any) -> Optional[float]:
 
 
 def _persist_firm_recos(payload: dict[str, Any], data: dict[str, Any]) -> None:
-    """Persiste les thèses FERMES du matin comme recommandations actives.
+    """Persiste les DÉCISIONS DU MOTEUR du matin comme recommandations actives.
 
     Pourquoi : sans cet appel, ``state/active_recommendations.json`` et
-    ``state/prediction_history.json`` restaient vides en permanence. Résultat :
-    ``refresh_active`` tournait sur une liste vide et ``compute_win_rate``
-    renvoyait toujours 0/0 (win rate jamais alimenté, calibration et regret
-    toujours vides). On enregistre donc les thèses actionnables pour fermer la
-    boucle de tracking.
+    ``state/prediction_history.json`` resteraient vides et le win rate ne
+    pourrait jamais se calculer. Règles v33 :
 
-    Règles :
-    - on ne garde que les actions SCORABLES : RENFORCER / ALLÉGER (les
-      SURVEILLER/MAINTENIR sont neutres et n'apportent rien au win rate) ;
-    - confiance numérique requise et >= 55 (on ne track pas les paris faibles) ;
-    - le prix d'entrée est le prix courant RÉEL calculé côté Python
-      (``all_positions_summary``), jamais le champ ``entry`` free-form de Gemini
-      qui est souvent une fourchette ou du texte, donc inexploitable pour le
-      scoring déterministe ;
-    - l'id ``{asset}-{date}-{action}`` est idempotent : ``add_recommendation``
-      dédoublonne, donc relancer le matin n'empile pas de doublons.
+    - seules les décisions RENFORCER du moteur sont persistées (aucune autre
+      posture ferme n'existe : le modèle de langage n'en crée pas) ;
+    - aucune condition de confiance : la confiance du modèle n'est plus une
+      variable du système ;
+    - le prix d'entrée est le cours RÉEL du candidat du moteur ;
+    - la barre de succès est le rendement requis, sur l'horizon de la décision ;
+    - l'id ``{asset}-{date}-RENFORCER`` est idempotent ; une ré-émission
+      conserve l'entrée, la date et la barre d'origine.
     """
     theses = payload.get("thesis_of_the_day") or []
     if not isinstance(theses, list):
         return
 
-    price_by_asset: dict[str, float] = {}
-    for row in (data.get("all_positions_summary") or []):
-        if not isinstance(row, dict):
-            continue
-        asset = row.get("asset")
-        price = row.get("price")
-        if asset and isinstance(price, (int, float)) and not isinstance(price, bool):
-            price_by_asset[asset] = float(price)
-
+    # ── v33 (audit zero-trust 01/10) — SEULES les décisions du MOTEUR sont
+    # persistées, et SANS condition de confiance. Avant, une reco n'entrait au
+    # suivi que si la confiance du MODÈLE DE LANGAGE valait ≥ 55 : une décision
+    # du moteur non narrée (ou narrée à 50 %) n'était jamais suivie, et le
+    # modèle décidait donc, par un nombre, de ce qui serait évalué.
+    #
+    # Les allègements du radar de sortie ne sont pas persistés : ce sont les
+    # règles de prise de profit d'Omar appliquées mécaniquement, pas un
+    # jugement du système dont on mesurerait la justesse.
     today = datetime.now(TZ).strftime("%Y-%m-%d")
     created = mem.now_iso()
     persisted = 0
+    _px_pos = {str(r.get("asset") or "").upper(): r.get("price")
+               for r in (data.get("all_positions_summary") or [])
+               if isinstance(r, dict)}
     for th in theses:
         if not isinstance(th, dict):
             continue
+        ev = th.get("engine_view") if isinstance(th.get("engine_view"), dict) else None
+        if not ev or (th.get("action") or "").upper() != "RENFORCER":
+            continue
         asset = th.get("asset")
-        action = (th.get("action") or "").upper()
-        if not asset or not any(k in action for k in ("RENFORC", "ALLÉG", "ALLEG")):
+        price = ev.get("price") or _px_pos.get(str(asset or "").upper())
+        req = ev.get("required_pct")
+        if not asset or not isinstance(price, (int, float)) or price <= 0 or req is None:
             continue
-        conf = _coerce_confidence(th.get("confidence"))
-        if conf is None or conf < 55:
-            continue
-        price = price_by_asset.get(asset)
-        if price is None or price <= 0:
-            continue
-        canonical = "RENFORCER" if "RENFORC" in action else "ALLEGER"
-        # v19 (Partie 6 — COHÉRENCE) : ne pas ré-émettre une reco qu'Omar vient
-        # d'écarter via /dismiss (anti ré-émission 48h). Évite le « je l'écarte,
-        # elle revient le lendemain » signalé comme incohérence.
-        if mem.is_recently_dismissed(asset, canonical):
-            logger.info("Reco %s %s ignorée : écartée récemment via /dismiss.",
-                        asset, canonical)
+        if mem.is_recently_dismissed(asset, "RENFORCER"):
+            logger.info("Reco %s RENFORCER ignorée : écartée récemment via /dismiss.",
+                        asset)
             continue
         reco = {
-            "id": f"{asset}-{today}-{canonical}",
+            "id": f"{asset}-{today}-RENFORCER",
             "asset": asset,
-            "action": canonical,
-            "confidence": conf,
+            "action": "RENFORCER",
+            "engine": True,
+            "horizon_days": int(ev.get("horizon_days") or 365),
             "entry_price": price,
             "signal_price": price,
             "created_at": created,
             "status": "in_progress",
-            "rationale": th.get("thesis") or th.get("summary") or "",
+            "required_pct": req,
+            "potential_pct": ev.get("potential_pct"),
+            "potential_conservative_pct": ev.get("potential_conservative_pct"),
+            # La barre de succès EST le rendement requis : la décision affirmait
+            # que l'allocation valait au moins cela sur son horizon.
+            "ct_target": round(price * (1.0 + float(req) / 100.0), 10),
+            "implied_target": ev.get("implied_price"),
+            "size_pct": ev.get("size_pct"),
+            "size_band": ev.get("size_band"),
+            "anchor": ev.get("anchor"),
+            "evidence_class": ev.get("evidence_class"),
+            "rationale": ev.get("reason") or "",
         }
-        # v26 (A12/B6) — persister la CIBLE 30j et le STOP de la thèse : sans
-        # eux, le Tracking du lendemain ne pouvait ni afficher « cible/stop »
-        # ni mesurer la progression VERS l'objectif (badge « Sur objectif »
-        # attribué dès +3% arbitraires — audit A12).
-        _tgt = _parse_num((th.get("targets") or {}).get("short_term_30d")
-                          if isinstance(th.get("targets"), dict) else None)
-        _ap_th = th.get("action_plan") if isinstance(th.get("action_plan"), dict) else {}
-        _sl_th = _parse_num(_ap_th.get("stop_loss"))
-        if _tgt is not None and _tgt > 0:
-            reco["ct_target"] = _tgt
-        if _sl_th is not None and _sl_th > 0:
-            reco["stop_loss"] = _sl_th
         try:
             mem.add_recommendation(reco)
             persisted += 1
         except Exception as exc:  # noqa: BLE001
             logger.warning("Persist reco %s échouée : %s", reco.get("id"), exc)
     if persisted:
-        logger.info("%d reco(s) ferme(s) persistée(s) pour le tracking.", persisted)
+        logger.info("%d décision(s) du moteur persistée(s) pour le suivi.", persisted)
 
 
 def _confidence_caps_from_data(data: dict[str, Any]) -> dict[str, int]:
@@ -4316,26 +4788,9 @@ def _apply_morning_guards(payload: dict[str, Any], data: dict[str, Any]) -> list
     # ── MA8 — conclusion chartiste : le verdict suit les chiffres cités.
     _apply(_dg.fix_historical_spin)
 
-    # ── MA2 — l'EN BREF ne contredit pas les plans (renfort vs plafond).
-    _theses_g = payload.get("thesis_of_the_day") or []
-    _reinf = {str(t.get("asset") or "").upper() for t in _theses_g
-              if isinstance(t, dict)
-              and "RENFORC" in (t.get("action") or "").upper()}
-    _capped = {str(t.get("asset") or "").upper() for t in _theses_g
-               if isinstance(t, dict) and (t.get("action") or "") == "MAINTENIR"
-               and (t.get("_gated") == "plafond" or t.get("gate_note"))}
-    _es = payload.get("executive_summary")
-    try:
-        if isinstance(_es, dict) and isinstance(_es.get("bullets"), list):
-            _es["bullets"], fx = _dg.fix_reinforce_claims(
-                _es["bullets"], _reinf - {""}, _capped - {""})
-            fixes.extend(fx)
-        elif isinstance(_es, list):
-            payload["executive_summary"], fx = _dg.fix_reinforce_claims(
-                _es, _reinf - {""}, _capped - {""})
-            fixes.extend(fx)
-    except Exception:  # noqa: BLE001
-        pass
+    # ── MA2 (v29) — réécriture « X au plafond de concentration » : retirée
+    # avec les plafonds (v33). Une puce qui prescrit un renfort non décidé est
+    # retirée par la garde de prose (strip_unbacked_gestures).
 
     # ── MA12 — le narratif de rotation ne cite que les tuiles affichées.
     try:
@@ -4354,7 +4809,11 @@ def _apply_morning_guards(payload: dict[str, Any], data: dict[str, Any]) -> list
 
     # ── v30 (#11) — seuil DXY unique dans tout le mail du matin (état
     # PARTAGÉ entre les sections : une seule ancre canonique par rapport).
-    _dxy_state_v30: dict[str, Any] = {"canon": None, "canon_txt": None}
+    # v32 (5.11) — on fournit la valeur MESURÉE comme ancre canonique.
+    _dxy_state_v30: dict[str, Any] = {
+        "canon": None, "canon_txt": None,
+        "measured": (data.get("macro_context") or {}).get("dxy"),
+    }
     _apply(_dg.unify_dxy_thresholds, _dxy_state_v30)
 
     # ── v30 (#40) — décimales cassées « X, Y% » recollées dans la prose.
@@ -4372,12 +4831,16 @@ def _apply_morning_guards(payload: dict[str, Any], data: dict[str, Any]) -> list
     except Exception:  # noqa: BLE001
         pass
 
-    # ── v30 (#78) — « survendu » vs RSI réel, thèse par thèse.
+    # ── v30 (#78) — « survendu » vs RSI réel, thèse par thèse. v33 — le RSI
+    # est lu dans les DONNÉES (le plan V30 n'est plus attaché aux thèses).
+    _rsi_par_actif = {
+        str(e.get("asset") or "").upper():
+            ((e.get("asset_plan") or {}).get("readout") or {}).get("rsi")
+        for e in (data.get("eligible_theses") or []) if isinstance(e, dict)}
     for _t78 in (payload.get("thesis_of_the_day") or []):
         if not isinstance(_t78, dict):
             continue
-        _rsi78 = (((_t78.get("asset_plan") or {}).get("readout") or {})
-                  .get("rsi"))
+        _rsi78 = _rsi_par_actif.get(str(_t78.get("asset") or "").upper())
         if _rsi78 is None:
             continue
         try:
@@ -4439,6 +4902,109 @@ def _apply_morning_guards(payload: dict[str, Any], data: dict[str, Any]) -> list
     # les tuiles (fini RSR sous 3 précisions différentes dans le même mail).
     _apply(_dg.round_micro_prices)
 
+    # ── v32 (5.7) — PASSE UNIQUE D'ASSAINISSEMENT DE LA PROSE, sur la
+    # TOTALITÉ du payload et pour les TROIS rapports. Avant v32, la réparation
+    # des décimales cassées n'était câblée qu'au matin (et, le soir, sur une
+    # liste blanche de six clés) : l'hebdo du 24/08 publiait donc
+    # « -37, 5% sous ATH » sur chacune de ses onze lignes de positions, et
+    # « puissant rebond de +41, structure quotidienne redevenue haussiere »
+    # où le pourcentage est coupé en deux au milieu de la phrase. Les cles de
+    # métadonnées (_SKIP_KEYS) restent intouchées.
+    try:
+        from src.analytics.prose_guard import (
+            flag_unsourced_etf_figures as _etf_flag,
+            sanitize_llm_prose as _sanit,
+        )
+        # v32 (5.8) - un chiffre ETF cité alors que Farside/CoinGlass sont KO porte
+        # désormais sa provenance. Le 21/08, « soutenu par +103,3 M$ d'entrées
+        # nettes d'ETF » ouvrait le mail pendant que son pied listait
+        # « Indisponibles · ETF flows » et que l'auto-critique reconnaissait
+        # l'indisponibilité de Farside et CoinGlass.
+        _neuf, _fx_etf = _etf_flag(
+            payload, bool((data.get("etf_flows") or {}).get("available")))
+        _remplacer_sur_place(payload, _neuf)
+        fixes += _fx_etf
+        # v32 (1.10) — l'icône que le modèle place EN TÊTE DU TEXTE s'ajoutait
+        # à celle rendue par le gabarit : « ⚠️✓ » et « ⚠️⚠ » le 21/08.
+        # v32 (1.12) — un libellé de taille annonçant un renfort sur une thèse
+        # qui n'achète pas est retiré (« Recharge stratégique » sur un plan
+        # disant « Conserver — pas de renfort aujourd'hui »).
+        # v32 (2.6) — « 18h48 UTC » ramené à l'heure du mail (Casablanca).
+        from src.analytics.prose_guard import (
+            align_size_note_with_action as _align_note,
+            normalize_news_times as _norm_heures,
+            strip_leading_icons as _strip_icones,
+        )
+        _es = payload.get("executive_summary")
+        if isinstance(_es, dict) and isinstance(_es.get("bullets"), list):
+            _, _fx_ic = _strip_icones(_es["bullets"])
+            fixes += _fx_ic
+        _, _fx_sn = _align_note(payload.get("thesis_of_the_day"))
+        fixes += _fx_sn
+        # v32 (5.7b) — un lien macro dont le chiffre ne correspond à aucune
+        # mesure est RETIRÉ, pas corrigé : « XRP  DXY 994 » le 21/08 pour un
+        # DXY à 98,73. On ne devine pas ce que le modèle visait.
+        from src.analytics.prose_guard import drop_unmatched_macro_drivers
+        _mi32 = payload.get("macro_impact")
+        if isinstance(_mi32, dict) and isinstance(_mi32.get("exposed_positions"), list):
+            _mi32["exposed_positions"], _fx_drv = drop_unmatched_macro_drivers(
+                _mi32["exposed_positions"], data.get("macro_context"))
+            fixes += _fx_drv
+        for _kn in ("news_24h", "news_today", "intraday_news"):
+            if payload.get(_kn) is not None:
+                _, _fx_h = _norm_heures(payload[_kn], TZ)
+                fixes += _fx_h
+        # v32 (1.1) - la synthèse ne peut plus conseiller d'alléger un actif
+        # que le tableau des thèses, deux écrans plus bas, dit de RENFORCER.
+        from src.analytics.prose_guard import reconcile_summary_vs_theses
+        for _cle_syn in ("executive_summary", "synthesis"):
+            if payload.get(_cle_syn) is not None:
+                payload[_cle_syn], _fx_syn = reconcile_summary_vs_theses(
+                    payload[_cle_syn], payload.get("thesis_of_the_day"))
+                fixes += _fx_syn
+        _neuf, _fx_prose = _sanit(payload)
+        _remplacer_sur_place(payload, _neuf)
+        fixes += _fx_prose
+        _neuf, _fx_dec = _dg.fix_broken_decimals(payload)
+        _remplacer_sur_place(payload, _neuf)
+        fixes += _fx_dec
+        # v33 (audit zero-trust 01/10) — aucune phrase ne prescrit un geste que
+        # le moteur (renfort) ou le radar (allègement) n'a pas décidé.
+        from src.analytics.prose_guard import strip_unbacked_gestures
+        _allowed_m = _dg.deterministic_gestures(
+            {"thesis_of_the_day": payload.get("thesis_of_the_day"),
+             "exit_signals": data.get("exit_signals")})
+        _univ_m = ({str(r.get("asset") or "").upper()
+                    for r in (data.get("all_positions_summary") or [])
+                    if isinstance(r, dict)} | set(_allowed_m)) - {""}
+        # Audit 02/10 — plausibilité des prix cités dans la prose.
+        _ath_m = {str(e.get("asset") or "").upper(): _parse_num(e.get("ath"))
+                  for e in (data.get("eligible_theses") or []) if isinstance(e, dict)}
+        _prix_m = {str(r.get("asset") or "").upper():
+                   (_parse_num(r.get("price")), _ath_m.get(str(r.get("asset") or "").upper()))
+                   for r in (data.get("all_positions_summary") or [])
+                   if isinstance(r, dict) and r.get("asset")}
+        for _kg in _PROSE_KEYS:
+            # Les thèses portent des champs STRUCTURÉS (« action »:
+            # « RENFORCER ») qu'une garde de prose viderait : seuls leurs
+            # champs narratifs sont filtrés, plus bas.
+            if _kg == "thesis_of_the_day" or payload.get(_kg) is None:
+                continue
+            payload[_kg], _fx_g = strip_unbacked_gestures(
+                payload[_kg], _allowed_m, _univ_m, _prix_m)
+            fixes += _fx_g
+        for _t_g in (payload.get("thesis_of_the_day") or []):
+            if not isinstance(_t_g, dict):
+                continue
+            for _kn in ("observation", "counter_thesis", "self_critique",
+                        "reasoning_signals", "watch_trigger", "price_line",
+                        "signals_summary"):
+                if _t_g.get(_kn) is not None:
+                    _t_g[_kn], _fx_g = strip_unbacked_gestures(
+                        _t_g[_kn], _allowed_m, _univ_m, _prix_m)
+                    fixes += _fx_g
+    except Exception as _pgexc:  # noqa: BLE001 - jamais bloquant
+        logger.info("Assainissement de la prose ignoré : %s", _pgexc)
     if fixes:
         logger.info("Gardes matin v30 : %d correction(s) — %s",
                     len(fixes), " | ".join(fixes[:8]))
@@ -4457,10 +5023,15 @@ def run_morning() -> int:
     data["macro_guardrail"] = _compute_macro_guardrail(data.get("macro_context") or {})
     evening_state = mem.load_evening_report()
     engine = DecisionEngine()
+    # v33 — le modèle reçoit la décision du moteur sous forme COMPACTE (actif,
+    # verdict, motif) : le bloc complet pesait 190 Ko sur 372 Ko de données
+    # (mesuré le 01/10), pour des détails internes qu'il n'a pas à relire.
+    _data_llm = {**data, "opportunity": _opportunity_brief(data.get("opportunity"))}
     payload = engine.generate_morning(
-        timestamp=_now_str(), data=data, portfolio_data=portfolio_data,
+        timestamp=_now_str(), data=_data_llm, portfolio_data=portfolio_data,
         evening_state=evening_state,
     )
+    payload = _restreindre_au_schema(payload, "morning")
     # FUSION : on écrase les champs factuels avec les valeurs Python.
     payload = _merge_python_facts(payload, data, _now_str())
     checked = check_report(payload, _confidence_caps_from_data(data))
@@ -4483,30 +5054,7 @@ def run_morning() -> int:
     # v17 (T-TAO / M-A1) : résumé des postures FERMES du matin (1/actif), pour que
     # le soir et le weekly se réconcilient au lieu de se contredire (matin
     # RENFORCER TAO / soir ALLÉGER / weekly SORTIE). Direction nette par actif.
-    _firm_postures: dict[str, dict[str, Any]] = {}
-    for _th in (payload.get("thesis_of_the_day") or []):
-        if not isinstance(_th, dict):
-            continue
-        _a = _th.get("asset")
-        _act = (_th.get("action") or "").upper()
-        if not _a or _a in _firm_postures:
-            continue
-        if any(k in _act for k in ("RENFORC", "ALLÉG", "ALLEG")):
-            _ap = _th.get("action_plan") if isinstance(_th.get("action_plan"), dict) else {}
-            # v30 (#26) — la cible du bilan soir = la MÊME « Cible 30j » que la
-            # table des thèses du matin (targets.short_term_30d). Le 14/07, le
-            # soir affichait le TP1 (TAO 210,74 $) quand le matin montrait
-            # 215,06 $ : la « cible » d'une même reco changeait dans la journée.
-            _tgt30 = (_parse_num((_th.get("targets") or {}).get("short_term_30d"))
-                      if isinstance(_th.get("targets"), dict) else None)
-            _firm_postures[_a] = {
-                "action": "RENFORCER" if "RENFORC" in _act else "ALLÉGER",
-                "entry": _ap.get("entry"),
-                "stop_loss": _ap.get("stop_loss"),
-                "target": _tgt30 or _first_take_profit(_ap),
-                "confidence": _coerce_confidence(_th.get("confidence")),
-            }
-    payload["firm_postures"] = _firm_postures
+    payload["firm_postures"] = _postures_fermes(payload)
     # v18.1 — persiste les 17 signaux croisés déterministes dans le payload, pour
     # qu'ils soient disponibles au bot Telegram (contexte complet) et à la
     # relecture. Sans nuisance pour le rendu mail (clé ignorée par le template).
@@ -4670,6 +5218,41 @@ def _filter_equity_catalysts_when_closed(
     return kept
 
 
+
+def _postures_fermes(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Postures FERMES du matin (1/actif) relues par le soir et l'hebdo."""
+    _firm_postures: dict[str, dict[str, Any]] = {}
+    for _th in (payload.get("thesis_of_the_day") or []):
+        if not isinstance(_th, dict):
+            continue
+        _a = _th.get("asset")
+        _act = (_th.get("action") or "").upper()
+        if not _a or _a in _firm_postures:
+            continue
+        if any(k in _act for k in ("RENFORC", "ALLÉG", "ALLEG")):
+            _ap = _th.get("action_plan") if isinstance(_th.get("action_plan"), dict) else {}
+            # v30 (#26) — la cible du bilan soir = la MÊME « Cible 30j » que la
+            # table des thèses du matin (targets.short_term_30d). Le 14/07, le
+            # soir affichait le TP1 (TAO 210,74 $) quand le matin montrait
+            # 215,06 $ : la « cible » d'une même reco changeait dans la journée.
+            _tgt30 = (_parse_num((_th.get("targets") or {}).get("short_term_30d"))
+                      if isinstance(_th.get("targets"), dict) else None)
+            # v33 (audit 01/10, chaîne matin→soir rejouée) — une décision du
+            # moteur n'a pas de « cible 30j » : sa cible est la BARRE de succès
+            # (le cours au rendement requis), la même que le suivi du matin.
+            # Sans elle, le bilan du soir affichait « Cible — » sur BTC.
+            _ev_fp = _th.get("engine_view") if isinstance(_th.get("engine_view"), dict) else {}
+            if _ev_fp.get("required_price") is not None:
+                _tgt30 = _parse_num(_ev_fp.get("required_price"))
+            _firm_postures[_a] = {
+                "action": "RENFORCER" if "RENFORC" in _act else "ALLÉGER",
+                "entry": _ap.get("entry"),
+                "stop_loss": _ap.get("stop_loss"),
+                "target": _tgt30 or _first_take_profit(_ap),
+                "confidence": _coerce_confidence(_th.get("confidence")),
+            }
+    return _firm_postures
+
 def _reco_bilan_status(
     action: str, entry: Optional[float], cur: Optional[float], sl: Optional[float]
 ) -> tuple[str, str]:
@@ -4772,19 +5355,28 @@ def _build_evening_reco_bilan(
     #    des recos OUVERTES (TAO −6,5% le 13/07, à la veille de son
     #    invalidation). Le bilan du soir couvre désormais TOUTES les positions
     #    suivies : repli sur le state (entrée/stop/cible 30j persistés).
-    if not out:
-        try:
-            from src.tracking.prediction_scoring import latest_open_reco_by_asset
-            for _asset, _r in latest_open_reco_by_asset(
-                    mem.load_active_recommendations()).items():
-                if _asset in seen:
-                    continue
-                seen.add(_asset)
-                _emit(_asset, (_r.get("action") or "").upper(),
-                      _r.get("entry_price"), _r.get("stop_loss"),
-                      _r.get("ct_target"), _r.get("confidence"))
-        except Exception as _fb_exc:  # noqa: BLE001 — filet best-effort
-            logger.info("Filet recos ouvertes du bilan soir ignoré : %s", _fb_exc)
+    # v32 (2.9) — TOUJOURS, plus seulement en repli. Arbitrage d'Omar
+    # (25/08/2026).
+    #
+    # Ce filet ne se déclenchait que si le matin n'avait RIEN émis. Le 24/08 au
+    # soir, le tableau ne montrait donc qu'INJ (émise le matin même) pendant que
+    # le même mail recommandait d'alléger TAO et signalait RSR « très proche de
+    # son stop » — deux lignes actionnées, aucune chiffrée dans le tableau. Le
+    # bilan du soir couvre désormais TOUTES les recos ouvertes ; la déduplication
+    # par ``seen`` garantit qu'une reco du matin n'apparaît pas deux fois.
+    try:
+        from src.tracking.prediction_scoring import latest_open_reco_by_asset
+        for _asset, _r in latest_open_reco_by_asset(
+                mem.load_active_recommendations()).items():
+            if _asset in seen:
+                continue
+            seen.add(_asset)
+            _emit(_asset, (_r.get("action") or "").upper(),
+                  _r.get("entry_price"), _r.get("stop_loss"),
+                  _r.get("ct_target") or _r.get("target_price"),
+                  _r.get("confidence"))
+    except Exception as _fb_exc:  # noqa: BLE001 — filet best-effort
+        logger.info("Recos ouvertes du bilan soir ignorées : %s", _fb_exc)
     return out
 
 
@@ -4897,6 +5489,13 @@ def _fmt_usd_short(v: Any) -> Optional[str]:
 def _pct_fr_signed(v: float, nd: int = 1) -> str:
     """« +1,2% » / « −0,3% » — signe typographique + virgule décimale."""
     return f"{'+' if v >= 0 else '−'}{abs(round(v, nd))}%".replace(".", ",")
+
+
+def _pct_fr(v: float, nd: int = 1) -> str:
+    """« 14,2% » / « 5% » — virgule décimale, zéro final retiré."""
+    r = round(float(v), nd)
+    txt = f"{r:.{nd}f}".rstrip("0").rstrip(".") if nd else f"{r:.0f}"
+    return txt.replace(".", ",") + "%"
 
 
 def _build_since_morning_facts(
@@ -5222,7 +5821,8 @@ def run_evening() -> int:
         delta_morning = 0.0  # baseline périmée/absente → pas de faux delta intraday
     morning_time_label = None  # ex. "08h32" — heure réelle du matin (Casablanca)
     since_morning_label = None  # ex. "il y a 11h" / "il y a 23min"
-    hours_since_morning = max(1, round(now_local.hour + now_local.minute / 60 - 8.5))
+    hours_since_morning = max(1, round(
+        (now_local - _slot_local("morning", now_local)).total_seconds() / 3600))
     if morning_saved_at:
         try:
             _ms = datetime.fromisoformat(str(morning_saved_at).replace("Z", "+00:00"))
@@ -5307,7 +5907,18 @@ def run_evening() -> int:
                 "value_usd": round(pos_val, 2),
             }
         )
-    movers.sort(key=lambda m: abs(m["change"]), reverse=True)
+    # v32 (2.4) - CLASSEMENT PAR IMPACT EN DOLLARS, pas par pourcentage.
+    # Le commentaire ci-dessus énonce exactement le bon critère — « le %
+    # seul masque l'impact réel » — puis le tri l'ignorait. Résultat mesuré
+    # le 24/08 au soir : « TOP MOUVEMENTS » listait INJ +9,2 % (+5 $),
+    # ATOM -4,3 % (-1 $), STX -4,1 % (-2 $), ARB -4,1 % (<1 $), RSR -3,9 %
+    # (-2 $) — cinq lignes pesant 11 $ au total — pendant que BTC, 42,7 % du
+    # portefeuille, bougeait de +2,0 % (soit ~+28 $) sans jamais apparaître.
+    # Le lecteur voyait le bruit et pas le signal. On trie donc sur le P&L en
+    # dollars, déjà calculé juste au-dessus, et on départage à égalité par le
+    # pourcentage.
+    movers.sort(key=lambda m: (abs(m["pnl_usd"]), abs(m["change"])),
+                reverse=True)
     movers = movers[:5]
     _day_pct = (round(delta_morning / morning_snap["value_usd"] * 100, 2)
                 if morning_snap.get("value_usd") else None)
@@ -5375,6 +5986,11 @@ def run_evening() -> int:
         "brent_delta": ev_macro_ctx.get("brent_delta"),
         "dxy": ev_macro_ctx.get("dxy"),
         "dxy_broad": ev_macro_ctx.get("dxy_broad"),
+        "dxy_broad_as_of": ev_macro_ctx.get("dxy_broad_as_of"),
+        # v32 (5.17) - meme etiquette de fraicheur que le matin : le soir
+        # affichait la MEME valeur, tout aussi peu datee.
+        "dxy_broad_freshness": _fraicheur_si_perimee(
+            ev_macro_ctx.get("dxy_broad_as_of")),
         "dxy_ice": ev_macro_ctx.get("dxy_ice"),
         "dxy_delta": ev_macro_ctx.get("dxy_delta"),
         # v14.1 — international (contexte IA UNIQUEMENT : la structure 8 blocs
@@ -5483,6 +6099,7 @@ def run_evening() -> int:
     payload = engine.generate_evening(
         timestamp=_now_str(), data=data, morning_state=morning_state,
     )
+    payload = _restreindre_au_schema(payload, "evening")
     checked = check_report(payload, _confidence_caps_from_data(data))
     payload = checked["sanitized_payload"]
     # v29 (EA1) — le tag « actionnable » est réservé aux news factuelles :
@@ -5504,6 +6121,40 @@ def run_evening() -> int:
                 _at_v30, mem.load_active_recommendations())
             payload["actions_tonight"] = _at_new
             _ea1_fixes += _at_fixes
+        # v33 (audit zero-trust 01/10) — un geste du modèle n'est conservé que
+        # s'il est porté par une décision déterministe du jour (moteur pour un
+        # renfort, radar de sortie pour un allègement).
+        _allowed_ev = _dg_ev.deterministic_gestures(
+            morning_state if morning_is_today else {},
+            mem.load_active_recommendations())
+        _at_v33, _at_fx33 = _dg_ev.restrict_llm_gestures(
+            payload.get("actions_tonight"), _allowed_ev,
+            {s.upper() for s in symbols} | set(_allowed_ev))
+        payload["actions_tonight"] = _at_v33
+        _ea1_fixes += _at_fx33
+        from src.analytics.prose_guard import strip_unbacked_gestures as _sug_ev
+        _univ_ev = {s.upper() for s in symbols} | set(_allowed_ev)
+        # Audit 02/10 — plausibilité des prix cités dans la prose.
+        _prix_ev = {s.upper(): (_parse_num((market.get(s) or {}).get("price")),
+                                _parse_num((market.get(s) or {}).get("ath")))
+                    for s in symbols}
+        for _kg_ev in ("delta_summary", "market_changes", "news_today",
+                       "tomorrow_checklist", "blind_spots", "intraday_news",
+                       # audit 02/10 — justification d'une action conservée
+                       "actions_tonight"):
+            if payload.get(_kg_ev) is not None:
+                payload[_kg_ev], _fx_g_ev = _sug_ev(
+                    payload[_kg_ev], _allowed_ev, _univ_ev, _prix_ev)
+                _ea1_fixes += _fx_g_ev
+        # Niveaux du soir : la CONSIGNE non portée est retirée, le niveau
+        # (information mesurée) reste.
+        for _lv in (payload.get("levels_tonight") or []):
+            if isinstance(_lv, dict) and isinstance(_lv.get("trigger"), str):
+                _lv["trigger"], _fx_g_ev = _sug_ev(_lv["trigger"], _allowed_ev,
+                                                   _univ_ev, _prix_ev)
+                _ea1_fixes += _fx_g_ev
+                if not _lv["trigger"]:
+                    _lv.pop("trigger", None)
         # v30 (#29) — seuil DXY unique par rapport (checklist vs niveaux),
         # ancre canonique PARTAGÉE entre les sections du soir.
         _dxy_state_ev: dict[str, Any] = {"canon": None, "canon_txt": None}
@@ -5537,6 +6188,41 @@ def run_evening() -> int:
                              _dg_ev.round_micro_prices):
                     payload[_pk_dec], _g_fx = _gfn(payload[_pk_dec])
                     _ea1_fixes += _g_fx
+        # ── v32 (5.7) — PASSE UNIQUE D'ASSAINISSEMENT DE LA PROSE, sur la
+        # TOTALITÉ du payload. La boucle ci-dessus ne couvrait que six clés ;
+        # tout le reste de la prose du soir échappait à la réparation des
+        # décimales, aux flèches ASCII et aux identifiants internes — d'ou
+        # « · since_morning_facts » cite trois fois comme une SOURCE dans le
+        # mail du 24/08.
+        try:
+            from src.analytics.prose_guard import (
+                flag_unsourced_etf_figures as _etf_flag,
+                sanitize_llm_prose as _sanit,
+            )
+            # v32 (5.8) - un chiffre ETF cité alors que Farside/CoinGlass sont KO porte
+            # désormais sa provenance. Le 21/08, « soutenu par +103,3 M$ d'entrées
+            # nettes d'ETF » ouvrait le mail pendant que son pied listait
+            # « Indisponibles · ETF flows » et que l'auto-critique reconnaissait
+            # l'indisponibilité de Farside et CoinGlass.
+            _neuf, _fx_etf = _etf_flag(
+                payload, bool((data.get("etf_flows") or {}).get("available")))
+            _remplacer_sur_place(payload, _neuf)
+            _ea1_fixes += _fx_etf
+            _neuf, _fx_prose = _sanit(payload)
+            _remplacer_sur_place(payload, _neuf)
+            _ea1_fixes += _fx_prose
+            _neuf, _fx_dec = _dg_ev.fix_broken_decimals(payload)
+            _remplacer_sur_place(payload, _neuf)
+            _ea1_fixes += _fx_dec
+            # v32 (2.6) - meme normalisation d'horaire le soir : c'est la que
+            # « 18h48 UTC » a été publié, dans un mail en heure de Casablanca.
+            from src.analytics.prose_guard import normalize_news_times as _nh_ev
+            for _kn_ev in ("news_today", "intraday_news"):
+                if payload.get(_kn_ev) is not None:
+                    _, _fx_h_ev = _nh_ev(payload[_kn_ev], TZ)
+                    _ea1_fixes += _fx_h_ev
+        except Exception as _pgexc:  # noqa: BLE001 - jamais bloquant
+            logger.info("Assainissement de la prose ignoré : %s", _pgexc)
         if _ea1_fixes:
             logger.info("Gardes soir v30 : %d correction(s) — %s",
                         len(_ea1_fixes), " | ".join(_ea1_fixes[:6]))
@@ -5661,6 +6347,33 @@ def run_evening() -> int:
     # BLOC 6 (v14) : bilan recos du dernier matin, calculé Python (1 ligne/actif,
     # zéro doublon). Remplace l'ancienne section reco_evolution (buguée/dupliquée).
     payload["reco_bilan"] = _build_evening_reco_bilan(morning_state, market)
+
+    # ── v32 (2.8) — SOURCES TOMBÉES : une ligne, et SEULEMENT si besoin.
+    # Arbitrage d'Omar (25/08/2026).
+    #
+    # Le matin et l'hebdo affichent « X / N sources actives » et la liste des
+    # indisponibles ; le soir n'affichait rien. Une source qui tombe entre 8 h
+    # et 20 h était donc invisible jusqu'au lendemain matin. On garde le mail
+    # du soir court en régime nominal : la ligne n'apparaît QUE lorsqu'une
+    # source du périmètre a réellement échoué sur CE run.
+    try:
+        _src_ev = _active_sources(
+            market=market, fng=fng, macro=macro, polymarket=polymarket,
+            etf=etf, news=bool(news_global), crypto_rss=rss_evening,
+        )
+        _down_ev = [s for s in _ALL_SOURCES_LIST if s not in set(_src_ev)]
+        # On ne signale QUE les sources réellement interrogées ce soir : le
+        # run du soir est volontairement plus léger que celui du matin, et
+        # lister ses non-collectes comme des pannes serait mensonger.
+        _interrogees = {
+            _SOURCE_LABELS[k] for k in
+            ("market", "fng", "macro", "polymarket", "etf", "news", "crypto_rss")
+        }
+        _down_ev = [s for s in _down_ev if s in _interrogees]
+        if _down_ev:
+            payload.setdefault("footer", {})["sources_down"] = _down_ev
+    except Exception as _sdexc:  # noqa: BLE001 — jamais bloquant
+        logger.info("Bilan des sources du soir ignoré : %s", _sdexc)
     # v16 — la mini-heatmap soir est SUPPRIMÉE (doublon avec « Top mouvements »).
     # v15 — Polymarket factuel pour le rendu soir (barres Fed si dispo).
     # v16.1 — déclenche aussi si seuls des extra_markets existent (cap 4).
@@ -5732,7 +6445,7 @@ def run_evening() -> int:
                 if _same_comp and abs(_e_score - _m_score) <= 0.3:
                     # v30 (#32) — « inchangée » nuancé quand des actions
                     # tactiques sont proposées plus bas dans le même mail.
-                    _suffix_r = (" (actions tactiques proposées plus bas)"
+                    _suffix_r = (" — voir « Actions à poser ce soir »."
                                  if payload.get("actions_tonight") else ".")
                     payload["risk_unchanged_since_morning"] = {
                         "active": True,
@@ -5770,7 +6483,7 @@ def run_evening() -> int:
         if (isinstance(_mh_score, (int, float)) and isinstance(_eh_score, (int, float))
                 and abs(_eh_score - _mh_score) <= 0.3):
             # v30 (#32) — même nuance que le bloc risque ci-dessus.
-            _suffix_h = (" (actions tactiques proposées plus bas)"
+            _suffix_h = (" — voir « Actions à poser ce soir »."
                          if payload.get("actions_tonight") else ".")
             payload["health_unchanged_since_morning"] = {
                 "active": True,
@@ -5861,7 +6574,8 @@ def _build_calls_review(
     la valeur STOCKÉE au hebdo précédent la contredit (> 3 pts — le 07/07 :
     24 stocké vs 15 en série), la série gagne. Une seule vérité par mail.
     """
-    if not isinstance(prev_calls, dict) or not prev_calls.get("dominant_scenario"):
+    if not isinstance(prev_calls, dict) or not (
+            prev_calls.get("dominant_scenario") or prev_calls.get("btc_price")):
         return None
     bits: list[str] = []
     _prev_btc = _parse_num(prev_calls.get("btc_price"))
@@ -5887,7 +6601,6 @@ def _build_calls_review(
     if _prev_fg is not None and _now_fg is not None:
         bits.append(f"F&G {int(_prev_fg)} → {int(_now_fg)}")
     _scn = prev_calls.get("dominant_scenario")
-    _pct = prev_calls.get("dominant_pct")
     # Verdict qualitatif : le scénario dominant annoncé s'est-il matérialisé ?
     verdict = None
     if _prev_btc and _now_btc and _scn:
@@ -5899,9 +6612,14 @@ def _build_calls_review(
             verdict = "conforme" if _mv > 2 else ("partiel" if _mv >= -2 else "démenti")
         else:  # range/neutre
             verdict = "conforme" if abs(_mv) <= 5 else "démenti"
-    header_line = (f"Scénario dominant annoncé : {_scn}"
-                   + (f" ({_pct}%)" if _pct else "")
-                   + (f" — {verdict}" if verdict else ""))
+    # v33 — un appel archivé AVANT le 01/10 portait un scénario « dominant »
+    # choisi sur une probabilité inventée : on rappelle le scénario, jamais
+    # sa probabilité. Les appels suivants n'en portent plus.
+    # Audit 02/10 — seul un hebdo V30 a pu archiver un scénario « dominant » :
+    # il est étiqueté comme tel (même règle que les recos V30 héritées).
+    header_line = ((f"Scénario dominant annoncé (hebdo V30) : {_scn}"
+                    + (f" — {verdict}" if verdict else ""))
+                   if _scn else "Semaine précédente")
     return {
         "available": True,
         "prev_week_label": prev_calls.get("week_label"),
@@ -5915,9 +6633,16 @@ def _build_positions_review(
     long_term: Any, scoring_detail: Any,
     portfolio: dict[str, Any], market: dict[str, Any],
     ath_facts: Optional[dict[str, Any]] = None,
-    asset_plans: Optional[dict[str, Any]] = None,
+    vols: Optional[dict[str, float]] = None,
+    radar_syms: Optional[set[str]] = None,
 ) -> list[dict[str, Any]]:
     """v23.x — FUSION (1 ligne/actif) des 2 anciens tableaux du weekly.
+
+    v33 (audit zero-trust 01/10) — l'ACTION de chaque ligne est déterministe
+    (renforcer = décision active du moteur ; alléger = règle de prise de profit
+    du radar ; sinon garder) et la cible long terme est la FOURCHETTE 12 MOIS
+    à volatilité mesurée — plus de reconquête d'ATH (Fibonacci 0,618 → ATH),
+    plus de repli sur une cible écrite par le modèle de langage.
 
     Joint le positionnement LONG TERME (LLM : analyse, cible, phase de cycle,
     action) avec la performance de la reco à 30j (Python : reco, Δ, statut) et
@@ -5941,7 +6666,11 @@ def _build_positions_review(
     for d in (scoring_detail or []):
         if isinstance(d, dict) and d.get("asset"):
             a = str(d["asset"]).upper()
-            if a not in h30_by:
+            # v33 (audit 02/10) — une décision du MOTEUR prime sur une reco
+            # V30 héritée du même actif (sinon la ligne héritée, triée avant
+            # car clôturée, cachait la décision en cours).
+            if a not in h30_by or (d.get("engine")
+                                   and not h30_by[a].get("engine")):
                 h30_by[a] = d
     for a in h30_by:               # recos fermes sans thèse LT → ajoutées en fin
         if a not in lt_by:
@@ -5961,13 +6690,15 @@ def _build_positions_review(
         if isinstance(d, dict):
             h30 = {"reco": d.get("reco"),
                    "delta_pct": d.get("delta_pct"),
-                   "status": d.get("status")}
+                   "status": d.get("status"),
+                   # v33 — reco V30 héritée (décidée par le modèle) : suivie
+                   # jusqu'à son terme, étiquetée, sans dicter l'action du jour.
+                   "legacy": not d.get("engine")}
 
         # ── v26 (W-A4/B6) — FALLBACKS Python : un actif sous reco active sans
         # thèse LT (RSR au v25) n'affiche plus « — / cible à définir / — ».
         _fact = (ath_facts or {}).get(a) or {}
         _from_ath = _parse_num(_fact.get("from_ath_pct"))
-        _ath_real = _parse_num(_fact.get("ath"))
         _ath_suspect = _wg_pr.ath_is_suspect(_from_ath)
         lt_status = lt.get("status")
         if not lt_status and _from_ath is not None and not _ath_suspect:
@@ -5977,67 +6708,41 @@ def _build_positions_review(
             lt_status = ("capitulation" if _dd > 75
                          else "accumulation" if _dd >= 50 else "expansion")
 
-        # ── v26 (W-A7/B6) — COHÉRENCE action ↔ reco 30j ACTIVE : la reco
-        # d'achat en cours PRIME (fini le « RENFORCER +1.8% » à côté d'une
-        # action « Garder » sur la même ligne).
-        action = lt.get("action")
+        # ── v33 — ACTION DÉTERMINISTE. Le modèle de langage proposait garder /
+        # renforcer / alléger / sortir par ligne ; ses « sortir » étaient même
+        # réinjectés dans la watchlist comme « sortie recommandée ». Or il ne
+        # décide ni RENFORCER ni ALLÉGER.
         _reco30 = str((d or {}).get("reco") or "").upper()
         _status30 = str((d or {}).get("status") or "")
-        _reco_active = _status30 in ("in_progress", "validated")
-        if _reco_active and _reco30.startswith(("RENFORCER", "BUY", "ACCUMULER")):
-            if str(action or "").lower() not in ("renforcer",):
-                action = "renforcer"
-        elif _reco_active and _reco30.startswith(("ALLÉGER", "ALLEGER", "SELL", "SORTIR")):
-            if str(action or "").lower() in ("renforcer", "", "none"):
-                action = "alléger"
-        elif not action:
-            action = "garder" if (h30 or lt) else None
+        # Audit 02/10 — seule une décision du MOTEUR en cours dit « renforcer »,
+        # seul le radar (paliers satellites) dit « alléger ». Une reco V30
+        # héritée (décidée par le modèle, ex. INJ/RENDER RENFORCER, RSR ALLÉGER)
+        # garde son suivi dans la colonne 30 j, mais ne dicte plus l'action.
+        if (_status30 == "in_progress" and _reco30.startswith("RENFORC")
+                and (d or {}).get("engine")):
+            action = "renforcer"
+        elif a in (radar_syms or set()):
+            action = "alléger"
+        else:
+            action = "garder"
 
         # ── v28 (W-A11) — CIBLE LT = SOURCE UNIQUE cross-mail : la fourchette
         # déterministe asset_plan.target_cycle (fib 0.618 → ATH réel), la MÊME
         # que les fiches du matin. Le 07/07, l'hebdo (LLM) disait ETH 3 500 $
         # quand le matin affichait 3 736–4 946 $. La cible LLM ne sert plus que
         # de repli quand aucun plan n'est calculable (série de prix absente).
+        # ── v33 — fourchette 12 mois (P10–P90, dérive nulle, volatilité
+        # mesurée) : la même méthode que le matin. Sans volatilité mesurée,
+        # rien n'est publié — jamais de repli sur une cible du modèle.
+        from src.analytics.forecast import distribution as _dist_w
+        _fc_w = _dist_w(price, (vols or {}).get(a), 365)
         target = None
-        target_low = target_high = None
+        target_low = _fc_w["p10"] if _fc_w else None
+        target_high = _fc_w["p90"] if _fc_w else None
         target_pct = None
-        target_kind = None
-        _plan_a = (asset_plans or {}).get(a) or {}
-        _cyc_a = _plan_a.get("target_cycle")
-        if isinstance(_cyc_a, dict) and _parse_num(_cyc_a.get("high")):
-            target_low = _parse_num(_cyc_a.get("low"))
-            target_high = _parse_num(_cyc_a.get("high"))
-            target_pct = _parse_num(_cyc_a.get("upside_pct"))
-            target_kind = _cyc_a.get("kind") or "cycle"
-            # v30 (#39/#69) — CIBLES CYCLE PLAFONNÉES : « RSR +9462% »,
-            # « ANKR +5928% » (retour mécanique à l'ATH ×10-×95) ancrent des
-            # attentes fantaisistes. Au-delà de +300% de « upside » vers la
-            # borne haute : on ne retient que la borne PRUDENTE (fib 0,618) ;
-            # si même elle dépasse +300%, la cible est masquée honnêtement.
-            _pct_low_cap = (round((target_low - price) / price * 100)
-                            if target_low and price and price > 0 else None)
-            if target_pct is not None and target_pct > 300:
-                if _pct_low_cap is not None and _pct_low_cap <= 300:
-                    target = target_low
-                    target_low = target_high = None
-                    target_pct = _pct_low_cap
-                    target_kind = "cycle · borne prudente (fib 0,618 — ATH non retenu)"
-                else:
-                    target = target_low = target_high = None
-                    target_pct = None
-                    target_kind = None
-        else:
-            # ── v26 (W-A16/B5) — repli LLM : cible crédible, jamais > ATH réel,
-            # et une cible ≥ +250% est étiquetée « cycle » (reconquête ATH).
-            target = _parse_num(lt.get("target_price"))
-            if _ath_suspect:
-                target = None
-            elif target and _ath_real and target > _ath_real * 1.05:
-                target = _ath_real
-            target_pct = (round((target - price) / price * 100)
-                          if target and price and price > 0 else None)
-            if target_pct is not None:
-                target_kind = "cycle" if target_pct >= 250 else "6-12m"
+        target_kind = "fourchette" if _fc_w else None
+        _lt_reason = (None if _fc_w else
+                      "volatilité non mesurée — pas de fourchette publiée")
 
         out.append({
             "asset": a,
@@ -6051,6 +6756,7 @@ def _build_positions_review(
             "lt_target_high": target_high,
             "lt_target_pct": target_pct,
             "lt_target_kind": target_kind,
+            "lt_target_reason": _lt_reason,   # v32 (3.4)
             "analysis": (lt.get("analysis") or lt.get("thesis_short")
                          or lt.get("thesis")),
             "action": action,
@@ -6108,9 +6814,10 @@ def run_weekly() -> int:
         if _breaches_w and (not lesson or "aucune" in lesson.lower()
                             or "discipline" in lesson.lower()):
             _b0 = _breaches_w[0]
-            lesson = (f"{_b0.get('asset')} : {_b0.get('condition')} — "
-                      "statuer plutôt que laisser dériver ; pas de "
-                      "re-renforcement automatique sous un stop cassé.")
+            # v33 — l'implication du tracker (information, dans le sens de
+            # la reco) remplace « statuer plutôt que laisser dériver » ; la
+            # condition porte déjà l'actif (« RSR : RSR : … » auparavant).
+            lesson = f"{_b0.get('condition')} — {_b0.get('implication')}."
     except Exception as _les_exc:  # noqa: BLE001
         logger.info("Leçon invalidations ignorée : %s", _les_exc)
     # v15 (audit weekly P0) — tableau de scoring 100% Python, dédupliqué,
@@ -6150,13 +6857,11 @@ def run_weekly() -> int:
                 # de l'exit plan à tort. Source de vérité unique cœur/satellite.
                 "conviction": _is_core_asset(s, portfolio.get(s) or {}),
                 "active_reco": False,
-                # v29 (WA10) — règle de sortie CALCULÉE (le 10/07, l'IA
-                # recommandait de « liquider immédiatement » SXT tout en notant
-                # que les frais dépasseraient sa valeur) : sous ~2 $, vendre
-                # coûte plus que ça ne rapporte → abandon assumé de la ligne.
-                "suggested_handling": (
-                    "abandonner (frais > valeur résiduelle — ne pas vendre)"
-                    if _pv < 2.0 else "vendre sur rebond technique (+20-30%)"),
+                # v29 (WA10) — sous ~2 $, vendre coûte plus que la ligne ne
+                # vaut. Audit 02/10 (décision d'Omar : liste INFORMATIVE) — un
+                # fait, plus une règle de sortie (« vendre sur rebond +20-30 % »
+                # était une vente décidée hors des règles de prise de profit).
+                "frais_de_vente_superieurs_a_la_valeur": _pv < 2.0,
             })
 
     # V6 : corrélation entre positions principales (>$5) pour les clusters de
@@ -6270,7 +6975,7 @@ def run_weekly() -> int:
         # ICE (~99-105) : les deux sont affichés côte à côte dans les repères.
         _dxy_broad_w = _cur_macro_w.get("dxy")
         # #2 DVOL (move implicite) + #14 dérivés (funding) pour le weekly.
-        _options_w = deribit.get_options_metrics()
+        _options_w = deribit.get_options_metrics(_spots_options(market))
         _btc_dvol_w = (
             ((_options_w.get("assets") or {}).get("BTC") or {}).get("dvol")
             if isinstance(_options_w, dict) else None
@@ -6683,8 +7388,16 @@ def run_weekly() -> int:
     data["active_sources_count"] = _wk_active_pre
     engine = DecisionEngine()
     payload = engine.generate_weekly(timestamp=_now_str(), data=data, week_state=week_state)
+    payload = _restreindre_au_schema(payload, "weekly")
     checked = check_report(payload, _confidence_caps_from_data(data))
     payload = checked["sanitized_payload"]
+    # v33 (audit zero-trust 01/10) — AUCUNE PROBABILITÉ INVENTÉE. Les
+    # probabilités des trois scénarios venaient d'un « prior » heuristique
+    # (neutre = 0,55 − 0,35·dispersion) recopié et ajusté par le modèle : des
+    # nombres non calibrés, affichés comme des probabilités. Les scénarios
+    # restent — CONDITIONNELS (déclencheurs, niveaux) —, sans chiffre de
+    # vraisemblance.
+    _retirer_probabilites_scenarios(payload)
     # v29 (WB5) — préambule + ligne de bascule des scénarios (déterministe).
     if _scenarios_context:
         payload["scenarios_context"] = _scenarios_context
@@ -6862,15 +7575,21 @@ def run_weekly() -> int:
         f"{_now_h.day} {_MOIS_FR[_now_h.month - 1]} – "
         f"{_wk_fwd_end.day} {_MOIS_FR[_wk_fwd_end.month - 1]}"
     )
-    header.setdefault("time_casablanca", _fr_date(_now_h))
-    header.setdefault("date", _fr_date(_now_h, with_time=False))
+    # Audit 02/10 — date et heure sont des FAITS, posés par Python comme au
+    # matin (A3) et au soir : ``setdefault`` gardait ceux du modèle (hebdo
+    # rejoué le 02/10 : « 15:30 Casablanca » d'un payload du 27/09, en tête du
+    # mail et du message Telegram).
+    header["time_casablanca"] = _now_str()
+    header["date"] = _fr_date(_now_h, with_time=False)
     # v26 (W-A15) — RUN HORS-CYCLE signalé : le v25 est parti un JEUDI 20h42
     # en construisant une « semaine à venir » comme s'il était dimanche midi,
     # sans le dire. Même honnêteté que le « · fenêtre courte » du soir.
     if _now_h.weekday() != 6:  # weekday(): lundi=0 .. dimanche=6
         header["offcycle_note"] = (
             f"Run hors-cycle ({_JOURS_FR[_now_h.weekday()]}) — l'hebdo est "
-            f"planifié le dimanche 12:00 ; fenêtres 7 j glissantes."
+            f"planifié le dimanche à partir de "
+            f"{_slot_local('weekly', _now_h):%H}h{_slot_local('weekly', _now_h):%M} ; "
+            f"fenêtres 7 j glissantes."
         )
     if win_rate.get("total", 0) == 0 and not scoring_detail:
         # 1re semaine sans historique : message clair
@@ -6927,54 +7646,25 @@ def run_weekly() -> int:
             f"Recos clôturées : {len(_closed)} cette semaine · "
             f"{_closed_30d_wr}/5 sur 30 j (minimum pour calibration)"
         )
-    # v28 (W-A11) — CIBLES LT UNIQUES : plans déterministes par actif (même
-    # moteur que le matin : asset_plan.target_cycle, fib 0.618 → ATH réel) pour
-    # que le tableau positions n'affiche plus une cible LLM divergente
-    # (ETH 3 500 $ hebdo vs 3 736–4 946 $ matin le 07/07). Best-effort : sans
-    # série de prix (positions < 5 $ / API muette), le repli LLM v26 s'applique.
-    _lt_plans_w: dict[str, Any] = {}
-    try:
-        from src.analytics import asset_plan as _aplan_w
-        for _s_lt, _closes_lt in (weekly_price_series or {}).items():
-            if len(_closes_lt or []) < 30:
-                continue
-            _fact_lt = (data.get("ath_by_asset") or {}).get(_s_lt.upper()) or {}
-            _plan_lt = _aplan_w.compute_asset_plan(
-                _s_lt, _closes_lt,
-                price=_parse_num((market.get(_s_lt) or {}).get("price")),
-                ath=_fact_lt.get("ath"),
-                ath_suspect=_wg.ath_is_suspect(
-                    _parse_num(_fact_lt.get("from_ath_pct"))),
-            )
-            if _plan_lt.get("available"):
-                _lt_plans_w[_s_lt.upper()] = _plan_lt
-    except Exception as _exc_lt:  # noqa: BLE001
-        logger.info("Plans LT weekly indisponibles : %s", _exc_lt)
-    # v30 (#57) — CIBLES LT IDENTIQUES cross-mail : l'hebdo réutilise les
-    # bornes cycle DU DERNIER MATIN PUBLIÉ (le 15/07, BTC affichait
-    # 102 552 $ le matin et 102 615 $ l'hebdo — même moteur, prix ayant
-    # bougé d'une heure). La dernière valeur publiée fait foi.
-    try:
-        for _th_m57 in ((mem.load_morning_report() or {})
-                        .get("thesis_of_the_day") or []):
-            if not isinstance(_th_m57, dict):
-                continue
-            _am57 = str(_th_m57.get("asset") or "").upper()
-            _apm57 = (_th_m57.get("asset_plan")
-                      if isinstance(_th_m57.get("asset_plan"), dict) else {})
-            _tcm57 = _apm57.get("target_cycle")
-            if _am57 in _lt_plans_w and isinstance(_tcm57, dict):
-                _lt_plans_w[_am57]["target_cycle"] = _tcm57
-    except Exception as _exc_57:  # noqa: BLE001
-        logger.info("Réutilisation cibles LT du matin ignorée : %s", _exc_57)
+    # v28 (W-A11) / v30 (#57) — plans V30 par actif (cible de cycle « fib
+    # 0,618 → ATH », R:R) : RETIRÉS (audit 02/10). Ils ne servaient plus qu'à
+    # un paramètre ignoré de _build_positions_review et à la garde « excellent
+    # R:R » qui réinjectait le R:R V30 dans la prose (voir plus bas).
 
     # v23.x — TABLEAU UNIFIÉ « Positions · 30j & long terme » : fusion du
     # positionnement LT (LLM) + perf reco 30j (scoring_detail) + prix/PRU/
     # conviction (déterministe). Remplace les 2 anciens tableaux par-actif.
+    from src.analytics.opportunity_adapter import daily_volatility_pct as _dvp_w
+    _vols_w = {str(_s).upper(): _dvp_w(_c)
+               for _s, _c in (weekly_price_series or {}).items()}
+    _radar_w = {str(_sg.get("symbol") or "").upper()
+                for _sg in (((mem.load_morning_report() or {}).get("exit_signals")
+                             or {}).get("signals") or [])
+                if isinstance(_sg, dict)}
     payload["positions_review"] = _build_positions_review(
         payload.get("long_term_positioning"), scoring_detail, portfolio, market,
         ath_facts=data.get("ath_by_asset"),
-        asset_plans=_lt_plans_w,
+        vols=_vols_w, radar_syms=_radar_w,
     )
 
     # ─────────────────────────────────────────────────────────────
@@ -7049,6 +7739,31 @@ def run_weekly() -> int:
         payload["exit_plan"], _fx = _wg.fix_dust_advice(
             payload["exit_plan"], _tiny_dust)
         _wg_fixes += _fx
+    # Audit 02/10 — décision d'Omar : les poussières sont une LISTE
+    # INFORMATIVE. Le tableau est posé par le système (le modèle l'écrivait),
+    # et aucune consigne de vente ne subsiste dans la prose de la section
+    # (« liquidation immédiate sur tout sursaut de +30 % », « exécuter les
+    # ordres de vente sans état d'âme » : des ventes, souvent à perte, hors des
+    # règles de prise de profit). Sans poussière, pas de section.
+    _dust_tbl = sorted(
+        ({"ticker": str(d.get("asset") or "").upper(), "value": d.get("value_usd")}
+         for d in dust if isinstance(d, dict) and not d.get("conviction")),
+        key=lambda r: -(_parse_num(r["value"]) or 0.0))
+    if _dust_tbl:
+        _ep = (payload.get("exit_plan")
+               if isinstance(payload.get("exit_plan"), dict) else {})
+        _ep["dust_table"] = _dust_tbl
+        _ep["subtitle"] = ("Positions de moins de 10 $ — information : un "
+                           "allègement ne vient que de tes règles de prise de "
+                           "profit.")
+        from src.analytics.prose_guard import retirer_consignes_de_vente
+        for _k_ep in ("diagnosis", "monitoring"):
+            if _ep.get(_k_ep) is not None:
+                _ep[_k_ep], _fx = retirer_consignes_de_vente(_ep[_k_ep])
+                _wg_fixes += _fx
+        payload["exit_plan"] = _ep
+    else:
+        payload.pop("exit_plan", None)
     # v30 (#61) — le 15/07, « liquider immédiatement SXT (0,15 $) » vivait
     # dans le PLAN D'ACTION (pas l'exit plan) : même règle, mêmes sections.
     if _tiny_dust:
@@ -7115,30 +7830,15 @@ def run_weekly() -> int:
         if payload.get(_k7) is not None:
             payload[_k7], _fx = _wg.fix_asset_7d_claims(payload[_k7], _real7_w)
             _wg_fixes += _fx
-    # ── v30 (#37) — le plan hebdo consomme le GATE de concentration : pas de
-    # « renforcer BTC +3% » sur un actif au plafond (cœur 20% / satellite 12%).
-    _capped_w: dict[str, float] = {}
-    if current_value:
-        for _s_cap in symbols:
-            _v_cap = _position_value(portfolio[_s_cap], market.get(_s_cap))
-            if not _v_cap:
-                continue
-            _w_cap = _v_cap / current_value * 100.0
-            _is_core_cap = _is_core_asset(_s_cap, portfolio.get(_s_cap) or {})
-            if _w_cap >= (20.0 if _is_core_cap else 12.0):
-                _capped_w[_s_cap.upper()] = round(_w_cap, 1)
-    for _kp in ("weekly_action_plan", "strategy_focus", "watchlist"):
-        if payload.get(_kp) is not None and _capped_w:
-            payload[_kp], _fx = _wg.gate_weekly_plan_reinforce(
-                payload[_kp], _capped_w)
-            _wg_fixes += _fx
-    # ── v30 (#38) — « excellent R:R » vs le R:R réel du plan du jour.
-    _rr_w = {a: (p.get("rr_30d")) for a, p in (_lt_plans_w or {}).items()
-             if isinstance(p, dict)}
-    for _kr in ("weekly_action_plan", "strategy_focus"):
-        if payload.get(_kr) is not None and _rr_w:
-            payload[_kr], _fx = _wg.fix_rr_superlatives(payload[_kr], _rr_w)
-            _wg_fixes += _fx
+    # ── v30 (#37) — porte « plafond de concentration » RETIRÉE (v33, décision
+    # d'Omar 01/10 : « pas de hard cap d'exposition ; les seuils encadrent la
+    # taille du renfort »). Un renfort du plan hebdo n'est plus jugé sur un
+    # plafond de poids, mais sur l'existence d'une décision du moteur
+    # (restrict_llm_gestures, plus bas).
+    # ── v30 (#38) — « excellent R:R » réécrit avec le R:R du plan V30 : RETIRÉ
+    # (audit 02/10). Le R:R n'est plus une variable du système ; une phrase qui
+    # vante un ratio risque/récompense est retirée par la garde de prose
+    # (prose_guard.METRIQUE_V30), plus bas.
     # ── v30 (#60) — la watchlist porte aussi des SORTIES déterministes
     # (recos ALLÉGER actives + poussières condamnées par l'exit plan).
     try:
@@ -7146,13 +7846,13 @@ def run_weekly() -> int:
         for _r_ex in (payload.get("positions_review") or []):
             if not isinstance(_r_ex, dict):
                 continue
-            if str(_r_ex.get("action") or "").lower() in ("alléger", "sortir"):
+            # v33 — « alléger » n'y vient que du radar (règles de prise de
+            # profit) ; « sortir » n'existe plus.
+            if str(_r_ex.get("action") or "").lower() == "alléger":
                 _exit_cands.append({
                     "asset": _r_ex.get("asset"),
                     "trigger": None,
-                    "rationale": ("reco d'allègement active"
-                                  if str(_r_ex.get("action")).lower() == "alléger"
-                                  else "sortie recommandée"),
+                    "rationale": "règle de prise de profit (palier ou pump)",
                 })
         _wl_new, _fx = _wg.append_watchlist_exits(
             payload.get("watchlist"), _exit_cands)
@@ -7161,6 +7861,89 @@ def run_weekly() -> int:
             _wg_fixes += _fx
     except Exception as _wl_exc:  # noqa: BLE001
         logger.info("Sorties watchlist ignorées : %s", _wl_exc)
+    # ── v33 (audit zero-trust 01/10) — AUCUN GESTE DU MODÈLE SANS DÉCISION :
+    # un « renforcer / alléger / sortir » du plan, de la watchlist ou de la
+    # prose n'est conservé que s'il est porté par une décision active du
+    # moteur (renfort) ou par le radar de sortie (prise de profit).
+    try:
+        from src.analytics import daily_guards as _dg_g33
+        from src.analytics.prose_guard import strip_unbacked_gestures as _sug_w
+        _allowed_w = _dg_g33.deterministic_gestures(
+            mem.load_morning_report() or {}, mem.load_active_recommendations())
+        _univ_w = {s.upper() for s in symbols} | set(_allowed_w)
+        # Audit 02/10 — plausibilité des prix cités (« BTC 888 888 $ »).
+        _prix_w = {s.upper(): (_parse_num((market.get(s) or {}).get("price")),
+                               _parse_num((market.get(s) or {}).get("ath")))
+                   for s in symbols}
+        payload["weekly_action_plan"], _fx = _dg_g33.restrict_llm_gestures(
+            payload.get("weekly_action_plan"), _allowed_w, _univ_w)
+        _wg_fixes += _fx
+        payload["watchlist"], _fx = _dg_g33.restrict_llm_gestures(
+            payload.get("watchlist"), _allowed_w, _univ_w,
+            champ_geste="trigger", champ_direction="direction")
+        _wg_fixes += _fx
+        # Audit 02/10 — plan et watchlist passent AUSSI par la garde de prose :
+        # restrict_llm_gestures garde intacts les éléments sans geste, dont la
+        # justification pouvait citer une métrique V30.
+        for _kw33 in ("weekly_summary", "strategy_focus", "concentration_reading",
+                      "exit_plan", "macro_panorama",
+                      "upcoming_calendar", "my_errors", "losses_vs_recos",
+                      "weekly_action_plan", "watchlist"):
+            if payload.get(_kw33) is not None:
+                payload[_kw33], _fx = _sug_w(payload[_kw33], _allowed_w, _univ_w,
+                                             _prix_w)
+                _wg_fixes += _fx
+        # Scénarios : filtrés CHAMP PAR CHAMP — une prescription non portée
+        # disparaît, le scénario conditionnel reste.
+        for _sc33 in (payload.get("scenarios") or []):
+            if not isinstance(_sc33, dict):
+                continue
+            for _ks in ("triggers", "points", "description", "action"):
+                if _sc33.get(_ks) is not None:
+                    _sc33[_ks], _fx = _sug_w(_sc33[_ks], _allowed_w, _univ_w, _prix_w)
+                    _wg_fixes += _fx
+                    if _sc33[_ks] in ("", []):
+                        _sc33.pop(_ks, None)
+        # Revue des positions : seule la PROSE (« analysis ») est filtrée — la
+        # colonne « action » est déterministe et doit rester intacte.
+        for _r33 in (payload.get("positions_review") or []):
+            if isinstance(_r33, dict) and isinstance(_r33.get("analysis"), str):
+                _r33["analysis"], _fx = _sug_w(_r33["analysis"], _allowed_w, _univ_w,
+                                               _prix_w)
+                _wg_fixes += _fx
+    except Exception as _g33_exc:  # noqa: BLE001
+        logger.info("Garde des gestes hebdo ignorée : %s", _g33_exc)
+    # ── v32 (5.7) — PASSE UNIQUE D'ASSAINISSEMENT DE LA PROSE, sur la
+    # TOTALITÉ du payload et pour les TROIS rapports. Avant v32, la réparation
+    # des décimales cassées n'était câblée qu'au matin (et, le soir, sur une
+    # liste blanche de six clés) : l'hebdo du 24/08 publiait donc
+    # « -37, 5% sous ATH » sur chacune de ses onze lignes de positions, et
+    # « puissant rebond de +41, structure quotidienne redevenue haussiere »
+    # où le pourcentage est coupé en deux au milieu de la phrase. Les cles de
+    # métadonnées (_SKIP_KEYS) restent intouchées.
+    try:
+        from src.analytics import daily_guards as _dg_wk
+        from src.analytics.prose_guard import (
+            flag_unsourced_etf_figures as _etf_flag,
+            sanitize_llm_prose as _sanit,
+        )
+        # v32 (5.8) - un chiffre ETF cité alors que Farside/CoinGlass sont KO porte
+        # désormais sa provenance. Le 21/08, « soutenu par +103,3 M$ d'entrées
+        # nettes d'ETF » ouvrait le mail pendant que son pied listait
+        # « Indisponibles · ETF flows » et que l'auto-critique reconnaissait
+        # l'indisponibilité de Farside et CoinGlass.
+        _neuf, _fx_etf = _etf_flag(
+            payload, bool((data.get("etf_flows") or {}).get("available")))
+        _remplacer_sur_place(payload, _neuf)
+        _wg_fixes += _fx_etf
+        _neuf, _fx_prose = _sanit(payload)
+        _remplacer_sur_place(payload, _neuf)
+        _wg_fixes += _fx_prose
+        _neuf, _fx_dec = _dg_wk.fix_broken_decimals(payload)
+        _remplacer_sur_place(payload, _neuf)
+        _wg_fixes += _fx_dec
+    except Exception as _pgexc:  # noqa: BLE001 - jamais bloquant
+        logger.info("Assainissement de la prose ignoré : %s", _pgexc)
     if _wg_fixes:
         logger.info("Gardes weekly v30 : %d correction(s) — %s",
                     len(_wg_fixes), " | ".join(_wg_fixes[:8]))
@@ -7299,6 +8082,10 @@ def run_weekly() -> int:
             "date_label": e.get("date_label"),
             # v26 (W-A2) — badge « déjà publié » au rendu.
             "already_published": bool(e.get("already_published")),
+            # v32 (3.10) — consensus et précédent, comme au matin. La donnée
+            # existait dans `calendar` ; seul le weekly ne la transportait pas.
+            "forecast": e.get("forecast"),
+            "previous": e.get("previous"),
         }
         if _fed_bars_w and "fomc" in (e.get("label") or "").lower():
             item["polymarket_note"] = (
@@ -7401,9 +8188,12 @@ def run_weekly() -> int:
             _ms_parts.append(
                 f"ETH {_ms['eth_dominance_pct']:.1f}%".replace(".", ","))
         if _ms.get("eth_btc_ratio") is not None:
-            _r = f"ETH/BTC {_ms['eth_btc_ratio']:.5f}"
+            _r = f"ETH/BTC {_ms['eth_btc_ratio']:.5f}".replace(".", ",")
             if _ms.get("eth_btc_7d_pct") is not None:
                 _r += f" ({_pct_fr_signed(_ms['eth_btc_7d_pct'])} 7j)"
+            # v32 (3.7) — décimale FRANÇAISE : ces quatre repères
+            # sortaient en « 0.03132 », « L/S 1.0 », « 0.61 »,
+            # « 43.7% » à côté de « NUPL 0,32 » dans le même bloc.
             _ms_parts.append(_r)
         if _ms.get("total_market_cap_usd"):
             _t = _ms["total_market_cap_usd"] / 1e12
@@ -7420,7 +8210,7 @@ def run_weekly() -> int:
             _dv_parts.append(
                 f"funding BTC {_pct_fr_signed(_dv_btc['funding_annualized_pct'], 2)}/an")
         if _dv_btc.get("long_short_ratio") is not None:
-            _dv_parts.append(f"L/S {_dv_btc['long_short_ratio']}")
+            _dv_parts.append(f"L/S {_dv_btc['long_short_ratio']}".replace(".", ","))
         # Fundings EXTRÊMES des autres positions (|annualisé| ≥ 15%/an) :
         # signal de positionnement (shorts/longs en excès).
         for _s_dv, _d_dv in _derivs_w.items():
@@ -7627,13 +8417,40 @@ def run_weekly() -> int:
         if _heavy:
             _conc_parts.append(
                 "mono-actifs " + " · ".join(f"{s} {p:.0f}%" for s, p in _heavy))
+        # ── v32 (3.5) — QUAND LA CONVICTION PRIME, ON CONSTATE SANS
+        # CONSEILLER D'ALLÉGER. Arbitrage d'Omar (25/08/2026).
+        #
+        # L'hebdo du 24/08 disait « BTC 43 % — alléger / diversifier » dans ce
+        # bloc ET « BTC ★ CONVICTION → Renforcer » dans son tableau de
+        # positions : deux conseils opposés sur la même ligne, dans le même
+        # mail. Quand les actifs qui CRÉENT la concentration sont des
+        # convictions assumées (cœur BTC/ETH), le bloc énonce désormais le
+        # FAIT sans le conseil contraire. Sur un satellite, l'alerte
+        # d'allègement reste entière : la tension n'existe pas.
+        _heavy_syms = {s for s, _ in _heavy}
+        _conviction_prime = bool(_heavy_syms) and _heavy_syms <= set(_TIER0)
+        if _conviction_prime:
+            _msg_conc = (
+                "Portefeuille très concentré (" + " ; ".join(_conc_parts)
+                + " du PTF) : vulnérable à une rotation défavorable. La "
+                "concentration vient de tes convictions cœur — elle est "
+                "assumée, pas subie ; ce bloc la mesure, il ne demande pas "
+                "de l'alléger."
+            )
+        else:
+            # v33 — information, pas un ordre : « aucun seuil ne déclenche une
+            # vente » (Omar, 01/10). La diversification progresse par les
+            # renforts que le moteur décide hors de ces lignes.
+            _msg_conc = (
+                "Portefeuille très concentré (" + " ; ".join(_conc_parts)
+                + " du PTF) : vulnérable à une rotation défavorable. Ce bloc "
+                "mesure la concentration ; aucun seuil de poids ne déclenche "
+                "de vente."
+            )
         _alert: dict[str, Any] = {
             "active": True,
-            "message": (
-                "Portefeuille très concentré (" + " ; ".join(_conc_parts)
-                + " du PTF) : vulnérable à une rotation défavorable — alléger / "
-                "diversifier progressivement vers d'autres narratifs."
-            ),
+            "conviction_driven": _conviction_prime,
+            "message": _msg_conc,
         }
         if _conc_top_sector:
             _alert["top_sector"] = _conc_top_sector
@@ -7830,28 +8647,32 @@ def run_weekly() -> int:
         logger.info("Bloc WoW indisponible : %s", _exc_wow)
 
     payload.setdefault("footer", {})["next_report_at"] = _next_report_label("weekly")
-    # v14 — date du prochain hebdo calculée en Python (le cron weekly_report.yml
-    # est dimanche 11h UTC = 12:00 Casablanca, UTC+1). Évite l'hallucination
-    # Gemini (« lundi 15 juin ») et corrige l'ancienne mention erronée 15:00.
+    # v14 — date du prochain hebdo calculée en Python. v33 (audit 02/10) —
+    # l'heure dérive du cron réel (``_SLOTS_UTC["weekly"]``, 11:00 UTC) : le
+    # « midi Casablanca » codé en dur supposait UTC+1 (Maroc en UTC+0 depuis
+    # le 20/09) et ignorait le retard du schedule GitHub.
     _now_w = datetime.now(TZ)
     _days_to_sun = (6 - _now_w.weekday()) % 7  # weekday(): lundi=0..dimanche=6
     if _days_to_sun == 0:
         _days_to_sun = 7  # le prochain hebdo, pas celui d'aujourd'hui
     from datetime import timedelta as _td
     _next_sun = _now_w + _td(days=_days_to_sun)
+    _ws = _slot_local("weekly", _next_sun)
     payload["footer"]["next_weekly"] = (
         f"{_JOURS_FR[_next_sun.weekday()]} {_next_sun.day} "
-        f"{_MOIS_FR[_next_sun.month - 1]} {_next_sun.year}, 12:00 Casablanca"
+        f"{_MOIS_FR[_next_sun.month - 1]} {_next_sun.year}, "
+        f"à partir de {_ws:%H}h{_ws:%M} Casablanca"
     )
     # v17 (E-A11) : heure du prochain matin HARMONISÉE (08h30 partout). Avant, le
     # weekly affichait « lundi 08:00 » (texte IA) ≠ « 08h30 » du soir. On force la
     # valeur Python canonique pour que les 3 mails soient cohérents.
     # v26 (W-A12) — format ABSOLU homogène avec la ligne hebdo (le v25 mêlait
     # « demain 08h30 » relatif et « dimanche 5 juillet 2026, 12:00 » absolu).
-    _nm_day = _now_w if (_now_w.hour + _now_w.minute / 60.0) < 8.5 else _now_w + _td(days=1)
+    _nm_slot = _slot_local("morning", _now_w)
+    _nm_day = _now_w if _now_w < _nm_slot else _now_w + _td(days=1)
     payload["footer"]["next_morning"] = (
         f"{_JOURS_FR[_nm_day.weekday()]} {_nm_day.day} "
-        f"{_MOIS_FR[_nm_day.month - 1]}, 08:30"
+        f"{_MOIS_FR[_nm_day.month - 1]}, {_nm_slot:%H:%M}"
     )
     # \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
     # v27 \u2014 ANALYSE PROFONDE HEBDO : r\u00e9gime (ME1), Brier (ES4), auto-backtest
@@ -7883,6 +8704,9 @@ def run_weekly() -> int:
                                  default=None)
                     _dom_type = str((_dom_w or {}).get("type") or "").lower()
                     _reg_kind = str(_reg_w.get("regime") or "").lower()
+                    if _dom_w is not None and _parse_num(
+                            _dom_w.get("probability_pct")) is None:
+                        _dom_w = None    # v33 : plus de scénario « dominant »
                     if (_reg_kind == "bear" and _dom_w
                             and _dom_type not in ("bearish", "bear")):
                         payload["regime_reconciliation_note"] = (
@@ -7919,14 +8743,10 @@ def run_weekly() -> int:
                                   or {}).get("hit_rate_pct"))
                 _h30 = _parse_num(((_hz_bt.get("30") or _hz_bt.get(30))
                                    or {}).get("hit_rate_pct"))
-                if _h7 is not None and _h7 <= 40:
-                    _bt_read = (
-                        " Lecture : signal défavorable à 7 j"
-                        + (f", avantage seulement à 30 j ({_h7:.0f}% vs "
-                           f"{_h30:.0f}%) — étaler le DCA, pas d'achat impulsif."
-                           if _h30 is not None and _h30 >= 55 else
-                           " — la patience prime sur l'accumulation immédiate."))
-                    _bt["note"] = (str(_bt.get("note") or "").rstrip() + _bt_read).strip()
+                _bt_read = _lecture_backtest(_h7, _h30)
+                if _bt_read:
+                    _bt["note"] = (str(_bt.get("note") or "").rstrip()
+                                   + " " + _bt_read).strip()
                 payload["strategy_backtest"] = _bt
     except Exception as _btexc:  # noqa: BLE001
         logger.info("Auto-backtest indisponible : %s", _btexc)
@@ -7951,7 +8771,7 @@ def run_weekly() -> int:
         logger.info("Zones de liquidation indisponibles : %s", _lzexc)
     # SO3 \u2014 positionnement options (max pain / put-call) \u2192 rep\u00e8re chiffr\u00e9.
     try:
-        _opt_w = deribit.get_options_metrics()
+        _opt_w = deribit.get_options_metrics(_spots_options(market))
         _optb = (_opt_w.get("assets") or {}).get("BTC") if _opt_w.get("available") else None
         if _optb:
             _op_parts = []
@@ -7961,12 +8781,12 @@ def run_weekly() -> int:
                     + (f" ({_pct_fr_signed(_optb['max_pain_gap_pct'])})"
                        if _optb.get("max_pain_gap_pct") is not None else ""))
             if _optb.get("put_call_ratio") is not None:
-                _op_parts.append(f"put/call {_optb['put_call_ratio']}")
+                _op_parts.append(f"put/call {_optb['put_call_ratio']}".replace(".", ","))
             if _optb.get("dvol") is not None:
-                _op_parts.append(f"DVOL {_optb['dvol']}%")
+                _op_parts.append(f"DVOL {_optb['dvol']}%".replace(".", ","))
             if _op_parts:
                 payload.setdefault("weekly_facts_lines", []).append(
-                    "\ud83c\udfb2 Options BTC \u00b7 " + " \u00b7 ".join(_op_parts))
+                    "\U0001f3b2 Options BTC \u00b7 " + " \u00b7 ".join(_op_parts))
     except Exception as _opexc:  # noqa: BLE001
         logger.info("Options positioning indisponible : %s", _opexc)
     # on-chain extras \u2192 aussi en rep\u00e8re chiffr\u00e9 (le lecteur voit la lecture).
@@ -7977,9 +8797,9 @@ def run_weekly() -> int:
     # de CETTE semaine (\u00e9valu\u00e9s au prochain hebdo).
     try:
         _prev_calls = mem.load_weekly_calls()
-        _dom_scn = max(
-            [s for s in (payload.get("scenarios") or []) if isinstance(s, dict)],
-            key=lambda s: _parse_num(s.get("probability_pct")) or 0, default=None)
+        # v33 — les probabilités de scénarios n'existent plus : aucun scénario
+        # n'est « dominant ». Le bilan hebdo compare des FAITS mesurés.
+        _dom_scn = None
         _cur_calls = {
             "week_label": header.get("period_covered"),
             "dominant_scenario": (_dom_scn or {}).get("label"),

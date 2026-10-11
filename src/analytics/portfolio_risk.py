@@ -173,12 +173,21 @@ def compute_portfolio_risk(
         idx = min(len(ordered) - 1, max(0, int(0.05 * len(ordered))))
         var_95_pct = round(ordered[idx] * 100, 2)
 
+    def _fr(v: Any) -> str:
+        """Décimale FRANÇAISE — RED TEAM (RT-14).
+
+        Le bloc affichait déjà ``bêta PTF 1,23`` et ``VaR 95% −4,1%`` localisés,
+        mais laissait passer ``~5.2 paris EFFECTIFs`` et ``BTC pèse 36.6%`` :
+        deux conventions dans la MÊME phrase, sous les yeux du lecteur.
+        """
+        return str(v).replace(".", ",")
+
     readings: list[str] = []
     if effective_bets is not None:
         readings.append(
             f"Concentration : {len(weights)} positions mais seulement "
-            f"~{effective_bets} paris EFFECTIFs (HHI) — "
-            + (f"{top_asset} pèse {top_weight}%."
+            f"~{_fr(effective_bets)} paris EFFECTIFs (HHI) — "
+            + (f"{top_asset} pèse {_fr(top_weight)}%."
                if top_asset else "réparti.")
         )
     readings.append(

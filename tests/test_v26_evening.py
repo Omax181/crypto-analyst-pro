@@ -525,8 +525,8 @@ def test_header_pnl_same_precision_as_bilan():
                       "day_change_pct": 2.154},
         "footer": {},
     })
-    assert html.count("+2.15%") >= 2
-    assert "+2.2% depuis matin" not in html and "+2.1% depuis matin" not in html
+    assert html.count("+2,15%") >= 2
+    assert "+2,2% depuis matin" not in html and "+2,1% depuis matin" not in html
 
 
 def test_expectancy_hidden_without_recos_visible_with():
@@ -542,7 +542,7 @@ def test_expectancy_hidden_without_recos_visible_with():
     assert "Espérance mathématique" in html_reco
     html_val = _render({**base, "expectancy": {
         "available": True, "expectancy_pct": 2.4}})
-    assert "+2.4% / reco" in html_val
+    assert "+2,4% / reco" in html_val
 
 
 def test_dxy_broad_labeled_explicitly():

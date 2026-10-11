@@ -524,3 +524,105 @@ def get_onchain_metrics() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Coin Metrics indisponible : %s", exc)
         return {"available": False, "source": "coinmetrics"}
+
+
+# ── HISTORIQUE MVRV — ancrage MESURÉ du moteur d'opportunité ──────────────
+#
+# Audit zero-trust (01/10). Le moteur ramenait le MVRV vers un « neutre » de
+# 1,0 posé à la main. 1,0, c'est le prix réalisé : historiquement la zone de
+# CREUX de cycle, pas la valeur centrale. Mesuré le 30/09 sur l'API community
+# (une requête, < 1 s) : médiane BTC 1,716 sur 2010-2026, 1,645 depuis 2015
+# — robuste au choix de fenêtre ; médiane ETH 1,213. Avec 1,0 comme ancre,
+# BTC et ETH n'étaient recommandables qu'en capitulation.
+#
+# L'ancrage devient la distribution OBSERVÉE de l'actif lui-même : médiane
+# (ancre centrale), premier quartile (ancre prudente) et minimum observé
+# (borne de plausibilité, l'analogue du « support observé » des pairs).
+_MVRV_HISTORY_MIN_OBS = 4 * 365   # garde-fou d'intégrité : au moins 4 ans de
+#                                   points (un cycle complet). Sous ce seuil,
+#                                   la requête a été tronquée : pas d'ancre.
+
+
+def _quantile(sorted_vals: list[float], q: float) -> float:
+    """Quantile par interpolation linéaire (même convention que numpy)."""
+    pos = (len(sorted_vals) - 1) * q
+    lo = int(pos)
+    hi = min(lo + 1, len(sorted_vals) - 1)
+    return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * (pos - lo)
+
+
+def mvrv_history_stats(rows: list[tuple[str, float]]) -> Optional[dict[str, Any]]:
+    """Statistiques de la distribution historique d'un MVRV quotidien."""
+    vals = sorted(v for _, v in rows if isinstance(v, (int, float)) and v > 0)
+    if len(vals) < _MVRV_HISTORY_MIN_OBS:
+        return None
+    dates = sorted(d for d, v in rows if isinstance(v, (int, float)) and v > 0)
+    return {
+        "median": round(_quantile(vals, 0.5), 4),
+        "q25": round(_quantile(vals, 0.25), 4),
+        "q75": round(_quantile(vals, 0.75), 4),
+        "min": round(vals[0], 4),
+        "max": round(vals[-1], 4),
+        "n": len(vals),
+        "first": dates[0],
+        "last": dates[-1],
+    }
+
+
+def get_mvrv_history() -> dict[str, Any]:
+    """Distribution historique COMPLÈTE du MVRV de BTC et ETH (Coin Metrics).
+
+    Une requête par actif (≈ 6 000 points pour BTC), pagination suivie : une
+    seule requête pour les deux actifs dépassait déjà 9 990 lignes le 30/09,
+    à quelques jours de la limite de page.
+
+    Returns:
+        ``{available, source, assets: {SYM: {median, q25, q75, min, max, n,
+        first, last}}}`` — un actif absent n'a PAS d'ancre (jamais de repli).
+    """
+    def _fetch() -> dict[str, Any]:
+        base, key = _cm_base_and_key()
+        out: dict[str, Any] = {}
+        for sym, cm_id in _CM_IDS.items():
+            rows: list[tuple[str, float]] = []
+            prix: dict[str, float] = {}
+            params: Optional[dict[str, Any]] = {
+                "assets": cm_id, "metrics": "CapMVRVCur,PriceUSD", "frequency": "1d",
+                "start_time": "2010-01-01T00:00:00Z", "page_size": 10000,
+                "pretty": "false", "api_key": key or "",
+            }
+            url: Optional[str] = base
+            for _page in range(5):
+                raw = get_json(url, params=params) if url else None
+                if not isinstance(raw, dict) or not isinstance(raw.get("data"), list):
+                    rows = []
+                    break
+                for r in raw["data"]:
+                    if not isinstance(r, dict):
+                        continue
+                    jour = str(r.get("time") or "")[:10]
+                    v = _to_float(r.get("CapMVRVCur"))
+                    if v is not None:
+                        rows.append((jour, v))
+                    px = _to_float(r.get("PriceUSD"))
+                    if px is not None and px > 0:
+                        prix[jour] = px
+                url = raw.get("next_page_url")
+                params = None   # l'URL de page suivante porte déjà ses paramètres
+                if not url:
+                    break
+            stats = mvrv_history_stats(rows)
+            if stats:
+                # Clôtures quotidiennes DATÉES des 120 derniers jours : repli de
+                # volatilité et de bêta du moteur quand CoinGecko refuse (429)
+                # — BTC et ETH sont les seuls actifs au potentiel mesurable.
+                stats["closes"] = {j: prix[j] for j in sorted(prix)[-120:]}
+                out[sym] = stats
+        return {"available": bool(out), "source": "coinmetrics (CapMVRVCur + PriceUSD, 1d)",
+                "assets": out}
+
+    try:
+        return CACHE.get_or_compute("coinmetrics:mvrv_history", 3600, _fetch)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Historique MVRV indisponible : %s", exc)
+        return {"available": False, "assets": {}}

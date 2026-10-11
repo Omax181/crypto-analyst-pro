@@ -16,10 +16,12 @@ Couvre :
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+import pytest
 
 from src import main
 from src.main import _build_onchain_tiles, _merge_python_facts
 from src.reporting.email_html import APP_VERSION, render
+from tests.conftest import il_y_a
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -27,7 +29,7 @@ from src.reporting.email_html import APP_VERSION, render
 # ─────────────────────────────────────────────────────────────────────────────
 def test_app_version_v26():
     # Nommage final : le livrable est étiqueté v26 (décision Omar, 2026-07-05).
-    assert APP_VERSION == "v30"
+    assert APP_VERSION == "v32"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -249,11 +251,11 @@ def test_zero_reco_banner_and_bullets_split():
     data = {"active_recommendations_display": [{"asset": "TAO"}, {"asset": "ETH"}]}
     out = _merge_python_facts(payload, data, "02/07 · 12h35")
     assert "2 recos" in out["thesis_context_note"]           # A20/B4
-    assert out["thesis_empty_reason"].startswith("Aucune thèse")
+    # v33 — le motif est celui du moteur (ici indisponible), jamais le
+    # « seuil » du modèle ; plus de pavé markdown possible.
+    assert out["thesis_empty_reason"].startswith("Moteur d'allocation indisponible")
     assert " * " not in out["thesis_empty_reason"]           # A4 : plus de pavé
-    assert out["thesis_empty_bullets"] == [
-        "BTC : rebond technique sans catalyseur.",
-        "ETH : activité adresses en baisse."]
+    assert "thesis_empty_bullets" not in out
 
 
 def test_zero_reco_structured_assets_kept():
@@ -280,8 +282,9 @@ def test_zero_reco_template_renders_structured():
              "why": "pas de catalyseur fort", "watch_level": "repli vers $58,454"}],
     }, "morning")
     assert "7 recos actives restent en vigueur" in html
-    assert "confiance" in html and "68%" in html and "plafond 80%" in html
-    assert "repli vers $58,454" in html
+    # v33 — la confiance du modèle n'est plus affichée (non décisionnelle).
+    assert "68%" not in html and "plafond 80%" not in html
+    assert "BTC" in html and "repli vers $58,454" in html
     assert "* BTC" not in html                               # A4
 
 
@@ -360,19 +363,20 @@ def test_blind_spots_no_source_list_and_hidden_when_empty():
 # A12/B6 — tracking : cible persistée + progression vers la cible
 # ─────────────────────────────────────────────────────────────────────────────
 def test_persist_firm_recos_saves_target_and_stop(monkeypatch):
+    """v33 — la cible persistée est la BARRE de succès (le rendement requis) ;
+    une conviction 6-12 mois n'a pas de stop de prix."""
     from src.state import report_memory as mem
     saved = []
     monkeypatch.setattr(mem, "add_recommendation", lambda r: saved.append(r))
     monkeypatch.setattr(mem, "is_recently_dismissed", lambda a, c: False)
     payload = {"thesis_of_the_day": [{
-        "asset": "TAO", "action": "RENFORCER", "confidence": 75,
-        "targets": {"short_term_30d": 220.24},
-        "action_plan": {"entry": 202.98, "stop_loss": 191.24},
+        "asset": "TAO", "action": "RENFORCER",
+        "engine_view": {"price": 202.98, "required_pct": 8.5, "horizon_days": 365},
     }]}
     data = {"all_positions_summary": [{"asset": "TAO", "price": 202.98}]}
     main._persist_firm_recos(payload, data)
-    assert saved and saved[0]["ct_target"] == 220.24
-    assert saved[0]["stop_loss"] == 191.24
+    assert saved and saved[0]["ct_target"] == pytest.approx(202.98 * 1.085)
+    assert saved[0].get("stop_loss") is None and saved[0]["engine"] is True
 
 
 def test_tracking_badge_path_based(monkeypatch):
@@ -380,7 +384,7 @@ def test_tracking_badge_path_based(monkeypatch):
     from src.state import report_memory as mem
     reco = {"asset": "TAO", "action": "RENFORCER", "status": "in_progress",
             "entry_price": 200.0, "ct_target": 220.0, "stop_loss": 190.0,
-            "created_at": "2026-07-02T08:00:00+00:00"}
+            "created_at": il_y_a(54)}
     monkeypatch.setattr(mem, "load_active_recommendations", lambda: [reco])
     tracker = ps.PredictionTracker()
     # +4% de prix = 40% du chemin vers +10% → « En bonne voie », PAS « Sur objectif ».

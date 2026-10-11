@@ -485,31 +485,7 @@ def test_ws14_assistant_independent_reasoning():
 # --------------------------------------------------------------------------- #
 # Partie 5 — score pondéré exhibé + 9 dimensions
 # --------------------------------------------------------------------------- #
-def test_partie5_weighted_score_breakdown_displayed():
-    """§4.2 : le score pondéré et le détail des signaux par poids sont AFFICHÉS
-    dans la thèse (preuve d'éligibilité multi-dimensionnelle, plus invisible)."""
-    from src.reporting.email_html import render
-
-    payload = {
-        "header": {"date": "17/06"},
-        "portfolio_snapshot": {"value_usd": 2630},
-        "thesis_of_the_day": [{
-            "asset": "ETH", "action": "RENFORCER", "action_type": "bullish",
-            "thesis_type": "conviction", "confidence": 70,
-            "thesis_scoring": {
-                "score": 6, "threshold": 4, "dimensions_count": 2,
-                "signals": [
-                    {"label": "MVRV < 1", "category": "fundamental_lt", "weight": 3},
-                    {"label": "drawdown −63% vs ATH", "category": "fundamental_lt", "weight": 3},
-                ]},
-        }],
-    }
-    html = render(payload, "morning")
-    assert "Score pondéré" in html
-    # NB : Jinja échappe « < » en « &lt; » → on teste sans le caractère spécial.
-    assert "MVRV" in html and "+3" in html
-    assert "seuil 4" in html
-    assert "2 dimension" in html
+# v33 (audit 01/10) — « test_partie5_weighted_score_breakdown_displayed » retiré : l'ancien score de thèse V30 (comptage de signaux) n'est plus affiché sur une décision du moteur ; la couverture des sources l'est (test_v25_ob21_completeness réécrit)
 
 
 def test_partie5_prompt_requires_nine_dimensions():

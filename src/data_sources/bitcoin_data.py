@@ -100,7 +100,7 @@ def get_btc_onchain_extras() -> dict[str, Any]:
         if out.get("sopr") is not None:
             s = out["sopr"]
             readings.append(
-                f"SOPR {s:.3f} — " + ("ventes à perte (capitulation en cours)"
+                f"SOPR {s:.3f}".replace(".", ",") + " — " + ("ventes à perte (capitulation en cours)"
                                       if s < 0.99 else
                                       "équilibre pertes/profits" if s <= 1.01
                                       else "prises de profit dominantes"))
@@ -113,7 +113,7 @@ def get_btc_onchain_extras() -> dict[str, Any]:
                                       if n < 0.25 else
                                       "optimisme" if n < 0.5 else "euphorie"))
         if out.get("nvt") is not None:
-            readings.append(f"NVT {out['nvt']:.1f}")
+            readings.append(f"NVT {out['nvt']:.1f}".replace(".", ","))
         if readings:
             out["available"] = True
             out["readings"] = readings

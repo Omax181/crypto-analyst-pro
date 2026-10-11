@@ -20,7 +20,15 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_BASE = "https://developers.coinmarketcal.com/v1/events"
+# v32 (5.4) — MESURÉ le 25/08/2026 : « developers.coinmarketcal.com » ne
+# résout plus du tout (getaddrinfo failed, aussi bien depuis les runners GitHub
+# US que hors CI) ; « api.coinmarketcal.com » résout et répond (403 sans clé,
+# soit la réponse attendue pour une requête non authentifiée). L'ancien hôte
+# faisait échouer la source à CHAQUE run du matin — visible dans les 4 logs
+# fournis — en brûlant ~30 s de retries, et tuait DEUX sources déclarées :
+# les catalyseurs crypto datés ET « Token Unlocks », qui se replie dessus
+# depuis la v26 (DefiLlama emissions étant payant, 402).
+_BASE = "https://api.coinmarketcal.com/v1/events"
 
 
 def get_events(max_events: int = 15) -> dict[str, Any]:

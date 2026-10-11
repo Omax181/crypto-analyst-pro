@@ -13,11 +13,59 @@ _SYMBOL_TO_SLUG = {"LINK": "chainlink", "UNI": "uniswap", "INJ": "injective",
     "DYDX": "dydx", "RUNE": "thorchain", "CAKE": "pancakeswap", "SUSHI": "sushiswap"}
 
 
+def _protocols_raw() -> list[dict[str, Any]]:
+    """Liste brute ``/protocols`` (≈ 8 400 protocoles), téléchargée UNE fois par run.
+
+    Elle était déjà téléchargée par ``get_defi_tvl`` pour n'en garder que le
+    top 8. Le moteur d'opportunité en a besoin en entier : c'est la seule
+    population de PAIRS de même catégorie disponible sans clé.
+    """
+    def _fetch() -> list[dict[str, Any]]:
+        try:
+            data = get_json("https://api.llama.fi/protocols")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("DeFiLlama /protocols : %s", exc)
+            return []
+        return data if isinstance(data, list) else []
+    return CACHE.get_or_compute("defillama:protocols", 3600, _fetch)
+
+
+def get_category_peers(category: Any, *, exclude_name: Any = None) -> dict[str, Any]:
+    """Ratios MC/TVL MESURÉS des protocoles de la même catégorie DeFiLlama.
+
+    Audit zero-trust (01/10) : le moteur comparait le MC/TVL d'un actif à celui
+    des autres positions DÉTENUES — un oracle, un index et un bridge le 30/09.
+    Ce ne sont pas des pairs. La seule référence défendable est la catégorie,
+    mesurée sur toute la base DeFiLlama, candidat exclu. Seuls les protocoles
+    portant à la fois une capitalisation et une TVL strictement positives sont
+    retenus : un ratio sans l'un des deux n'est pas une mesure.
+
+    Returns:
+        ``{available, category, ratios, n, source}``.
+    """
+    cat = str(category or "").strip()
+    if not cat:
+        return {"available": False, "category": None, "ratios": [], "n": 0}
+    excl = str(exclude_name or "").strip().lower()
+    ratios: list[float] = []
+    for p in _protocols_raw():
+        if not isinstance(p, dict) or str(p.get("category") or "") != cat:
+            continue
+        if excl and str(p.get("name") or "").strip().lower() == excl:
+            continue
+        mc, tv = p.get("mcap"), p.get("tvl")
+        if (isinstance(mc, (int, float)) and isinstance(tv, (int, float))
+                and mc > 0 and tv > 0):
+            ratios.append(float(mc) / float(tv))
+    return {"available": bool(ratios), "category": cat, "ratios": ratios,
+            "n": len(ratios), "source": "DeFiLlama /protocols"}
+
+
 def get_defi_tvl() -> dict[str, Any]:
     def _fetch() -> dict[str, Any]:
         try:
             chains = get_json("https://api.llama.fi/v2/chains")
-            protocols = get_json("https://api.llama.fi/protocols")
+            protocols = _protocols_raw()
             total = sum(c.get("tvl", 0) for c in chains) if isinstance(chains, list) else None
             top = []
             if isinstance(protocols, list):

@@ -46,9 +46,11 @@ def test_core_moderate_gain_not_flagged():
 
 
 def test_core_extreme_gain_small_tranche():
-    s = exit_radar.compute_exit_signals(
-        [_pos("ETH", pnl=350.0, tier="core")])["signals"][0]
-    assert s["urgency"] == 2 and "PETITE tranche" in s["action"]
+    """v33 (Omar, 02/10) : plus AUCUN allègement proposé sur le cœur, même à
+    +350 % — seuls les satellites ont des paliers de prise de profit."""
+    for sym in ("BTC", "ETH", "TAO", "LINK"):
+        r = exit_radar.compute_exit_signals([_pos(sym, pnl=350.0, tier="core")])
+        assert r["count"] == 0, sym
 
 
 def test_core_detected_even_without_tier_field():
@@ -71,9 +73,10 @@ def test_pump_ignored_if_underwater():
 
 
 def test_satellite_overconcentration():
-    s = exit_radar.compute_exit_signals(
-        [_pos("JASMY", pnl=5.0, weight=15.0)])["signals"][0]
-    assert s["urgency"] == 1 and "surpondéré" in s["reason"]
+    """v33 — Omar, 01/10 : « aucun seuil ne déclenche une vente ». Un
+    satellite lourd n'est plus un signal d'allègement."""
+    r = exit_radar.compute_exit_signals([_pos("JASMY", pnl=5.0, weight=15.0)])
+    assert r["count"] == 0
 
 
 def test_ladder_takes_priority_over_concentration():
@@ -85,12 +88,12 @@ def test_ladder_takes_priority_over_concentration():
 # ── ordonnancement + robustesse ────────────────────────────────────────────
 def test_signals_sorted_by_urgency():
     r = exit_radar.compute_exit_signals([
-        _pos("LOW", weight=13.0),           # concentration (urg 1)
+        _pos("LOW", weight=13.0),           # poids seul : plus un signal (v33)
         _pos("HIGH", pnl=250.0),            # ×3 (urg 3)
         _pos("MID", pnl=85.0),              # +80 (urg 2)
     ])
-    assert [s["symbol"] for s in r["signals"]] == ["HIGH", "MID", "LOW"]
-    assert r["count"] == 3 and "à considérer" in r["summary"]
+    assert [s["symbol"] for s in r["signals"]] == ["HIGH", "MID"]
+    assert r["count"] == 2 and "à considérer" in r["summary"]
 
 
 def test_empty_and_malformed_positions():

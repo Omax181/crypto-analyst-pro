@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from src.ai_brain.prompts.vue_modele import vue_modele
 from src.ai_brain.prompts.analyst_persona import (
     ANALYST_PERSONA,
     DISCLAIMER,
@@ -26,7 +27,7 @@ _MORNING_SCHEMA = """
   "active_recommendations_tracking": [{"asset","action","issued_at","ct_target","current_price","progress_pct","progress_label","status","status_color"}],
   "tracking_footnote": "string (1 phrase : leçon récente, ce qu'a appris l'agent)",
   "macro_context": {"btc_price","btc_note (ex. 'range macro')","fear_greed","fear_greed_label (ex. 'peur extrême')","dxy","dxy_note (ex. 'cassure ↑')","polymarket_fed_cut_pct","fed_cut_note (ex. '−10pts en 2 sem.')","regime_synthesis (v23.x — LE paragraphe macro COMPLET du « Contexte global » : 2-3 phrases DENSES, zéro blabla. Croise DXY/Gold/VIX/courbe des taux 2s10s + actions US ET internationales (Nikkei/Stoxx/DAX), la Fed/Polymarket (proba + implication LIQUIDITÉ pour les actifs risqués) et le DÉCOUPLAGE du crypto (F&G). Chaque phrase = un fait chiffré + son implication. Le VERDICT de régime (transition/risk-on/off · confiance %) et le BIAIS crypto (garde-fou) sont affichés SÉPARÉMENT en tête du bloc par le système — NE les répète pas, complète-les. Ex. 'Transition : DXY stable 101,2, Gold −0,3%, VIX 18,5 modéré ; actions US en repli léger mais Asie/Europe résilientes (Nikkei +107, DAX +48). Courbe 2s10s +0,31 (cycle en bascule). Fed attendue en maintien (81,5% Polymarket) sur inflation+emploi robustes → liquidité bridée pour le risque. Crypto en Peur extrême (F&G 12), décorrélé des actions.')"},
-  "risk_score_readout": {"driver (1 phrase : CE QUI pèse le plus dans le score, ex. 'Score tiré par la concentration L1 47% et l'absence de cash')","caveat (1 phrase de NUANCE CRITIQUE : un score de risque est subjectif et déterministe, il ne capte pas tout — ex. 'Note indicative : elle ne mesure pas le risque idiosyncratique projet ni les corrélations cachées')","reco (1 phrase ACTIONNABLE pour réduire le risque, ex. 'Pour baisser d'un cran : reconstituer 5-10% de cash et diversifier hors L1')"},
+  "risk_score_readout": {"driver (1 phrase : CE QUI pèse le plus dans le score, ex. 'Score tiré par la concentration L1 47% et l'absence de cash')","caveat (1 phrase de NUANCE CRITIQUE : un score de risque est subjectif et déterministe, il ne capte pas tout — ex. 'Note indicative : elle ne mesure pas le risque idiosyncratique projet ni les corrélations cachées')","reco (1 phrase : le levier qui ferait baisser le score — information, sans geste ni taille ; ex. 'Le score baisserait avec une concentration L1 moindre')"},
   "onchain_indicators": {
     "verdict": "positif|négatif|neutre (CONCLUSION GLOBALE on-chain, annoncée en tête de la lecture)",
     "combined_reading": "string (APRÈS le verdict : ce que ça implique pour l'investisseur — orienté DÉCISION, pas seulement description. v29 (MB2) : MAX 2 phrases de LECTURE CROISÉE (ce que les métriques disent ENSEMBLE : convergences/divergences, ex. « MVRV bas mais adresses en baisse → accumulation sans conviction »). NE RE-CITE PAS les valeurs déjà dans les tuiles (MVRV, adresses, max pain, funding, DVOL sont DÉJÀ affichés juste au-dessus) — le lecteur les a sous les yeux ; ta valeur ajoutée est la SYNTHÈSE, pas la répétition. v26 : les TUILES de la grille sont construites PAR LE SYSTÈME — NE fournis PAS de champ metrics. Fonde ta lecture sur data.onchain_advanced / data.options_deribit / data.whale_inflows / data.stablecoin_supply / data.etf_flows.)"
@@ -39,25 +40,25 @@ _MORNING_SCHEMA = """
   "today_watch": "string (PROSE : 2-3 catalyseurs/risques précis à surveiller dans la journée)",
   "thesis_of_the_day": [{
      "asset","name (nom complet ex. 'The Graph')","tier_label (recopie data.eligible_theses[].tier_label, ex. 'Tier 2 · mid cap')","price_line (ex. '$0.026 · position $11.49 · +8% / 24h')",
-     "action","action_type (bullish|bearish|neutral)","thesis_type (v18/Chantier F : 'tactical' OU 'conviction'. RECOPIE data.eligible_theses[].thesis_scoring.thesis_type comme base. TACTIQUE = court terme 7-30j, porté par technique + catalyseur immédiat, confiance 55-70%, R/R ≥ 2:1, stop serré. CONVICTION = long terme 3-12 mois, porté par fondamentaux + position sous PRU + structure W1/M1, confiance 65-85%, stop LARGE = invalidation de thèse, paliers d'accumulation au lieu de TP court terme. Ces deux types s'affichent distinctement.)","confidence","size_note (ex. 'taille standard')",
+     "action","action_type (bullish|bearish|neutral)","thesis_type (v18/Chantier F : 'tactical' OU 'conviction'. RECOPIE data.eligible_theses[].thesis_scoring.thesis_type comme base. TACTIQUE = court terme 7-30j, porté par technique + catalyseur immédiat. CONVICTION = long terme 3-12 mois, porté par fondamentaux + position sous PRU + structure W1/M1. Ces deux types s'affichent distinctement.)","confidence","size_note (OMETTRE — v33 : la taille vient du moteur)",
      "reliability (complète|partielle)",
      "signals_summary (v21 : RECOPIE le score pondéré ET la convergence depuis data.eligible_theses[].thesis_scoring — ex. 'score 9 · seuil 2 · 4 familles convergentes'. N'écris JAMAIS 'seuil non atteint' pour un actif listé dans data.eligible_theses : il EST éligible par construction.)",
-     "observation (PROSE plusieurs phrases — décris CE QUI CONVERGE réellement, familles + niveaux chiffrés. INTERDIT d'affirmer qu'un seuil n'est pas atteint pour une thèse listée : c'est contradictoire avec son éligibilité.)","sources_timestamps (ex. 'CoinGecko 08h12 · TradingView 08h15')",
+     "observation (PROSE plusieurs phrases — décris CE QUI CONVERGE réellement, familles + niveaux chiffrés. INTERDIT d'affirmer qu'un seuil n'est pas atteint pour une thèse listée : c'est contradictoire avec son éligibilité.)","sources_timestamps (LAISSE LA CHAÎNE VIDE '' — la provenance et l'heure de collecte sont RÉÉCRITES en Python à partir des horodatages réels. Toute valeur que tu écris ici sera écrasée.)",
      "reasoning_signals": ["signal 1 phrasé complet","signal 2",".."],
      "historical_pattern": {"verified","narrative (PROSE détaillée si verified)","occurrences_count","avg_move_pct","max_drawdown_pct","win_rate","data_source"},
      "self_critique (PROSE plusieurs arguments)","macro_coherence (PROSE)",
      "counter_thesis (v27/TH3 — OBLIGATOIRE pour toute thèse FERME : le MEILLEUR argument CONTRE ta propre thèse, honnête et chiffré, + ce qui te ferait changer d'avis. 1-2 phrases. Ex. 'Si le funding TAO repasse durablement positif, le squeeze est déjà pricé et la cassure de 205 devient un piège haussier ; je réviserais sous 195 en clôture D1.' JAMAIS un homme de paille : le vrai risque. Sers-toi de data.cross_signals.signals.confirmation_bias si actif.)",
      "sector_rank (v27/TH6 — OPTIONNEL : si l'actif appartient à un secteur où tu détiens plusieurs positions, situe-le vs ses pairs en 1 phrase chiffrée FACTUELLE. Ex. 'TAO surperforme RENDER de +8 pts sur 30j avec un funding moins tendu'. v28 (1.B, M-A16) : AUCUNE métaphore — pas de 'meilleur cheval', 'gérant du portefeuille', 'mène la danse' ; des faits chiffrés, point. Croise data.sector_rotation + les perfs des positions du même secteur.)",
-     "targets": {"short_term_label (ex. 'Tactique court terme · 30j')","short_term_30d (NOMBRE BRUT, ex. 285 — JAMAIS '285,00 $' ni '285$' — ANCRE-le sur data.eligible_theses[].projection.short_term_30d.target, confluence prioritaire, DANS la bande réaliste ; cf. RÈGLE PROJECTION)","short_term_note (ex. '+19,8% · confluence résistance + Fibonacci 0,618' — CITE la base du chiffre)","long_term_6_12m_low (NOMBRE BRUT — ancré sur projection.long_term_6_12m.low)","long_term_6_12m_high (NOMBRE BRUT — ancré sur projection.long_term_6_12m.high)","long_term_note (CONDITION NOMMÉE, ex. 'retour ATH si narratif AI confirmé')"},
+     "targets": "OMETTRE (v33 : les fourchettes publiées sont calculées par le système)",
      "watch_trigger (UNIQUEMENT si action SURVEILLER/MAINTENIR : 1 phrase, le déclencheur chiffré qui ferait passer à l'action)",
-     "action_plan": "OBJET UNIQUEMENT si action = RENFORCER ou ALLÉGER. Pour SURVEILLER/MAINTENIR : OMETTRE complètement action_plan (ne pas mettre de champs 'None'). Forme: {entry, limit_orders, position_size_pct, take_profit:{30pct,30pct_b,40pct}, stop_loss, stop_loss_basis, rr (ex '3.2:1' si fondé sinon omettre), invalidation_conditions}. v17 RÈGLE STRICTE FORMAT : entry, take_profit.*, stop_loss et TOUS les prix sont des NOMBRES BRUTS (ex. 264.3, 285, 302.17) — JAMAIS de chaîne pré-formatée ('264,30 $', '302.17 $', '285,00 $'). Le rendu applique le format ; si tu écris le symbole $ ou des séparateurs, tu provoques des incohérences (302.17 $ ET 302,00 $). stop_loss_basis est du TEXTE court (ex. 'bande basse Bollinger') et le niveau qu'il cite DOIT être cohérent avec stop_loss (même valeur). v18/M-B15 — position_size_pct (NOMBRE) : taille du geste en % DU PORTEFEUILLE (ex. 2 pour '+2% du PTF'), pas en % de la position. Dimensionne selon la conviction × la tradabilité (data.eligible_theses[].tradability) × le garde-fou macro (réduis si prudence). NE fournis PAS position_size_usd : la taille en $ est calculée AUTOMATIQUEMENT (% × valeur PTF). v23.x — stop_loss S'ANCRE sur data.eligible_theses[].projection.stop_suggestion (swing low réel) quand il existe. v18/M-B16 — stop_loss pour une CONVICTION LONG TERME = niveau d'INVALIDATION DE LA THÈSE (cassure d'un support majeur W1/M1, perte d'un palier structurel), PAS un stop technique serré (RSI/Bollinger intraday) qui serait touché par le bruit. Pour Omar (investisseur long terme), un stop à -3% sur une conviction n'a aucun sens : le stop doit laisser respirer la thèse. stop_loss_basis explicite la nature (ex. 'invalidation : cassure support W1 58k' vs 'bande basse Bollinger 1h')."
+     "action_plan": "OMETTRE (v33 : aucun plan de ton cru — ni entrée, ni stop, ni take-profit, ni R:R, ni taille)"
   }],
   "thesis_empty_reason": "string (REQUIS si thesis_of_the_day vide — v26 : COURT, 1-2 phrases d'INTRO seulement, SANS puces markdown '*', SANS détail par actif — le détail va dans no_thesis_assets ci-dessous. Ex. 'Aucune convergence assez forte ce matin pour une reco ferme : on surveille, on n'agit pas dans le bruit.')",
   "no_thesis_assets": [{"asset (ticker RÉEL étudié)","real_confidence_pct (ENTIER — ta confiance RÉELLE honnête pour cet actif, FORCÉMENT < 75 puisqu'il n'est pas émis. INTERDIT d'écrire une confiance ≥ 75 ici : ce serait contradictoire avec son absence des thèses)","cap_pct (ENTIER — le plafond de complétude data.eligible_theses[].thesis_scoring.confidence_bounds.cap, si connu)","why (1 ligne : CE QUI MANQUE concrètement — catalyseur, volume, signal on-chain)","watch_level (le niveau/déclencheur CHIFFRÉ qui changerait la donne, ex. 'repli vers $58,454 ou cassure >$63,254')"}] ,
   "macro_impact": {
     "intro": "string (PROSE courte : l'impact macro du jour sur le PTF)",
     "exposed_positions": [{"asset (un actif RÉEL du PTF)","driver (le facteur macro, ex. 'DXY > 100')","effect (effet attendu CHIFFRÉ ou directionnel sur cet actif, ex. 'pression baissière, −3 à −5%')"}],
-    "implication": "string (LE 'Donc' — CONCLUSION ACTIONNABLE : nomme 1-3 actifs du PTF et leur exposition concrète, ex. 'TAO et FET, les plus sensibles au risk-off, à alléger si le DXY casse 100 ; BTC plus résilient'. INTERDIT : répéter l'auto-critique globale, citer une limite méthodologique, ou citer une corrélation < 0,25 (bruit). Si aucun bêta significatif, dis simplement quels actifs sont structurellement les plus exposés au régime et quoi surveiller.)"
+    "implication": "string (LE 'Donc' — CONCLUSION ACTIONNABLE : nomme 1-3 actifs du PTF et leur exposition concrète, ex. 'TAO et FET, les plus sensibles au risk-off si le DXY casse 100 ; BTC plus résilient'. INTERDIT : répéter l'auto-critique globale, citer une limite méthodologique, ou citer une corrélation < 0,25 (bruit). Si aucun bêta significatif, dis simplement quels actifs sont structurellement les plus exposés au régime et quoi surveiller.)"
   },
   "all_positions_summary": [{"asset","tier","change_24h","comment","action_active (RENFORCER/ALLÉGER/SORTIR/SURVEILLER/MAINTENIR ou null)"}],
   "blind_spots": "string",
@@ -83,8 +84,11 @@ def build_morning_prompt(
     Returns:
         Prompt complet prêt pour ``generate_json``.
     """
-    data_json = json.dumps(data, ensure_ascii=False, indent=2, default=str)
-    evening_json = json.dumps(evening_state, ensure_ascii=False, default=str)[:4000]
+    # Audit 02/10 — le modèle ne voit plus le plan V30 (asset_plan, cibles et
+    # stop des projections) ni la confiance des recos héritées (vue_modele).
+    data_json = json.dumps(vue_modele(data), ensure_ascii=False, indent=2, default=str)
+    evening_json = json.dumps(vue_modele(evening_state), ensure_ascii=False,
+                              default=str)[:4000]
     regime_block = ""
     if macro_regime:
         regime_json = json.dumps(macro_regime, ensure_ascii=False, default=str)
@@ -107,6 +111,16 @@ PORTFOLIO :
 {portfolio_yaml}
 
 INSTRUCTIONS :
+00. v33 — LE MOTEUR D'ALLOCATION DÉCIDE (règle prioritaire, NON NÉGOCIABLE).
+   Les seules recommandations du système sont dans data.opportunity :
+   « recommandations » (RENFORCER décidés par le moteur déterministe) et
+   « allegements_regles_profit » (règles de prise de profit d'Omar). Pour ces
+   actifs, rédige l'observation, le raisonnement, la contre-thèse et les jalons.
+   N'écris RENFORCER/ALLÉGER pour AUCUN autre actif ; ne donne aucune taille,
+   aucune cible chiffrée et aucune probabilité de ton cru : le système les
+   ignore et retire toute phrase qui prescrirait un geste non décidé. Sans
+   recommandation, « aucune recommandation » est un résultat normal : explique
+   le motif du moteur (data.opportunity.refus), n'en fabrique pas.
 0av. v27 — RÈGLES DE FOND (analyse plus profonde, demandées par Omar) :
    • RÉGIME (ME1) : data.market_regime donne le régime BTC (bull/bear/range/
      transition) DÉTERMINISTE. Aligne l'agressivité de tes thèses dessus : en
@@ -129,10 +143,10 @@ INSTRUCTIONS :
      injecter des fonds externes. Le sizing s'exprime en % du PTF / en $
      (calculé côté Python), sans conditionner à une vente préalable. N'écris
      PAS « cash 0% = pas de poudre sèche » ni « céder X pour financer Y ».
-   • PLAN DÉTERMINISTE : les niveaux du plan (invalidation, cible 30j,
-     fourchette, R:R, scénarios bull/base/bear, EV, DCA, sizing) sont
-     RECALCULÉS en Python depuis data.eligible_theses[].asset_plan et écrasent
-     les tiens au rendu — cite-les, ne les contredis pas.
+   • PLAN V30 RETIRÉ (v33) : aucun plan par actif (invalidation, cible 30 j,
+     fourchette, R:R, scénarios pondérés, EV, DCA, taille) n'est publié ni
+     fourni : n'en écris aucun chiffre. Les fourchettes publiées viennent
+     du système (volatilité mesurée, dérive nulle).
 0. SOURCES ACTIVES ce matin = data.active_sources. INTERDICTION ABSOLUE de citer
    une news, une donnée macro/on-chain ou une statistique provenant d'une source
    ABSENTE de cette liste. Si "News" n'est pas dans active_sources : remplir
@@ -160,8 +174,8 @@ INSTRUCTIONS :
    listant les positions À CONSIDÉRER POUR ALLÈGEMENT (data.exit_signals.signals :
    symbol + reason + action). C'est le CŒUR de la stratégie d'Omar (prise de profit
    par paliers +80/×2/×3, vendre la force sur les satellites qui pumpent) — ne
-   l'omets JAMAIS quand available. Le cœur (BTC/ETH/TAO/LINK) n'y figure que sur
-   extension extrême et pour une petite tranche. C'est « à considérer », pas un ordre.
+   l'omets JAMAIS quand available. Le cœur (BTC/ETH/TAO/LINK) n'y figure JAMAIS :
+   aucun allègement n'est proposé sur lui. C'est « à considérer », pas un ordre.
    "self_critique_global" : 2-4 PUCES (1 ligne chacune) — quelles sources
    manquent ce matin, quelles incertitudes pèsent, ce qui invaliderait le
    scénario. Des angles NOUVEAUX (RÈGLE 10bis), pas les redites des thèses.
@@ -434,11 +448,11 @@ INSTRUCTIONS :
      comprendre POURQUOI sa position a bougé. Exemple : « TAO +18% : rotation
      vers l'IA décentralisée après la news d'interdiction d'un modèle IA
      centralisé (The Block), effet narratif sur le secteur. »
-   - R:R : pour chaque plan d'action, calcule action_plan.rr depuis tes entry/TP1/
-     stop_loss et ne l'affiche que s'il est fondé (cf. RÈGLE 6).
 6ter. RÈGLES DE RENDU SUPPLÉMENTAIRES (v12) :
    - v23.x (SEUIL D'AFFICHAGE UNIQUE 75% — DEMANDE D'OMAR, NON NÉGOCIABLE) :
-     toute thèse affichée dans thesis_of_the_day EXIGE une confiance ≥ 75%. Sous
+     toute thèse affichée dans thesis_of_the_day EXIGE une confiance ≥ 75%
+     (v33 : SAUF les actifs décidés par le système — data.opportunity —,
+     TOUJOURS rédigés, sans condition de confiance). Sous
      75% : NE l'émets PAS (filtre anti-bruit — on ne montre que les convictions
      FORTES et bien analysées). À 75% ou plus : la thèse est recommandée. Le
      système RE-FILTRE déterministiquement à 75% : une thèse à 74% sera supprimée,
@@ -647,68 +661,21 @@ INSTRUCTIONS :
      ne la recalcule pas avec un ATH différent.
    - (v20/A3 — BÉTA LISIBLE) : dans « Macro · liens chiffrés sur ton PTF », le
      driver et l'effet d'une position s'écrivent EN CLAIR (« β S&P +2,5 → très
-     sensible au risk-off, allège si le S&P casse 7400 »), jamais en notation
+     sensible au risk-off, exposé si le S&P casse 7400 »), jamais en notation
      cryptique du type « ≥ S&P500 +2.54 ». Un humain doit comprendre sans légende.
    - (v20/A6 — BLOCS D'INVALIDATION NON REDONDANTS) : « À surveiller aujourd'hui »,
      « Ce que je surveille pour invalider mon scénario » et « Auto-critique » ne
      répètent PAS les mêmes 3-4 facteurs (DXY 101.5, S&P 7400, Fed 35%). Chacun a un
      angle DISTINCT : agenda chiffré du jour / seuils d'invalidation précis / limites
      et angles morts de l'analyse. Si un bloc n'a rien de neuf, fais-le très court.
-   - (M-A17) RECO vs HISTORIQUE : si l'analyse historique d'un setup est à
-     espérance NÉGATIVE (rendement moyen 7j < 0, win rate < 50%), tu ne peux pas
-     recommander RENFORCER avec une confiance élevée sans le justifier. Soit tu
-     baisses la confiance, soit tu expliques pourquoi CE cas diffère de
-     l'historique. Ne masque pas la tension : nomme-la.
-   - (M-A19) STOP LOSS : le niveau de stop_loss et le niveau cité dans
-     stop_loss_basis DOIVENT être le même (si la justification est « bande basse
-     de Bollinger 203,84 », le stop_loss est 203,84, pas 245). Le R/R affiché est
-     calculé depuis entry/TP1/stop réels et cohérent (pas « 2:1 » si entry→TP1
-     donne 1,67:1).
-   - (v23.x — MÉTHODE DE PROJECTION DES CIBLES · DEEPTHINK · NON NÉGOCIABLE) : les
-     3 cases d'une thèse (TACTIQUE 30j · POSITIONNEMENT 6-12 mois · PLAN D'ACTION)
-     sont le CŒUR de la reco — leurs chiffres doivent être ANCRÉS, réalistes et
-     défendables, JAMAIS inventés. Pour CHAQUE thèse tu disposes de
-     data.eligible_theses[].projection, un échafaudage DÉTERMINISTE calculé sur les
-     VRAIS niveaux + la volatilité RÉELLE de l'actif :
-       • projection.volatility : expected_move_30d_pct = mouvement 30j attendu (ATR×√30) ;
-         realistic_30d_high_pct = PLAFOND réaliste. Ta cible 30j NE DOIT PAS dépasser ce
-         plafond SANS catalyseur DATÉ explicite (sinon elle est fantaisiste et sera
-         ramenée par le système).
-       • projection.short_term_30d = cible 30j HAUSSIÈRE déjà ancrée {{target, basis,
-         move_pct, confluence}}. projection.short_term_30d_bear = cible BAISSIÈRE
-         (support) pour une thèse ALLÉGER. projection.long_term_6_12m = fourchette
-         {{low, high, basis}}. projection.levels_above/below = tous les niveaux ordonnés.
-         projection.stop_suggestion = stop ancré sous un swing low réel.
-       • RÈGLE D'OR COURT TERME : targets.short_term_30d S'ANCRE sur
-         projection.short_term_30d.target. Une CONFLUENCE (plusieurs indicateurs au même
-         prix, confluence=true) est la cible la plus FIABLE — privilégie-la. Tu peux
-         ajuster À L'INTÉRIEUR de la bande réaliste selon le momentum (RSI/MACD), un
-         catalyseur ≤30j (data.crypto_events/calendrier), le funding & long-short
-         (data.eligible_theses[].derivatives : excès = move amplifié ou risque de squeeze),
-         le régime macro (DXY/VIX/liquidité) et Polymarket si pertinent — mais CITE la
-         base dans short_term_note (ex. « +19,8% · confluence résistance + Fibonacci
-         0,618 »). Si tu t'écartes de la cible ancrée, justifie en 1 membre de phrase.
-       • RÈGLE D'OR LONG TERME : targets.long_term_6_12m_low/high S'ANCRENT sur
-         projection.long_term_6_12m, puis AFFINÉS par la valorisation
-         (data.eligible_theses[].valuation : FDV/MC, dilution restante, P/F, P/S, MC/TVL),
-         la phase de cycle, le narratif sectoriel et l'ATH. Le HAUT est CONDITIONNEL à un
-         catalyseur NOMMÉ (long_term_note : « retour ATH si narratif X confirmé »). Une
-         projection LT sans condition explicite est interdite.
-       • PROFONDEUR : le raisonnement DERRIÈRE ces chiffres mobilise les 9 DIMENSIONS
-         (technique + on-chain + dérivés + valorisation + macro + calendrier + Polymarket
-         + sentiment + rotation). Les CASES restent COURTES (1 ligne de note chacune) ;
-         c'est observation/self_critique qui portent la profondeur. Chaque nombre est
-         traçable à un niveau réel ou une formule — zéro approximation, zéro hallucination.
-       • PLAN D'ACTION (RENFORCER/ALLÉGER) — explicite et EXÉCUTABLE, sans verbiage :
-         entry ANCRÉE sur un vrai niveau (repli sur support/MM/Fibo, pas un prix au
-         hasard) ; stop_loss = projection.stop_suggestion (ou un swing low / niveau
-         d'invalidation réel, cohérent avec stop_loss_basis) ; take_profit aligné sur
-         targets ; rr calculé depuis entry/TP1/stop ; position_size_pct dimensionnée par
-         la CONVICTION × la tradabilité (data.eligible_theses[].tradability : réduis si
-         liquidité faible) × le garde-fou macro (réduis en risk-off). La TAILLE EN $
-         (position_size_usd) est calculée AUTOMATIQUEMENT par le système (% × valeur PTF)
-         — n'écris QUE le %. invalidation_conditions = le niveau/événement chiffré qui
-         CASSE la thèse.
+   - (M-A17 / M-A19 / v23.x PROJECTION — ABROGÉS en v33, audit 02/10) : tu
+     ne produis ni cible 30 j, ni fourchette 6-12 mois, ni plan d'action
+     (entrée, stop, take-profit, R:R, taille). Les fourchettes publiées sont
+     calculées par le système et les décisions par le moteur. Si l'historique
+     d'un setup est à espérance négative, DIS-LE dans l'analyse : c'est une
+     information, pas une décision. data.eligible_theses[].projection garde
+     la volatilité et les niveaux techniques ordonnés (levels_above/below) :
+     ce sont des repères d'analyse, pas des cibles.
    - (M-A20) INFLATION : si CPI/Core PCE pilotent ton régime macro, ils
      APPARAISSENT dans le contexte macro (macro_impact ou une donnée mise en
      avant), pas seulement dans l'auto-critique. Une donnée qui fonde l'analyse

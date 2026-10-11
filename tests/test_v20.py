@@ -99,10 +99,10 @@ def test_send_email_without_images_stays_alternative(monkeypatch) -> None:
 # --------------------------------------------------------------------------- #
 def test_app_version_is_v20() -> None:
     # v28 — livrable étiqueté v28 (correctifs audit 07/07).
-    assert APP_VERSION == "v30"
+    assert APP_VERSION == "v32"
     payload = {"header": {"date": "19/06"}, "portfolio_snapshot": {"value_usd": 1.0}}
     html = render(payload, "weekly")
-    assert "v30" in html
+    assert "v32" in html
     assert "v18" not in html
 
 
@@ -166,4 +166,12 @@ def test_a1_summary_table_all_theses_detail_only_top3() -> None:
     # Détail (raisonnement) seulement pour le top-3 (_expand=True).
     assert "RAISONMARKETH" in html and "RAISONMARKLINK" in html
     assert "RAISONMARKINJ" not in html and "RAISONMARKXRP" not in html
-    assert "plus fortes convictions" in html  # légende ★
+    # v32 (1.7) — la légende dit désormais la RÈGLE réelle de sélection
+    # (cœur d'abord, puis les meilleurs scores) au lieu de « les 3 plus fortes
+    # convictions », qui était faux : le 21/08, INJ (score 8) n'avait pas de
+    # fiche pendant qu'ETH (6) et TAO (5) en avaient une.
+    assert "Détail complet ci-dessous" in html          # légende ★
+    # v33 (audit 02/10) — le score V30 ne choisit plus les fiches : c'est
+    # l'excédent du moteur (main : _score_these) ; la légende le dit.
+    assert ("cœur (BTC/ETH) d'abord, puis les plus forts excédents "
+            "(potentiel − requis)") in html

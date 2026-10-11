@@ -219,13 +219,41 @@ def test_context_to_text_handles_empty():
     assert "Aucun contexte" in txt
 
 
-def test_context_to_text_truncates():
+def test_context_to_text_omet_des_blocs_entiers_jamais_la_moitie():
+    """v32 (4.1) — la coupe est STRUCTURELLE, plus une coupe au caractère.
+
+    L'ancien contrat (« tronque à max_chars et ajoute une mention ») était
+    précisément le défaut : un ``text[:50000]`` sur un JSON coupait au milieu
+    du tableau des positions, et le bot lisait « 7 positions » là où le
+    portefeuille en compte 29. Le contrat devient : tout bloc présent est
+    COMPLET, et les blocs sacrifiés sont NOMMÉS.
+    """
+    import json as _json
     from src.telegram_bot.context_loader import context_to_text
 
-    big = {"x": ["data"] * 50000}
+    big = {"x": ["data"] * 50000, "portfolio": {"count": 3, "positions": [1, 2, 3]}}
     txt = context_to_text(big, max_chars=1000)
-    assert len(txt) <= 1100
-    assert "tronqué" in txt
+    out = _json.loads(txt)                       # reste un JSON VALIDE
+    assert out["portfolio"]["count"] == 3        # le socle factuel survit
+    assert "x" in out["_completude_contexte"]["blocs_omis"]
+    assert "x" not in out                        # omis en ENTIER, pas coupé
+
+
+def test_context_to_text_donne_la_priorite_au_portefeuille():
+    """Le portefeuille passe AVANT les rapports, quel que soit l'ordre reçu."""
+    import json as _json
+    from src.telegram_bot.context_loader import context_to_text
+
+    positions = [{"symbol": f"S{i}", "quantity": i, "pru": i * 1.5}
+                 for i in range(29)]
+    ctx = {
+        "last_morning_report": {"bloc": ["texte long " * 400] * 20},
+        "last_evening_report": {"bloc": ["texte long " * 400] * 20},
+        "portfolio": {"positions": positions, "count": 29},
+    }
+    out = _json.loads(context_to_text(ctx, max_chars=20000))
+    assert out["portfolio"]["count"] == 29
+    assert len(out["portfolio"]["positions"]) == 29
 
 
 # --------------------------------------------------------------------------- #

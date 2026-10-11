@@ -187,7 +187,9 @@ def _compute_skew(
     return out
 
 
-def _fetch_options_summary(currency: str) -> dict[str, Any]:
+def _fetch_options_summary(
+    currency: str, spot_price: Optional[float] = None,
+) -> dict[str, Any]:
     """Put/call ratio (OI global) + max pain + skew 25Δ (OB26)."""
     raw = get_json(
         f"{_BASE}/get_book_summary_by_currency",
@@ -201,6 +203,8 @@ def _fetch_options_summary(currency: str) -> dict[str, Any]:
     call_oi = put_oi = 0.0
     # OI par expiration pour isoler la prochaine échéance (max pain).
     by_expiry: dict[datetime, list[tuple[float, str, float]]] = {}
+    # v32 (5.3) — forward par échéance (cf. commentaire plus bas).
+    fwd_by_expiry: dict[datetime, float] = {}
     iv_opts: list[tuple[datetime, float, str, Optional[float], Optional[float]]] = []
     underlying: Optional[float] = None
 
@@ -224,8 +228,18 @@ def _fetch_options_summary(currency: str) -> dict[str, Any]:
             underlying = float(inst["underlying_price"])
         if expiry > now:
             by_expiry.setdefault(expiry, []).append((strike, opt, oi))
+            # v32 (5.3) — underlying_price de Deribit est le FORWARD de CETTE
+            # échéance, pas le spot : il dérive du spot d'autant plus que
+            # l'échéance est lointaine (~+4 % à 4 mois sous un funding de
+            # +10,9 %/an). On mémorise donc le forward PAR échéance pour
+            # pouvoir comparer le max pain à la référence de SA propre
+            # échéance — et non à celle, arbitraire, du premier instrument
+            # rencontré dans une réponse d'API non ordonnée.
+            _u = _f(inst.get("underlying_price"))
+            if _u:
+                fwd_by_expiry.setdefault(expiry, _u)
             iv_opts.append((expiry, strike, opt,
-                            _f(inst.get("mark_iv")), _f(inst.get("underlying_price"))))
+                            _f(inst.get("mark_iv")), _u))
 
     out: dict[str, Any] = {}
     if call_oi > 0:
@@ -240,8 +254,19 @@ def _fetch_options_summary(currency: str) -> dict[str, Any]:
         if mp is not None:
             out["max_pain"] = mp
             out["max_pain_expiry"] = nearest.strftime("%d %b %Y")
-            if underlying:
-                out["max_pain_gap_pct"] = round((mp - underlying) / underlying * 100, 1)
+            # v32 (5.3) — RÉFÉRENCE : le spot fourni par l'appelant s'il existe
+            # (c'est LUI que le mail affiche), sinon le forward de l'échéance
+            # DU max pain. Avant, l'écart était calculé contre le forward d'une
+            # échéance quelconque : le 23/08/2026, max pain 76 500 $ pour un
+            # spot 76 226 $ (soit +0,4 %, aimant HAUSSIER) était publié
+            # « −3,3 % vs spot · aimant baissier » — verdict directionnel
+            # INVERSÉ, pas seulement une magnitude fausse.
+            ref = spot_price or fwd_by_expiry.get(nearest) or underlying
+            if ref:
+                out["max_pain_gap_pct"] = round((mp - ref) / ref * 100, 1)
+                out["max_pain_ref_price"] = round(ref, 2)
+                out["max_pain_ref_kind"] = (
+                    "spot" if spot_price else "forward échéance")
 
     # OB26 — skew 25Δ sur l'échéance ≈30 j (best-effort, réutilise le même fetch).
     skew = _compute_skew(iv_opts, now)
@@ -277,19 +302,31 @@ def _fetch_dvol(currency: str) -> Optional[float]:
     return None
 
 
-def get_options_metrics() -> dict[str, Any]:
+def get_options_metrics(
+    spot_prices: Optional[dict[str, float]] = None,
+) -> dict[str, Any]:
     """Récupère les métriques options Deribit pour BTC et ETH.
+
+    Args:
+        spot_prices: v32 (5.3) — ``{"BTC": 78911.0, ...}`` prix SPOT affichés
+            par le mail. Sert de référence à ``max_pain_gap_pct`` pour que
+            l'écart publié soit celui que le lecteur peut recalculer lui-même
+            depuis les deux nombres du mail. Sans lui, on retombe sur le
+            forward de l'échéance du max pain (correct mais non recalculable
+            par le lecteur).
 
     Returns:
         Dict ``{available, assets: {SYM: {put_call_ratio, max_pain,
         max_pain_expiry, max_pain_gap_pct, dvol, underlying_price}}}``.
         ``available=False`` si aucune devise n'a pu être récupérée.
     """
+    spots = {str(k).upper(): v for k, v in (spot_prices or {}).items()
+             if isinstance(v, (int, float)) and v > 0}
 
     def _fetch() -> dict[str, Any]:
         assets: dict[str, Any] = {}
         for cur in _CURRENCIES:
-            entry = _fetch_options_summary(cur)
+            entry = _fetch_options_summary(cur, spots.get(cur.upper()))
             dvol = _fetch_dvol(cur)
             if dvol is not None:
                 entry["dvol"] = dvol
@@ -300,7 +337,10 @@ def get_options_metrics() -> dict[str, Any]:
         return {"available": True, "assets": assets}
 
     try:
-        return CACHE.get_or_compute("deribit:options", 1800, _fetch)
+        _cle = "deribit:options" + (
+            ":" + ",".join(f"{k}={spots[k]:.0f}" for k in sorted(spots))
+            if spots else "")
+        return CACHE.get_or_compute(_cle, 1800, _fetch)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Deribit indisponible : %s", exc)
         return {"available": False, "assets": {}}

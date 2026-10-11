@@ -16,7 +16,7 @@ import inspect
 def test_app_version_v23():
     from src.reporting.email_html import APP_VERSION
     # Nommage final : le livrable est étiqueté v26 (décision Omar, 2026-07-05).
-    assert APP_VERSION == "v30"
+    assert APP_VERSION == "v32"
 
 
 # --------------------------------------------------------------------------- #
@@ -342,13 +342,15 @@ def test_thesis_floor_filters_below_75():
 
 
 def test_thesis_all_below_75_yields_empty_with_reason():
-    """Toutes les pistes < 75% → aucune thèse + raison honnête mentionnant 75%."""
+    """v33 — le motif d'absence ne parle plus d'un seuil de confiance du
+    modèle : sans moteur, il dit que le moteur est indisponible."""
     from src.main import _merge_python_facts
     theses = [{"asset": "INJ", "action": "SURVEILLER", "action_type": "neutral", "confidence": 68}]
     out = _merge_python_facts(
         {"thesis_of_the_day": theses}, {"eligible_theses": []}, "29/06 08:00")
     assert out["thesis_of_the_day"] == []
-    assert "75%" in (out.get("thesis_empty_reason") or "")
+    assert "Moteur d'allocation indisponible" in out["thesis_empty_reason"]
+    assert "75%" not in out["thesis_empty_reason"]
 
 
 def test_sector_cells_holdings_5_plus_n():

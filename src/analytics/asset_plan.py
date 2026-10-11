@@ -22,9 +22,17 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from src.analytics.key_levels import compute_key_levels
+from src.utils import numfmt as _numfmt
+from src.utils.numfmt import arrondi_niveau as _arr
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# v32 (5.20) — NEUTRE d'un funding perpétuel : le taux par défaut appliqué par
+# les plateformes quand la prime est dans le corridor (0,01 % par période de
+# 8 h), soit 0,01 × 3 × 365 = 10,95 %/an. C'est le point zéro du signal :
+# en dessous, les shorts payent ; au-dessus, les longs payent.
+_FUNDING_NEUTRE = 10.95
 
 
 def _num(v: Any) -> Optional[float]:
@@ -49,7 +57,9 @@ def _fmt_usd(v: Optional[float]) -> Optional[str]:
         return f"{v:,.2f}".replace(".", ",") + " $"
     if a >= 0.01:
         return f"{v:.4f}".replace(".", ",") + " $"
-    return f"{v:.6f}".replace(".", ",") + " $"
+    # v32 (5.6) — 6 décimales FIXES perdaient encore les chiffres d'un actif à
+    # 1,2e-5 $ ; l'autorité unique donne 4 chiffres SIGNIFICATIFS.
+    return _numfmt.fr_num(v, thin=False) + " $"
 
 
 def _pct_fr(v: float, nd: int = 1) -> str:
@@ -87,8 +97,20 @@ def _prob_up_30d(
         tilts.append((_clamp(ma200 / 25.0, -1, 1), 0.6))
     fund = _num(funding_annualized_pct)
     if fund is not None:
-        # Funding très négatif = shorts en excès → carburant contrarian haussier.
-        tilts.append((_clamp(-fund / 25.0, -1, 1), 0.6))
+        # ── v32 (5.20) — LE POINT ZÉRO EST LE NEUTRE DU MARCHÉ, PAS 0 %/AN.
+        # Arbitrage d'Omar (25/08/2026).
+        #
+        # Funding très négatif = shorts en excès → carburant contrarian
+        # haussier ; funding très positif = surchauffe des longs. Mais le signal
+        # était centré sur 0 %/an, alors que le NEUTRE d'un perpétuel est le
+        # taux par défaut des plateformes : 0,01 % par période, soit
+        # 0,01 × 3 × 365 = **+10,95 %/an**. Un actif au funding parfaitement
+        # normal recevait donc un tilt de −0,438 (poids 0,6) — MESURÉ : −2,0
+        # points de probabilité de hausse par rapport à l'absence totale de
+        # donnée. Ce biais baissier s'appliquait à presque tous les actifs, se
+        # propageait à l'« Espérance 30 j » publiée sur chaque fiche, et
+        # provenait d'une valeur qui ne dit rien.
+        tilts.append((_clamp(-(fund - _FUNDING_NEUTRE) / 25.0, -1, 1), 0.6))
     tilt_mkt = _num(market_net_tilt)
     if tilt_mkt is not None:
         tilts.append((_clamp(tilt_mkt, -1, 1), 0.8))
@@ -220,6 +242,26 @@ def compute_asset_plan(
     readout = kl.get("readout") or {}
     atr = _num(readout.get("atr_abs")) or px * 0.03  # repli : 3% du prix
 
+    # ── RED TEAM (RT-4) — L'INVALIDATION DOIT RESTER SOUS LE REPÈRE
+    # D'ACCUMULATION DU MÊME PLAN.
+    #
+    # ``s_ref`` est le support de travail : le premier support détecté, ou
+    # « prix − 1 ATR » quand aucun ne l'est. Il sert à la zone d'accumulation
+    # et au 2ᵉ palier DCA. Les replis de l'invalidation étaient, eux, ancrés
+    # sur un −8 % FIXE : deux ancrages indépendants, donc un ordre non garanti.
+    # Reproduit par fuzzing sur des prix ordinaires : « Invalidation 0,1843 $ ·
+    # Zone d'accu 0,1803–0,1903 $ · DCA 50 % à 0,1803 $ » — le plan faisait
+    # acheter la moitié de la position 2 % SOUS son propre stop. Il suffit
+    # qu'aucun support ne soit détecté (l'actif fait un plus-bas) et que l'ATR
+    # dépasse 8 % du prix. On calcule donc ``s_ref`` d'abord, et tout repli
+    # d'invalidation passe sous lui d'au moins une demi-amplitude.
+    _s1 = _num(sups[0].get("level")) if sups else None
+    s_ref = _s1 if (_s1 and _s1 < px) else px - atr
+
+    def _repli_invalidation() -> float:
+        """−8 %, ou une demi-amplitude sous le repère d'accumulation : le plus bas."""
+        return min(px * 0.92, s_ref - 0.5 * atr)
+
     # ── TH1 — INVALIDATION : le prix qui tue la thèse. 2e support (le 1er
     # peut être bruité par l'intraday) ; repli : 1er support − 1 ATR ; repli
     # ultime : −8% (jamais de plan sans invalidation).
@@ -230,13 +272,34 @@ def compute_asset_plan(
         inv_level = (_num(sups[0].get("level")) or px * 0.95) - atr
         inv_basis = f"{sups[0].get('basis')} − 1 ATR"
     else:
-        inv_level, inv_basis = px * 0.92, "repli −8% (aucun support détecté)"
+        inv_level = _repli_invalidation()
+        inv_basis = ("repli −8% (aucun support détecté)"
+                     if inv_level >= px * 0.92 - 1e-12
+                     else "1,5 ATR sous le prix (aucun support détecté)")
     if inv_level is None or inv_level >= px or inv_level <= 0:
         # ``inv_level <= 0`` : micro-prix avec ATR > support (« s0 − 1 ATR »
         # négatif) — un plan n'a jamais d'invalidation à 0 ou négative.
-        inv_level, inv_basis = px * 0.92, "repli −8% (support incohérent)"
+        inv_level = _repli_invalidation()
+        inv_basis = ("repli −8% (support incohérent)"
+                     if inv_level >= px * 0.92 - 1e-12
+                     else "1,5 ATR sous le prix (support incohérent)")
+    if inv_level <= 0:
+        # Volatilité extrême : la demi-amplitude passe sous zéro. On garde une
+        # invalidation strictement positive plutôt qu'un prix impossible.
+        inv_level, inv_basis = px * 0.5, "repli −50% (volatilité extrême)"
+    # ── RED TEAM (RT-4, filet) — LE REPÈRE D'ACCUMULATION RESTE AU-DESSUS DU
+    # STOP, quoi qu'il arrive. Le repli « −50 % (volatilité extrême) » ci-dessus
+    # remonte l'invalidation ; quand l'ATR dépasse la moitié du prix, le repère
+    # « prix − 1 ATR » repasse en dessous. On le replace alors à mi-chemin, et
+    # on le DIT dans la base du palier : un palier d'accumulation sous son
+    # propre stop n'est pas un palier, c'est une contradiction publiée.
+    _base_s_ref = None
+    if s_ref <= inv_level:
+        s_ref = (inv_level + px) / 2.0
+        _base_s_ref = "mi-chemin prix / invalidation (volatilité extrême)"
+
     invalidation = {
-        "level": round(inv_level, 6),
+        "level": _arr(inv_level),
         "level_label": _fmt_usd(inv_level),
         "basis": inv_basis,
         "dist_pct": round((inv_level - px) / px * 100, 1),
@@ -257,11 +320,11 @@ def compute_asset_plan(
     if tgt is None:
         tgt = (px + 2 * atr, "extension +2 ATR (aucune résistance détectée)")
     target_30d = {
-        "level": round(tgt[0], 6),
+        "level": _arr(tgt[0]),
         "level_label": _fmt_usd(tgt[0]),
         "basis": tgt[1],
-        "low": round(max(tgt[0] - atr, px), 6),
-        "high": round(tgt[0] + atr, 6),
+        "low": _arr(max(tgt[0] - atr, px)),
+        "high": _arr(tgt[0] + atr),
         "low_label": _fmt_usd(max(tgt[0] - atr, px)),
         "high_label": _fmt_usd(tgt[0] + atr),
         "upside_pct": round((tgt[0] - px) / px * 100, 1),
@@ -274,8 +337,8 @@ def compute_asset_plan(
     if ath_v and ath_v > px * 1.10 and not ath_suspect:
         low_c = px + (ath_v - px) * 0.618
         target_cycle = {
-            "low": round(low_c, 6),
-            "high": round(ath_v, 6),
+            "low": _arr(low_c),
+            "high": _arr(ath_v),
             "low_label": _fmt_usd(low_c),
             "high_label": _fmt_usd(ath_v),
             "upside_pct": round((ath_v - px) / px * 100, 0),
@@ -300,7 +363,6 @@ def compute_asset_plan(
     p_base = int(round(55 - 20 * tilt_strength))
     p_bull = int(round((100 - p_base) * p_up))
     p_bear = 100 - p_base - p_bull
-    _s1 = _num(sups[0].get("level")) if sups else None
     scenarios = {
         "bull": {
             "probability_pct": p_bull,
@@ -311,7 +373,7 @@ def compute_asset_plan(
         },
         "base": {
             "probability_pct": p_base,
-            "low": round(_s1, 6) if _s1 else invalidation["level"],
+            "low": _arr(_s1) if _s1 else invalidation["level"],
             "high": target_30d["level"],
             "range_label": (f"{_fmt_usd(_s1 if _s1 else invalidation['level'])}"
                             f" – {target_30d['level_label']}"),
@@ -319,31 +381,60 @@ def compute_asset_plan(
         },
         "bear": {
             "probability_pct": p_bear,
-            "level": round(inv_level - atr, 6),
-            "level_label": _fmt_usd(inv_level - atr),
+            # RED TEAM (RT-7) — un PRIX négatif n'existe pas. « invalidation
+            # − 1 ATR » passait sous zéro quand l'ATR dépassait l'invalidation
+            # (volatilité extrême) : le mail publiait « −42,21 $ » comme
+            # objectif baissier. Plancher à la moitié de l'invalidation.
+            "level": _arr(max(inv_level - atr, inv_level * 0.5)),
+            "level_label": _fmt_usd(max(inv_level - atr, inv_level * 0.5)),
             "condition": (f"cassure de {invalidation['level_label']} "
                           f"({invalidation['basis']}) en clôture"),
         },
     }
 
     # ── RE3 — ZONE D'ACCUMULATION + DCA 3 tranches (contrarian, profil Omar).
-    s1 = _s1 if (_s1 and _s1 < px) else px - atr
+    s1 = s_ref
     accumulation_zone = {
-        "low": round(min(inv_level + 0.25 * atr, s1), 6),
-        "high": round(min(px, s1 + 0.5 * atr), 6),
+        "low": _arr(min(inv_level + 0.25 * atr, s1)),
+        "high": _arr(min(px, s1 + 0.5 * atr)),
     }
     accumulation_zone["low_label"] = _fmt_usd(accumulation_zone["low"])
     accumulation_zone["high_label"] = _fmt_usd(accumulation_zone["high"])
+    # ── v32 (5.10) — LA 3ᵉ TRANCHE DOIT AVOIR DE LA PLACE, ou disparaître.
+    # Elle était placée à inv + 0,25 ATR, soit un QUART de l'amplitude
+    # journalière au-dessus du stop du MÊME plan. Mesuré sur les mails réels :
+    # INJ 24/08 tranche 3 a 5,30 $ pour un stop a 5,25 $ ; TAO 21/08 213,70 $
+    # pour un stop a 212,45 $ ; RENDER 21/08 1,26 $ pour un stop a 1,25 $. Un
+    # ordre exécuté là se fait sortir par le bruit ordinaire de la séance : la
+    # tranche d'accumulation et le stop du même plan ne peuvent pas coexister
+    # à cette distance. Trois paliers factices valent moins que deux vrais :
+    # si l'espace sous le support ne loge pas un palier à ≥ 0,5 ATR du stop et
+    # nettement sous le précédent, on n'en publie que deux, et on le dit.
     dca = [
-        {"price": round(px, 6), "price_label": _fmt_usd(px),
+        {"price": _arr(px), "price_label": _fmt_usd(px),
          "weight_pct": 40, "basis": "prix actuel"},
-        {"price": round(s1, 6), "price_label": _fmt_usd(s1),
-         "weight_pct": 30, "basis": (sups[0].get("basis") if sups
-                                     else "prix − 1 ATR")},
-        {"price": round(max(inv_level + 0.25 * atr, inv_level), 6),
-         "price_label": _fmt_usd(max(inv_level + 0.25 * atr, inv_level)),
-         "weight_pct": 30, "basis": "au-dessus de l'invalidation"},
+        {"price": _arr(s1), "price_label": _fmt_usd(s1),
+         "weight_pct": 30, "basis": (_base_s_ref
+                                     or (sups[0].get("basis") if sups
+                                         else "prix − 1 ATR"))},
     ]
+    dca_note = None
+    # 0,5 ATR = une demi-amplitude journalière : en-deçà, le palier et le stop
+    # sont le même niveau à la volatilité près, et l'ordre se fait sortir le
+    # jour de son exécution. C'est le minimum, pas un confort.
+    _t3 = inv_level + 0.5 * atr
+    if _t3 < s1 - 0.15 * atr:
+        dca.append({"price": _arr(_t3), "price_label": _fmt_usd(_t3),
+                    "weight_pct": 30,
+                    "basis": "0,5 ATR au-dessus de l'invalidation"})
+    else:
+        # Pas de place : on redistribue le poids sur les deux paliers reels.
+        dca[0]["weight_pct"], dca[1]["weight_pct"] = 50, 50
+        _repere = ("sous le support" if sups
+                   else "sous le prix − 1 ATR (aucun support détecté)")
+        dca_note = (f"2 paliers seulement : {_repere}, il ne reste pas "
+                    "une demi-amplitude avant l'invalidation — un 3e palier serait sorti "
+                    "par le bruit du jour.")
 
     # ── ligne FR compacte (rendu mail + Telegram).
     parts = [
@@ -362,7 +453,7 @@ def compute_asset_plan(
     return {
         "available": True,
         "symbol": symbol,
-        "price": round(px, 6),
+        "price": _arr(px),
         "price_label": _fmt_usd(px),
         "invalidation": invalidation,
         "target_30d": target_30d,
@@ -370,9 +461,21 @@ def compute_asset_plan(
         "rr_30d": rr_30d,
         "prob_up_30d": p_up,
         "ev_30d_pct": ev,
-        "ev_note": "estimation indicative (signaux techniques + funding), pas une certitude",
+        # v32 (5.9) - L'ESPÉRANCE DIT SUR QUOI ELLE PORTE. Le mail affichait
+        # côte à côte une espérance à DEUX issues (cible vs invalidation,
+        # pondérées par p_up) et un arbre à TROIS scénarios (bull/base/bear à
+        # des niveaux différents) : deux modèles du même futur, impossibles à
+        # réconcilier. Vérifié sur les mails réels — INJ 24/08 : 0,50 ×
+        # (+3,91 %) + 0,50 × (−2,23 %) = +0,8 %, exactement la valeur publiée,
+        # alors que les scénarios affichés en donnaient +1,2 %. Les deux
+        # chiffres étaient justes ; rien ne disait qu'ils ne mesuraient pas la
+        # même chose. On nomme donc la base de calcul.
+        "ev_note": ("cible 30 j vs invalidation, pondérées par p↑ — "
+                    "distincte de l'arbre bull/base/bear ci-dessus ; "
+                    "estimation indicative, pas une certitude"),
         "scenarios": scenarios,
         "accumulation_zone": accumulation_zone,
         "dca": dca,
+        "dca_note": dca_note,
         "plan_line": plan_line,
     }

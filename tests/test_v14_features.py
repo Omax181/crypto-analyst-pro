@@ -14,6 +14,7 @@ Couvre :
 from __future__ import annotations
 
 import re
+from src.reporting.email_html import APP_VERSION
 
 
 # --------------------------------------------------------------------------- #
@@ -133,7 +134,9 @@ def test_reco_bilan_empty_renders_ras():
     """v23.x : aucune reco ferme -> ligne courte « RAS », pas de tableau vide."""
     from src.reporting.email_html import render
     html = render({"reco_bilan": []}, "evening")
-    assert "Recos du matin" in html
+    # v32 (2.9) - le tableau ne couvre plus les seules recos du matin
+    # mais TOUTES les recos ouvertes : son titre le dit.
+    assert "Recos actives · bilan soir" in html
     assert "Aucune reco active" in html
 
 
@@ -146,7 +149,10 @@ def test_tracker_dedup_same_asset_action(monkeypatch):
     import src.state.report_memory as rm
     store: dict = {}
     monkeypatch.setattr(rm, "_read",
-                        lambda f, default: store.get(f, default if default is not None else []))
+                        # RT-6 : la doublure suit la signature de _read
+                        # (parametre `elements`), sinon elle ment sur le vrai I/O.
+                        lambda f, default, elements=None: store.get(
+                            f, default if default is not None else []))
     monkeypatch.setattr(rm, "_write", lambda f, data: store.__setitem__(f, data))
     # 3 mornings BTC RENFORCER (ids datés différents) -> 1 seule reco
     for day in ("05", "06", "08"):
@@ -162,7 +168,10 @@ def test_tracker_action_change_archives(monkeypatch):
     import src.state.report_memory as rm
     store: dict = {}
     monkeypatch.setattr(rm, "_read",
-                        lambda f, default: store.get(f, default if default is not None else []))
+                        # RT-6 : la doublure suit la signature de _read
+                        # (parametre `elements`), sinon elle ment sur le vrai I/O.
+                        lambda f, default, elements=None: store.get(
+                            f, default if default is not None else []))
     monkeypatch.setattr(rm, "_write", lambda f, data: store.__setitem__(f, data))
     rm.add_recommendation({"id": "ETH-1-RENFORCER", "asset": "ETH",
                            "action": "RENFORCER", "entry_price": 1600})
@@ -250,12 +259,14 @@ def test_evening_render_8_blocs():
     html = render(_enriched_evening_payload(), "evening")
     assert not re.search(r"\{\{|\{%", html)          # pas de Jinja non rendu
     assert "rendu simplifié" not in html             # pas de fallback
-    assert "Crypto Analyst Pro · v30" in html        # versioning
+    assert f"Crypto Analyst Pro · {APP_VERSION}" in html        # versioning
     # blocs présents
     assert "Bilan du jour" in html
     assert "Marchés · mi-séance" in html
     assert "Ce qui a évolué" in html
-    assert "Recos du matin" in html
+    # v32 (2.9) - le tableau ne couvre plus les seules recos du matin
+    # mais TOUTES les recos ouvertes : son titre le dit.
+    assert "Recos actives · bilan soir" in html
     assert "Niveaux à surveiller" in html
     assert "Demain matin" in html
     # fmt_money dans le bilan recos (convention FR v30)
@@ -322,15 +333,7 @@ def test_morning_reorder_histoire_before_enbref():
     assert "en bref" in html.lower()               # EN BREF conservé
 
 
-def test_morning_plan_fmt_money():
-    from src.reporting.email_html import render
-    html = render(_morning_payload(), "morning")
-    assert "63\u202f180,00\u202f$" in html   # entrée (plan d'action)
-    assert "60\u202f500,00\u202f$" in html   # SL (plan d'action)
-    # v17 (M-B2) : le « Take profit » a été retiré du plan d'action (doublon des
-    # cibles). La cible CT 30j reste affichée dans l'encadré cibles à droite.
-    assert "70\u202f990,00\u202f$" in html   # cible CT 30j (targets.short_term_30d)
-    assert "Take profit :" not in html  # plus de TP dupliqué dans le plan
+# v33 (audit 01/10) — « test_morning_plan_fmt_money » retiré : le plan d'action V30 (entrée/stop/TP/R:R du modèle, cibles ATH/résistance) n'est plus rendu sur une posture ferme — la fiche porte les chiffres du moteur (tests/test_v33_chaine.py)
 
 
 def test_morning_arrows_and_plural_and_polymarket():
@@ -339,11 +342,11 @@ def test_morning_arrows_and_plural_and_polymarket():
     # v18 (M-A16) : la tuile BTC affiche désormais un Δ24h CHIFFRÉ (« +2.2% »)
     # au lieu d'une simple flèche. On vérifie ce % + la présence de flèches sur
     # les indices dont le mouvement dépasse le seuil (Nasdaq −23 → ▼).
-    assert "+2.2%" in html                          # Δ24h BTC chiffré (M-A16)
+    assert "+2,2%" in html                          # Δ24h BTC chiffré (M-A16)
     assert "▼" in html                              # flèche down (Nasdaq)
     assert "données partielles" in html             # pluriel
-    assert "maintien" in html and "99.8%" in html    # Polymarket reframé
-    assert "Crypto Analyst Pro · v30" in html
+    assert "maintien" in html and "99,8%" in html    # Polymarket reframé
+    assert f"Crypto Analyst Pro · {APP_VERSION}" in html
 
 
 # ─────────────────── v14 AUDIT HARDENING TESTS ─────────────────── #
@@ -365,14 +368,16 @@ def test_parse_num_rejects_non_finite():
 
 
 def test_strict_60_filter_all_below_shows_empty_reason():
-    """Toutes les thèses < 60% -> aucune affichée + thesis_empty_reason (pas la 'meilleure')."""
+    """v33 — sans moteur, AUCUNE posture ferme et un motif explicite (le
+    plancher de confiance du modèle ne décide plus rien)."""
     from src.main import _merge_python_facts
     pl = {"thesis_of_the_day": [
         {"asset": "BTC", "action": "RENFORCER", "action_type": "bullish", "confidence": 58},
         {"asset": "ETH", "action": "SURVEILLER", "action_type": "neutral", "confidence": 45}]}
     out = _merge_python_facts(dict(pl), {"eligible_theses": []}, "2026-06-09")
-    assert len(out.get("thesis_of_the_day") or []) == 0
-    assert out.get("thesis_empty_reason")
+    assert not [t for t in (out.get("thesis_of_the_day") or [])
+                if t.get("action") in ("RENFORCER", "ALLÉGER")]
+    assert "Moteur d'allocation indisponible" in out.get("thesis_empty_reason", "")
 
 
 def test_evening_delta_summary_not_rendered_v29():
@@ -401,18 +406,9 @@ def test_no_grid_flex_in_templates():
         assert "display:flex" not in content and "display: flex" not in content
 
 
-def test_morning_ct_lt_is_table_not_grid():
-    from src.reporting.email_html import render
-    pl = {"thesis_of_the_day": [{"asset": "BTC", "action": "RENFORCER", "action_type": "bullish",
-          "confidence": 70, "targets": {"short_term_30d": "70000", "long_term_6_12m_low": "82000"}}]}
-    html = render(pl, "morning")
-    assert "Tactique court terme" in html or "Positionnement LT" in html
-    assert "display:grid" not in html
+# v33 (audit 01/10) — « test_morning_ct_lt_is_table_not_grid » retiré : le plan d'action V30 (entrée/stop/TP/R:R du modèle, cibles ATH/résistance) n'est plus rendu sur une posture ferme — la fiche porte les chiffres du moteur (tests/test_v33_chaine.py)
 
 
-# =========================================================================== #
-# v14 AUDIT FINAL — régressions sur les 9 bugs corrigés
-# =========================================================================== #
 class _PassthroughCache:
     """Cache factice : exécute toujours compute (isole les tests du TTLCache)."""
 
@@ -452,22 +448,21 @@ def test_coingecko_series_exposes_prices_alias(monkeypatch):
 # BUG #3 — tri des thèses : confiance string "72%" ne crash plus
 # --------------------------------------------------------------------------- #
 def test_merge_python_facts_sorts_string_confidence():
+    """Une confiance en CHAÎNE ne fait plus planter le tri — et ne l'ordonne
+    plus : v33, la confiance du modèle n'est plus une variable du système."""
     from src.main import _merge_python_facts
 
     payload = {
         "thesis_of_the_day": [
-            # v23.x — confiances ≥ 75% (seuil d'affichage) pour rester visibles ;
-            # le test vérifie le TRI avec confiance en STRING (pas de TypeError).
             {"asset": "A", "action_type": "neutral", "confidence": "85%"},
             {"asset": "B", "action_type": "bullish", "confidence": "82%"},
             {"asset": "C", "action_type": "bearish", "confidence": 90},
         ]
     }
-    # Avant le fix : TypeError (bad operand type for unary -: 'str') au tri.
     out = _merge_python_facts(payload, {}, "10/06/2026 · 08h30")
     theses = out["thesis_of_the_day"]
-    # action (bullish/bearish) d'abord, par confiance décroissante, puis watch.
-    assert [t["asset"] for t in theses] == ["C", "B", "A"]
+    assert sorted(t["asset"] for t in theses) == ["A", "B", "C"]
+    assert all(t.get("action") not in ("RENFORCER", "ALLÉGER") for t in theses)
 
 
 # --------------------------------------------------------------------------- #
@@ -685,13 +680,26 @@ def test_workflows_forward_coinmetrics_key():
 # BUG #5 — footer hebdo : 12:00 Casablanca (cron dimanche 11h UTC)
 # --------------------------------------------------------------------------- #
 def test_weekly_footer_time_is_noon():
-    from pathlib import Path
+    """v33 (audit 02/10) — l'heure du prochain hebdo dérive du cron RÉEL
+    (11:00 UTC) converti en heure de Casablanca, jamais d'une heure en dur
+    (« 12:00 » supposait UTC+1 ; le Maroc est en UTC+0 depuis le 20/09)."""
+    import inspect
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    import src.main as M
 
-    src = (Path(__file__).resolve().parents[1] / "src" / "main.py").read_text(
-        encoding="utf-8"
-    )
-    assert "12:00 Casablanca" in src
-    assert "15:00 Casablanca" not in src
+    src = inspect.getsource(M.run_weekly)
+    assert '_slot_local("weekly"' in src
+    assert "12:00 Casablanca" not in src and "15:00 Casablanca" not in src
+    dimanche = datetime(2026, 10, 4, 9, tzinfo=timezone.utc).astimezone(ZoneInfo("Africa/Casablanca"))
+    # Indépendant de la base de fuseaux de la machine (2026c : 11:00 ; une base
+    # antérieure donne 12:00) : l'heure publiée est le créneau UTC CONVERTI,
+    # jamais une heure en dur. Une machine de déploiement à base ancienne ne
+    # doit pas faire échouer le déploiement sur ce test.
+    attendu = datetime(2026, 10, 4, 11, 0, tzinfo=timezone.utc).astimezone(
+        ZoneInfo("Africa/Casablanca"))
+    assert M._SLOTS_UTC["weekly"] == (11, 0)
+    assert M._slot_local("weekly", dimanche) == attendu
 
 
 # --------------------------------------------------------------------------- #

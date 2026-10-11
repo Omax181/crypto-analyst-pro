@@ -186,19 +186,21 @@ def test_upcoming_releases_no_key(monkeypatch) -> None:
 def test_next_report_label_values() -> None:
     from src import main
 
-    # Le matin pointe vers un créneau du soir ; le weekly vers un matin.
-    assert "20h00" in main._next_report_label("morning")
-    assert "08h30" in main._next_report_label("weekly")
-    # v28 (E-A1) — le soir pointe vers le PROCHAIN créneau réel : 20h00 le jour
-    # même pour un run hors-cycle en journée, sinon le matin suivant.
+    # v33 — les créneaux sont DÉRIVÉS de l'UTC (Maroc à UTC+0 depuis le
+    # 20/09/2026) : l'attendu se calcule, il ne se code plus en dur.
     from datetime import datetime as _dt
     _h = _dt.now(main.TZ)
-    _hh = _h.hour + _h.minute / 60.0
+    _m, _e = main._slot_local("morning", _h), main._slot_local("evening", _h)
+    _soir, _matin = f"{_e:%H}h{_e:%M}", f"{_m:%H}h{_m:%M}"
+    # Le matin pointe vers un créneau du soir ; le weekly vers un matin.
+    assert _soir in main._next_report_label("morning")
+    assert _matin in main._next_report_label("weekly")
+    # v28 (E-A1) — le soir pointe vers le PROCHAIN créneau réel.
     _ev = main._next_report_label("evening")
-    if 8.5 <= _hh < 20.0:
-        assert _ev == "aujourd'hui 20h00"
+    if _m <= _h < _e:
+        assert _ev == f"aujourd'hui {_soir}"
     else:
-        assert "08h30" in _ev
+        assert _matin in _ev
 
 
 # --------------------------------------------------------------------------- #

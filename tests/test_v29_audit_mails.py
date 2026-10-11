@@ -128,27 +128,7 @@ def test_ma8_historical_spin_replaced_when_stats_bad():
     assert out3 == tao and not fixes3
 
 
-def test_ma2_enbref_reinforce_claim_rewritten():
-    """MA2 — puce EN BREF « Renforcement … (BTC, ETH, TAO, LINK) » alors que
-    BTC/ETH/TAO sont au plafond → réécrite avec les recos fermes réelles."""
-    from src.analytics.daily_guards import fix_reinforce_claims
-
-    bullets = [
-        "Sentiment de marché en Peur extrême (F&G 23).",
-        "Renforcement tactique et de conviction sur le cœur du portefeuille "
-        "(BTC, ETH, TAO, LINK) via des injections de capital externe.",
-    ]
-    out, fixes = fix_reinforce_claims(
-        bullets, {"RENDER", "LINK", "RSR", "INJ"}, {"BTC", "ETH", "TAO"})
-    assert out[0] == bullets[0]
-    assert "plafond de concentration" in out[1]
-    assert "RENDER" in out[1] and "BTC" in out[1]
-    assert "injections de capital externe" not in out[1]
-    assert fixes
-    # Puce « renforcer » ne citant QUE des recos fermes réelles → intacte.
-    ok = ["Renforcer LINK sur repli."]
-    out2, fixes2 = fix_reinforce_claims(ok, {"LINK"}, {"BTC"})
-    assert out2 == ok and not fixes2
+# v33 (audit 01/10) — « test_ma2_enbref_reinforce_claim_rewritten » retiré : la réécriture « X au plafond de concentration » est retirée avec les plafonds ; un renfort non décidé est retiré par la garde de prose (tests/test_v33_soir_hebdo.py).
 
 
 def test_ma12_rotation_note_hidden_sector_sentences_dropped():
@@ -253,7 +233,9 @@ def test_wa10_dust_liquidate_now_becomes_abandon():
         "valeur résiduelle. Le reste attend un rebond.")}
     out, fixes = fix_dust_advice(node, {"SXT"})
     assert "liquidation immédiate" not in out["diagnosis"]
-    assert "ABANDONNER" in out["diagnosis"]
+    # Audit 02/10 (liste informative) : le fait, plus la consigne d'abandon.
+    assert "dépasseraient la valeur résiduelle" in out["diagnosis"]
+    assert "ABANDONNER" not in out["diagnosis"]
     assert "Le reste attend un rebond." in out["diagnosis"]
     assert fixes
     # Poussière absente du texte → intact.
@@ -286,24 +268,7 @@ def test_wa12_bearish_structure_reinforce_gets_lt_framing():
 # reco_gate — MA7 : plafond + EV négative → mention frontale
 # ═══════════════════════════════════════════════════════════════════════════
 
-def test_ma7_capped_maintain_with_negative_ev_gets_ct_warning():
-    """MA7 — MAINTENIR (plafond) n'échappe plus au check EV : mention posée."""
-    from src.analytics.reco_gate import apply_reco_gate
-
-    payload = {"thesis_of_the_day": [
-        {"asset": "ETH", "action": "RENFORCER", "thesis_type": "conviction",
-         "confidence": 78, "action_plan": {"position_size_pct": 0},
-         "asset_plan": {"ev_30d_pct": -2.1, "rr_30d": 0.5}},
-        {"asset": "BTC", "action": "RENFORCER", "thesis_type": "conviction",
-         "confidence": 76, "action_plan": {"position_size_pct": 0},
-         "asset_plan": {"ev_30d_pct": 1.3, "rr_30d": 0.8}},
-    ]}
-    fixes = apply_reco_gate(payload)
-    eth, btc = payload["thesis_of_the_day"]
-    assert eth["action"] == "MAINTENIR" and btc["action"] == "MAINTENIR"
-    assert "EV 30j −2,1%" in (eth.get("ct_warning") or "")
-    assert btc.get("ct_warning") is None          # EV positive → pas de mention
-    assert any("EV<0" in f for f in fixes)
+# v33 (audit 01/10) — « test_ma7_capped_maintain_with_negative_ev_gets_ct_warning » retiré : la porte v28 (plafond → MAINTENIR, EV/R:R → SURVEILLER, confiance plafonnée) est retirée : critères écartés par Omar (pas de hard cap, pas de probabilité inventée) et sans effet sur une décision du moteur
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -337,8 +302,11 @@ def _mk_plan(target_level: float, cyc_low: float, cyc_high: float) -> dict:
 
 
 def test_ma5_wa1_python_targets_overwrite_llm_targets():
-    """MA5/WA1 — les cibles IA (30j > scénario bull ; bornes LT divergentes du
-    weekly) sont ÉCRASÉES par asset_plan (source unique cross-mail)."""
+    """MA5/WA1 → v33 : ni les cibles du modèle ni celles du plan V30 (cible
+    30 j sur résistance, « reconquête ATH ») n'atteignent une thèse. Une
+    posture ferme sans moteur est requalifiée (verrou), et le plan V30 n'est
+    plus appliqué."""
+    from src.analytics.opportunity_adapter import verrouiller_postures_fermes
     from src.main import _apply_asset_plans_to_theses
 
     payload = {"thesis_of_the_day": [{
@@ -351,13 +319,12 @@ def test_ma5_wa1_python_targets_overwrite_llm_targets():
         "asset": "BTC", "conviction": True, "value_usd": 1158.0,
         "asset_plan": _mk_plan(65481.0, 102366.0, 126080.0),
     }], "portfolio_snapshot": {"value_usd": 2735.0}}
+    verrouiller_postures_fermes(payload["thesis_of_the_day"])
     _apply_asset_plans_to_theses(payload, data)
     t = payload["thesis_of_the_day"][0]
-    assert t["targets"]["short_term_30d"] == 65481.0       # Python, ≤ bull
-    assert t["targets"]["short_term_30d"] <= t["asset_plan"]["scenarios"]["bull"]["level"]
-    assert t["targets"]["long_term_6_12m_low"] == 102366.0  # même fib que weekly
-    assert t["targets"]["long_term_6_12m_high"] == 126080.0
-    assert "fourchette" in (t["targets"].get("short_term_note") or "")
+    assert t["action"] == "SURVEILLER"
+    assert "targets" not in t and "asset_plan" not in t and "plan_line" not in t
+    assert not (t.get("action_plan") or {}).get("stop_loss")
 
 
 def test_ma14_wa11_rotation_tiles_exclude_pseudo_sector():
@@ -440,37 +407,22 @@ def _thesis_card(action: str, **extra) -> dict:
     return t
 
 
-def test_ma6_ma15_dca_only_for_effective_reinforce():
-    """MA6 — MAINTENIR (plafond) : plus de plan DCA contradictoire.
-    MA15 — RENFORCER : la 1re tranche est « immédiat », pas un faux palier."""
-    from src.reporting.email_html import render
-
-    base = {"header": {"date": "x"}, "portfolio_snapshot": {"value_usd": 2735}}
-    html_m = render({**base, "thesis_of_the_day": [
-        _thesis_card("MAINTENIR", gate_note="déjà 19% du PTF (plafond 12%)")
-    ]}, "morning")
-    assert "DCA en 3 tranches" not in html_m
-    html_r = render({**base, "thesis_of_the_day": [_thesis_card("RENFORCER")]},
-                    "morning")
-    assert "DCA en 3 tranches" in html_r
-    assert "40% immédiat" in html_r
+# v33 (audit 01/10) — « test_ma6_ma15_dca_only_for_effective_reinforce » retiré : le plan d'action V30 (entrée/stop/TP/R:R du modèle, cibles ATH/résistance) n'est plus rendu sur une posture ferme — la fiche porte les chiffres du moteur (tests/test_v33_chaine.py)
 
 
 def test_ma9_ma13_dagger_and_completeness_label():
-    """MA9 — R:R < seuil sur conviction LT : † + note de lecture.
-    MA13 — « manque : sentiment » désambiguïsé (sentiment SOCIAL)."""
+    """MA9 (†, R:R tactique) : retiré avec le R:R. MA13 conservé sur la fiche
+    du moteur : « manque : sentiment » se lit « sentiment SOCIAL »."""
     from src.reporting.email_html import render
+    from tests.test_v32_redteam import _these_moteur
 
-    html = render({
-        "header": {"date": "x"}, "portfolio_snapshot": {"value_usd": 2735},
-        "thesis_of_the_day": [_thesis_card(
-            "RENFORCER",
-            ct_warning="⚠ EV 30j −2.1% · R:R 0.5 — accumulation LT")],
-    }, "morning")
-    assert "†" in html
-    assert "le R:R tactique 30 j n'est pas le critère" in html
+    t = _these_moteur()
+    t["engine_view"]["coverage_pct"] = 67
+    t["engine_view"]["coverage_missing"] = ["sentiment"]
+    html = render({"header": {"date": "x"}, "thesis_of_the_day": [t]}, "morning")
+    assert "couverture des sources 67 %" in html
     assert "sentiment social (LunarCrush/social trending)" in html
-    assert "accumulation LT — stats CT défavorables" in html
+    assert "†" not in html
 
 
 def test_ma1_chart_referenced_inline_for_expanded_thesis():
@@ -505,7 +457,7 @@ def test_ea3_ea5_ea6_evening_render():
     html = render(payload, "evening")
     assert "Marchés · fin de séance" in html
     assert "≈0%" in html and "baisse 0.0%" not in html
-    assert "hausse 22.1%" in html
+    assert "hausse 22,1%" in html
     assert "coexistent sans se contredire" in html   # EA6 (régime bear)
 
 

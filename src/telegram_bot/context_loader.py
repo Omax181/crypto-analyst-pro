@@ -158,23 +158,142 @@ def load_full_context() -> dict[str, Any]:
     return ctx
 
 
-def context_to_text(ctx: dict[str, Any], *, max_chars: int = 50000) -> str:
-    """Sérialise le contexte en JSON compact pour le system prompt.
+# v32 (4.1) — ORDRE DE PRIORITÉ DU CONTEXTE.
+#
+# La sérialisation était un ``json.dumps`` de TOUT le contexte suivi d'un
+# ``text[:50000]`` — une coupe AVEUGLE au caractère près. Or l'ordre
+# d'insertion plaçait les TROIS rapports complets (~35 blocs analytiques
+# chacun) AVANT le portefeuille. Le portefeuille, la valorisation live et les
+# ancres de prix tombaient donc systématiquement dans la partie coupée.
+#
+# Effet mesuré dans les échanges Telegram des 21-22/08/2026. À la demande
+# « donne-moi la quantité exacte de chacune de mes cryptos […] et la valeur
+# totale qui doit matcher », le bot :
+#   * n'a listé que 7 positions sur 29 ;
+#   * a annoncé « PRU : non disponible » pour BTC et LINK, alors que
+#     ``config/portfolio.yaml`` porte un PRU pour LES 29 ;
+#   * a FABRIQUÉ la quantité de BTC — « 0.01727 BTC (estimation basée sur
+#     l'allocation précédente de 42 % du portefeuille) » ;
+#   * a présenté 2 675 $ comme « valeur totale actuelle du portefeuille » là
+#     où la valeur réelle était ~3 300 $, soit 16 % d'écart sur la question la
+#     plus élémentaire qu'on puisse poser à l'agent.
+# Il a même diagnostiqué la cause lui-même : « les informations détaillées de
+# ces ~21 autres positions ne sont pas incluses dans les rapports du jour ».
+# Le fichier était bien chargé par ``_portfolio_live`` — il n'arrivait jamais
+# jusqu'au modèle.
+#
+# Deux corrections indissociables :
+#   1. les données FACTUELLES et FRAÎCHES passent devant les rapports ;
+#   2. la coupe devient STRUCTURELLE : on omet des blocs ENTIERS, jamais un
+#      demi-objet JSON — un tableau coupé en son milieu fait lire « 7
+#      positions » là où il y en a 29 — et on DIT lesquels ont été omis.
+_PRIORITE_CONTEXTE = (
+    "portfolio",                   # les 29 positions : le socle factuel
+    "live_portfolio",              # valorisation au prix courant
+    "live_market",
+    "price_anchors",
+    "active_recommendations",
+    "reco_scoring",
+    "durable_memory",
+    "weekly_snapshots",
+    "last_morning_report",         # volumineux : passent en dernier
+    "last_evening_report",
+    "last_weekly_report",
+)
+
+_RAPPORTS = frozenset(
+    ("last_morning_report", "last_evening_report", "last_weekly_report"))
+
+# Noyau d'un rapport : ce qui reste quand la place manque. Ce sont les blocs
+# dont le bot a besoin pour RAISONNER (thèses, régime, risque, scénarios) ;
+# les annexes descriptives (heatmaps, rotations, tuiles) sautent d'abord.
+_NOYAU_RAPPORT = frozenset((
+    "kind", "header", "executive_summary", "synthesis",
+    "thesis_of_the_day", "thesis_empty_reason", "firm_postures",
+    "active_recommendations_tracking", "reco_bilan", "delta_summary",
+    "macro_context", "macro_regime_readout", "risk_score",
+    "invalidation_watch", "self_critique_global", "scenarios", "week_ahead",
+    "blind_spots", "data_contradictions",
+    # v33 — la décision du MOTEUR (et son motif d'abstention) fait partie du
+    # noyau : sans elle, le bot raisonnait sur des thèses sans savoir laquelle
+    # le système recommande réellement.
+    "opportunity_summary", "top_action", "exit_signals",
+))
+
+
+def context_to_text(ctx: dict[str, Any], *, max_chars: int = 120000) -> str:
+    """Sérialise le contexte pour le system prompt, sans coupe aveugle.
 
     Args:
-        ctx: contexte assemblé par load_full_context.
-        max_chars: budget de caractères (tronque proprement si dépassé).
+        ctx: contexte assemblé par ``load_full_context``.
+        max_chars: budget de caractères. Un bloc qui ne tient pas est OMIS EN
+            ENTIER et signalé, jamais coupé en son milieu.
 
     Returns:
-        Chaîne JSON indentée et bornée.
+        Chaîne JSON indentée, complète pour tout bloc présent.
     """
     if not ctx:
         return "{}  // Aucun contexte disponible (état vide — première exécution ?)"
+    # Audit 02/10 — même vue que les trois mails : ni plan V30, ni confiance
+    # du modèle, ni niveau de reco du mauvais côté (vue_modele).
+    from src.ai_brain.prompts.vue_modele import vue_modele
+    ctx = vue_modele(ctx)
+
+    ordre = [k for k in _PRIORITE_CONTEXTE if k in ctx]
+    ordre += [k for k in ctx if k not in _PRIORITE_CONTEXTE]
+
+    retenus: dict[str, Any] = {}
+    omis: list[str] = []
+    reduits: list[str] = []
+    budget = max_chars - 400          # marge pour l'enveloppe et la note
+
+    def _taille(cle: str, valeur: Any) -> int:
+        return len(json.dumps({cle: valeur}, ensure_ascii=False,
+                              default=str, indent=1))
+
+    for cle in ordre:
+        valeur = ctx[cle]
+        try:
+            taille = _taille(cle, valeur)
+        except Exception:  # noqa: BLE001
+            omis.append(cle)
+            continue
+        if taille <= budget:
+            retenus[cle] = valeur
+            budget -= taille
+            continue
+        # Trop gros : pour un RAPPORT, on tente une version réduite avant de
+        # renoncer. Perdre l'analyse d'hier est un appauvrissement ; la perdre
+        # SANS LE DIRE serait une faute. Les données factuelles, elles, sont
+        # passées avant et ne subissent jamais cette réduction.
+        if cle in _RAPPORTS and isinstance(valeur, dict):
+            court = {k: v for k, v in valeur.items() if k in _NOYAU_RAPPORT}
+            try:
+                taille_courte = _taille(cle, court)
+            except Exception:  # noqa: BLE001
+                taille_courte = budget + 1
+            if court and taille_courte <= budget:
+                court["_reduit"] = ("blocs secondaires retirés faute de place "
+                                    "dans le contexte")
+                retenus[cle] = court
+                budget -= taille_courte
+                reduits.append(cle)
+                continue
+        omis.append(cle)
+
+    if omis or reduits:
+        # Le bot DOIT pouvoir dire ce qu'il ne voit pas plutôt que de combler.
+        retenus["_completude_contexte"] = {
+            "blocs_omis": omis,
+            "blocs_reduits": reduits,
+            "consigne": ("Ces blocs sont absents ou partiels. Dis-le si la "
+                         "question porte dessus ; n'estime jamais une donnée "
+                         "manquante."),
+        }
+        logger.info("Contexte Telegram : %d bloc(s) omis, %d réduit(s).",
+                    len(omis), len(reduits))
+
     try:
-        text = json.dumps(ctx, ensure_ascii=False, default=str, indent=1)
+        return json.dumps(retenus, ensure_ascii=False, default=str, indent=1)
     except Exception:  # noqa: BLE001
-        text = str(ctx)
-    if len(text) > max_chars:
-        # Tronque en signalant la coupe (le contexte reste exploitable).
-        text = text[:max_chars] + "\n… (contexte tronqué pour la taille)"
-    return text
+        return str(retenus)

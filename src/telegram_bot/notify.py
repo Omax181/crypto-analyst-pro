@@ -108,6 +108,12 @@ def _fmt_usd(v: Any) -> Optional[str]:
         s = f"{n:.0f}"
     elif a >= 1:
         s = f"{n:.2f}".replace(".", ",")
+    elif a < 0.01:
+        # Audit 02/10 — sous 0,01 $ : 4 chiffres SIGNIFICATIFS (autorité
+        # unique numfmt). « 0,0015 $ » publiait l'entrée RSR à 0,001464 $
+        # que le mail du même matin affichait en entier.
+        from src.utils.numfmt import fr_num
+        s = fr_num(n, thin=False)
     else:
         # Sous 1 $ : 4 décimales max, zéros superflus retirés (0,073 et non
         # 0,0730), mais 2 décimales minimum (0,10 pas 0,1).
@@ -213,13 +219,19 @@ def _regime_adj(reg: dict[str, Any]) -> Optional[str]:
 
 
 def _fear_greed(payload: dict[str, Any]) -> tuple[Optional[Any], Optional[str]]:
-    """(valeur, label) F&G, quelle que soit la source du payload."""
+    """(valeur, label) F&G, quelle que soit la source du payload.
+
+    Audit 02/10 — l'hebdo transmet la ``classification`` anglaise
+    d'alternative.me (« F&G 74 greed » le dimanche) : le libellé est dérivé de
+    la VALEUR, mêmes paliers que le matin, pour les trois messages.
+    """
     for node in (payload.get("macro_context"), payload.get("evening_macro")):
         if isinstance(node, dict) and node.get("fear_greed") is not None:
-            return node.get("fear_greed"), node.get("fear_greed_label")
+            v = node.get("fear_greed")
+            return v, _fg_label_fr(v) or node.get("fear_greed_label")
     fg = payload.get("fear_greed")
     if isinstance(fg, dict) and fg.get("value") is not None:
-        return fg.get("value"), fg.get("label")
+        return fg.get("value"), _fg_label_fr(fg.get("value")) or fg.get("label")
     return None, None
 
 
@@ -241,6 +253,22 @@ def _regime_evidence(payload: dict[str, Any], reg: dict[str, Any]) -> Optional[s
         # dans la ligne 📊 (« (BTC −8% vs MM200 · F&G 26 peur) »).
         bits.append(f"F&G {fg}" + (f" {_plain(fgl).lower()}" if fgl else ""))
     return _join_dots(bits)
+
+
+def _fg_label_fr(value: Any) -> Optional[str]:
+    """Libellé français du Fear & Greed (paliers de ``main._fng_label_fr``)."""
+    v = _num(value)
+    if v is None:
+        return None
+    if v <= 25:
+        return "Peur extrême"
+    if v <= 45:
+        return "Peur"
+    if v <= 55:
+        return "Neutre"
+    if v <= 75:
+        return "Avidité"
+    return "Avidité extrême"
 
 
 def _agenda_events(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -587,8 +615,8 @@ def _thesis_line(t: dict[str, Any]) -> str:
             else "on garde" if "MAINTEN" in a
             else "on surveille" if "SURVEIL" in a
             else (a.lower() or "—"))
-    conf = _num(t.get("confidence"))
-    confs = f" (conv. {conf:.0f}%)" if conf is not None else ""
+    # v33 — la confiance du modèle n'est plus publiée (non décisionnelle).
+    confs = ""
 
     ctw = t.get("ct_warning")
     if ctw:
@@ -612,24 +640,30 @@ def _thesis_line(t: dict[str, Any]) -> str:
 
 def _morning_action_block(payload: dict[str, Any]) -> list[str]:
     theses = payload.get("thesis_of_the_day") or []
-    picked: list[dict[str, Any]] = []
-    for t in theses:
-        if not isinstance(t, dict):
-            continue
-        a = str(t.get("action") or "").upper()
-        relevant = (any(k in a for k in ("RENFORC", "ALLÉG", "ALLEG", "MAINTEN"))
-                    or t.get("gate_note") or t.get("ct_warning"))
-        if relevant:
-            picked.append(t)
-        if len(picked) >= 3:
-            break
+    # v33 (audit zero-trust 01/10) — seules les postures DÉTERMINISTES (moteur,
+    # radar de sortie) sont listées. Avant, les thèses refusées rédigées par le
+    # modèle apparaissaient aussi (« TAO — on surveille… ») : le contenu du
+    # bloc dépendait de ce que le modèle avait choisi d'écrire.
+    picked: list[dict[str, Any]] = [
+        t for t in theses
+        if isinstance(t, dict) and (t.get("engine_view") or t.get("v33_trigger"))
+        and any(k in str(t.get("action") or "").upper()
+                for k in ("RENFORC", "ALLÉG", "ALLEG"))][:3]
     top = payload.get("top_action") or {}
     lines = ["🎯 *Action du jour*"]
     if top.get("is_nothing"):
-        # Formulation distincte de l'EN BREF (verdict sec là-bas, pourquoi ici).
-        lines.append("Rien à exécuter ce matin — le pourquoi, par actif :"
-                     if picked else
-                     "Rien à exécuter ce matin — pas de signal actionnable sur le book.")
+        _cl = ((payload.get("opportunity_summary") or {}).get("closest") or {})
+        if picked:
+            lines.append("Aucun renfort décidé ce matin — prises de profit :")
+        elif _cl.get("asset"):
+            # Audit 02/10 — le motif sans son ancrage entre parenthèses (trois
+            # niveaux imbriqués sur mobile) ; l'ancrage reste dans le mail.
+            _motif = str(_cl.get("reason") or "").split(" (")[0].strip()
+            lines.append(f"Rien à exécuter ce matin — le plus proche : "
+                         f"*{_sym(_cl.get('asset'))}*, {_clip(_motif, 150)}.")
+        else:
+            lines.append("Rien à exécuter ce matin — aucun potentiel mesuré ne "
+                         "couvre son rendement requis.")
     elif top.get("line"):
         lines.append(f"→ {_plain(top['line'])}")
     lines.extend(_thesis_line(t) for t in picked)
@@ -641,7 +675,10 @@ def _evening_action_block(payload: dict[str, Any]) -> list[str]:
     if not rows:
         return []
     moved = _evening_moved_rows(payload)
-    lines = ["🎯 *Action ce soir*"]
+    # Audit 02/10 — ce bloc est le SUIVI des recos (états : stop, cible,
+    # pression), pas une action : sous « Action ce soir », l'état d'une reco
+    # V30 héritée (« INJ — sous pression ») se lisait comme une consigne.
+    lines = ["🎯 *Suivi des recos ce soir*"]
     if not moved:
         n = len(rows)
         lines.append(
@@ -650,14 +687,20 @@ def _evening_action_block(payload: dict[str, Any]) -> list[str]:
         return lines
     for b, mkind in moved:
         asset = _sym(b.get("asset"))
+        # v33 (audit 01/10) — dans le SENS de la reco, sans prescrire de
+        # vente : « on ne renforce plus » sur un ALLÉGER invalidé (RSR réel,
+        # 01/10) et « prise de profit partielle à envisager » sur une cible
+        # (un seuil qui déclenche une vente — exclu par Omar).
+        _baisse = any(k in str(b.get("action") or "").upper() for k in ("ALLÉG", "ALLEG"))
         if mkind == "stop":
             reason = _clip(b.get("reason"), 90) if b.get("reason") else "stop franchi"
-            lines.append(f" • *{asset}* — 🔴 {reason} : thèse invalidée, "
-                         "on ne renforce plus.")
+            lines.append(f" • *{asset}* — 🔴 {reason} : thèse invalidée"
+                         + (", on n'allège pas sur ce motif." if _baisse
+                            else ", plus de renfort sur ce motif."))
         elif mkind == "target":
             tgt = _fmt_usd(b.get("target"))
             lines.append(f" • *{asset}* — ✅ cible{f' {tgt}' if tgt else ''} touchée : "
-                         "prise de profit partielle à envisager.")
+                         "reco validée (aucune vente déclenchée par une cible).")
         else:
             d = _pct(b.get("delta_pct"), 2)
             reason = _clip(b.get("reason"), 80) if b.get("reason") else None
@@ -671,9 +714,14 @@ def _evening_action_block(payload: dict[str, Any]) -> list[str]:
 
 
 def _weekly_action_block(payload: dict[str, Any]) -> list[str]:
+    # v33 (audit zero-trust 01/10) — plus de « scénario dominant » : les
+    # probabilités de scénarios étaient inventées et ont été retirées. Un
+    # ``max`` sur des probabilités absentes désignerait le premier scénario
+    # venu comme « dominant ».
     scens = [s for s in (payload.get("scenarios") or []) if isinstance(s, dict)]
     dom = (max(scens, key=lambda s: _num(s.get("probability_pct")) or 0.0)
-           if scens else None)
+           if any(_num(s.get("probability_pct")) is not None for s in scens)
+           else None)
     plan = payload.get("weekly_action_plan") or []
     action = (plan[0].get("action") if plan and isinstance(plan[0], dict) else None)
 
@@ -707,14 +755,9 @@ def _weekly_action_block(payload: dict[str, Any]) -> list[str]:
 # 📊 Évolution des thèses énoncées (top 3 — le reste vit dans le mail)
 # --------------------------------------------------------------------------- #
 def _conv_note(conf: Any, prev: Any) -> Optional[str]:
-    """« conv. 78% » — ou « conv. 72% → 78% » quand la conviction a évolué."""
-    c = _num(conf)
-    if c is None:
-        return None
-    p = _num(prev)
-    if p is not None and abs(p - c) >= 1:
-        return f"conv. {p:.0f}% → {c:.0f}%"
-    return f"conv. {c:.0f}%"
+    """v33 — plus rien : la « conviction » était la confiance du modèle,
+    retirée de tout affichage (non décisionnelle, non calibrée)."""
+    return None
 
 
 def _thesis_head_line(asset: str, conf: Any, prev: Any, issued: Any) -> str:
@@ -749,11 +792,14 @@ def _morning_thesis_rows(payload: dict[str, Any]) -> list[str]:
     for r in rows:
         asset = _sym(r.get("asset"))
         lines.append(_thesis_head_line(asset, r.get("confidence"),
-                                       r.get("prev_confidence"), r.get("issued_at")))
+                                       r.get("prev_confidence"), r.get("issued_at"))
+                     + (" · reco V30" if r.get("legacy") else ""))
         tgt = _fmt_usd(r.get("ct_target"))
         path = _thesis_path_line(r.get("entry_price"), r.get("current_price"),
                                  r.get("progress_pct"), tgt,
-                                 "cible act." if r.get("ct_target_fallback") else "cible")
+                                 # Audit 02/10 — une décision du moteur a une
+                                 # BARRE de succès à 12 mois, pas une cible.
+                                 "cible" if r.get("legacy", True) else "barre 12 mois")
         if path:
             lines.append(path)
         # Lecture courte : statut de santé déterministe + son commentaire.
@@ -793,10 +839,11 @@ def _weekly_thesis_rows(payload: dict[str, Any]) -> list[str]:
             asset = _sym(r.get("asset"))
             lines.append(_thesis_head_line(asset, r.get("confidence"),
                                            r.get("prev_confidence"),
-                                           r.get("entry_date")))
+                                           r.get("entry_date"))
+                         + ("" if r.get("engine") else " · reco V30"))
             pr = pr_by.get(asset) or {}
             tgt = _fmt_usd(r.get("ct_target"))
-            tlabel = "cible"
+            tlabel = "barre 12 mois" if r.get("engine") else "cible"
             if not tgt:
                 tl, th = _fmt_usd(pr.get("lt_target_low")), _fmt_usd(pr.get("lt_target_high"))
                 if tl and th:

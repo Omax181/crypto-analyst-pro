@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from src.ai_brain.prompts.vue_modele import vue_modele
 from src.ai_brain.prompts.analyst_persona import (
     ANALYST_PERSONA,
     DISCLAIMER,
@@ -22,8 +23,8 @@ _EVENING_SCHEMA = """
   "delta_summary": [{"icon ('✓'|'⚠'|'✗')","text (1-2 phrases, dense, chiffré : une chose à retenir + sa CONSÉQUENCE concrète, pas un constat vague)"}],
   "market_changes": [{"status (invalidated|confirmed|unchanged|new)","tag (MÊME logique que le matin : 'Catalyseur'|'Risque'|'Macro'|'Géopo'|'Info' — sert à colorer)","importance (1-5 ; un mouvement anecdotique comme +2,7 points de base sur un taux = 1-2, PAS 'NOUVEAU' majeur)","description (1-2 phrases, le DELTA vs ce matin uniquement)","source (nom réel de la source ; ajoute une heure UNIQUEMENT si c'est l'horodatage PROPRE de la donnée, ex. 'Financial Times 12h48'. v21 (E11) : n'ajoute JAMAIS l'heure d'envoi du rapport (~20h Casablanca), identique sur toutes les lignes — elle se répétait 6× pour rien)"}],
   "news_today": [{"title (titre court)","source (nom réel)","time (ex. '12h48')","impact (1 phrase : effet sur le PTF/marché)","status (intégré|actionnable)"}],
-  "levels_tonight": [{"asset (BTC/ETH/DXY/… )","level (niveau PRÉCIS ex. '63 000 $')","type (support|resistance|critical|threshold)","trigger (ce qui se passe si cassé/atteint, ACTIONNABLE ex. 'sous 62k → alléger, capitulation probable')"}],
-  "actions_tonight": [{"action (le geste précis et CHIFFRÉ, ex. 'Alléger 10% de TAO à 270$')","rationale (POURQUOI, chiffré et technique : RSI/résistance/divergence/surchauffe, ex. 'RSI 4h à 78 (surchauffe), butée sur résistance 272$ jamais cassée en 3 tentatives')","rebuy (SI c'est un allègement sur un actif de CONVICTION LT : le niveau de RACHAT visé + sa logique, ex. 'racheter vers 235-240$ après retour RSI < 55 / test support')","horizon (precise si l'action est tactique sur une position LT — ex. 'geste tactique, la thèse LT TAO reste intacte')"}],
+  "levels_tonight": [{"asset (BTC/ETH/DXY/… )","level (niveau PRÉCIS ex. '63 000 $')","type (support|resistance|critical|threshold)","trigger (ce qui se passe si cassé/atteint, ex. 'sous 62k → capitulation probable, support suivant 59 400')"}],
+  "actions_tonight": [{"action (v33 : UNIQUEMENT un geste décidé par le système — RENFORCER du moteur ce matin, ALLÉGER des règles de prise de profit — rappelé SANS taille de ton cru, ex. 'Alléger QNT : palier ×3 atteint (règle de prise de profit)' ; sinon liste VIDE)","rationale (POURQUOI ce soir, chiffré : ce qui a bougé depuis le matin)","horizon (optionnel : contexte temporel)"}],
   "tomorrow_checklist": {
     "calendar": "string — événements macro réels des 48h (RECOPIE data.tomorrow_macro_events). Si vide : 'Pas d'événement macro majeur dans les 48h.'",
     "checks": "string — 2-3 vérifs CONCRÈTES liées aux mouvements/recos du jour (ex. 'IMX tient son +12% overnight ? · DXY reste sous 100 ?'). Pas de généralité.",
@@ -31,7 +32,7 @@ _EVENING_SCHEMA = """
     "invalidation": "string — 1 condition CHIFFRÉE qui ferait basculer l'analyse (ex. 'BTC sous 62k + VIX > 25 = risk-off confirmé'). Cohérente avec levels_tonight."
   },
   "blind_spots": "string — 1 phrase MAX si un angle mort est critique (ex. flux ETF indisponibles), sinon chaîne vide.",
-  "footer": {"next_morning_time (ex. '08h30')"}
+  "footer": {"next_morning_time (recopie data — l'heure est calculée)"}
 }
 """
 
@@ -49,8 +50,11 @@ def build_evening_prompt(
     Returns:
         Prompt complet pour ``generate_json``.
     """
-    data_json = json.dumps(data, ensure_ascii=False, indent=2, default=str)
-    morning_json = json.dumps(morning_state, ensure_ascii=False, default=str)[:6000]
+    # Audit 02/10 — le modèle ne voit plus le plan V30 ni la confiance des
+    # recos héritées (vue_modele) : il ne peut pas les citer.
+    data_json = json.dumps(vue_modele(data), ensure_ascii=False, indent=2, default=str)
+    morning_json = json.dumps(vue_modele(morning_state), ensure_ascii=False,
+                              default=str)[:6000]
     return f"""{ANALYST_PERSONA}
 
 CONTEXTE · {timestamp}. RAPPORT DU SOIR · complément différentiel du matin.
@@ -62,6 +66,10 @@ DONNÉES DU SOIR (deltas depuis le matin) :
 {data_json}
 
 INSTRUCTIONS :
+00. v33 — AUCUN GESTE DE TON CRU : « renforcer / alléger / vendre » n'est
+   permis que pour un actif décidé ce matin par le moteur (posture ferme du
+   rapport du matin) ou par les règles de prise de profit d'Omar. Le système
+   retire toute autre prescription. Tu analyses, tu ne décides pas.
 0. RÈGLE DES CHIFFRES (CRITIQUE). Tout nombre (prix, %, niveau, delta) doit être
    copié VERBATIM depuis le JSON fourni — jamais calculé, extrapolé, mémorisé
    d'ailleurs, ni inventé. Donnée absente = "n/d" ou description sans chiffre. Un
@@ -118,7 +126,7 @@ INSTRUCTIONS :
    Mieux vaut 2 news pertinentes que 5 dont une creuse. L'audit a vu « Global X
    Zero Coupon Bond ETF declares dividend — pas d'impact direct » : à bannir.
    v18 (E-B3) : « depuis ce matin » est LITTÉRAL — n'inclus QUE des news dont
-   l'heure est POSTÉRIEURE au rapport du matin (~08h30 Casablanca). Une news de
+   l'heure est POSTÉRIEURE au rapport du matin (~07h30 UTC). Une news de
    la nuit ou d'avant le matin a déjà été vue : elle n'a rien à faire ici. Si une
    news n'a pas d'heure claire postérieure au matin, ne la mets pas.
    v17 (E-B2 — anti-doublon) : « Ce qui a évolué » (market_changes) et « Ce qui
@@ -135,11 +143,9 @@ INSTRUCTIONS :
      ambigu. Si l'événement est PASSÉ, parle au passé (« la Fed a maintenu… »).
    • (E-B6 — CFX niveaux vs action) : un actif qui a déjà une ACTION ce soir ne
      doit PAS aussi figurer dans « niveaux à surveiller » comme s'il n'avait pas
-     de plan — choisis l'un, OU explicite le lien (« rachat après allègement »).
-   • (V18-E1 — ACTION SANS THÈSE MATIN) : si tu proposes une action que le matin
-     n'avait pas anticipée, badge-la explicitement « TACTIQUE court terme » et
-     précise que la conviction LT reste inchangée. Pas de trading déguisé en
-     conviction pour un investisseur LT.
+     de plan — choisis l'un, OU explicite le lien.
+   • (V18-E1 — ACTION SANS THÈSE MATIN, v33) : aucune action que le système
+     n'a pas décidée — pas de « tactique » de ton cru.
    • (V18-E12/X4 — DIAGNOSTIC COHÉRENT avec le matin) : ton diagnostic d'un actif
      doit être COHÉRENT avec celui du matin du jour. Si le matin a dit « rotation
      L2/Interop » sur CFX, ne dis pas le soir « spike sans catalyseur » — confirme,
@@ -174,7 +180,7 @@ INSTRUCTIONS :
    data.big_movers_day (mouvement > ±8% aujourd'hui) avec un niveau de
    TP/résistance ou de protection — un +12% du jour SANS niveau le soir =
    défaut d'audit avéré. Pour chaque niveau : type (support/resistance/
-   critical/threshold) + trigger ACTIONNABLE (« sous 62k → alléger »), jamais
+   critical/threshold) + trigger explicite (« sous 62k → capitulation probable »), jamais
    « à surveiller ». Niveaux ancrés techniquement (supports testés, Fibonacci,
    max pain), pas de ronds arbitraires.
    v18 (E-B6) : une position qui PÈSE significativement dans le PTF (≳ 1% du
@@ -192,34 +198,17 @@ INSTRUCTIONS :
    INTERDIT d'inventer un niveau qui n'y figure pas (fini les ronds arbitraires
    « 59 000 / 61 000 » sans ancrage) ; (c) enrichis le trigger avec le readout
    quand il éclaire la décision (ex. « RSI 72 en surchauffe sous la résistance
-   62 126 $ → prise de profit partielle défendable ») ; (d) le scénario/
+   62 126 $ → risque de rejet ») ; (d) le scénario/
    l'invalidation de la checklist s'appuient sur expected_range et le premier
    support. Exception : DXY et actifs absents de computed_levels — analyse
    classique depuis le contexte macro, prudence sur les chiffres.
-4bis. actions_tonight (v16.1) : 0 à 3 actions à POSER ce soir, objet structuré
-   {{action, rationale, rebuy, horizon}}. C'est LA section qui découle de toute
-   l'analyse — Omar s'en sert pour décider, donc elle doit être DENSE en chiffres
-   et IRRÉPROCHABLE (zéro hallucination, chaque chiffre dérivé d'une analyse
-   réelle : RSI, résistance/support testés, divergence, max pain, ATR). Chaque
-   action :
-   - action : le geste précis et chiffré (« Alléger 10% de TAO à 270$ »,
-     « Placer un ordre d'achat ETH à 1 600$ »).
-   - rationale : POURQUOI, justifié techniquement et chiffré (« RSI 4h à 78 =
-     surchauffe + butée sur résistance 272$ non franchie en 3 tentatives sur 24h »).
-     JAMAIS « pour sécuriser » seul : explique le signal technique.
-   - rebuy : CRITIQUE — Omar est INVESTISSEUR LONG TERME. Si l'action est un
-     allègement sur une position de CONVICTION (Tier 1-2, ou un actif avec une
-     thèse LT comme BTC/ETH/TAO/RENDER), tu DOIS donner le niveau de RACHAT visé
-     et sa logique (« racheter 235-240$ après retour RSI < 55 / test du support
-     hebdo »). Un allègement sans plan de rachat sur un actif de conviction = NON
-     conforme à sa stratégie. Si c'est une vraie sortie définitive (faible
-     conviction), dis-le et rebuy peut rester vide.
-   - horizon : précise que le geste est TACTIQUE et que la thèse LT reste intacte
-     (« geste tactique court terme, conviction LT TAO inchangée »).
-   Ne propose un allègement QUE s'il est techniquement justifié : pas de vente
-   gratuite. Si rien ne justifie une action chiffrée, renvoie une liste VIDE
-   (ne meuble pas). Ne répète pas un simple niveau de levels_tonight — une action
-   = un geste à exécuter avec sa justification complète.
+4bis. actions_tonight (v33, audit 02/10) : 0 à 3 lignes, UNIQUEMENT pour un
+   geste décidé par le système — RENFORCER du moteur au matin
+   (morning_state.firm_postures), ALLÉGER des règles de prise de profit
+   (data.exit_signals). Rappelle le geste SANS taille de ton cru (la taille vient
+   du système), et dis ce qui a bougé depuis le matin. Pas de niveau de rachat,
+   pas de geste « tactique » de ton cru : le système retire toute autre ligne.
+   Sans décision du système, renvoie une liste VIDE — c'est un résultat normal.
    v18 (E-A3 — DÉFINITION « POUSSIÈRE », IMPÉRATIF) : une position est une
    « poussière » si sa VALEUR TOTALE dans le portefeuille (quantité × prix) est
    < 10 $ — JAMAIS si son prix UNITAIRE est faible. JASMY à 0,005 $ l'unité mais
@@ -227,18 +216,9 @@ INSTRUCTIONS :
    valeur de position (value_usd) : fie-toi à ELLE pour qualifier une poussière,
    pas au prix unitaire. Ne justifie JAMAIS un allègement par « optimiser la
    liquidité d'une poussière » si la valeur de position est ≥ 10 $.
-   v17 (T-TAO / E-A1 — COHÉRENCE AVEC LE MATIN, IMPÉRATIF) : morning_state.firm_postures
-   donne la posture FERME du matin par actif (RENFORCER / ALLÉGER + entrée + SL).
-   Tes actions du soir NE DOIVENT PAS contredire frontalement cette posture sans
-   l'expliciter. Si le matin a dit RENFORCER TAO (achat, entrée ~260) et que tu
-   proposes d'alléger TAO le soir, c'est soit (a) un SCALP tactique court terme
-   sur un rebond — alors DIS-LE explicitement dans horizon (« prise de profit
-   tactique sur le rebond vers 270, la thèse d'achat LT du matin à 260 reste
-   valide, rachat visé 245-250 ») et donne un rebuy cohérent avec l'entrée du
-   matin ; soit (b) un vrai changement d'avis justifié par un fait nouveau du
-   soir — alors explique CE fait. INTERDIT : recommander sèchement « ALLÉGER TAO »
-   le soir comme si le matin n'avait pas dit « RENFORCER », sans réconciliation.
-   Omar lit les deux mails : ils doivent raconter une histoire cohérente.
+   v17 (T-TAO / E-A1 — COHÉRENCE AVEC LE MATIN, v33) : morning_state.firm_postures
+   donne les postures FERMES du matin (décisions du système). Le soir ne les
+   contredit pas et n'en crée pas : il dit ce qui a bougé depuis.
 5. tomorrow_checklist (« Demain matin ») — objet à 4 champs :
    - calendar : RECOPIE EXCLUSIVEMENT data.tomorrow_macro_events (v16 : déjà
      FILTRÉ aux 2 prochains jours calendaires — le weekly couvre la semaine).
@@ -282,8 +262,8 @@ INSTRUCTIONS :
    « rester liquide en USDC », « renforcer USDC » ni « déployer du cash ».
    v27 (RE1) : le cash n'est JAMAIS une contrainte — Omar peut injecter des
    fonds externes à tout moment. NE conditionne PAS une entrée à l'allègement
-   d'une autre position (« financer en vendant X » = interdit) ; un allègement
-   ne se propose que s'il est justifié par la thèse de l'actif allégé.
+   d'une autre position (« financer en vendant X » = interdit) ; les
+   allègements viennent des règles de prise de profit d'Omar (RÈGLE 0).
 9. NOMS DE SOURCES — libellé public TOUJOURS : « CoinGecko » (pas prices_now),
    « Fear & Greed Index » (pas fear_greed), « Yahoo Finance » (pas evening_macro),
    « Farside Investors » (pas etf_flows), « Rapport matin » (pas morning_report).
@@ -292,7 +272,7 @@ INSTRUCTIONS :
    horodatage DISTINCT du moment du rapport (pas tout à 20h00). Sinon, omets la
    source entièrement plutôt que d'en inventer une.
 NE répète PAS le contexte macro/on-chain/rotation déjà donné le matin.
-Le mail tombe à 20h Casablanca = 14h US = MI-SÉANCE américaine (pas la clôture).
+Le mail tombe vers 19h00 UTC = MI-SÉANCE américaine (pas la clôture).
 
 {OUTPUT_CONTRACT}
 Disclaimer footer : "{DISCLAIMER}"

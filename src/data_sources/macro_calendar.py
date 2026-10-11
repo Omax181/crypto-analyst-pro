@@ -22,7 +22,7 @@ les récurrences statistiques sont étiquetées « estimé » dans le label fina
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 from src.data_sources import fred
@@ -217,7 +217,14 @@ def get_consolidated_calendar(horizon_days: int = 8) -> dict[str, Any]:
         (quasi impossible avec le repli banques centrales + récurrences).
     """
     def _build() -> dict[str, Any]:
-        today = date.today()
+        # v33.1 — DATE UTC, PAS LA DATE DE LA MACHINE.
+        # ``date.today()`` renvoie la date LOCALE du runner. Tout le
+        # reste du projet raisonne en UTC (workflows, horodatages,
+        # persistance). Sur une machine à UTC+1, entre minuit et 1 h
+        # locales, le calendrier était donc décalé d'un jour : une
+        # publication « demain » devenait « aujourd'hui ». Invisible
+        # sur GitHub Actions (UTC), reproductible en local.
+        today = datetime.now(timezone.utc).date()
         merged: dict[str, dict[str, Any]] = {}
         sources_used: list[str] = []
 

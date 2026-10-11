@@ -148,17 +148,30 @@ def _fmt_usd(v: Any) -> str:
         return "—"
 
 
+# Audit 02/10 — statut en français et ORIGINE de la reco : une décision du
+# moteur et une reco V30 héritée (décidée par le modèle de langage avant la
+# V33, suivie jusqu'à son terme) ne se lisent pas de la même façon. Les mails
+# l'étiquettent ; /recos, /suivi et /pourquoi aussi.
+_STATUT_FR = {"in_progress": "en cours", "validated": "validée",
+              "invalidated": "invalidée", "neutral": "neutre"}
+
+
+def _ligne_reco(r: dict[str, Any]) -> str:
+    action = str(r.get("action") or "?").upper().replace("ALLEGER", "ALLÉGER")
+    statut = _STATUT_FR.get(r.get("status") or "in_progress",
+                            str(r.get("status")))
+    origine = "moteur" if r.get("engine") else "reco V30"
+    tag = " 😴" if r.get("snoozed") else ""
+    return f"{r.get('asset', '?')} — {action} ({statut} · {origine}){tag}"
+
+
 def _cmd_recos() -> str:
     recos = mem.load_active_recommendations()
     if not recos:
         return "Aucune recommandation active pour le moment."
     lines = ["*Recos actives :*"]
     for r in recos:
-        asset = r.get("asset", "?")
-        action = r.get("action", "?")
-        status = r.get("status") or "en cours"
-        tag = " 😴" if r.get("snoozed") else ""
-        lines.append(f"• {asset} — {action} ({status}){tag}")
+        lines.append(f"• {_ligne_reco(r)}")
     lines.append("\n_Actions : /validate SYM · /dismiss SYM · /snooze SYM_")
     return "\n".join(lines)
 
@@ -330,7 +343,7 @@ def _cmd_help() -> str:
         "rapports du jour.\n\n"
         "*Commandes lecture :*\n"
         "/recos — recos actives\n"
-        "/analyse SYM — plan complet à la demande (niveaux, R:R, scénarios)\n"
+        "/analyse SYM — état des lieux (niveaux, fourchette 30 j, posture du moteur)\n"
         "/pourquoi SYM — la thèse derrière une reco active\n"
         "/ptf — portefeuille\n"
         "/risque — score de risque PTF\n"
@@ -362,11 +375,14 @@ def _cmd_help() -> str:
 
 
 def _cmd_analyse(args: list[str]) -> str:
-    """v27 (TG2) — /analyse SYM : plan complet à la demande pour tout actif.
+    """v27 (TG2) — /analyse SYM : état des lieux à la demande pour tout actif.
 
-    Prix + readout technique + S/R calculés + plan (invalidation, cible 30j,
-    R:R, EV, zone d'accumulation) + dérivés. 100% déterministe (mêmes moteurs
-    que les mails) : aucune hallucination possible.
+    Prix + readout technique + S/R calculés + fourchette 30 j P10–P90 à
+    volatilité mesurée + posture du moteur ce matin + dérivés. 100 %
+    déterministe. v33 (audit 01/10) — le plan V30 (invalidation, cible 30 j,
+    R:R, « EV 30j (p↑ 55 %) », scénarios bull/base/bear pondérés) n'est plus
+    publié : sa probabilité était une heuristique (0,30–0,70), retirée des
+    mails pour cette raison.
     """
     if not args:
         return "Utilisation : `/analyse SYM` (ex. `/analyse TAO`)."
@@ -374,7 +390,8 @@ def _cmd_analyse(args: list[str]) -> str:
     try:
         from src.reporting.charts import _load_series
         from src.analytics import key_levels as _kl
-        from src.analytics.asset_plan import compute_asset_plan
+        from src.analytics.forecast import _fourchette, distribution
+        from src.analytics.opportunity_adapter import daily_volatility_pct
         series = _load_series(sym, days=180)
         if not series or not series.get("closes"):
             return (f"Pas de série de prix pour *{sym}* (ticker inconnu de "
@@ -390,12 +407,8 @@ def _cmd_analyse(args: list[str]) -> str:
                 funding = _d.get("funding_annualized_pct")
         except Exception:  # noqa: BLE001
             funding = None
-        plan = compute_asset_plan(sym, closes, price=closes[-1],
-                                  funding_annualized_pct=funding,
-                                  key_levels_result=kl)
-        if not plan.get("available"):
-            return f"Analyse indisponible pour *{sym}* : {plan.get('reason')}."
-        lines = [f"*🔎 {sym} · {plan.get('price_label')}*"]
+        from src.utils.numfmt import fr_usd
+        lines = [f"*🔎 {sym} · {fr_usd(closes[-1])}*"]
         if kl.get("readout_line"):
             lines.append(kl["readout_line"])
         sups = kl.get("supports") or []
@@ -406,14 +419,10 @@ def _cmd_analyse(args: list[str]) -> str:
         if ress:
             lines.append("Résistances : " + " · ".join(
                 f"{r['level_label']} ({r['basis']})" for r in ress[:2]))
-        lines.append(f"📐 {plan['plan_line']}")
-        sc = plan.get("scenarios") or {}
-        if sc:
-            lines.append(
-                f"Scénarios 30j : bull {sc['bull']['probability_pct']}% "
-                f"→ {sc['bull']['level_label']} · base "
-                f"{sc['base']['probability_pct']}% · bear "
-                f"{sc['bear']['probability_pct']}% → {sc['bear']['level_label']}")
+        _fc = distribution(closes[-1], daily_volatility_pct(closes), 30)
+        lines.append(f"📐 30 j (80 %) : {_fourchette(_fc)} — volatilité mesurée, "
+                     "dérive nulle")
+        lines.append(_posture_du_matin(sym))
         if funding is not None:
             lines.append(f"Funding {funding:+.1f}%/an".replace(".", ","))
         # Contexte PTF : position détenue ?
@@ -428,19 +437,32 @@ def _cmd_analyse(args: list[str]) -> str:
                 lines.append("💼 En portefeuille")
         except Exception:  # noqa: BLE001
             pass
-        lines.append("_Niveaux calculés (pivots/MM/Fibo/Bollinger) · EV indicatif._")
+        lines.append("_Niveaux calculés (pivots/MM/Fibo/Bollinger) · information, "
+                     "pas une recommandation._")
         return "\n".join(lines)
     except Exception as exc:  # noqa: BLE001
         logger.warning("/analyse %s échoué : %s", sym, exc)
         return f"Analyse de {sym} momentanément indisponible ({exc})."
 
 
+def _posture_du_matin(sym: str) -> str:
+    """Posture du moteur sur ``sym`` dans le dernier rapport du matin."""
+    morning = mem.load_morning_report() or {}
+    for t in morning.get("thesis_of_the_day") or []:
+        if isinstance(t, dict) and str(t.get("asset") or "").upper() == sym:
+            if t.get("engine_view") or t.get("v33_trigger"):
+                return f"⚙ Moteur ce matin : {t.get('action')}"
+    return ("⚙ Moteur ce matin : aucune décision sur cet actif "
+            "(seul le moteur décide RENFORCER ; ALLÉGER suit tes règles de "
+            "prise de profit)")
+
+
 def _cmd_pourquoi(args: list[str]) -> str:
     """v27 (TG5) — /pourquoi SYM : développe la thèse derrière une reco active.
 
-    Reco (entrée, date, stop, cible, confiance) + observation/raisonnement de
-    la thèse du matin + contre-thèse. Sans reco active : le dit honnêtement
-    et oriente vers /analyse.
+    Reco (entrée, date, niveaux cohérents) + observation/raisonnement de la
+    thèse du matin + contre-thèse. Sans reco active : le dit honnêtement et
+    oriente vers /analyse.
     """
     if not args:
         return "Utilisation : `/pourquoi SYM` (ex. `/pourquoi TAO`)."
@@ -452,17 +474,27 @@ def _cmd_pourquoi(args: list[str]) -> str:
         return (f"Aucune reco active sur *{sym}*. "
                 f"Tape `/analyse {sym}` pour un plan à la demande.")
     lines = [f"*🎯 Pourquoi {reco.get('action', '—')} {sym} ?*"]
+    if not reco.get("engine"):
+        lines.append("_Reco V30 héritée — décidée par le modèle de langage avant "
+                     "la V33 ; suivie jusqu'à son terme, ce n'est pas une "
+                     "décision du moteur._")
     _meta = []
     if reco.get("created_at"):
         _meta.append(f"émise le {str(reco['created_at'])[:10]}")
+    # v33 (audit 01/10) — montants formatés (« entrée 83966.0 · cible
+    # 93504.5376 » sur la chaîne rejouée) ; une décision du moteur a une barre
+    # de succès à 12 mois, pas une cible ; la confiance du modèle n'est plus
+    # publiée.
+    from src.utils.numfmt import fr_usd as _usd
+    from src.tracking.prediction_scoring import niveaux_publiables
+    _cible, _stop = niveaux_publiables(reco)
     if reco.get("entry_price"):
-        _meta.append(f"entrée {reco['entry_price']}")
-    if reco.get("stop_loss"):
-        _meta.append(f"invalidation {reco['stop_loss']}")
-    if reco.get("ct_target") or reco.get("target_price"):
-        _meta.append(f"cible {reco.get('ct_target') or reco.get('target_price')}")
-    if reco.get("confidence"):
-        _meta.append(f"confiance {reco['confidence']}%")
+        _meta.append(f"entrée {_usd(reco['entry_price'])}")
+    if _stop:
+        _meta.append(f"invalidation {_usd(_stop)}")
+    if _cible:
+        _lib = "barre de succès 12 mois" if reco.get("engine") else "cible"
+        _meta.append(f"{_lib} {_usd(_cible)}")
     if _meta:
         lines.append(" · ".join(str(m) for m in _meta))
     # La thèse d'origine (rapport du matin persisté).
@@ -479,8 +511,10 @@ def _cmd_pourquoi(args: list[str]) -> str:
             lines.append(f"{i}. {str(s)[:160]}")
         if thesis.get("counter_thesis"):
             lines.append(f"⚖️ Contre-thèse : {str(thesis['counter_thesis'])[:200]}")
-        if thesis.get("plan_line"):
-            lines.append(f"📐 {thesis['plan_line']}")
+        _ev = thesis.get("engine_view") if isinstance(thesis.get("engine_view"), dict) else {}
+        _disp = _ev.get("display") if isinstance(_ev.get("display"), dict) else {}
+        if _disp.get("pot_req"):
+            lines.append(f"⚙ Moteur : potentiel / requis {_disp['pot_req']}")
     else:
         lines.append("_Thèse détaillée du matin non retrouvée dans le state — "
                      f"`/analyse {sym}` pour l'état des lieux actuel._")
@@ -529,9 +563,7 @@ def _cmd_suivi() -> str:
         if recos:
             lines.append(f"• Recos actives : *{len(recos)}*")
             for r in recos[:5]:
-                lines.append(
-                    f"   – {r.get('asset', '?')} · {r.get('action', '?')} "
-                    f"({r.get('status') or 'en cours'})")
+                lines.append(f"   – {_ligne_reco(r)}")
         else:
             lines.append("• Recos actives : aucune")
     except Exception:  # noqa: BLE001

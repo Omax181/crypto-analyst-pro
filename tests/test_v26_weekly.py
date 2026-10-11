@@ -441,8 +441,10 @@ def test_positions_review_reco_without_lt_gets_fallbacks():
     r = rows[0]
     assert r["asset"] == "RSR"
     assert r["lt_status"] == "capitulation"   # −99% → capitulation (calculé)
-    assert r["action"] == "renforcer"          # aligné sur la reco active
-    assert r["h30"]["reco"] == "RENFORCER"
+    # v33 (02/10) — une reco V30 héritée reste SUIVIE (colonne 30 j, étiquetée
+    # « reco V30 ») mais ne dicte plus l'action : seul le moteur dit renforcer.
+    assert r["action"] == "garder"
+    assert r["h30"]["reco"] == "RENFORCER" and r["h30"]["legacy"] is True
 
 
 def test_positions_review_action_aligned_with_active_reco():
@@ -453,26 +455,35 @@ def test_positions_review_action_aligned_with_active_reco():
         [{"asset": "INJ", "status": "capitulation", "action": "garder",
           "analysis": "x.", "target_price": 52.62}],
         [{"asset": "INJ", "reco": "RENFORCER", "status": "in_progress",
-          "delta_pct": 1.8}],
+          "delta_pct": 1.8, "engine": True}],
         _PTF, _MKT, ath_facts=_ATH_FACTS)
+    # v33 — vrai pour une décision du MOTEUR en cours (W-A7 conservé) ; une
+    # reco V30 héritée, elle, est étiquetée et ne dicte plus l'action.
     assert rows[0]["action"] == "renforcer"
+    from src.reporting.email_html import render
+    rows_v30 = _build_positions_review(
+        [], [{"asset": "INJ", "reco": "RENFORCER", "status": "in_progress",
+              "delta_pct": 1.8}], _PTF, _MKT, ath_facts=_ATH_FACTS)
+    html = render({"header": {"date": "x"}, "positions_review": rows_v30}, "weekly")
+    assert "reco V30" in html
 
 
 def test_positions_review_target_clamped_to_ath_and_kind():
-    """W-A16 : cible > ATH clampée ; ≥ +250% = « cycle », sinon « 6-12m »."""
+    """v33 — plus de cible du modèle ni de reconquête d'ATH : la colonne long
+    terme est la fourchette 12 mois à volatilité mesurée (ou rien)."""
     from src.main import _build_positions_review
 
     rows = _build_positions_review(
         [{"asset": "ATOM", "status": "capitulation", "action": "garder",
-          "analysis": "x.", "target_price": 60.0},   # > ATH 44.45 → clamp
+          "analysis": "x.", "target_price": 60.0},
          {"asset": "INJ", "status": "capitulation", "action": "garder",
-          "analysis": "y.", "target_price": 9.0}],   # +95% → 6-12m
-        [], _PTF, _MKT, ath_facts=_ATH_FACTS)
+          "analysis": "y.", "target_price": 9.0}],
+        [], _PTF, _MKT, ath_facts=_ATH_FACTS, vols={"INJ": 4.0})
     atom = next(r for r in rows if r["asset"] == "ATOM")
     inj = next(r for r in rows if r["asset"] == "INJ")
-    assert atom["lt_target"] == pytest.approx(44.45)
-    assert atom["lt_target_kind"] == "cycle"          # +2768% → cycle
-    assert inj["lt_target_kind"] == "6-12m"
+    assert atom["lt_target"] is None and atom["lt_target_high"] is None
+    assert inj["lt_target_kind"] == "fourchette"
+    assert inj["lt_target_low"] < inj["current_price"] < inj["lt_target_high"]
 
 
 def test_positions_review_suspect_ath_no_target():
@@ -550,12 +561,12 @@ def test_render_weekly_facts_lines_and_offcycle():
                                            "est planifié le dimanche 12:00.")
     payload["weekly_facts_lines"] = [
         "📊 Probas taux Fed (Polymarket) · maintien 89.5%",
-        "💵 Dollar · DXY (ICE) 101.20 · indice élargi (Fed) 120.10",
+        "💵 Dollar · DXY (ICE) 101,20 · indice élargi (Fed) 120.10",
         "😨 Fear & Greed · 19 (Extreme Fear) · il y a 7 j : 24 (−5 pts)",
     ]
     html = _render(payload)
     assert "Repères chiffrés" in html
-    assert "DXY (ICE) 101.20" in html
+    assert "DXY (ICE) 101,20" in html
     assert "Run hors-cycle (jeudi)" in html
     assert "il y a 7 j : 24" in html
 
@@ -620,10 +631,12 @@ def test_render_weekly_target_cycle_label():
          "analysis": "y.", "action": "garder"},
     ]
     html = _render(payload)
-    assert "reconquête de l'ATH" in html
-    # 1 occurrence dans la ligne ATOM + 1 dans la légende ; la cible « 6-12m »
-    # d'INJ reste un simple « cible ».
-    assert html.count("cible cycle") == 2
+    # v33 — plus de « cible cycle » (reconquête d'ATH) ni de cible ponctuelle :
+    # seule la fourchette 12 mois mesurée est rendue.
+    assert "cible cycle" not in html and "44,45" not in html
+    payload["positions_review"][1].update(
+        {"lt_target_kind": "fourchette", "lt_target_low": 1.57, "lt_target_high": 35.83})
+    assert "12 mois (80 %)" in _render(payload)
 
 
 def test_render_weekly_heatmap_thresholds_7d():
@@ -645,7 +658,7 @@ def test_render_weekly_heatmap_thresholds_7d():
 
 
 def test_render_weekly_momentum_detail_in_pct():
-    """W-A19 : « +0.3% vs BTC 7j » (plus de « pts »)."""
+    """W-A19 : « +0,3% vs BTC 7j » (plus de « pts »)."""
     payload = dict(_MINIMAL)
     payload["ptf_quality_score"] = {
         "score": 3.3, "delta_wow": None, "improve": None,
@@ -653,15 +666,15 @@ def test_render_weekly_momentum_detail_in_pct():
             {"label": "Diversification", "score": 1.7,
              "detail": "top secteur 67% du PTF"},
             {"label": "Momentum vs BTC", "score": 5.2,
-             "detail": "+0.3% vs BTC 7j"},
+             "detail": "+0,3% vs BTC 7j"},
             {"label": "Solidité (vs ATH)", "score": 2.9,
-             "detail": "drawdown pondéré -67.8% vs ATH"},
+             "detail": "drawdown pondéré -67,8% vs ATH"},
         ],
     }
     html = _render(payload)
-    assert "+0.3% vs BTC 7j" in html
+    assert "+0,3% vs BTC 7j" in html
     assert "pts vs BTC 7j" not in html
-    assert "-67.8% vs ATH" in html
+    assert "-67,8% vs ATH" in html
 
 
 def test_render_weekly_nominal_v25_like_no_regression():

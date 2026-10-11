@@ -182,9 +182,28 @@ def compute_setup_stats(
     # RSI 54, ETH RSI 61 le 15/07) : le matcher accepte aussi les replis
     # comparables. « Configuration comparable » est toujours vrai.
     # v30 (#79) — n < 20 : échantillon statistiquement insuffisant, dit tel quel.
-    _sample_note = ("" if occurrences >= 20
-                    else f" Échantillon insuffisant (n={occurrences} < 20) — "
-                         "indicatif seulement, pas un signal.")
+    # v32 (1.13) — DEUX facons de rendre la statistique creuse, pas une.
+    # La v30 ne surveillait que l'echantillon TROP PETIT. L'autre extreme est
+    # au moins aussi trompeur : si le critere retient un jour sur cinq, il ne
+    # decrit plus une CONFIGURATION mais le comportement ordinaire de l'actif.
+    # Mesure sur le mail du 24/08 : INJ, « sur les 95 derniers jours, une
+    # configuration similaire de divergence haussiere s'est produite 20 fois »
+    # — soit une fois tous les 4,75 jours. Presente sans reserve (n=20
+    # atteignait pile le seuil bas), le lecteur y lit un signal rare ; c'est
+    # une description du regime. On borne donc la SELECTIVITE.
+    _fenetre_eligible = max(1, n - forward_days - ma_window)
+    _taux = occurrences / _fenetre_eligible
+    if occurrences < 20:
+        _sample_note = (f" Échantillon insuffisant (n={occurrences} < 20) — "
+                        "indicatif seulement, pas un signal.")
+    elif _taux > 0.15:
+        _sample_note = (
+            f" Critère peu sélectif : {occurrences} occurrences sur "
+            f"{_fenetre_eligible} jours retenus ({_taux * 100:.0f}%) — ceci "
+            "décrit le comportement habituel de l'actif, pas une configuration "
+            "particulière.")
+    else:
+        _sample_note = ""
     summary = (
         f"Sur ~{n}j d'historique, une configuration comparable s'est "
         f"présentée {occurrences} fois ; rendement moyen {f'{avg_fwd:+.1f}'.replace('.', ',')}% sur "
@@ -197,5 +216,6 @@ def compute_setup_stats(
         "win_rate_pct": round(win_rate, 0),
         "forward_days": forward_days,
         "lookback_days": n,
+        "selectivity_pct": round(_taux * 100, 1),   # v32 (1.13)
         "summary": summary,
     }

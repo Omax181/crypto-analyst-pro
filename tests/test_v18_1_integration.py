@@ -20,6 +20,19 @@ from src.state import report_memory as mem
 from src.telegram_bot import context_loader
 
 
+def _opportunite() -> dict:
+    """Sortie RÉELLE du moteur v33 (ETH à MVRV 0,6 : potentiel mesuré qui
+    couvre le requis). Audit zero-trust 01/10 : la version précédente était un
+    dictionnaire écrit à la main, sans requis ni potentiel ni candidat — une
+    forme que le moteur ne produit pas."""
+    from src.analytics import opportunity as O
+    from tests.test_v33_moteur import eth, univers
+    cands = univers(eth(mvrv=0.6, price=1640.0))
+    res = O.decide_universe(cands, ptf_value_usd=2630.0)
+    res["candidates"] = cands
+    return res
+
+
 def _fake_data() -> dict:
     """Dict renvoyé par _collect_morning_data (forme réaliste, bornée)."""
     return {
@@ -51,6 +64,11 @@ def _fake_data() -> dict:
         "eligible_theses": [
             {"asset": "ETH", "tier_label": "Tier 1 · large cap"},
         ],
+        # v33 — le moteur d'opportunité fait partie de la COLLECTE (il est
+        # calculé dans _collect_morning_data, mocké ici). Sans ce bloc, aucune
+        # action ferme ne survit : c'est le contrat v33, et le test
+        # test_v33_sans_moteur_aucune_posture_ferme le vérifie à l'envers.
+        "opportunity": _opportunite(),
         "cross_signals": {
             "signals": {"mvrv_context": {"available": True, "zone": "accumulation"}},
             "readings": ["MVRV BTC à 0.95 (< 1) : zone d'accumulation."],
@@ -222,3 +240,43 @@ def test_run_weekly_degradation_end_to_end(monkeypatch) -> None:
     assert rc == 0
     saved = mem.load_weekly_report()
     assert saved  # un payload weekly a bien été persisté
+
+
+def test_v33_sans_moteur_aucune_posture_ferme(tmp_path, monkeypatch):
+    """Contrat v33, vérifié dans le VRAI pipeline : moteur absent ⇒ abstention.
+
+    Le pendant du test end-to-end nominal. Sans lui, on ne saurait pas si la
+    posture ferme d'ETH vient du moteur ou de la prose du modèle de langage.
+    """
+    data = _fake_data()
+    data.pop("opportunity")          # moteur indisponible
+    payload = main._merge_python_facts(_fake_payload(), data, "17/06 08:30")
+    theses = payload.get("thesis_of_the_day") or []
+    assert theses, "la thèse doit rester AFFICHÉE"
+    assert theses[0]["asset"] == "ETH"
+    assert theses[0]["action"] == "SURVEILLER"
+    assert theses[0]["_v33_gated"] == "moteur_indisponible"
+    assert not (payload.get("firm_postures") or {})
+
+
+def test_l_heure_de_l_hebdo_n_est_jamais_celle_du_modele(monkeypatch) -> None:
+    """Audit 02/10 — l'hebdo rejoué le 02/10 affichait « 15:30 Casablanca »,
+    l'heure écrite par le modèle dans un payload du 27/09 (``setdefault``).
+    Comme au matin (A3) et au soir, date et heure sont posées par Python."""
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    monkeypatch.setattr(mem, "_STATE_DIR", tmp)
+    _seed_morning(tmp)
+    _patch_weekly_sources(monkeypatch)
+    monkeypatch.setattr(DecisionEngine, "generate_weekly", lambda self, **kw: {
+        "header": {"time_casablanca": "15:30 Casablanca",
+                   "date": "dimanche 27 septembre 2026"},
+        "weekly_narrative": "Semaine calme."})
+    sent = {}
+    monkeypatch.setattr(main, "send_email", lambda subject, html, inline_images=None:
+                        sent.update(html=html) or True)
+    assert main.run_weekly() == 0
+    header = mem.load_weekly_report()["header"]
+    assert header["time_casablanca"] != "15:30 Casablanca"
+    assert header["time_casablanca"].endswith(" Casablanca")
+    assert header["date"] != "dimanche 27 septembre 2026"
+    assert "15:30 Casablanca" not in sent["html"]

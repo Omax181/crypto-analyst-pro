@@ -164,7 +164,22 @@ def run_from_relay() -> int:
         logger.info("Relais : file vide, rien à traiter.")
         return 0
 
-    messages, _max_update_id = telegram_api.extract_text_messages(updates, allowed_chat)
+    messages, max_update_id = telegram_api.extract_text_messages(updates, allowed_chat)
+
+    # v32 (4.6) — LE RELAIS AVANCE AUSSI L'OFFSET DE POLLING.
+    #
+    # Le mode relais ignorait ``max_update_id`` : l'offset persisté restait figé
+    # à la valeur qu'il avait le jour où le relais a pris la main. Or ``main()``
+    # choisit son mode À CHAQUE RUN sur ``relay_configured()`` : que le secret
+    # du relais expire, soit retiré, ou que le Worker tombe, et le run suivant
+    # repasse en polling avec un offset périmé — donc redemande à Telegram TOUS
+    # les updates déjà traités par le relais depuis, et y RÉPOND une seconde
+    # fois. C'est un mécanisme plausible des réponses dupliquées observées.
+    # Avancer l'offset ici ne coûte rien au mode relais (qui ne le lit pas) et
+    # rend les deux chemins interchangeables sans rejeu.
+    if max_update_id is not None:
+        mem.save_telegram_offset(max_update_id + 1)
+
     if not messages:
         logger.info("Relais : updates reçus mais aucun message exploitable.")
         return 0

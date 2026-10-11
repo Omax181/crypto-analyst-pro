@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from src.utils import numfmt as _numfmt
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -117,7 +118,7 @@ def evaluate_thesis_eligibility(
         # daté. Le 07/07, un MVRV ETH du 23/05 pesait +3 en signal n°1 de la
         # reco : une donnée de 6 semaines ne pilote plus une thèse à plein poids.
         _w_mvrv = _W_FUNDAMENTAL_LT
-        _lbl_mvrv = f"MVRV {mvrv:.2f} < 1 (sous-évaluation historique)"
+        _lbl_mvrv = f"MVRV {mvrv:.2f} < 1 (sous-évaluation historique)".replace(".", ",", 1)
         if mvrv_stale:
             _w_mvrv = max(1, _W_FUNDAMENTAL_LT - 1)
             _d_mvrv = (f"{mvrv_as_of[8:10]}/{mvrv_as_of[5:7]}"
@@ -166,8 +167,20 @@ def evaluate_thesis_eligibility(
     if _dist_sup is None:
         _dist_sup = ta.get("dist_to_support_pct")
     if _is_num(_dist_sup) and 0 <= _dist_sup <= 2:
-        _sig(f"prix à {_dist_sup:.1f}% d'un support clé",
-             "technical_struct", _W_TECHNICAL_STRUCT)
+        # v32 (1.8) — LE NIVEAU EST NOMMÉ, pas seulement la distance. Le
+        # fragment disait « prix à 1.3% d'un support clé » sans dire LEQUEL :
+        # le modèle, chargé de narrer le score, comblait avec le niveau qu'il
+        # avait sous la main. Le 21/08, il a écrit « à seulement 1,3 % de son
+        # support clé de 1,24 $ » pour RENDER coté 1,44 $ — soit 16 % au-dessus
+        # de ce niveau : il avait nommé le STOP, pas le support du moteur
+        # (~1,42 $). Donner la valeur retire le trou à combler.
+        # La décimale passait aussi en format anglais (« 1.3% ») au milieu
+        # d'une ligne de score par ailleurs française.
+        _niv_sup = _sr.get("support")
+        _lbl_sup = f"prix à {_dist_sup:.1f}% d'un support clé".replace(".", ",")
+        if _is_num(_niv_sup):
+            _lbl_sup += f" ({_numfmt.fr_usd(_niv_sup)})"
+        _sig(_lbl_sup, "technical_struct", _W_TECHNICAL_STRUCT)
     if _tlocal.get("bullish_divergence") or ta.get("bullish_divergence"):
         _sig("divergence haussière prix/RSI (plus-bas prix, RSI plus haut)",
              "technical_struct", _W_TECHNICAL_STRUCT)
@@ -216,7 +229,7 @@ def evaluate_thesis_eligibility(
         _sig("Fear & Greed < 20 + position sous PRU (setup d'accumulation)",
              "sentiment", _W_SENTIMENT)
     if _is_num(put_call_ratio) and (put_call_ratio >= 1.3 or put_call_ratio <= 0.5):
-        _sig(f"put/call ratio extrême ({put_call_ratio:.2f})",
+        _sig(f"put/call ratio extrême ({put_call_ratio:.2f})".replace(".", ","),
              "sentiment", _W_SENTIMENT)
 
     score = sum(s["weight"] for s in signals)

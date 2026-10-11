@@ -67,11 +67,11 @@ def test_exit_radar_skips_stablecoins():
     from src.analytics.exit_radar import compute_exit_signals
 
     out = compute_exit_signals([
-        # USDC surpondéré (du cash, pas un risque de concentration volatile).
-        {"symbol": "USDC", "pnl_pct": 0.1, "weight_pct": 25.0,
+        # USDC « en profit » : du cash, jamais un palier de prise de profit.
+        {"symbol": "USDC", "pnl_pct": 300.0, "weight_pct": 25.0,
          "tier": "satellite", "change_7d": 0.0, "change_24h": 0.0},
-        # Satellite réellement surpondéré → signal attendu.
-        {"symbol": "JASMY", "pnl_pct": 5.0, "weight_pct": 15.0,
+        # Satellite au palier +80 % → signal attendu.
+        {"symbol": "JASMY", "pnl_pct": 85.0, "weight_pct": 15.0,
          "tier": "satellite", "change_7d": 2.0, "change_24h": 1.0},
     ])
     syms = [s["symbol"] for s in out["signals"]]

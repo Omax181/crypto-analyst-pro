@@ -15,6 +15,7 @@ Chaque test fige un correctif du ré-audit :
 
 from src.analytics import daily_guards as dg
 from src.analytics import weekly_guards as wg
+from tests.conftest import il_y_a
 
 
 # ── fix_broken_decimals : vrais positifs / faux positifs ──────────────────
@@ -89,17 +90,7 @@ def test_weekly_guards_fmt_pct_french():
     assert wg._fmt_pct(0.0) == "+0%"
 
 
-def test_reco_gate_stats_french():
-    from src.analytics.reco_gate import apply_reco_gate
-    payload = {"thesis_of_the_day": [{
-        "asset": "ETH", "action": "RENFORCER", "thesis_type": "tactical",
-        "action_plan": {"position_size_pct": 1.0},
-        "asset_plan": {"ev_30d_pct": -2.1, "rr_30d": 1.0},
-    }]}
-    apply_reco_gate(payload)
-    t = payload["thesis_of_the_day"][0]
-    assert t["action"] == "SURVEILLER"
-    assert "−2,1%" in t["gate_note"] and "R:R 1,0" in t["gate_note"]
+# v33 (audit 01/10) — « test_reco_gate_stats_french » retiré : la porte v28 (plafond → MAINTENIR, EV/R:R → SURVEILLER, confiance plafonnée) est retirée : critères écartés par Omar (pas de hard cap, pas de probabilité inventée) et sans effet sur une décision du moteur
 
 
 def test_liquidation_zones_labels_french():
@@ -114,7 +105,7 @@ def test_tracking_life_line_french(monkeypatch):
     from src.tracking import prediction_scoring as ps
     monkeypatch.setattr(ps.mem, "load_active_recommendations", lambda: [{
         "asset": "TAO", "action": "RENFORCER", "status": "in_progress",
-        "entry_price": 200.0, "created_at": "2026-07-10T08:00:00+00:00",
+        "entry_price": 200.0, "created_at": il_y_a(46),
         "stop_loss": 190.0, "ct_target": 220.0,
     }])
     rows = ps.PredictionTracker().active_for_display({"TAO": 206.9})
@@ -154,7 +145,7 @@ def test_check_report_survives_non_dict_thesis():
 # ── extract_lesson : la PIRE invalidation (pas la première) ───────────────
 def test_extract_lesson_picks_most_costly(monkeypatch):
     from src.tracking import prediction_scoring as ps
-    now = "2026-07-15T08:00:00+00:00"
+    now = il_y_a(2)
     monkeypatch.setattr(ps.mem, "load_prediction_history", lambda: [
         {"asset": "PETIT", "action": "RENFORCER", "status": "invalidated",
          "created_at": now, "price_change_pct": -2.0},
@@ -170,7 +161,7 @@ def test_check_invalidations_condition_french(monkeypatch):
     from src.tracking import prediction_scoring as ps
     monkeypatch.setattr(ps.mem, "load_active_recommendations", lambda: [{
         "asset": "TAO", "action": "RENFORCER", "status": "in_progress",
-        "entry_price": 210.0, "created_at": "2026-07-10T08:00:00+00:00",
+        "entry_price": 210.0, "created_at": il_y_a(46),
         "stop_loss": 190.0,
     }])
     out = ps.PredictionTracker().check_invalidations({"TAO": 193.0})

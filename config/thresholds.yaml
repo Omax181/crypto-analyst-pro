@@ -132,3 +132,114 @@ confidence_to_action:
   - {min: 40, max: 54,  label: "pas d'action · surveiller avec trigger", firm: false}
   - {min: 0,  max: 39,  label: "silence · pas de mention", firm: false}
 
+
+# =============================================================================
+# MOTEUR D'OPPORTUNITÉ (v33) — sélection déterministe des changements
+# d'allocation. TOUS les paramètres métier vivent ici, aucun n'est en dur.
+#
+# Le moteur ne prévoit PAS le rendement d'un actif : il calcule le rendement
+# REQUIS pour qu'une opération vaille la peine, puis vérifie qu'un potentiel
+# MESURÉ le couvre. Trois familles de paramètres, explicitement distinguées :
+#   * DÉCISION MÉTIER  — choix d'Omar, non dérivables des données ;
+#   * HYPOTHÈSE        — valeur déclarée faute de mesure (à instrumenter) ;
+#   * GARDE-FOU        — bornes d'un calcul, pas un ancrage.
+# =============================================================================
+opportunity_engine:
+
+  # ── contrefactuel et coûts ────────────────────────────────────────────────
+  # DÉCISION MÉTIER (Omar) : rendement de référence d'une détention USDC/USDT.
+  # Contrefactuel du CAS A (apport externe non investi). Jamais un seuil de
+  # recommandation à lui seul. Valeur fixe, aucune recherche par API.
+  cash_benchmark_annual_pct: 5.0
+  # HYPOTHÈSE : coût aller-retour (frais + spread + slippage). NON MESURÉ —
+  # aucune instrumentation d'exécution n'existe. Tant que cost_is_measured est
+  # faux, le rendement requis est publié comme SCÉNARIO, pas comme un calcul.
+  round_trip_cost_pct: 0.6
+  cost_is_measured: false
+
+  # ── horizon de référence ──────────────────────────────────────────────────
+  # DÉCISION MÉTIER (Omar) : RENFORCER = conviction de quelques semaines à
+  # quelques mois, horizon naturel 6-12 mois. Un geste plus court doit offrir
+  # AUTANT qu'une conviction — et, faute de grandeur propre à 30 jours, il ne
+  # déclenche jamais (canal analytique uniquement).
+  reference_horizon_days: 365
+  tactical_horizon_days: 30
+
+  # ── prime de risque de référence ──────────────────────────────────────────
+  # DÉCISION MÉTIER (Omar) : repère « ≈ 20 % », exprimé comme le rendement
+  # requis de l'actif MÉDIAN de l'univers (multiplicateur = 1). Le seuil de
+  # chaque actif en est dérivé par modulation : plus bas pour un actif solide,
+  # plus haut pour un actif risqué. Il n'apparaît nulle part en dur.
+  required_return_reference_pct: 20.0
+
+  # ── modulation par grandeurs MESURÉES ─────────────────────────────────────
+  # Chaque facteur compare l'actif à la MÉDIANE de l'univers du jour. Les
+  # bornes sont des GARDE-FOUS TECHNIQUES (aucun facteur ne peut à lui seul
+  # multiplier l'exigence au-delà) — pas des décisions métier.
+  modulation:
+    volatility:        # σ_i / σ_médiane
+      min: 0.6
+      max: 2.0
+    liquidity:         # volume 24 h ($) médian ÷ celui de l'actif
+      min: 0.8
+      max: 1.5
+    dilution:          # dilution restante relative ; donnée ABSENTE → plafond
+      min: 0.8
+      max: 1.5
+    coverage:          # couverture médiane ÷ couverture de l'actif
+      min: 0.8
+      max: 1.5
+    multiplier:        # borne du produit des quatre facteurs
+      min: 0.4
+      max: 3.0
+
+  # ── ancrages de valorisation MESURÉS (potentiel) ──────────────────────────
+  # Le potentiel n'est JAMAIS dérivé de l'ATH.
+  #  · MVRV (BTC/ETH) : ancre = MÉDIANE de la distribution historique de
+  #    l'actif (Coin Metrics, mesurée à chaque run) ; ancre prudente = premier
+  #    quartile ; plausibilité = support historique observé [min ; max].
+  #    Aucun nombre choisi ici : l'ancien « neutre » 1,0 était le prix réalisé,
+  #    zone de creux de cycle (médiane BTC mesurée : 1,72).
+  #  · MC/TVL : médiane des protocoles de la même catégorie DeFiLlama.
+  valuation:
+    peer_min_sample: 5         # GARDE-FOU STATISTIQUE : une médiane sur 4
+                               # points n'est pas une référence de valorisation.
+
+  # ── standard de preuve — AMPLITUDE ≠ CRÉDIBILITÉ ──────────────────────────
+  preuve:
+    # Borne primaire : le SUPPORT OBSERVÉ des pairs (sans paramètre). k ne
+    # sert qu'à borner un support corrompu par un pair erroné : 3 σ exprimés
+    # en MAD (σ = 1,4826·MAD), la convention standard — pas une valeur réglée
+    # sur des exemples.
+    k_aberrant: 4.448
+    # DÉCISION ANALYTIQUE DÉCLARÉE : au-delà de cette dispersion, la médiane
+    # des pairs n'est plus une référence (MAD_log 0,40 ≈ pairs entre −33 % et
+    # +49 % de leur médiane). Mesuré le 30/09 : AUCUNE catégorie DeFiLlama ne
+    # descend sous 0,88 — le chemin MC/TVL s'abstient donc, motif publié.
+    mad_log_max: 0.40
+    # Couverture minimale des sources sous laquelle toute grandeur dérivée est
+    # déclassée en SCÉNARIO et ne peut plus déclencher.
+    couverture_min: 0.50
+
+  # ── bandes de taille du RENFORT (DÉCISIONS MÉTIER Omar) ───────────────────
+  # La taille est une ENTRÉE, jamais une sortie d'optimisation. Les bandes
+  # encadrent le RENFORT, elles ne plafonnent pas l'exposition totale (« pas
+  # de hard cap d'exposition », Omar, 01/10/2026). Bande exceptionnelle :
+  # ouverte seulement si le potentiel tient aussi à l'ancre PRUDENTE.
+  core_sizing_assets: [BTC, ETH]   # Omar, 01/10 : TAO et LINK suivent les
+                                   # bandes satellites (restent intouchables).
+  sizing_bands:
+    core:
+      normal: [5.0, 10.0]
+      exceptional: [15.0, 20.0]
+    satellite:                     # Omar, 01/10 : 3–5 % / 5–8 %
+      normal: [3.0, 5.0]
+      exceptional: [5.0, 8.0]
+
+  # ── gate de viabilité (ferme un RENFORT, ne déclenche JAMAIS une vente) ───
+  # GARDE-FOUS TECHNIQUES (non fixés par Omar) : en deçà de cette liquidité le
+  # cours n'est pas exécutable ; au-delà de cette dilution restante, l'offre
+  # future écrase toute mesure de valorisation actuelle.
+  viability:
+    min_volume_to_mcap: 0.005
+    max_dilution_remaining_pct: 400.0

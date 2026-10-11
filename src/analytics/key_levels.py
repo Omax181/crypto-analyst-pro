@@ -20,6 +20,9 @@ from __future__ import annotations
 import math
 from typing import Any, Optional
 
+from src.utils import numfmt as _numfmt
+from src.utils.numfmt import arrondi_niveau as _arr
+
 from src.analytics.technical_local import (
     _pivot_highs,
     _pivot_lows,
@@ -39,14 +42,17 @@ _BASIS_RANK = {"pivot": 0, "MM200": 1, "MM100": 2, "MM50": 3,
 
 
 def _fmt_usd(v: float) -> str:
-    """Prix formaté façon mail : « 61 200 $ » (milliers U+202F) / « 3.42 $ »."""
-    if v >= 1000:
-        return f"{v:,.0f}".replace(",", _NNBSP) + f"{_NNBSP}$"
-    if v >= 100:
-        return f"{v:.0f}{_NNBSP}$"
-    if v >= 1:
-        return f"{v:.2f}".replace(".", ",") + f"{_NNBSP}$"
-    return f"{v:.4f}{_NNBSP}$"
+    """Prix formaté façon mail : « 61 200 $ » / « 0,001446 $ ».
+
+    v32 (5.6 / 2.2) — deux défauts corrigés en déléguant à l'autorité unique
+    ``utils.numfmt`` :
+      • la branche « < 1 » était la SEULE des quatre à ne pas convertir le point
+        décimal en virgule — d'où « ATR 3,5 % (≈0.2100 $/j) » pour INJ à côté de
+        « ATR 1,8 % (≈1 413 $/j) » pour BTC dans le mail du soir du 24/08 ;
+      • sa précision fixe à 4 décimales réduisait à ZÉRO l'ATR d'un micro-prix
+        (« ≈0.0000 $/j » sur RSR, mails des 21 et 23/08).
+    """
+    return _numfmt.fr_usd(v)
 
 
 def _sma(closes: list[float], period: int) -> Optional[float]:
@@ -152,7 +158,7 @@ def compute_key_levels(
 
     def _decorate(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [{
-            "level": round(it["level"], 6),
+            "level": _arr(it["level"]),
             "level_label": _fmt_usd(it["level"]),
             # Lisibilité : 2 bases max à l'affichage (les plus fortes d'abord).
             "basis": " + ".join(it["basis"].split(" + ")[:2]),
@@ -232,7 +238,7 @@ def compute_key_levels(
         }
 
     return {
-        "available": True, "symbol": symbol, "price": round(px, 6),
+        "available": True, "symbol": symbol, "price": _arr(px),
         "price_label": _fmt_usd(px),
         "supports": supports, "resistances": resistances,
         "readout": readout, "readout_line": readout_line,

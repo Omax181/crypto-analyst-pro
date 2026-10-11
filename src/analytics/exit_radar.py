@@ -4,11 +4,12 @@ Moteur DÉTERMINISTE consolidant « quelles positions envisager d'alléger
 AUJOURD'HUI », aligné sur la stratégie réelle d'Omar :
   • prise de profit par PALIERS : +80 % / ×2 (+100 %) / ×3 (+200 %) vs PRU ;
   • offload des SATELLITES (« jetables ») dans les pumps (vendre la force) ;
-  • contrôle de la CONCENTRATION (satellite surpondéré = risque).
+  • (la règle de CONCENTRATION a été retirée le 01/10/2026 : aucun seuil de
+    poids ne déclenche une vente — décision d'Omar.)
 
-Le CŒUR (BTC/ETH/TAO/LINK, gardé des années) n'est signalé que sur extension
-EXTRÊME (+300 %) et seulement pour une PETITE tranche — jamais offloadé comme un
-satellite. Les satellites reçoivent des signaux bien plus réactifs.
+Le CŒUR (BTC/ETH/TAO/LINK, gardé des années) n'est JAMAIS signalé : aucun
+allègement n'est proposé sur lui (décision d'Omar du 02/10/2026 ; TAO/LINK
+« intouchables » depuis le 01/10). Seuls les SATELLITES ont des paliers.
 
 Best-effort : toute donnée manquante → le déclencheur concerné est ignoré, jamais
 d'exception. Le LLM COMMENTE ces signaux déterministes, il ne les invente pas.
@@ -21,9 +22,9 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-# Cœur structurel d'Omar (source : investor_profile). Détecté même si le champ
-# ``tier`` du portefeuille est absent → protège toujours ces 4 positions.
-_CORE_SYMBOLS = {"BTC", "ETH", "TAO", "LINK"}
+# Cœur structurel d'Omar — SOURCE UNIQUE : investor_profile.CORE_ASSETS (la
+# copie locale pouvait diverger). Détecté même si le champ ``tier`` est absent.
+from src.ai_brain.prompts.investor_profile import CORE_ASSETS as _CORE_SYMBOLS
 
 # Audit v26 final — un stablecoin (ajoutable via /buy) n'est ni un palier de
 # profit ni un risque de concentration volatile : JAMAIS de signal dessus
@@ -34,10 +35,8 @@ _STABLE_SYMBOLS = {"USDC", "USDT", "DAI", "FDUSD", "TUSD", "PYUSD", "USDE"}
 _LADDER_X3 = 200.0        # ×3 vs PRU
 _LADDER_X2 = 100.0        # ×2 vs PRU
 _LADDER_80 = 80.0         # premier palier de prise de profit
-_CORE_EXTREME = 300.0     # cœur : seuil d'extension extrême (petite tranche)
 _PUMP_7D = 40.0           # pump satellite sur 7 j → fenêtre d'offload
 _PUMP_24H = 20.0          # accélération 24 h (renforce le signal de pump)
-_CONC_SATELLITE = 12.0    # satellite surpondéré (% du PTF)
 
 
 def _is_core(symbol: str, tier: Optional[str]) -> bool:
@@ -73,14 +72,18 @@ def compute_exit_signals(positions: list[dict[str, Any]]) -> dict[str, Any]:
         chg7 = _num(p.get("change_7d"))
         chg24 = _num(p.get("change_24h"))
         core = _is_core(sym, p.get("tier"))
+        # Décision d'Omar (02/10/2026) : AUCUN allègement n'est proposé sur le
+        # cœur (BTC, ETH, TAO, LINK) — seules les règles de prise de profit des
+        # SATELLITES subsistent. (TAO/LINK : « intouchables, jamais d'allègement
+        # proposé », 01/10.) L'ancienne règle « cœur +300 % → petite tranche »
+        # est retirée.
+        if core:
+            continue
         best: Optional[tuple[int, str, str]] = None  # (urgency, reason, action)
 
         # 1) PALIERS DE PRISE DE PROFIT (priorité maximale).
         if pnl is not None:
-            if core and pnl >= _CORE_EXTREME:
-                best = (2, f"cœur très étendu (+{pnl:.0f}% vs PRU)",
-                        "allège une PETITE tranche, garde le socle long terme")
-            elif not core and pnl >= _LADDER_X3:
+            if pnl >= _LADDER_X3:
                 best = (3, f"×3 atteint (+{pnl:.0f}% vs PRU)",
                         "allège une grosse tranche (prise de profit)")
             elif not core and pnl >= _LADDER_X2:
@@ -98,11 +101,11 @@ def compute_exit_signals(positions: list[dict[str, Any]]) -> dict[str, Any]:
             best = (2, f"pump de +{chg7:.0f}% sur 7j{extra}",
                     "fenêtre pour offloader une partie sur la force")
 
-        # 3) SUR-CONCENTRATION (satellite surpondéré).
-        if (best is None and not core and weight is not None
-                and weight >= _CONC_SATELLITE):
-            best = (1, f"surpondéré ({weight:.0f}% du PTF)",
-                    "réduis le risque de concentration")
+        # 3) SUR-CONCENTRATION — RETIRÉE (décision d'Omar, 01/10/2026) :
+        # « Pas de hard cap d'exposition. Aucun seuil ne déclenche une vente ;
+        # l'allègement dépend de la conviction. » Un poids élevé est une
+        # information (publiée dans le moteur d'opportunité), pas un signal de
+        # vente. Seules restent les règles de PRISE DE PROFIT du profil.
 
         if best is not None:
             urgency, reason, action = best

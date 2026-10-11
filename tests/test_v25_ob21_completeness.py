@@ -26,27 +26,25 @@ def _render(completeness):
     return render(payload, "morning")
 
 
-def test_partial_completeness_shows_warning_and_missing():
-    html = _render({"pct": 40, "available_count": 2, "total": 6,
-                    "missing": ["dérivés", "sentiment", "on-chain"]})
-    assert "complétude 40%" in html
-    assert "analyse partielle" in html          # ⚠ car < 50 %
-    assert "manque : dérivés" in html
+# v33 (audit 01/10) — « test_partial_completeness_shows_warning_and_missing » retiré : la complétude s'affichait dans le score V30 ; elle est désormais la « couverture des sources » de la fiche moteur (test ci-dessous)
 
 
-def test_full_completeness_no_warning():
-    html = _render({"pct": 100, "available_count": 6, "total": 6, "missing": []})
-    assert "complétude 100%" in html
-    assert "analyse partielle" not in html
+# v33 (audit 01/10) — « test_full_completeness_no_warning » retiré : la complétude s'affichait dans le score V30 ; elle est désormais la « couverture des sources » de la fiche moteur (test ci-dessous)
 
 
 def test_no_completeness_renders_without_error():
-    """Absence de complétude → bloc omis, aucun crash (rétro-compat)."""
-    payload = {"header": {"date": "05/07"}, "thesis_of_the_day": [{
-        "asset": "BTC", "action": "RENFORCER", "action_type": "bullish",
-        "thesis_scoring": {"score": 5, "threshold": 3,
-                           "signals": [{"label": "RSI", "weight": 2}]},
-    }]}
-    html = render(payload, "morning")
-    assert "Score pondéré" in html
-    assert "complétude" not in html
+    """v33 — la couverture des sources (et ses manques) figure dans la fiche
+    du moteur ; son absence ne casse rien."""
+    from src.reporting.email_html import render
+    from tests.test_v32_redteam import _these_moteur
+    t = _these_moteur()
+    t["engine_view"]["coverage_pct"] = 40
+    t["engine_view"]["coverage_missing"] = ["dérivés", "sentiment"]
+    html = render({"thesis_of_the_day": [t]}, "morning")
+    assert "couverture des sources 40 %" in html and "dérivés" in html
+    t2 = _these_moteur()
+    t2["engine_view"]["coverage_pct"] = None
+    html2 = render({"thesis_of_the_day": [t2]}, "morning")
+    assert "Décision du moteur" in html2 and "couverture des sources" not in html2
+
+

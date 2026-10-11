@@ -95,9 +95,23 @@ def ensure_v18_reset() -> None:
     logger.info("Reset v18 effectué : historique de performance remis à zéro (%s fichiers).", len(wiped))
 
 
-def _read(name: str, default: Any) -> Any:
+def _read(name: str, default: Any, elements: Any = None) -> Any:
     """Lit un JSON de state ; renvoie ``default`` si absent, illisible ou de TYPE
-    inattendu (OB23 — durcissement anti-corruption)."""
+    inattendu (OB23 — durcissement anti-corruption).
+
+    Args:
+        name: nom du fichier d'état.
+        default: valeur de repli, qui porte AUSSI le type attendu du conteneur.
+        elements: type attendu des ÉLÉMENTS quand ``default`` est une liste.
+            Les éléments d'un autre type sont ÉCARTÉS (et journalisés).
+
+            RED TEAM (RT-6) — la validation OB23 s'arrêtait au conteneur. Un
+            ``weekly_snapshots.json`` contenant ``[1, 2, "trois"]`` est bien une
+            liste : il passait, puis ``record_weekly_snapshot`` faisait
+            ``s.get("iso_week")`` sur un entier. Mesuré : le hebdo LÈVE
+            ``AttributeError`` et AUCUN mail ne part. Un état corrompu doit
+            dégrader le rapport, jamais l'empêcher.
+    """
     p = _path(name)
     if not p.exists():
         return default
@@ -116,6 +130,13 @@ def _read(name: str, default: Any) -> Any:
             "State %s de type inattendu (%s, attendu %s) — défaut utilisé.",
             name, type(loaded).__name__, type(default).__name__)
         return default
+    if elements is not None and isinstance(loaded, list):
+        propres = [e for e in loaded if isinstance(e, elements)]
+        if len(propres) != len(loaded):
+            logger.warning(
+                "State %s : %d élément(s) de type inattendu écarté(s).",
+                name, len(loaded) - len(propres))
+        return propres
     return loaded
 
 
@@ -211,7 +232,7 @@ def load_weekly_report() -> dict[str, Any]:
 # --------------------------- recommandations -------------------------------- #
 def load_active_recommendations() -> list[dict[str, Any]]:
     """Charge les recommandations actives (non clôturées)."""
-    return _read(ACTIVE_RECOS_FILE, [])
+    return _read(ACTIVE_RECOS_FILE, [], elements=dict)
 
 
 def save_active_recommendations(recos: list[dict[str, Any]]) -> None:
@@ -252,6 +273,10 @@ def add_recommendation(reco: dict[str, Any]) -> None:
             r.get("asset") == asset
             and (r.get("action") or "").upper() == new_action
             and (r.get("status") or "in_progress") == "in_progress"
+            # v33 — une décision du MOTEUR n'est pas la ré-émission d'une reco
+            # V30 du modèle de langage (fenêtre 30 j, entrée et date propres) :
+            # les fusionner ferait juger la décision sur l'entrée d'une autre.
+            and bool(r.get("engine")) == bool(reco.get("engine"))
         ):
             preserved_entry = r.get("entry_price")
             preserved_created = r.get("created_at")
@@ -264,8 +289,17 @@ def add_recommendation(reco: dict[str, Any]) -> None:
             if (_old_conf is not None and _new_conf is not None
                     and _new_conf != _old_conf):
                 r["prev_confidence"] = _old_conf
+            # v33 — une décision du MOTEUR est jugée sur la barre fixée À SA
+            # PREMIÈRE émission (entrée × (1 + requis)). La réécrire chaque
+            # matin avec le cours du jour ferait glisser la barre et rendrait
+            # le jugement ex post invérifiable.
+            _figes = {"entry_price", "created_at", "id"}
+            if r.get("engine"):
+                _figes |= {"ct_target", "required_pct", "potential_pct",
+                           "potential_conservative_pct", "implied_target",
+                           "horizon_days", "size_pct", "size_band"}
             for k, v in reco.items():
-                if k in ("entry_price", "created_at", "id"):
+                if k in _figes:
                     continue
                 if v is not None:
                     r[k] = v
@@ -312,7 +346,7 @@ def add_recommendation(reco: dict[str, Any]) -> None:
 # --------------------------- versioning des recos (V6) ---------------------- #
 def load_reco_changes() -> list[dict[str, Any]]:
     """Charge l'historique des changements d'avis (RENFORCER->ALLÉGER, etc.)."""
-    return _read(RECO_CHANGES_FILE, [])
+    return _read(RECO_CHANGES_FILE, [], elements=dict)
 
 
 def record_reco_change(
@@ -357,7 +391,7 @@ def record_reco_change(
 # --------------------- v19 (Partie 6) — dismissals via le bot --------------- #
 def load_reco_dismissals() -> list[dict[str, Any]]:
     """Recos écartées manuellement par Omar via le bot (/dismiss)."""
-    return _read(RECO_DISMISSALS_FILE, [])
+    return _read(RECO_DISMISSALS_FILE, [], elements=dict)
 
 
 def record_reco_dismissal(asset: str, action: str | None = None,
@@ -430,7 +464,7 @@ def recent_reco_changes(days: int = 7) -> list[dict[str, Any]]:
 # --------------------------- historique prédictions ------------------------- #
 def load_prediction_history() -> list[dict[str, Any]]:
     """Charge l'historique complet des prédictions (clôturées + en cours)."""
-    return _read(PREDICTION_HISTORY_FILE, [])
+    return _read(PREDICTION_HISTORY_FILE, [], elements=dict)
 
 
 def save_prediction_history(history: list[dict[str, Any]]) -> None:
@@ -453,7 +487,7 @@ def load_recent_theses(limit: int = 12) -> list[dict[str, Any]]:
     Returns:
         Liste de dicts ``{asset, action_type, created_at}``.
     """
-    history = _read(PREDICTION_HISTORY_FILE, [])
+    history = _read(PREDICTION_HISTORY_FILE, [], elements=dict)
 
     def _sort_key(p: dict[str, Any]) -> str:
         return p.get("created_at") or ""
@@ -494,7 +528,7 @@ def load_weekly_snapshots() -> list[dict[str, Any]]:
     Chaque snapshot : ``{date, value_usd, btc_price, week_label}``. Sert à
     tracer l'évolution du PTF (H7) et la comparaison vs BTC hold (H6).
     """
-    return _read(WEEKLY_SNAPSHOTS_FILE, [])
+    return _read(WEEKLY_SNAPSHOTS_FILE, [], elements=dict)
 
 
 def record_weekly_snapshot(
@@ -567,7 +601,7 @@ def record_source_health(all_sources: list[str], active_sources: list[str]) -> N
     """
     import datetime as _dt
 
-    logs = _read(SOURCE_HEALTH_FILE, [])
+    logs = _read(SOURCE_HEALTH_FILE, [], elements=dict)
     _active_canon = {_canon_source(s) for s in active_sources}
     down = [_canon_source(s) for s in all_sources
             if _canon_source(s) not in _active_canon]
@@ -602,7 +636,7 @@ def compute_weekly_source_stats(total_sources: int) -> dict[str, Any]:
     """
     import datetime as _dt
 
-    logs = _read(SOURCE_HEALTH_FILE, [])
+    logs = _read(SOURCE_HEALTH_FILE, [], elements=dict)
     if not logs or total_sources <= 0:
         return {"available": False}
     now = _dt.datetime.now(_dt.timezone.utc)
@@ -642,7 +676,7 @@ def compute_blind_spots_weekly() -> dict[str, Any]:
     """
     import datetime as _dt
 
-    logs = _read(SOURCE_HEALTH_FILE, [])
+    logs = _read(SOURCE_HEALTH_FILE, [], elements=dict)
     if not logs:
         return {"available": False}
 
@@ -814,7 +848,7 @@ def load_seen_news(hours: int = 48) -> set[str]:
     Returns:
         Ensemble de signatures (str) encore valides.
     """
-    raw = _read(SEEN_NEWS_FILE, [])
+    raw = _read(SEEN_NEWS_FILE, [], elements=dict)
     if not isinstance(raw, list):
         return set()
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -844,7 +878,7 @@ def record_seen_news(titles: list[str], retention_hours: int = 96) -> None:
         titles: titres des news effectivement affichées ce run.
         retention_hours: au-delà, les entrées sont purgées (défaut 96h).
     """
-    raw = _read(SEEN_NEWS_FILE, [])
+    raw = _read(SEEN_NEWS_FILE, [], elements=dict)
     if not isinstance(raw, list):
         raw = []
     cutoff = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
@@ -891,7 +925,7 @@ def load_telegram_history(limit: int = 12) -> list[dict[str, Any]]:
     Returns:
         Liste ``[{role: 'user'|'assistant', content: str, at: iso}]``.
     """
-    hist = _read(TELEGRAM_HISTORY_FILE, [])
+    hist = _read(TELEGRAM_HISTORY_FILE, [], elements=dict)
     return hist[-limit:] if isinstance(hist, list) else []
 
 
@@ -903,7 +937,7 @@ def append_telegram_turn(role: str, content: str, *, max_keep: int = 40) -> None
         content: texte du message.
         max_keep: nombre de tours conservés (au-delà, on tronque le plus ancien).
     """
-    hist = _read(TELEGRAM_HISTORY_FILE, [])
+    hist = _read(TELEGRAM_HISTORY_FILE, [], elements=dict)
     if not isinstance(hist, list):
         hist = []
     hist.append({"role": role, "content": content, "at": now_iso()})
@@ -927,7 +961,7 @@ def load_bot_memory(limit: int = 0) -> list[dict[str, Any]]:
     Args:
         limit: si > 0, ne renvoie que les ``limit`` entrées les plus récentes.
     """
-    mems = _read(BOT_MEMORY_FILE, [])
+    mems = _read(BOT_MEMORY_FILE, [], elements=dict)
     if not isinstance(mems, list):
         return []
     return mems[-limit:] if limit and limit > 0 else mems
@@ -944,7 +978,7 @@ def append_bot_memory(kind: str, text: str, *, max_keep: int = 200) -> None:
     text = (text or "").strip()
     if not text:
         return
-    mems = _read(BOT_MEMORY_FILE, [])
+    mems = _read(BOT_MEMORY_FILE, [], elements=dict)
     if not isinstance(mems, list):
         mems = []
     mems.append({"ts": now_iso(), "kind": kind, "text": text})
@@ -955,7 +989,7 @@ def append_bot_memory(kind: str, text: str, *, max_keep: int = 200) -> None:
 
 def remove_bot_memory(index: int) -> bool:
     """Supprime l'entrée n° ``index`` (0-based). True si supprimée."""
-    mems = _read(BOT_MEMORY_FILE, [])
+    mems = _read(BOT_MEMORY_FILE, [], elements=dict)
     if isinstance(mems, list) and 0 <= index < len(mems):
         mems.pop(index)
         _write(BOT_MEMORY_FILE, mems)
@@ -989,7 +1023,7 @@ def record_thesis_scores(scores_by_asset: dict[str, Any],
     """
     if not isinstance(scores_by_asset, dict) or not scores_by_asset:
         return
-    hist = _read(THESIS_SCORES_FILE, [])
+    hist = _read(THESIS_SCORES_FILE, [], elements=dict)
     if not isinstance(hist, list):
         hist = []
     today = now_iso()[:10]
@@ -1007,7 +1041,7 @@ def load_thesis_score_deltas(days_back: int = 7) -> dict[str, Any]:
         la catégorie de signaux dont le poids a le PLUS bougé (le « moteur »
         du changement). Dict vide si pas d'historique comparable.
     """
-    hist = _read(THESIS_SCORES_FILE, [])
+    hist = _read(THESIS_SCORES_FILE, [], elements=dict)
     if not isinstance(hist, list) or len(hist) < 2:
         return {}
     latest = hist[-1]

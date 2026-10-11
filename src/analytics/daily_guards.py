@@ -358,53 +358,6 @@ def fix_historical_spin(node: Any) -> tuple[Any, list[str]]:
     return walk_strings(node, _fn), fixes
 
 
-# ── MA2 — l'EN BREF ne contredit pas les plans par-actif ──────────────────
-
-def fix_reinforce_claims(
-    bullets: Any, reinforce_assets: set[str], capped_assets: set[str],
-) -> tuple[Any, list[str]]:
-    """Une puce EN BREF annonçant le renforcement d'actifs AU PLAFOND est
-    remplacée par le constat honnête (recos fermes réelles + plafonds).
-
-    Le 10/07 : « Renforcement tactique et de conviction sur le cœur (BTC,
-    ETH, TAO, LINK) » alors que BTC/ETH/TAO étaient MAINTENIR (plafond) et
-    que le geste du jour était RENFORCER RENDER.
-    """
-    fixes: list[str] = []
-    if not isinstance(bullets, list) or not capped_assets:
-        return bullets, fixes
-    universe = {a.upper() for a in (reinforce_assets | capped_assets)}
-    renf = re.compile(r"(?i)renforc")
-    token = re.compile(r"\b[A-Z0-9]{2,10}\b")
-
-    out: list[Any] = []
-    for b in bullets:
-        text = b if isinstance(b, str) else (b.get("text") if isinstance(b, dict) else None)
-        if not isinstance(text, str) or not renf.search(text):
-            out.append(b)
-            continue
-        cited = {t for t in token.findall(text) if t in universe}
-        offenders = cited & {a.upper() for a in capped_assets}
-        if not offenders:
-            out.append(b)
-            continue
-        realf = sorted(a.upper() for a in reinforce_assets)
-        if realf:
-            new_text = (
-                f"Recos fermes du jour : {', '.join(realf)} — "
-                f"{', '.join(sorted(offenders))} au plafond de concentration "
-                "(maintenir, pas de renfort).")
-        else:
-            new_text = (
-                f"Aucun renfort aujourd'hui : {', '.join(sorted(offenders))} "
-                "au plafond de concentration — maintenir les positions.")
-        fixes.append(
-            f"puce EN BREF « renforcement » contredisant les plans réécrite "
-            f"({', '.join(sorted(offenders))} au plafond)")
-        out.append({**b, "text": new_text} if isinstance(b, dict) else new_text)
-    return out, fixes
-
-
 # ── MA12 — le narratif de rotation ne cite que les tuiles affichées ──────
 
 _SECTOR_ALIASES: dict[str, tuple[str, ...]] = {
@@ -560,6 +513,12 @@ def _action_text(a: Any) -> str:
     return str(a or "")
 
 
+
+def _fmt_niveau(v: float) -> str:
+    """Niveau de prix au format français (v32 : autorité unique numfmt)."""
+    from src.utils import numfmt as _nf
+    return _nf.fr_num(v, thin=False) + " $"
+
 def reconcile_evening_actions(
     actions: Any, active_recos: Any
 ) -> tuple[Optional[list[Any]], list[str]]:
@@ -586,6 +545,10 @@ def reconcile_evening_actions(
     if not isinstance(actions, list) or not actions:
         return (actions if isinstance(actions, list) else None), fixes
     stance_by_asset: dict[str, str] = {}
+    # v32 (2.3) — on garde la reco COMPLÈTE : la condition « cible publiée
+    # dépassée » a besoin de target_price et current_price, pas seulement du
+    # sens de la thèse.
+    _recos_by_asset: dict[str, dict] = {}
     for r in (active_recos or []):
         if not isinstance(r, dict):
             continue
@@ -595,6 +558,7 @@ def reconcile_evening_actions(
         act = (r.get("action") or "").upper()
         if a and ("RENFORC" in act or "ALLÉG" in act or "ALLEG" in act):
             stance_by_asset[a] = "RENFORCER" if "RENFORC" in act else "ALLEGER"
+            _recos_by_asset[a] = r
     if not stance_by_asset:
         return actions, fixes
 
@@ -625,8 +589,45 @@ def reconcile_evening_actions(
                 f"action soir « {text[:50].strip()}… » SUPPRIMÉE : sortie "
                 f"définitive contraire à la thèse LT {stance} active ({asset})")
             continue
+        # ── v32 (2.3) — UN ALLÈGEMENT SUR UNE CONVICTION EXIGE QUE LA CIBLE
+        # PUBLIÉE SOIT DÉPASSÉE. Arbitrage d'Omar (25/08/2026).
+        #
+        # Le 24/08, le matin disait « RENFORCER INJ à 5,37 $ · cible 30 j
+        # 5,58 $ » et le soir « Alléger 50 % de INJ à 5,82 $ ». Le geste était
+        # FONDÉ — 5,82 dépasse la cible — mais rien ne le distinguait d'un
+        # allègement d'humeur : la garde v30 accolait la même note dans les
+        # deux cas. On exige désormais la condition mesurable, et on la CITE.
+        # Sans cible publiée, on retombe sur le comportement v30 (requalifier),
+        # faute de critère : refuser par défaut supprimerait des gestes
+        # légitimes sur les recos anciennes qui n'en portent pas.
+        if stance == "RENFORCER" and _red:
+            # RT-1 — même clé que le carnet : ``ct_target`` d'abord (voir
+            # prediction_scoring._target_hit_level). Avec ``target_price`` seul,
+            # ``_cible`` valait toujours None sur les recos réelles et cet
+            # arbitrage du 25/08 ne s'appliquait jamais en production.
+            _reco_a = _recos_by_asset.get(asset) or {}
+            _cible = _to_float(_reco_a.get("ct_target"))
+            if _cible is None:
+                _cible = _to_float(_reco_a.get("target_price"))
+            _spot = _to_float(_reco_a.get("current_price"))
+            if _cible is not None and _spot is not None:
+                if _spot < _cible:
+                    fixes.append(
+                        f"action soir sur {asset} SUPPRIMÉE : allègement sur "
+                        f"une conviction RENFORCER dont la cible publiée "
+                        f"({_fmt_niveau(_cible)}) n'est PAS atteinte "
+                        f"(cours {_fmt_niveau(_spot)})")
+                    continue
+                note_cible = (f" Cible publiée {_fmt_niveau(_cible)} dépassée "
+                              f"({_fmt_niveau(_spot)}) : prise de profit "
+                              f"fondée.")
+            else:
+                note_cible = ""
+        else:
+            note_cible = ""
         note = (f"Couverture tactique CT — la thèse LT ({stance}) sur "
-                f"{asset} reste active : geste borné, pas une sortie.")
+                f"{asset} reste active : geste borné, pas une sortie."
+                + note_cible)
         if isinstance(a, dict):
             a["horizon"] = (f"{a.get('horizon')} · {note}"
                             if a.get("horizon") else note)
@@ -639,6 +640,14 @@ def reconcile_evening_actions(
 
 
 # ── v30 (#11/#29) — SEUIL DXY UNIQUE par rapport ──────────────────────────
+
+# v32 (5.11) — marqueurs d'un SEUIL conditionnel (par opposition a une mention
+# du niveau courant). Une borne de surveillance est légitimement différente du
+# spot : la réaligner dessus la rendrait déjà franchie.
+_SEUIL_DXY = re.compile(
+    r"(?i)(?:[<>]|au-dessus|au-dessous|en dessous|sous\b|passe\b|franchi|"
+    r"depasse|dépasse|resistance|résistance|support|si\b|seuil|"
+    r"cassure|repasse|revient|remonte|tombe|clôture)")
 
 _DXY_LEVEL = re.compile(r"(?i)\bDXY\b[^.\d%]{0,40}?(\d{2,3}(?:[.,]\d{1,2})?)")
 
@@ -662,6 +671,20 @@ def unify_dxy_thresholds(
     fixes: list[str] = []
     if state is None:
         state = {"canon": None, "canon_txt": None}
+    # v32 (5.11) — L'ANCRE EST LA VALEUR MESURÉE, pas la première rencontrée.
+    # Avant, l'ancre etait « le premier nombre DXY croise en parcourant le
+    # payload », donc dependante de l'ordre de parcours et non de la realite :
+    # le 21/08/2026 la garde a réécrit « 98,73 » (le DXY RÉELLEMENT mesuré,
+    # affiché tel quel dans la tuile du mail) en « 99 », un seuil rond inventé
+    # par le modele. Elle a donc propage la valeur fausse au lieu de la
+    # corriger — et sans jamais atteindre son but affiché (« pivot unique »),
+    # puisque les tuiles sont rendues depuis les données, pas depuis la prose.
+    if state.get("measured") is not None and state["canon"] is None:
+        _m = _to_float(state["measured"])
+        if _m is not None and 80 <= _m <= 130:
+            state["canon"] = _m
+            state["canon_txt"] = (f"{_m:.2f}".rstrip("0").rstrip(".")
+                                  .replace(".", ","))
 
     def _fix(text: str) -> str:
         def _sub(m: re.Match) -> str:
@@ -674,6 +697,14 @@ def unify_dxy_thresholds(
                 state["canon_txt"] = raw
                 return m.group(0)
             if val != state["canon"] and abs(val - state["canon"]) / state["canon"] < 0.01:
+                # v32 (5.11) — un SEUIL n'est pas un NIVEAU. « DXY > 99,0 »
+                # est une borne de surveillance : la reecrire sur le spot
+                # (98,73) la rendrait déjà franchie et détruirait la phrase.
+                # On ne realigne donc que les mentions du NIVEAU COURANT, pas
+                # les bornes conditionnelles.
+                if _SEUIL_DXY.search(m.group(0)) or _SEUIL_DXY.search(
+                        text[max(0, m.start() - 40):m.start()]):
+                    return m.group(0)
                 fixes.append(f"seuil DXY {raw} → {state['canon_txt']} (pivot unique)")
                 return m.group(0).replace(raw, str(state["canon_txt"]))
             return m.group(0)
@@ -767,7 +798,10 @@ def tone_down_gated_theses(theses: Any) -> list[str]:
     if not isinstance(theses, list):
         return fixes
     for t in theses:
-        if not isinstance(t, dict) or not t.get("_gated"):
+        # v33 — la requalification par le moteur (``_v33_gated`` : renfort
+        # refusé, allègement sans déclencheur, veto) remplace le gate v28 :
+        # sans elle, ce garde ne voyait plus aucune fiche.
+        if not isinstance(t, dict) or not (t.get("_gated") or t.get("_v33_gated")):
             continue
         asset = str(t.get("asset") or "?").upper()
         for key in ("observation", "thesis", "summary"):
@@ -893,7 +927,6 @@ def align_checklist_levels(
 _BROKEN_DECIMAL = re.compile(
     r"(\d)(?<!19\d\d)(?<!20\d\d)(?<!/\d\d),\s+(\d{1,2})(?=\s?(?:%|\$|€|/an|\s?:))")
 
-
 def fix_broken_decimals(node: Any) -> tuple[Any, list[str]]:
     """Répare les décimales françaises cassées par un espace (« -48, 7% »).
 
@@ -909,3 +942,114 @@ def fix_broken_decimals(node: Any) -> tuple[Any, list[str]]:
         return new
 
     return walk_strings(node, _fix), fixes
+
+
+# ── v33 — AUCUN GESTE DU MODÈLE SANS DÉCISION DÉTERMINISTE ────────────────
+#
+# Audit zero-trust (01/10). Le soir publiait ``actions_tonight`` (« Alléger
+# 10 % de TAO à 270 $ ») et l'hebdo ``weekly_action_plan`` / ``watchlist``
+# (« si ETH < 1 500 $ → renforcer le cœur ») : des gestes CHIFFRÉS décidés par
+# le modèle de langage, hors de tout moteur. La garde V30 ne retirait que ceux
+# qui CONTREDISAIENT une reco ouverte — un geste nouveau passait tel quel.
+# Or « le LLM ne peut pas décider RENFORCER, ALLÉGER, ni choisir le sizing »
+# (Omar). Un geste n'est donc conservé que s'il est porté par une décision
+# déterministe du jour : le moteur pour un renfort, le radar de sortie (règles
+# de prise de profit d'Omar) pour un allègement. Les lignes de SURVEILLANCE
+# (vérifier, poser une alerte, attendre) restent : ce ne sont pas des gestes.
+
+def _tickers_cites(texte: str, univers: set[str]) -> set[str]:
+    return {sym for sym in univers
+            if re.search(rf"(?<![A-Z0-9]){re.escape(sym)}(?![A-Z0-9])", texte)}
+
+
+def restrict_llm_gestures(
+    items: Any,
+    allowed: dict[str, set[str]],
+    univers: set[str],
+    *,
+    champ_geste: str = "action",
+    champ_direction: Optional[str] = None,
+) -> tuple[Optional[list[Any]], list[str]]:
+    """Retire tout geste du modèle qui n'est pas porté par une décision.
+
+    Args:
+        items: liste d'actions (dicts ou chaînes) rédigées par le modèle.
+        allowed: ``{ACTIF: {"RENFORCER", "ALLEGER"}}`` — directions décidées
+            de façon déterministe aujourd'hui.
+        univers: tickers connus (portefeuille + décisions), pour l'attribution.
+        champ_geste: champ portant la ligne d'action.
+        champ_direction: champ de direction explicite (« entrée »/« sortie »),
+            pour la watchlist hebdo.
+
+    Returns:
+        (liste filtrée ou ``None`` si vide, corrections pour le log).
+    """
+    fixes: list[str] = []
+    if not isinstance(items, list) or not items:
+        return (items if isinstance(items, list) else None), fixes
+    kept: list[Any] = []
+    for it in items:
+        primary = (str(it.get(champ_geste) or "") if isinstance(it, dict)
+                   else str(it or ""))
+        direction = None
+        if isinstance(it, dict) and champ_direction:
+            d = str(it.get(champ_direction) or "").lower()
+            if d.startswith(("entr", "achat", "buy", "renf")):
+                direction = "RENFORCER"
+            elif d.startswith(("sort", "vente", "sell", "all")):
+                direction = "ALLEGER"
+        if direction is None:
+            red = _REDUCE_VERBS.search(primary)
+            inc = _INCREASE_VERBS.search(primary)
+            if inc and not red:
+                direction = "RENFORCER"
+            elif red and not inc:
+                direction = "ALLEGER"
+            elif red and inc:
+                direction = "AMBIGU"
+        if direction is None:
+            kept.append(it)            # surveillance : pas un geste
+            continue
+        actifs = set()
+        if isinstance(it, dict) and it.get("asset"):
+            actifs.add(str(it["asset"]).upper())
+        actifs |= _tickers_cites(primary.upper(), univers)
+        from src.analytics.prose_guard import TAILLE_DU_MODELE
+        porte = (direction != "AMBIGU" and bool(actifs)
+                 and all(direction in allowed.get(a, set()) for a in actifs)
+                 # la taille appartient au moteur / au radar (v33)
+                 and not any(isinstance(v, str) and TAILLE_DU_MODELE.search(v)
+                             for v in ((it.values() if isinstance(it, dict)
+                                        else [primary]))))
+        if porte:
+            kept.append(it)
+        else:
+            fixes.append(
+                f"geste du modèle retiré (non porté par une décision "
+                f"déterministe) : « {primary[:70]} »")
+    return (kept or None), fixes
+
+
+def deterministic_gestures(
+    morning_state: Any, active_recos: Any = None,
+) -> dict[str, set[str]]:
+    """Directions décidées de façon déterministe : moteur (matin) + radar."""
+    allowed: dict[str, set[str]] = {}
+    ms = morning_state if isinstance(morning_state, dict) else {}
+    for th in (ms.get("thesis_of_the_day") or []):
+        if not isinstance(th, dict) or not th.get("asset"):
+            continue
+        a = str(th["asset"]).upper()
+        if th.get("engine_view") and (th.get("action") or "") == "RENFORCER":
+            allowed.setdefault(a, set()).add("RENFORCER")
+        if th.get("v33_trigger") and "ALL" in (th.get("action") or "").upper():
+            allowed.setdefault(a, set()).add("ALLEGER")
+    for s in ((ms.get("exit_signals") or {}).get("signals") or []):
+        if isinstance(s, dict) and s.get("symbol"):
+            allowed.setdefault(str(s["symbol"]).upper(), set()).add("ALLEGER")
+    for r in (active_recos or []):
+        if (isinstance(r, dict) and r.get("engine")
+                and (r.get("status") or "in_progress") == "in_progress"
+                and (r.get("action") or "").upper() == "RENFORCER"):
+            allowed.setdefault(str(r.get("asset") or "").upper(), set()).add("RENFORCER")
+    return allowed

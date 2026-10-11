@@ -43,6 +43,11 @@ _FUNDINGS_PER_DAY = 3
 # Seuils d'interprétation (par période de 8h).
 _HOT_LONG = 0.0005   # +0.05% : excès de longs marqué
 _HOT_SHORT = -0.0005  # -0.05% : excès de shorts marqué
+# v32 (5.13) — BANDE NEUTRE autour du taux par défaut (0,01 %/période, soit
+# 10,95 %/an annualisé). Bornes retenues avec Omar : 9 à 13 %/an, converties
+# ici en taux par période. À l'intérieur, le funding ne soutient AUCUNE thèse.
+_NEUTRE_BAS = 9.0 / (_FUNDINGS_PER_DAY * 365 * 100)     # ~0,0000822
+_NEUTRE_HAUT = 13.0 / (_FUNDINGS_PER_DAY * 365 * 100)   # ~0,0001187
 
 
 def _perp_symbol(symbol: str) -> Optional[str]:
@@ -153,13 +158,29 @@ def _fetch_okx(symbol: str, inst: str) -> dict[str, Any]:
 
 
 def _interpret(funding_rate: float) -> str:
-    """Lecture analytique d'un funding rate (période 8h)."""
+    """Lecture analytique d'un funding rate (période 8h).
+
+    v32 (5.13) — LA VALEUR PAR DÉFAUT N'EST PAS UN SIGNAL. Arbitrage d'Omar
+    (25/08/2026).
+
+    ``0,01 %`` par période est le taux que les plateformes appliquent quand la
+    prime est dans le corridor : c'est le NEUTRE du marché, pas une mesure.
+    Annualisé, il vaut exactement ``0,01 × 3 × 365 = 10,95 %/an`` — la valeur
+    qu'on retrouve sur TAO le 21/08, INJ le 24/08 et LINK dans l'hebdo du
+    24/08, sur trois actifs différents. L'ancienne lecture la qualifiait de
+    « légèrement positif · longs majoritaires, **sain** », et le modèle a repris
+    le mot : « validée par un taux de financement SAIN de 10,95 %/an ». Un
+    argument tiré d'une valeur qui n'en porte aucun.
+    """
     if funding_rate >= _HOT_LONG:
         return "excès de longs · surchauffe perp, risque de purge baissière"
     if funding_rate <= _HOT_SHORT:
         return "excès de shorts · potentiel short squeeze haussier"
+    if _NEUTRE_BAS <= funding_rate <= _NEUTRE_HAUT:
+        return ("neutre · valeur par défaut du marché (0,01 %/période) — "
+                "n'appuie AUCUNE thèse, dans un sens ni dans l'autre")
     if funding_rate > 0:
-        return "légèrement positif · longs majoritaires, sain"
+        return "légèrement positif · longs majoritaires"
     if funding_rate < 0:
         return "légèrement négatif · shorts majoritaires"
     return "neutre"

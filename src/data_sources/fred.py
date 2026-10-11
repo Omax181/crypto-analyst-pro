@@ -260,10 +260,17 @@ def get_upcoming_releases(horizon_days: int = 10) -> dict[str, Any]:
     if not key:
         return {"available": False, "events": []}
 
-    from datetime import date, datetime
+    from datetime import datetime, timezone
 
     def _fetch() -> dict[str, Any]:
-        today = date.today()
+        # v33.1 — DATE UTC, PAS LA DATE DE LA MACHINE.
+        # ``date.today()`` renvoie la date LOCALE du runner. Tout le
+        # reste du projet raisonne en UTC (workflows, horodatages,
+        # persistance). Sur une machine à UTC+1, entre minuit et 1 h
+        # locales, le calendrier était donc décalé d'un jour : une
+        # publication « demain » devenait « aujourd'hui ». Invisible
+        # sur GitHub Actions (UTC), reproductible en local.
+        today = datetime.now(timezone.utc).date()
         events: list[dict[str, Any]] = []
         for rid, (label, importance) in _UPCOMING_RELEASES.items():
             data = get_json(

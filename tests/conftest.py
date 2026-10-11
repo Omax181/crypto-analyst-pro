@@ -47,3 +47,29 @@ if "requests" not in sys.modules and _ilu.find_spec("requests") is None:
     _r.RequestException = Exception
     _r.get = lambda *a, **k: None
     sys.modules["requests"] = _r
+
+
+# ── v32 (5.15) — DATES DE FIXTURE RELATIVES ───────────────────────────────
+# Les fixtures datées en ABSOLU pourrissent : « 2026-07-15 » tombait hors de la
+# fenêtre de 30 j du win rate dès le 15/08/2026, et
+# ``test_extract_lesson_picks_most_costly`` échouait sans qu'une ligne de code
+# ait bougé. Une suite qui verdit en juillet et rougit en août ne prouve rien,
+# et fait sauter les portes de déploiement qui comptent les tests verts.
+def il_y_a(jours: float) -> str:
+    """Horodatage ISO-8601 UTC situé ``jours`` avant maintenant."""
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone.utc) - timedelta(days=jours)).isoformat()
+
+
+# ── v33 (audit 01/10) — AUCUN TEST N'ÉCRIT DANS LE VRAI ``state/`` ─────────
+# Un rendu du matin passe par ``record_seen_news`` : la suite ajoutait ses
+# titres de test au ``state/seen_news.json`` du dépôt. Lancée par le script de
+# déploiement sur le clone de production, elle aurait mêlé ces titres à la
+# déduplication réelle des news, puis les aurait commités avec le code.
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _etat_isole(tmp_path_factory, monkeypatch):
+    from src.state import report_memory as _mem
+    monkeypatch.setattr(_mem, "_STATE_DIR", tmp_path_factory.mktemp("state"))

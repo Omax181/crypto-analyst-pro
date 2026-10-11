@@ -30,6 +30,13 @@ _MULT_MAX = 1.00          # borne haute = HUMBLE-ONLY (jamais > 1)
 _MIN_SAMPLE = 10          # prédictions clôturées minimum avant d'agir
 _EMA_ALPHA = 0.30         # adaptation lente : 30 % neuf, 70 % ancien
 _STATE_KEY = "learning_calibration.json"
+# v32 (5.1) — fenêtre de calibration, EXPLICITE et transportée jusqu'au libellé.
+# Elle vaut 90 j là où le win rate du bandeau en couvre 30 : le mail juxtaposait
+# « échantillon 15 » et « en calibration (3/5) » sans jamais dire qu'ils ne
+# parlaient pas de la même période. Deux nombres justes, un lecteur incapable de
+# les réconcilier — et l'impression tenace qu'aucune reco ne se clôture jamais
+# alors que 15 l'avaient été.
+_FENETRE_JOURS = 90
 
 # Milieu du palier de confiance annoncé (aligné sur prediction_scoring.compute_calibration).
 _ANNOUNCED_MID = {"50-69%": 60.0, "70-79%": 75.0, "80%+": 90.0}
@@ -65,7 +72,7 @@ def compute_confidence_multiplier(tracker: Any) -> dict[str, Any]:
                 "reason": "apprentissage désactivé (LEARNING_ENABLED=0)"}
 
     try:
-        cal = tracker.compute_calibration(90)
+        cal = tracker.compute_calibration(_FENETRE_JOURS)
     except Exception:  # noqa: BLE001
         cal = {"available": False}
     if not isinstance(cal, dict) or not cal.get("available"):
@@ -110,10 +117,11 @@ def compute_confidence_multiplier(tracker: Any) -> dict[str, Any]:
         pass
 
     if mult < 0.98:
-        reason = (f"sur-confiance historique (échantillon {sample}) → confiance "
-                  f"affichée réduite ×{mult} par prudence (bornée à {_MULT_MIN})")
+        reason = (f"sur-confiance historique (échantillon {sample} sur "
+                  f"{_FENETRE_JOURS} j) → confiance affichée réduite ×{mult} par "
+                  f"prudence (bornée à {_MULT_MIN})")
     else:
-        reason = (f"calibration correcte (échantillon {sample}) → confiance quasi "
+        reason = (f"calibration correcte (échantillon {sample} sur {_FENETRE_JOURS} j) → confiance quasi "
                   f"inchangée (×{mult})")
     return {"available": True, "multiplier": mult, "raw_multiplier": round(raw, 3),
             "sample": sample, "reason": reason, "enabled": True}

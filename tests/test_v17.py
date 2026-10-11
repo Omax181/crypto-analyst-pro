@@ -17,6 +17,7 @@ Verrouille les comportements INTRODUITS en v17 (sans réseau) :
 """
 
 from __future__ import annotations
+from tests.conftest import il_y_a
 
 
 # --------------------------------------------------------------------------- #
@@ -118,13 +119,13 @@ def test_active_for_display_dedupes_and_enriches(tmp_path, monkeypatch):
     # Doublons legacy : BTC ×2 (dont une plus récente), ETH ×1.
     fake = [
         {"asset": "BTC", "action": "RENFORCER", "entry_price": 60000,
-         "created_at": "2026-06-01T08:00:00+00:00", "status": "in_progress"},
+         "created_at": il_y_a(85), "status": "in_progress"},
         {"asset": "BTC", "action": "RENFORCER", "entry_price": 62000,
-         "created_at": "2026-06-10T08:00:00+00:00", "status": "in_progress"},
+         "created_at": il_y_a(76), "status": "in_progress"},
         {"asset": "ETH", "action": "ALLÉGER", "entry_price": 1700,
-         "created_at": "2026-06-09T08:00:00+00:00", "status": "in_progress"},
+         "created_at": il_y_a(77), "status": "in_progress"},
         {"asset": "ADA", "action": "SURVEILLER", "entry_price": None,
-         "created_at": "2026-06-09T08:00:00+00:00", "status": "in_progress"},
+         "created_at": il_y_a(77), "status": "in_progress"},
     ]
     monkeypatch.setattr(mem, "load_active_recommendations", lambda: fake)
     tracker = PredictionTracker()
@@ -278,32 +279,13 @@ def test_weekly_no_details_tag_and_md_concentration():
     assert "<details" not in html
     # Markdown rendu : les ** deviennent du gras, pas des astérisques littéraux.
     assert "**L1" not in html
-    assert "<strong>L1 (44.2%)</strong>" in html or "<b>L1 (44.2%)</b>" in html
+    assert "<strong>L1 (44,2%)</strong>" in html or "<b>L1 (44,2%)</b>" in html
 
 
 # --------------------------------------------------------------------------- #
 # M-B2 — take profit retiré du plan d'action (cibles dédupliquées)
 # --------------------------------------------------------------------------- #
-def test_morning_plan_no_duplicate_take_profit():
-    from src.reporting.email_html import render
-    html = render({
-        "header": {"active_sources_count": 20, "total_sources_count": 25},
-        "portfolio_snapshot": {"value_usd": 1700},
-        "thesis_of_the_day": [{
-            "asset": "TAO", "action": "RENFORCER", "action_type": "bullish",
-            "confidence": 70,
-            "targets": {"short_term_30d": 285, "short_term_label": "Tactique 30j",
-                        "long_term_6_12m_low": 320},
-            "action_plan": {"entry": 260, "stop_loss": 245,
-                            "take_profit": {"30pct": 285, "30pct_b": 302, "40pct": 320},
-                            "rr": "2.5:1"},
-        }],
-    }, "morning")
-    # Le plan d'action ne montre plus « Take profit : » (doublon des cibles).
-    assert "Take profit :" not in html
-    # Mais l'entrée, le stop et la cible CT restent visibles.
-    assert "Entrée :" in html and "Stop loss :" in html
-    assert "285" in html  # la cible existe toujours (encadré cibles)
+# v33 (audit 01/10) — « test_morning_plan_no_duplicate_take_profit » retiré : le plan d'action V30 (entrée/stop/TP/R:R du modèle, cibles ATH/résistance) n'est plus rendu sur une posture ferme — la fiche porte les chiffres du moteur (tests/test_v33_chaine.py)
 
 
 # --------------------------------------------------------------------------- #

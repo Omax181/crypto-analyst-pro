@@ -1,232 +1,52 @@
-"""Gate de cohérence des recos du matin (v28 · M-A1/A2/A3/A4).
+"""Gate de cohérence des recos du matin — v33 : réduit à ce qui vit encore.
 
-L'audit des mails du 07/07 a montré des recos incohérentes avec leurs propres
-preuves : « RENFORCER » avec « Taille : +0.0% » (plafond de concentration
-atteint), espérance 30 j NÉGATIVE et backtest défavorable (BTC : win rate
-historique 20%), R:R < 1 sur 6 recos sur 7 — et le « SI TU NE FAIS QU'UNE
-CHOSE » poussait TAO… dont le renfort était « non suggéré » dans la même ligne.
+Historique (v28 · M-A1/A2/A3/A4, décision d'Omar du 07/07) : quand l'action
+venait du modèle de langage, ce module rattrapait les recos incohérentes avec
+leurs propres preuves — « MAINTENIR » au plafond de concentration, tactique
+dégradée en « SURVEILLER » si EV 30 j < 0 ou R:R < 1,2, confiance plafonnée à
+70 % — et le garde « anti-glissement » (v30 #1/#68) bloquait un renfort sous un
+stop de prix déjà franchi.
 
-Décision d'Omar (07/07) — GATE PAR TYPE :
-  * plafond de concentration atteint (sizing 0%) → action « MAINTENIR »
-    (jamais « RENFORCER +0.0% ») ;
-  * thèse TACTIQUE 7-30 j → dégradée en « SURVEILLER » si EV 30 j < 0
-    ou R:R < 1.2 (un trade court terme sans espérance n'est pas un trade) ;
-  * thèse CONVICTION LT → reste « RENFORCER » (accumulation DCA) mais la
-    confiance est plafonnée à 70% et la fiche porte une mention explicite
-    « stats CT défavorables » (l'auto-critique ne suffisait pas) ;
-  * le « one thing » ne propose que des gestes EXÉCUTABLES (sizing > 0,
-    EV ≥ 0, R:R ≥ 1.2 pour les tactiques) — sinon « Ne rien faire
-    aujourd'hui » est la recommandation honnête.
+Audit zero-trust (01/10/2026) — ces deux portes sont RETIRÉES :
 
-Toutes les fonctions sont pures/best-effort : payload partiel → inchangé.
+* l'action est désormais décidée par le moteur d'opportunité (ou par les
+  règles de prise de profit du radar) : il n'existe plus de RENFORCER rédigé
+  par le modèle à rattraper ;
+* leurs critères — plafond de concentration, EV 30 j fondée sur une
+  probabilité heuristique, R:R, stop de prix — sont ceux qu'Omar a écartés
+  (« pas de hard cap d'exposition » le 01/10 ; « aucun stop de trading
+  arbitraire » le 26/08) ;
+* sur une décision du moteur, elles ne pouvaient plus rien faire : sans plan
+  V30, ni EV ni R:R à lire, et l'avertissement de stop qu'elles posaient
+  n'était rendu par aucun gabarit. Du code correct isolément mais sans effet
+  en production — exactement ce que l'audit devait éliminer.
+
+Restent la ligne d'abstention et le filtre d'exécutabilité du digest Telegram.
 """
 
 from __future__ import annotations
 
-from typing import Any, Optional
-
-from src.utils.logger import get_logger
-
-logger = get_logger(__name__)
-
-# Seuils de la décision Omar (07/07). R:R minimal d'un trade tactique : 1.2.
-TACTICAL_MIN_RR = 1.2
-LT_CONFIDENCE_CAP = 70
-
-
-def _num(v: Any) -> Optional[float]:
-    try:
-        f = float(v)
-    except (TypeError, ValueError):
-        return None
-    return f if f == f else None
-
-
-def _is_reinforce(action: Any) -> bool:
-    a = str(action or "").upper()
-    return "RENFORC" in a or "ACCUMUL" in a or a == "BUY"
-
-
-def _thesis_type(t: dict[str, Any]) -> str:
-    """« conviction » (LT) ou « tactical » — champ LLM, repli prudent tactique."""
-    tt = str(t.get("thesis_type") or "").lower()
-    if tt in ("conviction", "tactical"):
-        return tt
-    return "tactical"  # sans étiquette, on applique le gate le plus strict
-
-
-def _ct_stats(t: dict[str, Any]) -> tuple[Optional[float], Optional[float]]:
-    """(EV 30 j %, R:R 30 j) depuis le plan déterministe de la thèse."""
-    plan = t.get("asset_plan") if isinstance(t.get("asset_plan"), dict) else {}
-    return _num(plan.get("ev_30d_pct")), _num(plan.get("rr_30d"))
-
-
-def apply_reco_gate(payload: dict[str, Any]) -> list[str]:
-    """Applique le gate par type aux thèses fermes. Mutation in-place.
-
-    À appeler APRÈS ``_apply_asset_plans_to_theses`` (le sizing et le plan
-    doivent être attachés) et AVANT ``_compute_top_action``.
-
-    Returns:
-        Liste des corrections opérées (pour le log).
-    """
-    fixes: list[str] = []
-    theses = payload.get("thesis_of_the_day")
-    if not isinstance(theses, list):
-        return fixes
-    for t in theses:
-        if not isinstance(t, dict) or not _is_reinforce(t.get("action")):
-            continue
-        asset = str(t.get("asset") or "?").upper()
-        ap = t.get("action_plan") if isinstance(t.get("action_plan"), dict) else {}
-        ev, rr = _ct_stats(t)
-
-        # ── M-A1/M-A2 — plafond de concentration atteint : MAINTENIR.
-        size_pct = _num(ap.get("position_size_pct"))
-        if size_pct is not None and size_pct == 0:
-            t["action"] = "MAINTENIR"
-            t["_gated"] = "plafond"
-            t["gate_note"] = (ap.get("sizing_note")
-                              or "plafond de concentration atteint — aucun renfort")
-            fixes.append(f"{asset} : RENFORCER+0.0% → MAINTENIR (plafond)")
-            # v29 (MA7) — l'ancien continue sautait le check EV : le 10/07,
-            # ETH/BTC/TAO (MAINTENIR plafond) affichaient « Espérance 30j
-            # −2.1% » sans aucune réconciliation frontale. Une espérance CT
-            # négative mérite la même mention explicite que sur une conviction.
-            if ev is not None and ev < 0:
-                t["ct_warning"] = (
-                    f"⚠ EV 30j −{str(abs(ev)).replace('.', ',')}% — "
-                    "espérance court-terme négative : "
-                    "conserver (plafond atteint), ce n'est pas un trade 30 j")
-                fixes.append(f"{asset} : MAINTENIR (plafond) + mention EV<0")
-            continue
-
-        ct_bad = ((ev is not None and ev < 0)
-                  or (rr is not None and rr < TACTICAL_MIN_RR))
-        if not ct_bad:
-            continue
-        _stats_bits = []
-        if ev is not None:
-            _stats_bits.append(
-                f"EV 30j {'+' if ev >= 0 else '−'}"
-                f"{str(abs(ev)).replace('.', ',')}%")
-        if rr is not None:
-            _stats_bits.append(f"R:R {str(rr).replace('.', ',')}")
-        _stats = " · ".join(_stats_bits) or "stats CT indisponibles"
-
-        if _thesis_type(t) == "tactical":
-            # ── M-A3/M-A4 — tactique sans espérance : SURVEILLER.
-            t["action"] = "SURVEILLER"
-            t["_gated"] = "stats_ct"
-            t["gate_note"] = (f"{_stats} — stats court-terme défavorables : "
-                              "pas de trade tactique aujourd'hui")
-            fixes.append(f"{asset} : RENFORCER (tactique) → SURVEILLER ({_stats})")
-        else:
-            # ── conviction LT : RENFORCER (DCA) conservé, confiance plafonnée
-            # + mention EXPLICITE (l'auto-critique seule ne suffisait pas).
-            conf = _num(t.get("confidence"))
-            if conf is not None and conf > LT_CONFIDENCE_CAP:
-                t["confidence"] = LT_CONFIDENCE_CAP
-                t["_confidence_capped_ct"] = True
-            t["ct_warning"] = (f"⚠ {_stats} — signaux court-terme défavorables : "
-                               "accumulation LT (DCA), pas un trade 30 j")
-            fixes.append(
-                f"{asset} : conviction LT conservée, confiance ≤ "
-                f"{LT_CONFIDENCE_CAP}% + mention CT ({_stats})")
-    if fixes:
-        logger.info("Reco gate v28 : %d ajustement(s) — %s",
-                    len(fixes), " | ".join(fixes))
-    return fixes
-
-
-def apply_stop_slide_gate(
-    payload: dict[str, Any],
-    active_recos: list[dict[str, Any]],
-    price_by_asset: dict[str, Any],
-) -> list[str]:
-    """v30 (#1/#68) — ANTI-GLISSEMENT DE STOP : pas de renfort sous un stop cassé.
-
-    Le 14/07, le stop TAO persisté (201,11 $) était FRANCHI (prix 199,14 $) et
-    le plan du jour recalculait un stop PLUS BAS (190 $) → le mail poussait
-    « RENFORCER TAO » en action n°1 à côté d'une alerte « invalidation
-    FRANCHIE ». Un stop qui glisse vers le bas après franchissement n'est pas
-    un stop : c'est le mécanisme du « couteau qui tombe ».
-
-    Règle : une thèse RENFORCER dont le stop de la reco OUVERTE (state) est
-    déjà franchi est DÉGRADÉE en SURVEILLER, avec note explicite. La reco
-    active reste ouverte avec son ANCIEN stop (l'alerte « franchie » reste
-    donc affichée, cohérente avec la posture SURVEILLER). Best-effort pur.
-    """
-    fixes: list[str] = []
-    theses = payload.get("thesis_of_the_day")
-    if not isinstance(theses, list) or not active_recos:
-        return fixes
-    open_by_asset: dict[str, dict[str, Any]] = {}
-    for r in active_recos:
-        if not isinstance(r, dict):
-            continue
-        if (r.get("status") or "in_progress") != "in_progress":
-            continue
-        a = str(r.get("asset") or "").upper()
-        if a and "RENFORC" in (r.get("action") or "").upper():
-            open_by_asset[a] = r
-    for t in theses:
-        if not isinstance(t, dict) or not _is_reinforce(t.get("action")):
-            continue
-        asset = str(t.get("asset") or "").upper()
-        reco = open_by_asset.get(asset)
-        if not reco:
-            continue
-        old_stop = _num(reco.get("stop_loss"))
-        price = _num(price_by_asset.get(asset))
-        if old_stop is None or price is None or old_stop <= 0 or price <= 0:
-            continue
-        if price > old_stop:
-            continue  # stop intact — rien à faire
-        _fmt = (f"{old_stop:,.0f}".replace(",", "\u202f") if old_stop >= 1000
-                else f"{old_stop:.2f}".replace(".", ",") if old_stop >= 1
-                else f"{old_stop:.4f}".replace(".", ","))
-        t["action"] = "SURVEILLER"
-        t["_gated"] = "stop_slide"
-        t["gate_note"] = (
-            f"stop précédent {_fmt} $ FRANCHI — renfort automatique bloqué "
-            "sous un stop cassé : statuer (réduction, ou nouvelle thèse avec "
-            "nouveau plan), ne pas moyenner par réflexe")
-        fixes.append(f"{asset} : RENFORCER → SURVEILLER (stop {_fmt} $ franchi)")
-    if fixes:
-        logger.info("Stop-slide gate v30 : %d blocage(s) — %s",
-                    len(fixes), " | ".join(fixes))
-    return fixes
+from typing import Any
 
 
 def executable_for_top_action(t: dict[str, Any]) -> bool:
-    """Un geste n'entre dans le « one thing » que s'il est EXÉCUTABLE.
+    """Un geste est-il exécutable aujourd'hui ? (digest Telegram)
 
-    RENFORCER : sizing > 0 ET EV ≥ 0 ET (tactique → R:R ≥ 1.2).
-    ALLÉGER : toujours exécutable (réduire ne dépend pas d'un plafond).
-    Actions non fermes (MAINTENIR/SURVEILLER…) : jamais.
+    Une décision du moteur (RENFORCER) ou une règle de prise de profit du radar
+    (ALLÉGER) l'est toujours ; toute autre posture ne l'est jamais.
     """
     if not isinstance(t, dict):
         return False
     a = str(t.get("action") or "").upper()
-    if "ALLÉG" in a or "ALLEG" in a:
+    if ("ALLÉG" in a or "ALLEG" in a) and t.get("v33_trigger"):
         return True
-    if not _is_reinforce(a):
-        return False
-    ap = t.get("action_plan") if isinstance(t.get("action_plan"), dict) else {}
-    size_pct = _num(ap.get("position_size_pct"))
-    if size_pct is not None and size_pct <= 0:
-        return False
-    ev, rr = _ct_stats(t)
-    if ev is not None and ev < 0:
-        return False
-    if _thesis_type(t) == "tactical" and rr is not None and rr < TACTICAL_MIN_RR:
-        return False
-    return True
+    _v33 = t.get("v33_decision")
+    return ("RENFORC" in a and isinstance(_v33, dict)
+            and _v33.get("decided") is True)
 
 
 NOTHING_TO_DO_LINE = (
-    "Ne rien faire aujourd'hui — aucun geste exécutable : plafonds de "
-    "concentration atteints ou signaux court-terme défavorables. "
-    "S'abstenir est aussi une décision."
+    "Ne rien faire aujourd'hui — le moteur n'a décidé aucun renfort : aucun "
+    "potentiel mesuré ne couvre son rendement requis. S'abstenir est aussi une "
+    "décision."
 )

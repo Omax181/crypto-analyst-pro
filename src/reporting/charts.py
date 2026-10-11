@@ -63,7 +63,7 @@ def _import_plt():
 def _load_closes(symbol: str, *, days: int = 90) -> Optional[list[float]]:
     """Charge la série de clôtures CoinGecko (≥ 20 points) ou None."""
     series = coingecko.get_price_volume_series(symbol, days=days)
-    if not series or len(series.get("closes", [])) < 20:
+    if not series or not _serie_exploitable(series.get("closes")):
         return None
     return series["closes"]
 
@@ -71,7 +71,7 @@ def _load_closes(symbol: str, *, days: int = 90) -> Optional[list[float]]:
 def _load_series(symbol: str, *, days: int = 90) -> Optional[dict[str, list[float]]]:
     """v26 (C1) — clôtures ET volumes (le volume confirme cassures/rebonds)."""
     series = coingecko.get_price_volume_series(symbol, days=days)
-    if not series or len(series.get("closes", [])) < 20:
+    if not series or not _serie_exploitable(series.get("closes")):
         return None
     return {"closes": series["closes"], "volumes": series.get("volumes") or []}
 
@@ -703,6 +703,23 @@ def charts_for_tracked_recos(
         except Exception as exc:  # noqa: BLE001
             logger.warning("Graphique suivi %s échoué : %s", sym, exc)
     return out
+
+
+def _serie_exploitable(closes: Any) -> bool:
+    """Une série de prix doit contenir des nombres FINIS et STRICTEMENT positifs.
+
+    RED TEAM (RT-8) — ``price_bollinger_png`` refusait une série vide ou trop
+    courte, mais dessinait sans broncher une série entièrement à NaN, à zéro ou
+    négative : un PNG de 5,5 ko parfaitement vide, envoyé dans le mail comme
+    s'il montrait quelque chose. Un graphique qui ne montre rien ne vaut pas
+    mieux que pas de graphique — il vaut moins, car il prétend le contraire.
+    """
+    if not isinstance(closes, (list, tuple)):
+        return False
+    bons = [c for c in closes
+            if isinstance(c, (int, float)) and not isinstance(c, bool)
+            and c == c and c not in (float("inf"), float("-inf")) and c > 0]
+    return len(bons) >= 20
 
 
 def price_bollinger_png(symbol: str, *, days: int = 90) -> Optional[bytes]:
