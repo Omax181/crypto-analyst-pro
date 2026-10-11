@@ -13,6 +13,37 @@ telegram_channels:
   etf_flows:
     handle: "ETF_Flows"
     filter: false          # flux ETF -> directement pertinent
+  # V32.1 (11/10/2026, demande d'Omar) — Fin Watch (t.me/Fin_Watch) : titres
+  # en anglais, ~20/jour, marchés, taux, géopolitique, mais aussi actualité
+  # d'entreprises indiennes, faits divers, catastrophes. Filtre PROPRE à la
+  # chaîne : seuls les messages contenant un de ces mots-clés remontent (lus
+  # en DÉBUT DE MOT : « rate » prend « rates », pas « corporate »). Le modèle
+  # trie ensuite ce qui est utile à l'analyse.
+  fin_watch:
+    handle: "Fin_Watch"
+    filter: true
+    # Par thème : crypto | banques centrales, taux, macro | change | marchés |
+    # géopolitique | politique américaine, nominations, régulation.
+    keywords: [
+      bitcoin, btc, crypto, ethereum, ether, stablecoin, tether, usdt, usdc, etf,
+      blockchain, binance, coinbase, saylor, microstrategy, solana, xrp, cbdc,
+      digital asset, token,
+      fed, fomc, powell, central bank, ecb, lagarde, boj, pboc, interest, rate,
+      yield, treasur, bond, inflation, cpi, pce, ppi, gdp, recession, payroll,
+      nfp, jobs, jobless, unemployment, retail sales, pmi, debt, deficit,
+      shutdown, stimulus, liquidity,
+      dollar, dxy, euro, yen, yuan, renminbi, currenc, forex, fx,
+      nasdaq, s&p, spx, dow jones, stocks, wall street, market overview, vix,
+      sell-off, selloff, gold, silver, oil, crude, brent, wti, opec,
+      war, iran, israel, gaza, hezbollah, houthi, russia, ukrain, putin,
+      zelensky, kremlin, china, chinese, beijing, taiwan, xi jinping, japan,
+      north korea, nato, g7, g20, brics, imf, missile, nuclear, military, troops,
+      attack, ceasefire, invasion, hormuz, red sea, suez, sanction, tariff,
+      embargo, export control,
+      trump, white house, congress, senate, supreme court, election, midterm,
+      nominat, nominee, appoint, resign, sworn, chair, governor, secretary,
+      regulat, securities and exchange
+    ]
 
 keywords_filter:
   - payment

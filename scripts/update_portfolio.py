@@ -7,12 +7,16 @@ Usage :
     python scripts/update_portfolio.py --asset BTC --action set  --quantity 0.015225
     python scripts/update_portfolio.py --asset PEPE --action add  --quantity 1000000 \
         --tier 4 --coingecko-id pepe --notes "meme coin"
+    python scripts/update_portfolio.py --asset QNT --action remove
 
 Actions :
-    buy   → ajoute la quantité à l'existant
-    sell  → soustrait la quantité (erreur si insuffisant)
-    set   → remplace la quantité par la valeur donnée
-    add   → crée un nouvel actif (--tier et --coingecko-id requis)
+    buy    → ajoute la quantité à l'existant
+    sell   → soustrait la quantité (erreur si insuffisant)
+    set    → remplace la quantité par la valeur donnée
+    add    → crée un nouvel actif (--tier et --coingecko-id requis)
+    remove → vente TOTALE : retire l'actif du portefeuille, donc de l'analyse
+             (sans --quantity ; les correspondances de sources.yaml restent,
+             elles ne servent qu'aux actifs détenus)
 
 Le fichier YAML est modifié « chirurgicalement » (regex sur les lignes) pour
 CONSERVER les commentaires, la mise en page et les notes existantes.
@@ -41,7 +45,9 @@ def _load_yaml_raw(path: Path) -> str:
 
 
 def _save_yaml_raw(path: Path, content: str) -> None:
-    path.write_text(content, encoding="utf-8")
+    # Fins de ligne LF quel que soit l'OS : lancé sous Windows, write_text
+    # réécrivait tout le fichier en CRLF (diff de 189 lignes pour une vente).
+    path.write_text(content, encoding="utf-8", newline="\n")
 
 
 def _find_asset_block(text: str, asset: str) -> tuple[int, int] | None:
@@ -137,6 +143,18 @@ def action_buy_sell_set(text: str, asset: str, action: str, qty: float) -> str:
     return result
 
 
+def action_remove(text: str, asset: str) -> str:
+    """Vente TOTALE : retire le bloc de l'actif (une position à 0 resterait
+    dans l'univers analysé)."""
+    bounds = _find_asset_block(text, asset)
+    if bounds is None:
+        print(f"❌ Actif '{asset}' introuvable dans portfolio.yaml.")
+        sys.exit(1)
+    start, end = bounds
+    print(f"✅ {asset} : retiré du portefeuille (vente totale)")
+    return text[:start] + text[end:]
+
+
 def action_add(text: str, asset: str, qty: float, tier: int,
                coingecko_id: str | None, notes: str | None) -> str:
     if _find_asset_block(text, asset) is not None:
@@ -208,10 +226,11 @@ def main() -> None:
     parser.add_argument("--asset", required=True,
                         help="Symbole (ex. BTC, SOL, PEPE)")
     parser.add_argument("--action", required=True,
-                        choices=["buy", "sell", "set", "add"],
-                        help="buy=ajouter, sell=retirer, set=fixer, add=nouvel actif")
-    parser.add_argument("--quantity", required=True, type=float,
-                        help="Quantité (positif)")
+                        choices=["buy", "sell", "set", "add", "remove"],
+                        help="buy=ajouter, sell=retirer, set=fixer, add=nouvel actif, "
+                             "remove=vente totale (retire l'actif)")
+    parser.add_argument("--quantity", type=float,
+                        help="Quantité (positif) — sauf pour remove")
     parser.add_argument("--tier", type=int, choices=[1, 2, 3, 4], default=3,
                         help="Tier pour un nouvel actif (défaut: 3)")
     parser.add_argument("--coingecko-id",
@@ -223,13 +242,15 @@ def main() -> None:
     asset = args.asset.upper()
     qty = args.quantity
 
-    if qty <= 0:
+    if args.action != "remove" and (qty is None or qty <= 0):
         print("❌ La quantité doit être strictement positive.")
         sys.exit(1)
 
     text = _load_yaml_raw(PORTFOLIO_PATH)
 
-    if args.action == "add":
+    if args.action == "remove":
+        text = action_remove(text, asset)
+    elif args.action == "add":
         if not args.coingecko_id:
             print("❌ --coingecko-id est requis pour ajouter un nouvel actif.")
             print("   Trouvez-le sur https://www.coingecko.com (URL slug).")

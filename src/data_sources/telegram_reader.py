@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -18,19 +19,43 @@ from src.utils.portfolio_loader import load_config
 
 logger = get_logger(__name__)
 
+
+def _mots_cles(liste: Any) -> list[str]:
+    return [str(k).strip().lower() for k in (liste or []) if str(k).strip()]
+
+
 _CONF = load_config("telegram_channels")
-_KEYWORDS = [k.lower() for k in (_CONF.get("keywords_filter") or [])]
+_KEYWORDS = _mots_cles(_CONF.get("keywords_filter"))
 _SETTINGS = _CONF.get("settings") or {}
 
 
 def _channels() -> dict[str, dict[str, Any]]:
-    """Construit le mapping {handle: {filter: bool}} depuis la config."""
+    """Construit le mapping {handle: {filter, keywords}} depuis la config."""
     out: dict[str, dict[str, Any]] = {}
     for _, cfg in (_CONF.get("telegram_channels") or {}).items():
-        handle = (cfg or {}).get("handle", "").strip()
+        cfg = cfg or {}
+        handle = (cfg.get("handle") or "").strip()
         if handle:
-            out[handle] = {"filter": bool((cfg or {}).get("filter", False))}
+            out[handle] = {"filter": bool(cfg.get("filter", False)),
+                           "keywords": _mots_cles(cfg.get("keywords"))}
     return out
+
+
+def _pertinent(texte: str, cfg: dict[str, Any]) -> bool:
+    """Vrai si le message passe le filtre de sa chaîne.
+
+    V32.1 (11/10, chaîne Fin_Watch) : une chaîne peut déclarer SES mots-clés
+    (``keywords``), lus en DÉBUT DE MOT — « rate » ne prend pas « corporate »,
+    « war » ne prend pas « software ». Sans liste propre, la liste commune
+    ``keywords_filter`` s'applique telle qu'avant (sous-chaîne).
+    """
+    if not cfg.get("filter"):
+        return True
+    t = texte.lower()
+    propres = cfg.get("keywords") or []
+    if propres:
+        return any(re.search("(?<![a-z0-9])" + re.escape(k), t) for k in propres)
+    return any(k in t for k in _KEYWORDS)
 
 
 def _session_is_valid(session: str) -> bool:
@@ -95,7 +120,7 @@ def get_telegram_news(hours: int = 24) -> dict[str, Any]:
                             dt = msg.date if msg.date.tzinfo else msg.date.replace(tzinfo=timezone.utc)
                             if dt < cutoff:
                                 break
-                            if cfg["filter"] and not any(k in msg.text.lower() for k in _KEYWORDS):
+                            if not _pertinent(msg.text, cfg):
                                 continue
                             messages.append({
                                 "channel": handle,
