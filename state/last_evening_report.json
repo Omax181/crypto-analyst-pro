@@ -1,7 +1,7 @@
 {
   "header": {
-    "date": "samedi 24 octobre 2026 · 19:02 Casablanca",
-    "time_casablanca": "samedi 24 octobre 2026 · 19:02 Casablanca",
+    "date": "dimanche 25 octobre 2026 · 19:02 Casablanca",
+    "time_casablanca": "dimanche 25 octobre 2026 · 19:02 Casablanca",
     "hours_since_morning": 11,
     "morning_time_label": "07h36",
     "since_morning_label": "il y a 11h",
@@ -16,33 +16,33 @@
     "checklist_title": "Demain matin · check list",
     "us_market_open": false,
     "us_session_label": null,
-    "ptf_value_delta_since_morning": -33.22,
-    "ptf_value_pct_since_morning": -0.97
+    "ptf_value_delta_since_morning": 20.69,
+    "ptf_value_pct_since_morning": 0.61
   },
   "portfolio_snapshot": {
-    "value_usd": 3400.29,
-    "change_since_morning_pct": -0.97
+    "value_usd": 3419.14,
+    "change_since_morning_pct": 0.61
   },
   "market_changes": [
     {
       "status": "new",
       "tag": "Macro",
       "importance": 5,
-      "description": "La probabilité de maintien des taux Fed à la prochaine réunion d'octobre a augmenté de 1,1 point depuis le matin, atteignant 94,5% sur Polymarket, renforçant le consensus d'une politique monétaire stable à court terme.",
+      "description": "Les anticipations de maintien des taux Fed pour octobre 2026 ont légèrement reculé de 1,0 point, passant de 95,4% à 94,4% sur Polymarket, signalant une légère incertitude avant la décision FOMC de mercredi.",
       "source": "Polymarket"
-    },
-    {
-      "status": "unchanged",
-      "tag": "Macro",
-      "importance": 4,
-      "description": "BTC a poursuivi son repli à 80 475 $ (−0,3% depuis le matin) et ETH à 2 336 $ (−1,7% depuis le matin), confirmant la pression baissière observée ce matin.",
-      "source": "CoinGecko"
     },
     {
       "status": "new",
       "tag": "Macro",
-      "importance": 2,
-      "description": "L'or a reculé de 52,5 $ tandis que le Brent a progressé de 3,04 $ sur 24h, signalant une légère rotation vers les matières premières et une pression inflationniste persistante.",
+      "importance": 3,
+      "description": "Le Brent a progressé de 3,04 $ pour atteindre 111,7 $ le baril, ravivant les craintes inflationnistes et potentiellement la pression sur les taux longs.",
+      "source": "Yahoo Finance"
+    },
+    {
+      "status": "new",
+      "tag": "Risque",
+      "importance": 3,
+      "description": "L'indice de volatilité VIX a augmenté de 0,42 point pour atteindre 19,45, indiquant une légère hausse de l'aversion au risque sur les marchés actions.",
       "source": "Yahoo Finance"
     },
     {
@@ -53,25 +53,32 @@
   ],
   "news_today": [
     {
-      "title": "Ethereum : retraits d'échange records suite à 1 Md $ de pertes ETF en octobre",
-      "source": "CryptoSlate",
-      "time": "13h30",
-      "impact": "Le retrait massif d'ETH des plateformes, couplé aux pertes des ETF, signale une pression vendeuse institutionnelle et une fragilité du sentiment sur l'actif.",
-      "status": "actionnable"
-    },
-    {
-      "title": "Franklin Templeton prépare un ETF Bitcoin sur Nasdaq convertissant les dividendes d'actions",
-      "source": "Stocktwits",
-      "time": "14h06",
-      "impact": "L'arrivée d'un nouvel ETF Bitcoin institutionnel sur Nasdaq est un signal haussier pour l'adoption, mais l'impact est probablement déjà intégré vu l'annonce.",
+      "title": "CoinDCX confirme une perte de 16 M$ sur des portefeuilles retirés",
+      "source": "The Block",
+      "time": "19h46",
+      "impact": "Événement négatif pour la confiance dans les exchanges centralisés, potentiellement intégré vu le démenti initial.",
       "status": "intégré"
     },
     {
-      "title": "Chainlink (LINK) : activité des baleines en hausse",
-      "source": "Stocktwits",
-      "time": "09h20",
-      "impact": "L'augmentation de l'activité des grandes adresses sur LINK pourrait indiquer un intérêt d'accumulation à ces niveaux bas, malgré la pression actuelle du marché.",
+      "title": "37 M$ volés transférés via une banque des Bahamas vers USDT",
+      "source": "CryptoSlate",
+      "time": "19h40",
+      "impact": "Soulève des questions sur la traçabilité des fonds et la régulation des stablecoins, risque de réputation pour USDT.",
       "status": "à suivre"
+    },
+    {
+      "title": "Les ETF Bitcoin mettent fin à deux semaines de pertes",
+      "source": "Decrypt",
+      "time": "15h01",
+      "impact": "Signal positif pour l'appétit institutionnel, suggérant un plancher après la correction récente.",
+      "status": "à suivre"
+    },
+    {
+      "title": "La Fed et les résultats d'entreprises mettront à l'épreuve le rallye de l'IA",
+      "source": "Investing.com",
+      "time": "14h00",
+      "impact": "Risque de volatilité accrue pour les actifs IA du portefeuille (TAO, RENDER, FET) à l'approche du FOMC et des publications de résultats.",
+      "status": "actionnable"
     }
   ],
   "levels_tonight": [
@@ -79,66 +86,72 @@
       "asset": "BTC",
       "level": "80 268 $",
       "type": "support",
-      "trigger": "Sous 80 268 $ → risque de test du support clé à 77 297 $."
+      "trigger": "Si cassure sous 80 268 $, risque de test du support majeur à 77 297 $."
     },
     {
       "asset": "BTC",
       "level": "81 265 $",
       "type": "resistance",
-      "trigger": "Au-dessus de 81 265 $ → potentiel de rebond vers 83 479 $."
+      "trigger": "Franchissement au-dessus de 81 265 $ confirmerait une reprise vers 83 479 $."
     },
     {
       "asset": "ETH",
-      "level": "2 312 $",
+      "level": "2 317 $",
       "type": "support",
-      "trigger": "Cassure de 2 312 $ → accentuation de la baisse vers 2 199 $."
+      "trigger": "Une rupture sous 2 317 $ ouvrirait la voie à 2 199 $."
     },
     {
       "asset": "ETH",
       "level": "2 391 $",
       "type": "resistance",
-      "trigger": "Franchissement de 2 391 $ → signal de reprise vers 2 438 $."
+      "trigger": "Au-dessus de 2 391 $, ETH pourrait viser 2 438 $."
     },
     {
       "asset": "DXY",
       "level": "102,50",
-      "type": "critical",
-      "trigger": "DXY > 102,50 → resserrement des conditions financières, pression sur les actifs risqués."
+      "type": "resistance",
+      "trigger": "Un DXY au-dessus de 102,50 renforcerait la pression sur les actifs risqués."
+    },
+    {
+      "asset": "DXY",
+      "level": "101,50",
+      "type": "support",
+      "trigger": "Maintien sous 101,50 signalerait un apaisement de la pression dollar."
     },
     {
       "asset": "TAO",
       "level": "292,09 $",
       "type": "resistance",
-      "trigger": "TAO > 292,09 $ → annulation du signal d'invalidation, potentiel de reprise."
+      "trigger": "TAO fait face à une résistance clé à 292,09 $, son ancienne invalidation."
     },
     {
       "asset": "LINK",
       "level": "12,35 $",
       "type": "resistance",
-      "trigger": "LINK > 12,35 $ → annulation du signal d'invalidation, potentiel de rebond."
+      "trigger": "LINK doit franchir 12,35 $ pour invalider la pression baissière."
     }
   ],
   "actions_tonight": [
     {
       "action": "RENFORCER BTC",
-      "rationale": "Le moteur d'allocation maintient sa décision de renfort, le prix actuel à 80 475 $ étant en repli de −0,3% depuis ce matin, offrant un point d'entrée légèrement plus bas.",
+      "rationale": "Le moteur d'allocation maintient sa décision de renforcer BTC, le prix ayant légèrement progressé de 0,1% depuis le matin à 80 592 $, toujours ancré sur un MVRV de 1,49.",
       "horizon": "Long terme"
     },
     {
       "action": "RENFORCER ETH",
-      "rationale": "Le moteur d'allocation maintient sa décision de renfort, le prix actuel à 2 336 $ étant en repli de −1,7% depuis ce matin, renforçant la zone d'accumulation.",
+      "rationale": "Le renfort sur ETH est confirmé, avec un prix en hausse de 0,4% à 2 353 $ depuis le matin, son MVRV de 1,04 restant favorable à l'accumulation.",
       "horizon": "Long terme"
     }
   ],
   "tomorrow_checklist": {
-    "calendar": "Pas d'événement macro majeur dans les 48h.",
-    "checks": "Le support BTC à 80 268 $ tient-il overnight ? · Le support ETH à 2 312 $ est-il défendu ? · Le DXY reste-t-il sous 102,50, évitant un renforcement du dollar ?",
-    "scenario": "Une consolidation autour des niveaux actuels est probable si les supports BTC/ETH tiennent et que le DXY ne s'envole pas.",
-    "invalidation": "Une cassure du support BTC à 80 268 $ ou ETH à 2 312 $ invaliderait ce scénario de consolidation, signalant une poursuite de la baisse."
+    "calendar": "Mardi 27 octobre : CB Consumer Confidence (US) à 14:00.",
+    "checks": "Le support BTC à 80 268 $ tient-il face à la pression baissière ? · Les proxies crypto (COIN, MARA) montrent-ils un rebond ou continuent-ils de peser sur le sentiment ?",
+    "scenario": "Une consolidation autour des niveaux actuels est probable pour BTC/ETH avant la décision FOMC de mercredi, sauf surprise macro majeure.",
+    "invalidation": "Une cassure du support BTC à 77 297 $ ou un DXY franchissant 102,50 invaliderait ce scénario de consolidation."
   },
-  "blind_spots": "Les données de flux ETF restent indisponibles, masquant la demande institutionnelle réelle sur BTC et ETH.",
+  "blind_spots": "L'indisponibilité des données de flux ETF physiques continue de masquer la direction nette des capitaux institutionnels.",
   "footer": {
-    "next_morning_time": "dimanche 25 octobre 2026 · 07:30 Casablanca",
+    "next_morning_time": "demain 07h30 Casablanca",
     "sources_down": [
       "ETF flows"
     ],
@@ -150,40 +163,40 @@
     "reason": "Espérance mathématique disponible dès 5 recos clôturées avec niveaux (actuellement 2)."
   },
   "daily_pnl": {
-    "value_usd": 3400.29,
-    "day_change_usd": -33.22,
-    "day_change_pct": -0.97,
+    "value_usd": 3419.14,
+    "day_change_usd": 20.69,
+    "day_change_pct": 0.61,
     "day_change_label": null,
     "top_movers": [
       {
+        "symbol": "TAO",
+        "change": 2.1,
+        "pnl_usd": 8.64,
+        "value_usd": 407.12
+      },
+      {
         "symbol": "ETH",
-        "change": -2.6,
-        "pnl_usd": -18.28,
-        "value_usd": 701.75
+        "change": 0.8,
+        "pnl_usd": 5.42,
+        "value_usd": 706.84
+      },
+      {
+        "symbol": "INJ",
+        "change": 5.3,
+        "pnl_usd": 4.22,
+        "value_usd": 80.26
       },
       {
         "symbol": "BTC",
-        "change": -1.1,
-        "pnl_usd": -15.86,
-        "value_usd": 1458.21
-      },
-      {
-        "symbol": "TAO",
-        "change": -3.6,
-        "pnl_usd": -14.48,
-        "value_usd": 399.14
-      },
-      {
-        "symbol": "RSR",
-        "change": -6.4,
-        "pnl_usd": -4.5,
-        "value_usd": 70.45
+        "change": 0.2,
+        "pnl_usd": 2.8,
+        "value_usd": 1460.33
       },
       {
         "symbol": "STX",
-        "change": -6.4,
-        "pnl_usd": -4.48,
-        "value_usd": 69.87
+        "change": 3.1,
+        "pnl_usd": 2.23,
+        "value_usd": 72.01
       }
     ]
   },
@@ -192,10 +205,10 @@
       "asset": "BTC",
       "action": "RENFORCER",
       "confidence": null,
-      "entry": 80734.0,
-      "target": 89905.38239999999,
-      "current": 80475.0,
-      "delta_pct": -0.32,
+      "entry": 80518.0,
+      "target": 89664.84479999999,
+      "current": 80592.0,
+      "delta_pct": 0.09,
       "status": "stable",
       "reason": "proche de l'entrée (bruit court terme) · pas de niveau d'invalidation"
     },
@@ -203,12 +216,12 @@
       "asset": "ETH",
       "action": "RENFORCER",
       "confidence": null,
-      "entry": 2376.86,
-      "target": 2721.7423860000004,
-      "current": 2336.04,
-      "delta_pct": -1.72,
-      "status": "under_pressure",
-      "reason": "repli sous l'entrée · pas de niveau d'invalidation"
+      "entry": 2344.19,
+      "target": 2684.800807,
+      "current": 2352.99,
+      "delta_pct": 0.38,
+      "status": "stable",
+      "reason": "proche de l'entrée (bruit court terme) · pas de niveau d'invalidation"
     },
     {
       "asset": "TAO",
@@ -216,8 +229,8 @@
       "confidence": 75.0,
       "entry": 289.46,
       "target": 318.860135,
-      "current": 249.46,
-      "delta_pct": -13.82,
+      "current": 254.45,
+      "delta_pct": -12.09,
       "status": "invalidated",
       "reason": "stop 292,09 $ franchi"
     },
@@ -227,38 +240,26 @@
       "confidence": 75.0,
       "entry": 14.01,
       "target": 13.792789,
-      "current": 11.53,
-      "delta_pct": -17.7,
+      "current": 11.51,
+      "delta_pct": -17.84,
       "status": "invalidated",
       "reason": "stop 12,35 $ franchi"
     }
   ],
   "polymarket_facts": {
     "fed_bars": {
-      "cut_pct": 0.0,
-      "hold_pct": 94.5,
+      "cut_pct": 0.1,
+      "hold_pct": 94.4,
       "hike_pct": 5.5,
       "dominant": "maintien",
-      "dominant_pct": 94.5,
+      "dominant_pct": 94.4,
       "meeting_hint": "réunion octobre 2026"
     },
     "extra_markets": [
       {
-        "question": "Will Bitcoin dip to $70,000 by December 31, 2026?",
-        "probability_pct": 40,
-        "volume_usd": 1289769,
-        "end_date": "2027-01-01T05:00:00Z"
-      },
-      {
-        "question": "Will Bitcoin dip to $78,000 October 19-25?",
-        "probability_pct": 11,
-        "volume_usd": 231536,
-        "end_date": "2026-10-26T04:00:00Z"
-      },
-      {
         "question": "Will Benjamin Netanyahu be the next Prime Minister of Israel?",
-        "probability_pct": 28,
-        "volume_usd": 10769675,
+        "probability_pct": 26,
+        "volume_usd": 11285690,
         "end_date": "2026-10-28T03:59:00Z"
       }
     ]
@@ -266,15 +267,15 @@
   "since_morning_facts": {
     "available": true,
     "window_label": "depuis le matin (07h36)",
-    "line": "BTC 80 734 $ → 80 475 $ (−0,3%) · ETH 2 377 $ → 2 336 $ (−1,7%) · F&G 51 → 51 (stable) · DXY 101,75 → 101,75 (+0,0%) · Fed maintien 93,4% → 94,5% (+1,1 pts)"
+    "line": "BTC 80 518 $ → 80 592 $ (+0,1%) · ETH 2 344 $ → 2 353 $ (+0,4%) · F&G 54 → 54 (stable) · DXY 101,75 → 101,75 (+0,0%) · Fed maintien 95,4% → 94,4% (−1,0 pts)"
   },
-  "derivatives_flows_line": "Funding BTC −0,2%/an · L/S 2,16",
+  "derivatives_flows_line": "Funding BTC +6,3%/an · L/S 2,15",
   "levels_readout": {
-    "BTC": "RSI 43 (neutre) · MACD baissier · Bollinger médiane · ATR 1,2% (≈957,65 $/j) · −1,6% vs MM50 · volume 7j −6% vs 30j",
-    "ETH": "RSI 35 (neutre) · MACD baissier · Bollinger médiane · ATR 1,6% (≈37,14 $/j) · −8,2% vs MM50 · volume 7j −10% vs 30j"
+    "BTC": "RSI 43 (neutre) · MACD baissier · Bollinger médiane · ATR 1,1% (≈894,57 $/j) · −1,5% vs MM50 · volume 7j −8% vs 30j",
+    "ETH": "RSI 36 (neutre) · MACD baissier · Bollinger médiane · ATR 1,4% (≈33,88 $/j) · −7,5% vs MM50 · volume 7j −11% vs 30j"
   },
   "risk_score": {
-    "score": 3.5,
+    "score": 3.2,
     "level": "maîtrisé",
     "level_color": "#3B6D11",
     "factors": [
@@ -283,7 +284,7 @@
     "components": [
       {
         "label": "Drawdown 7j",
-        "pts": 0.4,
+        "pts": 0.6,
         "max": 3.0
       },
       {
@@ -293,7 +294,7 @@
       },
       {
         "label": "Volatilité 24h",
-        "pts": 0.7,
+        "pts": 0.2,
         "max": 2.0
       },
       {
@@ -310,10 +311,10 @@
         "ratio_pct": 100
       },
       {
-        "label": "Volatilité 24h",
-        "pts": 0.7,
-        "max": 2.0,
-        "ratio_pct": 35
+        "label": "Drawdown 7j",
+        "pts": 0.6,
+        "max": 3.0,
+        "ratio_pct": 20
       }
     ],
     "holdings_snapshot": [
@@ -348,17 +349,17 @@
     ]
   },
   "risk_score_readout": {
-    "driver": "Score tiré par Concentration (2.5/2.5) et Volatilité 24h (0.7/2.0).",
+    "driver": "Score tiré par Concentration (2.5/2.5) et Drawdown 7j (0.6/3.0).",
     "reco": "Concentration sectorielle élevée — information de risque, aucun seuil ne déclenche de vente.",
     "caveat": "Note indicative et déterministe (concentration, drawdown, volatilité, sentiment) : elle ne capte ni le risque spécifique projet ni les corrélations cachées ou chocs exogènes."
   },
   "risk_unchanged_since_morning": {
     "active": true,
-    "morning_score": 3.5,
-    "note": "Risque stable depuis ce matin (3.5/10 → 3.5/10) — composition du portefeuille non modifiée à ce jour — voir « Actions à poser ce soir »."
+    "morning_score": 3.4,
+    "note": "Risque stable depuis ce matin (3.4/10 → 3.2/10) — composition du portefeuille non modifiée à ce jour — voir « Actions à poser ce soir »."
   },
   "health_score": {
-    "score": 3.2,
+    "score": 3.0,
     "level": "à risque",
     "level_color": "#A32D2D",
     "axes": [
@@ -370,30 +371,30 @@
       },
       {
         "label": "Momentum vs BTC",
-        "score": 4.4,
+        "score": 4.0,
         "max": 10.0,
-        "detail": "-1,2 pts vs BTC 7j"
+        "detail": "-1,9 pts vs BTC 7j"
       },
       {
         "label": "Solidité (vs ATH)",
-        "score": 4.1,
+        "score": 4.0,
         "max": 10.0,
-        "detail": "drawdown -56% vs ATH"
+        "detail": "drawdown -57% vs ATH"
       }
     ],
-    "driver": "Moins pénalisée par Momentum vs BTC (4,4/10), pénalisée par Diversification (1,0/10).",
+    "driver": "Moins pénalisée par Momentum vs BTC (4,0/10), pénalisée par Diversification (1,0/10).",
     "improve": "La diversification progresse par les renforts décidés hors du secteur dominant — aucun allègement n'est déclenché par ce seuil (axe Diversification à 1,0/10 ce jour)."
   },
   "health_unchanged_since_morning": {
     "active": true,
-    "note": "Santé stable depuis ce matin (3.2/10 → 3.2/10) — composition du portefeuille non modifiée à ce jour — voir « Actions à poser ce soir »."
+    "note": "Santé stable depuis ce matin (3.0/10 → 3.0/10) — composition du portefeuille non modifiée à ce jour — voir « Actions à poser ce soir »."
   },
   "evening_macro": {
-    "btc_price": 80475,
-    "btc_change_24h": -1.08762,
-    "eth_price": 2336.04,
-    "eth_change_24h": -2.60461,
-    "fear_greed": 51,
+    "btc_price": 80592,
+    "btc_change_24h": 0.1917,
+    "eth_price": 2352.99,
+    "eth_change_24h": 0.76711,
+    "fear_greed": 54,
     "fear_greed_label": "Neutre",
     "fear_greed_delta": 0,
     "gold_usd": 4007.9,
@@ -401,7 +402,7 @@
     "sp500": 7623.68,
     "sp500_delta": -39.75,
     "nasdaq": 25955.342,
-    "nasdaq_delta": -53.51800000000003,
+    "nasdaq_delta": -53.5580000000009,
     "vix": 19.45,
     "vix_delta": 0.41999999999999815,
     "brent_usd": 111.7,
@@ -413,10 +414,10 @@
     "dxy_ice": 101.752,
     "dxy_delta": -0.058000000000006935,
     "nikkei": 62693.16,
-    "nikkei_delta": -214.67999999999302,
+    "nikkei_delta": -214.63999999999942,
     "stoxx50": 6068.22,
     "stoxx50_delta": -18.789999999999964,
-    "eur_usd": 1.1204,
+    "eur_usd": 1.122,
     "usd_jpy": 156.814,
     "ecb_deposit_rate": 2.5,
     "boj_rate": 1.043
@@ -439,31 +440,44 @@
     "ecb_deposit_rate": "single",
     "boj_rate": "single"
   },
+  "tomorrow_macro_events": [
+    {
+      "label": "CB Consumer Confidence (US)",
+      "date": "2026-10-27",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "mardi",
+      "date_label": "mardi 27 octobre",
+      "time": "14:00"
+    }
+  ],
   "intraday_news": [
     {
-      "title": "Franklin Templeton Prepares Nasdaq Debut For ETFs That Turn Stock Dividends Into Bitcoin - Yahoo Finance",
-      "source": "Stocktwits",
-      "timestamp": "14h06"
+      "title": "CoinDCX confirms $16 million loss from retired wallets days after CEO called breach reports a ‘false alarm’",
+      "source": "The Block",
+      "timestamp": "18h46"
     },
     {
-      "title": "Ethereum sees biggest exchange withdrawal in four months as October ETF losses top $1 billion",
+      "title": "How $37 million stolen from Americans moved through a Bahamas bank into Tether’s USDT",
       "source": "CryptoSlate",
-      "timestamp": "13h30"
+      "timestamp": "18h40"
     },
     {
-      "title": "Hong Kong’s Biggest Bank Puts a Stablecoin in 3 Million Wallets",
-      "source": "Decrypt",
-      "timestamp": "13h01"
+      "title": "We have a $300,000 mortgage with a 2.75% interest rate. I want to pay it off. My husband says I’m crazy. Who’s right?",
+      "source": "MarketWatch",
+      "timestamp": "17h00"
     },
     {
-      "title": "Best Crypto to Buy in October 2026? Swiss Retail Bitcoin ETF Gets Green Light as Remittix Plans a 64.3% Presale Price Rise - StreetInsider",
-      "source": "Stocktwits",
-      "timestamp": "12h41"
+      "title": "Keystone customers say breach exposed data the hardware wallet maker promised to delete",
+      "source": "The Block",
+      "timestamp": "15h56"
     },
     {
-      "title": "7 Best Crypto Presales to Watch as Banks Warn Crypto Rewards Could Drain Trillions in Deposits - openPR.com",
-      "source": "Stocktwits",
-      "timestamp": "12h18"
+      "title": "Bitcoin steadies near $80,400 after weekend selloff, Fed decision looms",
+      "source": "Investing.com",
+      "timestamp": "14h32"
     }
   ],
   "market_regime": {
@@ -471,16 +485,16 @@
     "regime": "bull",
     "label_fr": "HAUSSIER",
     "reasons": [
-      "prix +10,4% vs MM200",
+      "prix +10,5% vs MM200",
       "MM50 +12,2% vs MM200",
-      "pente MM50 14j +1,3%"
+      "pente MM50 14j +1,2%"
     ],
-    "price_vs_ma200_pct": 10.4,
+    "price_vs_ma200_pct": 10.5,
     "ma50_vs_ma200_pct": 12.2,
-    "ma50_slope_14d_pct": 1.3,
+    "ma50_slope_14d_pct": 1.2,
     "since": "2026-09-23",
     "changed": false,
-    "days_in_regime": 31
+    "days_in_regime": 32
   },
-  "_saved_at": "2026-10-24T19:02:12.920930+00:00"
+  "_saved_at": "2026-10-25T19:02:23.727176+00:00"
 }
