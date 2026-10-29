@@ -1,260 +1,136 @@
 {
   "header": {
-    "date": "mercredi 28 octobre 2026 · 19:02 Casablanca",
-    "time_casablanca": "mercredi 28 octobre 2026 · 19:02 Casablanca",
+    "date": "jeudi 29 octobre 2026 · 19:03 Casablanca",
+    "time_casablanca": "jeudi 29 octobre 2026 · 19:03 Casablanca",
     "hours_since_morning": 11,
-    "morning_time_label": "07h36",
+    "morning_time_label": "07h37",
     "since_morning_label": "il y a 11h",
-    "win_rate_30d": 83,
-    "win_rate_total": "5/6",
-    "win_rate_calibration": "6/5",
+    "win_rate_30d": 80,
+    "win_rate_total": "4/5",
+    "win_rate_calibration": "5/5",
     "evening_time_label": "19h01",
-    "timing_line": "matin 07h36 · soir 19h01 · Δ11h",
+    "timing_line": "matin 07h37 · soir 19h01 · Δ11h",
     "is_evening_slot": true,
     "closing_greeting": "Bonne soirée.",
     "levels_window_label": "Niveaux à surveiller cette nuit",
     "checklist_title": "Demain matin · check list",
     "us_market_open": true,
     "us_session_label": "fin de séance (en cours)",
-    "ptf_value_delta_since_morning": 10.35,
-    "ptf_value_pct_since_morning": 0.3
+    "ptf_value_delta_since_morning": 58.33,
+    "ptf_value_pct_since_morning": 1.75
   },
   "portfolio_snapshot": {
-    "value_usd": 3424.89,
-    "change_since_morning_pct": 0.3
+    "value_usd": 3389.55,
+    "change_since_morning_pct": 1.75
   },
   "market_changes": [
     {
-      "status": "confirmed",
-      "tag": "Macro",
+      "status": "new",
+      "tag": "Risque",
       "importance": 5,
-      "description": "La Réserve Fédérale a maintenu ses taux directeurs inchangés, confirmant le consensus du marché. La probabilité d'une hausse des taux en décembre est tombée de 4,3% à 0,1% sur Polymarket, signalant un repricing dovish.",
-      "source": "CoinDesk 18h00, Barron's 18h43, Decrypt 18h25"
-    },
-    {
-      "status": "unchanged",
-      "tag": "Macro",
-      "importance": 3,
-      "description": "Le DXY a légèrement reculé de 102,46 à 102,13 (−0,3%), reflétant une réaction modérée du dollar à la décision de la Fed.",
-      "source": "Barron's 18h43"
-    },
-    {
-      "status": "confirmed",
-      "tag": "Macro",
-      "importance": 3,
-      "description": "Les indices actions américains ont poursuivi leur légère progression après la Fed, le S&P 500 gagnant 19,4 points et le Nasdaq 32,3 points, maintenant un biais 'risk-on' modéré.",
-      "source": "Seeking Alpha 18h53, Barron's 18h31"
-    },
-    {
-      "status": "confirmed",
-      "tag": "Macro",
-      "importance": 2,
-      "description": "L'or a reculé de 15,90 $ à 4 058,70 $ l'once, les investisseurs délaissant l'actif refuge après la décision de la Fed.",
-      "source": "Barron's 17h43"
+      "description": "Les actions liées aux cryptos et à l'IA (NVDA, AMD, TSM, COIN, MSTR, MARA) ont toutes reculé de -1,3% à -3,1% depuis le matin, signalant une aversion au risque sur ces segments, en contraste avec la tendance haussière générale des marchés actions mondiaux observée ce matin. L'impact est direct sur les positions IA de ton portefeuille (TAO, RENDER, FET).",
+      "source": "Yahoo Finance"
     },
     {
       "status": "new",
-      "tag": "Info",
-      "importance": 2,
-      "description": "AMD a enregistré une hausse de 2,87%, tandis que les proxys crypto comme COIN (-0,81%) et MSTR (-0,29%) ont légèrement baissé, montrant une divergence sectorielle.",
+      "tag": "Macro",
+      "importance": 4,
+      "description": "Le dollar a légèrement reculé, le DXY passant de 102,5 à 102,03 (−0,2%) depuis le matin, tandis que l'euro a progressé. Ce mouvement offre un léger répit aux actifs risqués, mais ne remet pas en cause le biais hawkish de la Fed.",
+      "source": "Investing.com 18h45"
+    },
+    {
+      "status": "new",
+      "tag": "Macro",
+      "importance": 3,
+      "description": "Les indices boursiers américains ont légèrement corrigé en séance : le S&P 500 est à 7 699,52 points (−44,46 points) et le Nasdaq à 26 121,75 points (−428,10 points). Cela tempère la forte performance des marchés actions mondiaux mentionnée ce matin.",
       "source": "Yahoo Finance"
+    },
+    {
+      "status": "unchanged",
+      "tag": "Sentiment",
+      "importance": 1,
+      "description": "L'indice Fear & Greed reste stable à 51 ('Neutre'), sans évolution depuis le matin, indiquant une absence de mouvement de panique ou d'euphorie généralisée.",
+      "source": "Fear & Greed Index"
     }
   ],
   "news_today": [
     {
-      "title": "Google lance un outil de garde crypto de niveau bancaire",
+      "title": "Franklin Templeton lance des ETF Bitcoin DRIP",
       "source": "Bitcoin Magazine",
-      "time": "17h26",
-      "impact": "Signal positif pour l'adoption institutionnelle et la sécurité des actifs numériques, renforçant la légitimité du secteur.",
+      "time": "16h26",
+      "impact": "Franklin Templeton a lancé deux ETF Bitcoin DRIP qui réinvestissent les dividendes en Bitcoin. Cela est potentiellement haussier à long terme pour l'adoption institutionnelle du Bitcoin, mais l'effet est déjà intégré dans le prix actuel.",
+      "status": "intégré"
+    },
+    {
+      "title": "Croissance du PIB US et accélération de l'inflation",
+      "source": "CNBC Economy",
+      "time": "18h06",
+      "impact": "Le PIB américain a augmenté de 3,4% au troisième trimestre, dépassant les attentes, tandis que l'inflation de septembre a accéléré. Ces chiffres solides pourraient renforcer la position hawkish de la Fed, pesant sur les actifs risqués.",
       "status": "à suivre"
     },
     {
-      "title": "Pertes importantes sur les CEX et DeFi en 2026 malgré les wallets hardware",
-      "source": "Bitcoin Magazine",
-      "time": "17h43",
-      "impact": "Rappelle les risques de sécurité persistants dans l'écosystème crypto, pouvant peser sur le sentiment général.",
+      "title": "Polygon et Solana s'associent pour les paiements stablecoins",
+      "source": "CoinDesk",
+      "time": "16h35",
+      "impact": "Polygon et Solana collaborent pour intégrer les paiements en stablecoins dans les banques. C'est un signal positif pour l'adoption des stablecoins et la collaboration inter-chaînes, mais sans impact direct immédiat sur ton portefeuille.",
+      "status": "intégré"
+    },
+    {
+      "title": "Circle demande à la SEC d'alléger les règles pour les stablecoins",
+      "source": "CryptoSlate",
+      "time": "16h30",
+      "impact": "Circle souhaite que la SEC supprime une règle coûteuse de Wall Street qui freine les stablecoins. Une telle mesure pourrait favoriser la croissance et l'adoption des stablecoins, mais son issue est incertaine et l'impact à court terme est limité.",
       "status": "intégré"
     }
   ],
   "levels_tonight": [
     {
       "asset": "BTC",
-      "level": "80 268 $",
+      "level": "80 029 $",
       "type": "support",
-      "trigger": "sous 80 268 $ → risque de test du support Fibo 38,2% à 77 297 $"
+      "trigger": "Sous 80 029 $ (pivot + Bollinger) → risque d'accélération baissière vers 77 297 $ (Fibo 38,2%). Le RSI 46 (neutre) et le MACD baissier suggèrent une fragilité."
     },
     {
       "asset": "BTC",
       "level": "81 265 $",
       "type": "resistance",
-      "trigger": "au-dessus de 81 265 $ → potentiel de rebond vers 83 479 $"
+      "trigger": "Au-dessus de 81 265 $ (pivot + MM50) → pourrait ouvrir la voie vers 83 479 $ (Bollinger supérieure), mais le volume 7j en baisse de 13% vs 30j limite le potentiel haussier."
     },
     {
       "asset": "ETH",
-      "level": "2 331 $",
+      "level": "2 321 $",
       "type": "support",
-      "trigger": "sous 2 331 $ → fragilisation vers Fibo 61,8% à 2 199 $"
+      "trigger": "Sous 2 321 $ (pivot + MM100) → la pression vendeuse pourrait s'intensifier, avec un prochain support à 2 199 $ (Fibo 61,8%). Le RSI 36 (neutre) et le MACD baissier confirment la faiblesse."
     },
     {
       "asset": "ETH",
       "level": "2 391 $",
       "type": "resistance",
-      "trigger": "au-dessus de 2 391 $ → objectif 2 438 $"
+      "trigger": "Au-dessus de 2 391 $ (pivot + seuil rond) → pourrait viser 2 438 $ (Fibo 38,2%). Cependant, ETH est à -8,0% vs MM50 et le volume 7j est en baisse de 18% vs 30j."
     },
     {
       "asset": "DXY",
-      "level": "102,50",
+      "level": "102,5",
       "type": "resistance",
-      "trigger": "au-dessus de 102,50 → pression renouvelée sur les actifs risqués"
+      "trigger": "Si le DXY remonte au-dessus de 102,5 → pression renouvelée sur les actifs risqués, notamment les alts, en renforçant le biais hawkish de la Fed."
     },
     {
       "asset": "DXY",
-      "level": "101,80",
+      "level": "101,8",
       "type": "support",
-      "trigger": "sous 101,80 → affaiblissement du dollar, favorable aux cryptos"
-    },
-    {
-      "asset": "TAO",
-      "level": "292,09 $",
-      "type": "resistance",
-      "trigger": "au-dessus de 292,09 $ → annulation de l'invalidation du matin, potentiel de reprise"
-    },
-    {
-      "asset": "LINK",
-      "level": "12,35 $",
-      "type": "resistance",
-      "trigger": "au-dessus de 12,35 $ → annulation de l'invalidation du matin, signal de force"
+      "trigger": "Sous 101,8 → le dollar pourrait continuer de s'affaiblir, offrant un soutien aux cryptos."
     }
   ],
-  "actions_tonight": null,
+  "actions_tonight": [],
   "tomorrow_checklist": {
-    "calendar": [
-      {
-        "label": "Advance GDP q/q (US)",
-        "date": "2026-10-29",
-        "when": "demain",
-        "days_ahead": 1,
-        "source": "ForexFactory",
-        "importance": "high",
-        "weekday_label": "jeudi",
-        "date_label": "jeudi 29 octobre",
-        "time": "12:30"
-      },
-      {
-        "label": "Core PCE Price Index m/m (US)",
-        "date": "2026-10-29",
-        "when": "demain",
-        "days_ahead": 1,
-        "source": "ForexFactory",
-        "importance": "high",
-        "weekday_label": "jeudi",
-        "date_label": "jeudi 29 octobre",
-        "time": "12:30"
-      },
-      {
-        "label": "Décision BCE (taux zone euro)",
-        "date": "2026-10-29",
-        "when": "demain",
-        "days_ahead": 1,
-        "source": "Calendrier BCE officiel",
-        "importance": "high",
-        "weekday_label": "jeudi",
-        "date_label": "jeudi 29 octobre",
-        "time": null
-      },
-      {
-        "label": "Monetary Policy Statement (Zone euro)",
-        "date": "2026-10-29",
-        "when": "demain",
-        "days_ahead": 1,
-        "source": "ForexFactory",
-        "importance": "high",
-        "weekday_label": "jeudi",
-        "date_label": "jeudi 29 octobre",
-        "time": "13:15"
-      },
-      {
-        "label": "Tokyo Core CPI y/y (Japon)",
-        "date": "2026-10-29",
-        "when": "demain",
-        "days_ahead": 1,
-        "source": "ForexFactory",
-        "importance": "medium",
-        "weekday_label": "jeudi",
-        "date_label": "jeudi 29 octobre",
-        "time": "23:30"
-      },
-      {
-        "label": "Unemployment Claims (US)",
-        "date": "2026-10-29",
-        "when": "demain",
-        "days_ahead": 1,
-        "source": "ForexFactory",
-        "importance": "medium",
-        "weekday_label": "jeudi",
-        "date_label": "jeudi 29 octobre",
-        "time": "12:30"
-      },
-      {
-        "label": "Décision BoJ (taux Japon)",
-        "date": "2026-10-30",
-        "when": "dans 2j",
-        "days_ahead": 2,
-        "source": "Calendrier BoJ officiel",
-        "importance": "high",
-        "weekday_label": "vendredi",
-        "date_label": "vendredi 30 octobre",
-        "time": null
-      },
-      {
-        "label": "Employment Cost Index q/q (US)",
-        "date": "2026-10-30",
-        "when": "dans 2j",
-        "days_ahead": 2,
-        "source": "ForexFactory",
-        "importance": "medium",
-        "weekday_label": "vendredi",
-        "date_label": "vendredi 30 octobre",
-        "time": "12:30"
-      },
-      {
-        "label": "German Prelim CPI m/m (Zone euro)",
-        "date": "2026-10-30",
-        "when": "dans 2j",
-        "days_ahead": 2,
-        "source": "ForexFactory",
-        "importance": "medium",
-        "weekday_label": "vendredi",
-        "date_label": "vendredi 30 octobre",
-        "time": "07:29"
-      },
-      {
-        "label": "German Prelim GDP q/q (Zone euro)",
-        "date": "2026-10-30",
-        "when": "dans 2j",
-        "source": "ForexFactory",
-        "importance": "medium",
-        "weekday_label": "vendredi",
-        "date_label": "vendredi 30 octobre",
-        "time": "09:00"
-      },
-      {
-        "label": "Monetary Policy Statement (Japon)",
-        "date": "2026-10-30",
-        "when": "dans 2j",
-        "source": "ForexFactory",
-        "importance": "high",
-        "weekday_label": "vendredi",
-        "date_label": "vendredi 30 octobre",
-        "time": "02:30"
-      }
-    ],
-    "checks": "Surveiller la réaction des marchés US et crypto aux chiffres du PIB et PCE US demain à 12h30. Observer la décision de la BCE demain et son impact sur la liquidité euro.",
-    "scenario": "Le marché devrait consolider autour des niveaux actuels, avec un biais légèrement haussier si les chiffres d'inflation PCE US de demain ne surprennent pas à la hausse.",
-    "invalidation": "Une cassure de BTC sous 80 268 $ combinée à un PCE Core supérieur au consensus invaliderait le biais haussier."
+    "calendar": "Demain vendredi 30 octobre : Décision BoJ (taux Japon) et Monetary Policy Statement (Japon) sont des événements à haute importance. En Zone euro, le German Prelim CPI m/m et le German Prelim GDP q/q sont de moyenne importance. Aux US, l'Employment Cost Index q/q est également de moyenne importance.",
+    "checks": "1. Surveiller la réaction du marché aux données d'inflation de Tokyo Core CPI y/y ce soir (23h30). 2. Observer la tenue des niveaux de support clés pour BTC (80 029 $) et ETH (2 321 $) après la correction des actions US. 3. Vérifier si le DXY maintient sa légère baisse sous 102,5.",
+    "scenario": "Le marché crypto pourrait consolider autour des niveaux actuels, avec une pression baissière persistante si les données d'inflation japonaises sont élevées et si les actions US continuent de corriger. Le biais macro reste défavorable.",
+    "invalidation": "Une cassure du support BTC à 80 029 $ ou une remontée du DXY au-dessus de 102,5 invaliderait ce scénario de consolidation et signalerait une accentuation du risk-off."
   },
-  "blind_spots": "L'absence de données de flux ETF spot directes limite la visibilité sur les mouvements institutionnels de capitaux.",
+  "blind_spots": "L'absence de données sur les flux ETF structurés (Farside 403) limite la visibilité sur les flux institutionnels réels, ce qui est un angle mort critique pour l'analyse des flux de capitaux.",
   "footer": {
+    "next_morning_time": "vendredi 30 octobre 2026 · 07:37 Casablanca",
     "sources_down": [
       "ETF flows"
     ],
@@ -266,40 +142,40 @@
     "reason": "Espérance mathématique disponible dès 5 recos clôturées avec niveaux (actuellement 2)."
   },
   "daily_pnl": {
-    "value_usd": 3424.89,
-    "day_change_usd": 10.35,
-    "day_change_pct": 0.3,
+    "value_usd": 3389.55,
+    "day_change_usd": 58.33,
+    "day_change_pct": 1.75,
     "day_change_label": null,
     "top_movers": [
       {
+        "symbol": "ETH",
+        "change": -1.0,
+        "pnl_usd": -6.91,
+        "value_usd": 699.9
+      },
+      {
         "symbol": "TAO",
-        "change": 1.8,
-        "pnl_usd": 7.27,
-        "value_usd": 411.14
+        "change": -1.7,
+        "pnl_usd": -6.77,
+        "value_usd": 404.32
+      },
+      {
+        "symbol": "JASMY",
+        "change": -7.7,
+        "pnl_usd": -4.28,
+        "value_usd": 55.29
       },
       {
         "symbol": "BTC",
-        "change": 0.5,
-        "pnl_usd": 6.93,
-        "value_usd": 1467.14
-      },
-      {
-        "symbol": "ETH",
-        "change": 0.4,
-        "pnl_usd": 3.11,
-        "value_usd": 707.02
-      },
-      {
-        "symbol": "INJ",
-        "change": -3.0,
-        "pnl_usd": -2.38,
-        "value_usd": 79.05
+        "change": -0.2,
+        "pnl_usd": -3.14,
+        "value_usd": 1463.99
       },
       {
         "symbol": "RSR",
-        "change": 2.9,
-        "pnl_usd": 2.02,
-        "value_usd": 70.17
+        "change": -4.3,
+        "pnl_usd": -2.89,
+        "value_usd": 67.1
       }
     ]
   },
@@ -308,23 +184,23 @@
       "asset": "BTC",
       "action": "RENFORCER",
       "confidence": null,
-      "entry": 80833.0,
-      "target": 90015.62879999999,
-      "current": 80968.0,
-      "delta_pct": 0.17,
-      "status": "stable",
-      "reason": "proche de l'entrée (bruit court terme) · pas de niveau d'invalidation"
+      "entry": 79792.0,
+      "target": 88856.3712,
+      "current": 80794.0,
+      "delta_pct": 1.26,
+      "status": "on_track",
+      "reason": "au-dessus de l'entrée · pas de niveau d'invalidation"
     },
     {
       "asset": "ETH",
       "action": "RENFORCER",
       "confidence": null,
-      "entry": 2351.22,
-      "target": 2691.441534,
-      "current": 2353.61,
-      "delta_pct": 0.1,
-      "status": "stable",
-      "reason": "proche de l'entrée (bruit court terme) · pas de niveau d'invalidation"
+      "entry": 2305.51,
+      "target": 2637.042338,
+      "current": 2329.89,
+      "delta_pct": 1.06,
+      "status": "on_track",
+      "reason": "au-dessus de l'entrée · pas de niveau d'invalidation"
     },
     {
       "asset": "TAO",
@@ -332,8 +208,8 @@
       "confidence": 75.0,
       "entry": 289.46,
       "target": 318.860135,
-      "current": 256.96,
-      "delta_pct": -11.23,
+      "current": 252.7,
+      "delta_pct": -12.7,
       "status": "invalidated",
       "reason": "stop 292,09 $ franchi"
     },
@@ -351,46 +227,52 @@
   ],
   "polymarket_facts": {
     "fed_bars": {
-      "cut_pct": 0.1,
-      "hold_pct": 99.8,
-      "hike_pct": 0.1,
-      "dominant": "maintien",
-      "dominant_pct": 99.8,
-      "meeting_hint": "réunion octobre 2026"
+      "cut_pct": 0.4,
+      "hold_pct": 21.8,
+      "hike_pct": 77.7,
+      "dominant": "hausse",
+      "dominant_pct": 77.7,
+      "meeting_hint": "réunion décembre 2026"
     },
     "extra_markets": [
       {
-        "question": "Will Bitcoin reach $87,500 in October?",
-        "probability_pct": 3,
-        "volume_usd": 1237036,
-        "end_date": "2026-11-01T04:00:00Z"
-      },
-      {
         "question": "Will Bitcoin dip to $77,500 in October?",
-        "probability_pct": 14,
-        "volume_usd": 978526,
+        "probability_pct": 8,
+        "volume_usd": 1120588,
         "end_date": "2026-11-01T04:00:00Z"
       },
       {
-        "question": "Will Benjamin Netanyahu be the next Prime Minister of Israel?",
-        "probability_pct": 52,
-        "volume_usd": 27455446,
-        "end_date": "2026-10-28T03:59:00Z"
+        "question": "Will Bitcoin reach $85,000 in October?",
+        "probability_pct": 4,
+        "volume_usd": 795211,
+        "end_date": "2026-11-01T04:00:00Z"
+      },
+      {
+        "question": "Will Bitcoin dip to $75,000 in October?",
+        "probability_pct": 3,
+        "volume_usd": 751899,
+        "end_date": "2026-11-01T04:00:00Z"
+      },
+      {
+        "question": "Will Bitcoin reach $82,500 in October?",
+        "probability_pct": 34,
+        "volume_usd": 404982,
+        "end_date": "2026-11-01T04:00:00Z"
       }
     ]
   },
   "since_morning_facts": {
     "available": true,
-    "window_label": "depuis le matin (07h36)",
-    "line": "BTC 80 833 $ → 80 968 $ (+0,2%) · ETH 2 351 $ → 2 354 $ (+0,1%) · F&G 51 → 51 (stable) · DXY 102,46 → 102,13 (−0,3%) · Fed maintien 95,6% → 99,8% (+4,2 pts) · ⚠ proba hausse taux 4,3% → 0,1% (−4,2 pts — repricing dovish)"
+    "window_label": "depuis le matin (07h37)",
+    "line": "BTC 79 792 $ → 80 794 $ (+1,3%) · ETH 2 306 $ → 2 330 $ (+1,1%) · F&G 51 → 51 (stable) · DXY 102,25 → 102,03 (−0,2%) · Fed hausse 77,7% → 77,7%"
   },
-  "derivatives_flows_line": "Funding BTC +10,9%/an · L/S 2,05",
+  "derivatives_flows_line": "Funding BTC +10,9%/an · L/S 1,75",
   "levels_readout": {
-    "BTC": "RSI 46 (neutre) · MACD baissier · Bollinger médiane · ATR 0,8% (≈655,84 $/j) · −1,1% vs MM50 · volume 7j −11% vs 30j",
-    "ETH": "RSI 38 (neutre) · MACD baissier · Bollinger médiane · ATR 1,0% (≈22,83 $/j) · −7,1% vs MM50 · volume 7j −18% vs 30j"
+    "BTC": "RSI 46 (neutre) · MACD baissier · Bollinger médiane · ATR 0,8% (≈678,67 $/j) · −1,4% vs MM50 · volume 7j −13% vs 30j",
+    "ETH": "RSI 36 (neutre) · MACD baissier · Bollinger médiane · ATR 1,0% (≈23,76 $/j) · −8,0% vs MM50 · volume 7j −18% vs 30j"
   },
   "risk_score": {
-    "score": 2.7,
+    "score": 3.1,
     "level": "maîtrisé",
     "level_color": "#3B6D11",
     "factors": [
@@ -399,7 +281,7 @@
     "components": [
       {
         "label": "Drawdown 7j",
-        "pts": 0.0,
+        "pts": 0.3,
         "max": 3.0
       },
       {
@@ -409,7 +291,7 @@
       },
       {
         "label": "Volatilité 24h",
-        "pts": 0.2,
+        "pts": 0.3,
         "max": 2.0
       },
       {
@@ -427,9 +309,9 @@
       },
       {
         "label": "Volatilité 24h",
-        "pts": 0.2,
+        "pts": 0.3,
         "max": 2.0,
-        "ratio_pct": 10
+        "ratio_pct": 15
       }
     ],
     "holdings_snapshot": [
@@ -464,76 +346,76 @@
     ]
   },
   "risk_score_readout": {
-    "driver": "Score tiré par Concentration (2.5/2.5) et Volatilité 24h (0.2/2.0).",
+    "driver": "Score tiré par Concentration (2.5/2.5) et Volatilité 24h (0.3/2.0).",
     "reco": "Concentration sectorielle élevée — information de risque, aucun seuil ne déclenche de vente.",
     "caveat": "Note indicative et déterministe (concentration, drawdown, volatilité, sentiment) : elle ne capte ni le risque spécifique projet ni les corrélations cachées ou chocs exogènes."
   },
   "risk_unchanged_since_morning": {
     "active": true,
-    "morning_score": 2.7,
-    "note": "Risque stable depuis ce matin (2.7/10 → 2.7/10) — composition du portefeuille non modifiée à ce jour."
+    "morning_score": 3.4,
+    "note": "Risque stable depuis ce matin (3.4/10 → 3.1/10) — composition du portefeuille non modifiée à ce jour."
   },
   "health_score": {
-    "score": 3.5,
-    "level": "fragile",
-    "level_color": "#BA7517",
+    "score": 3.2,
+    "level": "à risque",
+    "level_color": "#A32D2D",
     "axes": [
       {
         "label": "Diversification",
-        "score": 1.1,
+        "score": 1.0,
         "max": 10.0,
         "detail": "top secteur 70% du PTF"
       },
       {
         "label": "Momentum vs BTC",
-        "score": 5.2,
+        "score": 4.6,
         "max": 10.0,
-        "detail": "+0,4 pts vs BTC 7j"
+        "detail": "-0,8 pts vs BTC 7j"
       },
       {
         "label": "Solidité (vs ATH)",
-        "score": 4.1,
+        "score": 4.0,
         "max": 10.0,
-        "detail": "drawdown -56% vs ATH"
+        "detail": "drawdown -57% vs ATH"
       }
     ],
-    "driver": "Portée par Momentum vs BTC (5,2/10), pénalisée par Diversification (1,1/10).",
-    "improve": "La diversification progresse par les renforts décidés hors du secteur dominant — aucun allègement n'est déclenché par ce seuil (axe Diversification à 1,1/10 ce jour)."
+    "driver": "Moins pénalisée par Momentum vs BTC (4,6/10), pénalisée par Diversification (1,0/10).",
+    "improve": "La diversification progresse par les renforts décidés hors du secteur dominant — aucun allègement n'est déclenché par ce seuil (axe Diversification à 1,0/10 ce jour)."
   },
   "health_unchanged_since_morning": {
     "active": true,
-    "note": "Santé stable depuis ce matin (3.4/10 → 3.5/10) — composition du portefeuille non modifiée à ce jour."
+    "note": "Santé stable depuis ce matin (3.2/10 → 3.2/10) — composition du portefeuille non modifiée à ce jour."
   },
   "evening_macro": {
-    "btc_price": 80968,
-    "btc_change_24h": 0.47225,
-    "eth_price": 2353.61,
-    "eth_change_24h": 0.44008,
+    "btc_price": 80794,
+    "btc_change_24h": -0.21476,
+    "eth_price": 2329.89,
+    "eth_change_24h": -0.98796,
     "fear_greed": 51,
     "fear_greed_label": "Neutre",
     "fear_greed_delta": 0,
-    "gold_usd": 4058.7,
-    "gold_delta": -15.900000000000091,
-    "sp500": 7742.0,
-    "sp500_delta": 19.399999999999636,
-    "nasdaq": 26510.127,
-    "nasdaq_delta": 32.3169999999991,
-    "vix": 17.3,
-    "vix_delta": -0.21999999999999886,
-    "brent_usd": 111.54,
-    "brent_delta": 2.1300000000000097,
-    "dxy": 102.133,
+    "gold_usd": 4021.5,
+    "gold_delta": -30.09999999999991,
+    "sp500": 7699.52,
+    "sp500_delta": -44.45999999999913,
+    "nasdaq": 26121.752,
+    "nasdaq_delta": -428.09999999999854,
+    "vix": 17.0,
+    "vix_delta": 0.08999999999999986,
+    "brent_usd": 110.95,
+    "brent_delta": -0.6899999999999977,
+    "dxy": 102.034,
     "dxy_broad": 121.3202,
     "dxy_broad_as_of": "2026-10-23",
     "dxy_broad_freshness": " · au 23/10",
-    "dxy_ice": 102.133,
-    "dxy_delta": -0.18600000000000705,
-    "nikkei": 63954.19,
-    "nikkei_delta": 685.8199999999997,
-    "stoxx50": 6167.81,
-    "stoxx50_delta": 3.1200000000008004,
-    "eur_usd": 1.1159,
-    "usd_jpy": 157.951,
+    "dxy_ice": 102.034,
+    "dxy_delta": -0.1599999999999966,
+    "nikkei": 64659.47,
+    "nikkei_delta": 705.2799999999988,
+    "stoxx50": 6207.07,
+    "stoxx50_delta": 39.25999999999931,
+    "eur_usd": 1.1166,
+    "usd_jpy": 157.937,
     "ecb_deposit_rate": 2.5,
     "boj_rate": 1.043
   },
@@ -557,43 +439,10 @@
   },
   "tomorrow_macro_events": [
     {
-      "label": "Décision FOMC (taux Fed)",
-      "date": "2026-10-28",
-      "when": "ce soir",
-      "days_ahead": 0,
-      "source": "Calendrier Fed officiel",
-      "importance": "high",
-      "weekday_label": "mercredi",
-      "date_label": "mercredi 28 octobre",
-      "time": null
-    },
-    {
-      "label": "Advance GDP q/q (US)",
-      "date": "2026-10-29",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "jeudi",
-      "date_label": "jeudi 29 octobre",
-      "time": "12:30"
-    },
-    {
-      "label": "Core PCE Price Index m/m (US)",
-      "date": "2026-10-29",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "jeudi",
-      "date_label": "jeudi 29 octobre",
-      "time": "12:30"
-    },
-    {
       "label": "Décision BCE (taux zone euro)",
       "date": "2026-10-29",
-      "when": "demain",
-      "days_ahead": 1,
+      "when": "ce soir",
+      "days_ahead": 0,
       "source": "Calendrier BCE officiel",
       "importance": "high",
       "weekday_label": "jeudi",
@@ -601,21 +450,10 @@
       "time": null
     },
     {
-      "label": "Monetary Policy Statement (Zone euro)",
-      "date": "2026-10-29",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "jeudi",
-      "date_label": "jeudi 29 octobre",
-      "time": "13:15"
-    },
-    {
       "label": "Tokyo Core CPI y/y (Japon)",
       "date": "2026-10-29",
-      "when": "demain",
-      "days_ahead": 1,
+      "when": "ce soir",
+      "days_ahead": 0,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "jeudi",
@@ -623,21 +461,10 @@
       "time": "23:30"
     },
     {
-      "label": "Unemployment Claims (US)",
-      "date": "2026-10-29",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "medium",
-      "weekday_label": "jeudi",
-      "date_label": "jeudi 29 octobre",
-      "time": "12:30"
-    },
-    {
       "label": "Décision BoJ (taux Japon)",
       "date": "2026-10-30",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "Calendrier BoJ officiel",
       "importance": "high",
       "weekday_label": "vendredi",
@@ -647,8 +474,8 @@
     {
       "label": "Employment Cost Index q/q (US)",
       "date": "2026-10-30",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "vendredi",
@@ -658,8 +485,8 @@
     {
       "label": "German Prelim CPI m/m (Zone euro)",
       "date": "2026-10-30",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "vendredi",
@@ -669,8 +496,8 @@
     {
       "label": "German Prelim GDP q/q (Zone euro)",
       "date": "2026-10-30",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "vendredi",
@@ -680,8 +507,8 @@
     {
       "label": "Monetary Policy Statement (Japon)",
       "date": "2026-10-30",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "high",
       "weekday_label": "vendredi",
@@ -691,29 +518,29 @@
   ],
   "intraday_news": [
     {
-      "title": "U.S. stocks slightly higher after Fed keeps interest rates unchanged",
-      "source": "Seeking Alpha",
-      "timestamp": "18h53"
+      "title": "Crypto investors refuse to sell XRP ETF tokens despite a 25% price crash",
+      "source": "CryptoSlate",
+      "timestamp": "18h50"
     },
     {
-      "title": "Dollar Little Changed After Fed’s Expected Hold",
-      "source": "Barron's",
-      "timestamp": "18h43"
+      "title": "Dollar dips and euro rises after Fed, ECB rate decisions; pound extends gains",
+      "source": "Investing.com",
+      "timestamp": "18h45"
     },
     {
-      "title": "U.S. Stocks Narrowly Mixed Following Fed Decision",
-      "source": "Barron's",
-      "timestamp": "18h31"
+      "title": "Our church has a $1.5 million bequest earning 3.75% in a bank account. Is inflation eroding it?",
+      "source": "MarketWatch",
+      "timestamp": "18h30"
     },
     {
-      "title": "Fed Stands Pat, Bitcoin Holds Steady—But a December Rate Hike Is in Play",
-      "source": "Decrypt",
-      "timestamp": "18h25"
+      "title": "Third-quarter U.S. GDP increases a better-than-expected 3.4% as September inflation accelerates",
+      "source": "CNBC Economy",
+      "timestamp": "18h06"
     },
     {
-      "title": "Fed leaves interest rates unchanged, as expected",
-      "source": "CoinDesk",
-      "timestamp": "18h00"
+      "title": "Did the Fed make a mistake with its October rate pause? The Treasury could help save the day.",
+      "source": "MarketWatch",
+      "timestamp": "17h59"
     }
   ],
   "market_regime": {
@@ -721,16 +548,16 @@
     "regime": "bull",
     "label_fr": "HAUSSIER",
     "reasons": [
-      "prix +10,9% vs MM200",
+      "prix +10,5% vs MM200",
       "MM50 +12,1% vs MM200",
       "pente MM50 14j +0,9%"
     ],
-    "price_vs_ma200_pct": 10.9,
+    "price_vs_ma200_pct": 10.5,
     "ma50_vs_ma200_pct": 12.1,
     "ma50_slope_14d_pct": 0.9,
     "since": "2026-09-23",
     "changed": false,
-    "days_in_regime": 35
+    "days_in_regime": 36
   },
-  "_saved_at": "2026-10-28T19:02:31.448479+00:00"
+  "_saved_at": "2026-10-29T19:03:53.787118+00:00"
 }
