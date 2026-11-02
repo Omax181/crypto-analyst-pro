@@ -1,80 +1,85 @@
 {
   "header": {
-    "date": "dimanche 1 novembre 2026",
-    "time_casablanca": "dimanche 1 novembre 2026 · 07:37 Casablanca",
+    "date": "lundi 2 novembre 2026",
+    "time_casablanca": "lundi 2 novembre 2026 · 07:36 Casablanca",
     "active_sources_count": 23,
-    "win_rate_30d": 80,
-    "win_rate_total": "4/5",
+    "win_rate_30d": 100,
+    "win_rate_total": "4/4",
     "total_sources_count": 26,
-    "win_rate_calibration": "5/5",
+    "win_rate_calibration": "4/5",
     "active_recos_count": 4,
     "firm_theses_count": 0,
     "watch_theses_count": 2,
     "reissued_theses_count": 2
   },
   "portfolio_snapshot": {
-    "value_usd": 3265.61,
-    "change_24h_pct": 0.98,
-    "change_7d_pct": -3.34,
-    "change_7d_usd": -112.95,
-    "vs_btc_7d_pct": -0.19,
-    "drawdown_ath_pct": -58.0,
+    "value_usd": 3246.41,
+    "change_24h_pct": -0.59,
+    "change_7d_pct": -0.48,
+    "change_7d_usd": -15.51,
+    "vs_btc_7d_pct": -0.44,
+    "drawdown_ath_pct": -57.7,
     "usdc_pct": 0.0,
     "usdc_usd": 0.0,
-    "computed_date": "2026-11-01",
-    "overnight_pnl_usd": 2.9,
-    "overnight_pnl_pct": 0.09
+    "computed_date": "2026-11-02",
+    "overnight_pnl_usd": 1.33,
+    "overnight_pnl_pct": 0.04
   },
   "executive_summary": {
     "bullets": [
       {
         "icon": "⚠",
-        "text": "Régime macro en Risk-Off net : chute marquée du Nasdaq (-747,73 pts) et du S&P 500 (-140,32 pts) sous la pression des taux BoJ (+0,066 pt)."
-      },
-      {
-        "icon": "✓",
-        "text": "Binance a couvert 90% des 6,33 Mds$ volés par la Corée du Nord, stabilisant le sentiment global malgré Fear & Greed à 34 (Peur)."
+        "text": "Régime macro Risk-Off confirmé : repli des indices US (Nasdaq -747,70 pts, S&P 500 -140,32 pts) et hausse du taux BoJ à 1,043% pesant sur la liquidité mondiale."
       },
       {
         "icon": "⚠",
-        "text": "Options Deribit BTC/ETH affichent un skew baissier (−5,2 pts) : couverture active des opérateurs avant l'ISM Manufacturier de lundi."
+        "text": "Sorties massives sur les ETF Bitcoin (-643 M$ vendredi) et 23 jours consécutifs de sorties sur ETH suite aux 5,8 Mds$ retirés de Binance post-hack. [chiffre ETF non recoupé — la source structurée (Farside / CoinGlass) était indisponible sur ce run]. À lire comme un geste tactique sur la force : la thèse du jour sur ETH reste RENFORCER (accumulation), et le plan détaillé plus bas la chiffre."
       },
       {
         "icon": "✓",
-        "text": "Moteur d'allocation maintenu : renforcement progressif sur BTC (77 759 $) et ETH (2 265,66 $) sur décote MVRV."
+        "text": "Le moteur d'allocation confirme le maintien des ordres d'accumulation sur BTC (MVRV 1,45 neutre) et ETH (MVRV 1,03 au coût de revient) pour le cœur PTF."
+      },
+      {
+        "icon": "⚠",
+        "text": "Risque événementiel court terme : publication de l'ISM Manufacturier US aujourd'hui (15h00) avec move implicite DVOL de ±2,9% sur 48h."
       }
     ]
   },
   "macro_regime_readout": {
     "regime": "risk-off",
     "confidence_pct": 85,
-    "reading": "La baisse des indices actions américains et la remontée du VIX (+2,22 pts à 19,42) traduisent une aversion au risque marquée, renforcée par le resserrement monétaire au Japon.",
-    "crypto_bias": "défavorable"
+    "reading": "La hausse des taux de la BoJ (+0,066 pt) accélère le débouclage du carry trade yen, poussant les indices mondiaux au repli et le VIX à 19,42 points.",
+    "crypto_bias": "défavorable à court terme, pression vendeuse accrue sur les alts bêtas"
   },
   "self_critique_global": {
     "bullets": [
-      "Flux ETF institutionnels non disponibles en direct (source Farside/CoinGlass bloquée), masquant l'orientation exacte des zinzins.",
-      "Incertitude géopolitique et élections américaines dans 2 jours pouvant provoquer des mèche de liquidité inattendues."
+      "Flux ETF Bitcoin et Ethereum indisponibles en direct via Farside/CoinGlass (repli sur données historiques J-1).",
+      "Élections de mi-mandat US demain introduisant une volatilité politique non modélisable sur les corrélations 30j.",
+      "Dispersion élevée des bêtas sur les altcoins du Tier 2-3 rendant la transmission du Risk-Off asymétrique."
     ]
   },
   "invalidation_watch": [
     {
-      "condition": "TAO : invalidation 292,09 $ FRANCHIE (prix 237,10 $)",
+      "condition": "TAO : invalidation 292,09 $ FRANCHIE (prix 230,37 $)",
       "implication": "thèse d'achat caduque — plus de renfort sur ce motif ; aucun niveau de prix ne déclenche de vente",
       "status": "franchi"
     },
     {
-      "condition": "LINK : invalidation 12,35 $ FRANCHIE (prix 11,74 $)",
+      "condition": "LINK : invalidation 12,35 $ FRANCHIE (prix 11,31 $)",
       "implication": "thèse d'achat caduque — plus de renfort sur ce motif ; aucun niveau de prix ne déclenche de vente",
       "status": "franchi"
     },
     {
-      "condition": "DXY > 102,00 en clôture journalière",
-      "implication": "Accélération de la pression baissière sur l'ensemble des alts et rupture potentielle du pivot BTC à 76 555 $"
+      "condition": "Polymarket : probabilité de dip BTC sous 77 500 $ franchissant 95% (actuellement 94%)",
+      "implication": "Validation de la cassure du Fibonacci 0.382 (77 746 $) et accélération baissière vers le support 74 786 $."
     },
     {
-      "condition": "",
-      "implication": "Plafonnement prolongé des valorisations sur les secteurs AI et L1 à fort bêta"
+      "condition": "DXY (ICE) repassant durablement au-dessus de 102,50",
+      "implication": "Renforcement de la pression baissière sur les actifs à forte duration (bloc AI à 14,2% du PTF)."
+    },
+    {
+      "condition": "Résultats ISM Manufacturier US < 52,0 cet après-midi à 15h00",
+      "implication": "Résurgence des craintes de récession US, écartement des spreads high yield au-delà de 3,50%."
     }
   ],
   "active_recommendations_tracking": [
@@ -85,18 +90,18 @@
       "confidence": 75.0,
       "prev_confidence": null,
       "entry_price": 289.46,
-      "progress_pct": -18.1,
+      "progress_pct": -20.4,
       "ct_target": 318.860135,
       "legacy": true,
       "stop_loss": 292.085072,
-      "days_open": 28,
-      "stop_distance_pct": 23.2,
-      "life_line": "il y a 28 j · -18,1% · 0% du chemin vers la cible (s'éloigne) · stop à +23,2%",
-      "target_path_pct": -178.0,
+      "days_open": 29,
+      "stop_distance_pct": 26.8,
+      "life_line": "il y a 29 j · -20,4% · 0% du chemin vers la cible (s'éloigne) · stop à +26,8%",
+      "target_path_pct": -201.0,
       "target_path_display_pct": 0.0,
       "target_path_away": true,
-      "dist_to_target_pct": 34.5,
-      "current_price": 237.1,
+      "dist_to_target_pct": 38.4,
+      "current_price": 230.37,
       "status": "● en cours",
       "status_color": "#BA7517",
       "action_badge_bg": "#E7F0DD",
@@ -113,18 +118,18 @@
       "confidence": 75.0,
       "prev_confidence": 70.0,
       "entry_price": 14.01,
-      "progress_pct": -16.2,
+      "progress_pct": -19.3,
       "ct_target": null,
       "legacy": true,
       "stop_loss": 12.351352,
-      "days_open": 28,
-      "stop_distance_pct": 5.2,
-      "life_line": "il y a 28 j · -16,2% · stop à +5,2%",
+      "days_open": 29,
+      "stop_distance_pct": 9.2,
+      "life_line": "il y a 29 j · -19,3% · stop à +9,2%",
       "target_path_pct": null,
       "target_path_display_pct": null,
       "target_path_away": false,
       "dist_to_target_pct": null,
-      "current_price": 11.74,
+      "current_price": 11.31,
       "status": "● en cours",
       "status_color": "#BA7517",
       "action_badge_bg": "#E7F0DD",
@@ -141,18 +146,18 @@
       "confidence": null,
       "prev_confidence": null,
       "entry_price": 83647.0,
-      "progress_pct": -7.0,
+      "progress_pct": -6.7,
       "ct_target": 93149.2992,
       "legacy": false,
       "stop_loss": null,
-      "days_open": 18,
+      "days_open": 19,
       "stop_distance_pct": null,
-      "life_line": "il y a 18 j · -7,0% · 0% du chemin vers la cible (s'éloigne)",
-      "target_path_pct": -62.0,
+      "life_line": "il y a 19 j · -6,7% · 0% du chemin vers la cible (s'éloigne)",
+      "target_path_pct": -59.0,
       "target_path_display_pct": 0.0,
       "target_path_away": true,
-      "dist_to_target_pct": 19.8,
-      "current_price": 77759,
+      "dist_to_target_pct": 19.4,
+      "current_price": 78038,
       "status": "● en cours",
       "status_color": "#BA7517",
       "action_badge_bg": "#E7F0DD",
@@ -168,18 +173,18 @@
       "confidence": null,
       "prev_confidence": null,
       "entry_price": 2406.72,
-      "progress_pct": -5.9,
+      "progress_pct": -5.2,
       "ct_target": 2760.267168,
       "legacy": false,
       "stop_loss": null,
-      "days_open": 13,
+      "days_open": 14,
       "stop_distance_pct": null,
-      "life_line": "il y a 13 j · -5,9% · 0% du chemin vers la cible (s'éloigne)",
-      "target_path_pct": -40.0,
+      "life_line": "il y a 14 j · -5,2% · 0% du chemin vers la cible (s'éloigne)",
+      "target_path_pct": -36.0,
       "target_path_display_pct": 0.0,
       "target_path_away": true,
-      "dist_to_target_pct": 21.8,
-      "current_price": 2265.66,
+      "dist_to_target_pct": 21.0,
+      "current_price": 2281.19,
       "status": "● en cours",
       "status_color": "#BA7517",
       "action_badge_bg": "#E7F0DD",
@@ -189,37 +194,36 @@
       "comment": null
     }
   ],
-  "tracking_footnote": "Les renforts sur actifs majeurs s'effectuent en DCA contrarien dans la zone de valeur MVRV, sans céder à la volatilité de court terme.",
+  "tracking_footnote": "Les invalidations sur TAO et LINK annulent de nouveaux renforts sur ces motifs, mais ne déclenchent aucune vente forcée en portefeuille.",
   "macro_context": {
-    "btc_price": 77759,
-    "btc_note": "consolidation sous 78 000 $",
-    "fear_greed": 34,
+    "btc_price": 78038,
+    "btc_note": "maintien sur pivot Fibonacci 0.382",
+    "fear_greed": 37,
     "fear_greed_label": "Peur",
-    "dxy": 101.964,
-    "dxy_note": "en hausse à 101,96",
+    "dxy": 101.782,
+    "dxy_note": "repli modéré (-0,10 pt)",
     "polymarket_fed_cut_pct": null,
-    "fed_cut_note": "Taux effectif Fed à 3,88%",
-    "regime_synthesis": "Régime Risk-Off : le DXY se maintient à 101,964 tandis que le VIX s'évapore vers 19,42. La chute marquée du Nasdaq (−747,73 pts) et du S&P 500 (−140,32 pts) met les actifs risqués sous tension monétaire. Le relèvement du taux BoJ à 1,043% pèse sur le carry trade mondial. Le marché crypto reste en zone de Peur (Fear & Greed 34), montrant une résilience locale de BTC au-dessus de 77 000 $.",
+    "fed_cut_note": "ISM Manufacturier et élections US en catalyseurs immédiats",
+    "regime_synthesis": "Régime Risk-Off global : les indices actions s'enfoncent (Nasdaq -747,70 pts, S&P 500 -140,32 pts, Nikkei -208,25 pts) sous l'effet du relèvement de taux de la BoJ (1,043%) et du VIX à 19,42 points. L'or monte à 3 915,40 $ (+16,50 $) tandis que le pétrole Brent recule à 110,04 $. La liquidité M2 reste en expansion (+1,5%), mais le sentiment crypto stagne en Peur (37), bridé par les sorties d'ETF et les incertitudes entourant l'ISM Manufacturier US de cet après-midi.",
     "dxy_broad_freshness": " · au 23/10",
-    "fear_greed_delta": 4,
+    "fear_greed_delta": 3,
     "dxy_is_broad_fallback": false,
     "dxy_broad": 121.3202,
     "dxy_broad_as_of": "2026-10-23",
-    "dxy_delta": 0.08499999999999375,
-    "dxy_ice": 101.964,
+    "dxy_delta": -0.09700000000000841,
+    "dxy_ice": 101.782,
     "polymarket_extra_markets": [
       {
-        "question": "Will the price of Ethereum be above $2,300 on November 1?",
-        "probability_pct": 4,
-        "volume_usd": 119587,
-        "end_date": "2026-11-01T17:00:00Z"
+        "question": "Will Bitcoin dip to $77,500 in November?",
+        "probability_pct": 94,
+        "volume_usd": 402384,
+        "end_date": "2026-12-01T05:00:00Z"
       },
       {
-        "question": "Ethereum Up or Down on November 1?",
+        "question": "Will Bitcoin reach $80,000 in November?",
         "probability_pct": 82,
-        "volume_usd": 93043,
-        "end_date": "2026-11-01T17:00:00Z",
-        "outcome": "Up"
+        "volume_usd": 347762,
+        "end_date": "2026-12-01T05:00:00Z"
       }
     ],
     "vix": 19.42,
@@ -228,78 +232,78 @@
     "us_10y_delta": -0.06,
     "us_2y": 4.61,
     "yield_curve_10y_2y": 0.38,
-    "gold_usd": 3898.9,
-    "gold_delta": -132.5,
+    "gold_usd": 3915.4,
+    "gold_delta": 16.5,
     "sp500": 7580.07,
     "sp500_delta": -140.32000000000062,
     "nasdaq": 25436.998,
-    "nasdaq_delta": -747.726999999999,
-    "brent_usd": 113.43,
-    "brent_delta": 2.6300000000000097,
-    "wti_usd": 104.12,
-    "eur_usd": 1.1166,
-    "eur_usd_delta": -0.0015000000000000568,
-    "usd_jpy": 157.519,
-    "usd_jpy_delta": -0.12999999999999545,
-    "nikkei": 63290.11,
-    "nikkei_delta": -1369.3600000000006,
+    "nasdaq_delta": -747.7020000000011,
+    "brent_usd": 110.04,
+    "brent_delta": -3.3900000000000006,
+    "wti_usd": 100.6,
+    "eur_usd": 1.1194,
+    "eur_usd_delta": 0.0027999999999999137,
+    "usd_jpy": 157.782,
+    "usd_jpy_delta": 0.26300000000000523,
+    "nikkei": 63081.86,
+    "nikkei_delta": -208.25,
     "stoxx50": 6131.31,
     "stoxx50_delta": -75.75999999999931,
     "dax": 25818.21,
-    "dax_delta": -221.47000000000116,
+    "dax_delta": -221.4900000000016,
     "ecb_deposit_rate": 2.5,
     "ecb_deposit_rate_delta": 0.0,
     "ecb_deposit_rate_date": "2026-10-30",
     "boj_rate": 1.043,
     "boj_rate_delta": 0.066,
     "boj_rate_date": "2026-09-01",
-    "btc_change_24h": 0.53835,
-    "eth_price": 2265.66,
+    "btc_change_24h": 0.31192,
+    "eth_price": 2281.19,
     "_price_source": "yahoo+fred"
   },
   "risk_score_readout": {
-    "driver": "Score tiré par Concentration (2.5/2.5) et Drawdown 7j (0.7/3.0).",
+    "driver": "Score tiré par Concentration (2.5/2.5) et Volatilité 24h (0.4/2.0).",
     "reco": "Concentration sectorielle élevée — information de risque, aucun seuil ne déclenche de vente.",
     "caveat": "Note indicative et déterministe (concentration, drawdown, volatilité, sentiment) : elle ne capte ni le risque spécifique projet ni les corrélations cachées ou chocs exogènes."
   },
   "onchain_indicators": {
     "verdict": "neutre",
-    "combined_reading": "L'on-chain signale une phase de consolidation neutre : le MVRV BTC à 1,43 et ETH à 1,02 indiquent un cours proche des valeurs réalisées sans capitulation ni surchauffe. Le skew des options Deribit à −5,2 pts confirme une prudence acheteuse à court terme.",
+    "combined_reading": "Neutre : MVRV BTC à 1,45 et ETH à 1,03 indiquent un marché proche des coûts de revient sans surchauffe. La baisse du Put/Call ratio (0,66 sur BTC, 0,55 sur ETH) traduit une demande de calls, mais le skew négatif confirme que les couvertures baissières restent chères.",
     "source": "fallback",
     "btc_network": {
-      "n_tx_24h": 757188,
-      "hash_rate_ehs": 1121.04,
+      "n_tx_24h": 500204,
+      "hash_rate_ehs": 958.78,
       "mempool_size": 53197
     },
-    "eth_gas_fast_gwei": 0.039839482,
+    "eth_gas_fast_gwei": 0.069725962,
     "metrics": [
       {
         "label": "MVRV BTC",
-        "value": "1,43",
+        "value": "1,45",
         "color": "#1a1a18",
         "short": "neutre"
       },
       {
         "label": "MVRV ETH",
-        "value": "1,02",
+        "value": "1,03",
         "color": "#1a1a18",
         "short": "neutre"
       },
       {
         "label": "Adresses actives BTC",
-        "value": "684 067",
+        "value": "650 214",
         "color": "#1a1a18",
         "short": "tendance 7j n/d"
       },
       {
         "label": "Adresses actives ETH",
-        "value": "725 848",
+        "value": "873 319",
         "color": "#1a1a18",
-        "short": "-19,0% / 7j"
+        "short": "-0,9% / 7j"
       },
       {
         "label": "Put/Call BTC",
-        "value": "0,67",
+        "value": "0,66",
         "color": "#3B6D11",
         "short": "appétit calls (haussier)"
       },
@@ -311,9 +315,9 @@
       },
       {
         "label": "Supply Stablecoins",
-        "value": "256,3 Mds$",
+        "value": "255,8 Mds$",
         "color": "#1a1a18",
-        "short": "+0,05% / 7j · stable"
+        "short": "-0,03% / 7j · stable"
       },
       {
         "label": "Dépôts whales ETH · 24h",
@@ -323,13 +327,13 @@
       },
       {
         "label": "Funding BTC",
-        "value": "+7,3%/an",
+        "value": "+9,1%/an",
         "color": "#BA7517",
-        "short": "longs dominants · L/S 2,58"
+        "short": "longs dominants · L/S 2,21"
       },
       {
         "label": "Volatilité implicite (DVOL)",
-        "value": "BTC 40 · ETH 54",
+        "value": "BTC 39 · ETH 53",
         "color": "#5a5852",
         "short": "vol. options annualisée"
       }
@@ -338,85 +342,96 @@
   "sector_rotation": [
     {
       "sector": "DeFi",
-      "change_24h": 3.73,
-      "change_7d": -4.87,
-      "change_30d": -6.33,
+      "change_24h": -4.04,
+      "change_7d": -8.72,
+      "change_30d": -11.5,
       "your_holdings": [
         "INJ",
         "RSR"
       ]
     },
     {
+      "sector": "Meme/Gaming",
+      "change_24h": -3.9,
+      "change_7d": -4.96,
+      "change_30d": -31.21,
+      "your_holdings": [
+        "NOT"
+      ]
+    },
+    {
       "sector": "Oracle/Infra",
-      "change_24h": 2.79,
-      "change_7d": 2.95,
-      "change_30d": -18.52,
+      "change_24h": -3.67,
+      "change_7d": -1.34,
+      "change_30d": -19.44,
       "your_holdings": [
         "LINK"
       ]
     },
     {
-      "sector": "IoT/Data",
-      "change_24h": -1.8,
-      "change_7d": -15.09,
-      "change_30d": -32.22,
+      "sector": "Interop",
+      "change_24h": -3.36,
+      "change_7d": -8.07,
+      "change_30d": -17.75,
       "your_holdings": [
-        "JASMY"
-      ]
-    },
-    {
-      "sector": "Infra",
-      "change_24h": 1.69,
-      "change_7d": -9.38,
-      "change_30d": -24.83,
-      "your_holdings": [
-        "GRT",
-        "ANKR"
+        "W",
+        "AXL"
       ]
     },
     {
       "sector": "Autres · 8 secteurs",
-      "change_24h": 0.76,
-      "change_7d": -5.56,
-      "change_30d": -19.79,
+      "change_24h": -1.77,
+      "change_7d": -7.35,
+      "change_30d": -20.7,
       "your_holdings": [],
       "is_aggregate": true
     }
   ],
-  "sector_rotation_ptf_note": "Le secteur DeFi (+3,73% sur 24h) et les Oracles (+2,79%) mènent le rebond du portefeuille, portés par RSR (+5,78%) et LINK (+2,79%). À l'inverse, IoT/Data (JASMY -1,80%) accuse du retard sur 30 jours (-32,22%).",
+  "sector_rotation_ptf_note": "Divergence marquée sur ton portefeuille : le secteur L1 résiste mieux (-1,38% sur 24h) grâce à la neutralité de BTC/ETH, tandis que la DeFi (-4,04%) et les Oracles (-3,67%) accusent le coup sur 24h et 30j (-22,8% sur l'IA).",
   "news_24h": [
     {
-      "category": "Catalyseur",
-      "tag_bg": "#E7F0DD",
-      "tag_color": "#27500A",
-      "title": "Binance reconstitue 90% des 6,3 Mds$ volés et réouvre les retraits",
-      "source": "Investing.com",
-      "timestamp": "04h24",
+      "category": "Risque",
+      "tag_bg": "#FCE8E6",
+      "tag_color": "#A50E0E",
+      "title": "Les ETF Bitcoin enregistrent 643 M$ de sorties nettes vendredi. [chiffre ETF non recoupé — la source structurée (Farside / CoinGlass) était indisponible sur ce run]",
+      "source": "CoinDesk",
+      "timestamp": "06:46",
       "confidence": 80,
-      "impact_on_ptf": "Rassure l'écosystème global et réduit le risque de panique bancaire sur les exchanges, soutenant la tenue du BTC et de l'ETH."
+      "impact_on_ptf": "Pression vendeuse institutionnelle directe sur BTC (43,6% du PTF). Contribue à maintenir le cours sous la médiane de Bollinger (79 214 $).",
+      "impact": "(chiffre de canal Telegram — non recoupé : source structurée Farside/CoinGlass indisponible ce matin)"
     },
     {
       "category": "Risque",
-      "tag_bg": "#FCEBE6",
-      "tag_color": "#791F0E",
-      "title": "Le FBI attribue le hack de Binance à la Corée du Nord",
-      "source": "CoinDesk",
-      "timestamp": "01h10",
+      "tag_bg": "#FCE8E6",
+      "tag_color": "#A50E0E",
+      "title": "Les sorties nettes de Binance atteignent 5,8 Mds$ après la reprise des retraits",
+      "source": "Cointelegraph",
+      "timestamp": "23:59",
       "confidence": 80,
-      "impact_on_ptf": "Demande du FBI de bloquer les adresses compromises en DeFi. Risque de durcissement réglementaire accru à court terme."
+      "impact_on_ptf": "Mouvement de défiance généralisé pesant sur la liquidité globale des altcoins, particulièrement sur les petites capitalisations du PTF."
     },
     {
       "category": "Macro",
-      "tag_bg": "#E6F1FB",
-      "tag_color": "#0C4A6E",
-      "title": "La Bourse de Moscou ouvrira le trading crypto en décembre",
-      "source": "Telegram · WatcherGuru",
-      "timestamp": "31/10 19h17",
+      "tag_bg": "#E8F0FE",
+      "tag_color": "#1A73E8",
+      "title": "Les hedge funds dumperaient les actions tech américaines au rythme le plus rapide en dix ans",
+      "source": "Telegram · Fin_Watch",
+      "timestamp": "03:14",
       "confidence": 75,
-      "impact_on_ptf": "Nouvelle voie d'adoption institutionnelle hors dollar, renforçant la thèse fondamentale de Bitcoin comme réserve neutre."
+      "impact_on_ptf": "Ventes massives sur les semi-conducteurs (AMD -10,9%, NVDA -4,2%) qui impactent par transmission le bloc IA du portefeuille (TAO, RENDER, FET)."
+    },
+    {
+      "category": "Info",
+      "tag_bg": "#EFEFEF",
+      "tag_color": "#555555",
+      "title": "Le pétrole passe sous 100 $ sur fond de discussions diplomatiques entre l'Iran et le Qatar",
+      "source": "Telegram · Fin_Watch",
+      "timestamp": "03:36",
+      "confidence": 75,
+      "impact_on_ptf": "Atténuation modérée des pressions inflationnistes à moyen terme, offrant une marge de manœuvre théorique à la Fed."
     }
   ],
-  "today_watch": "Surveiller la réaction du marché actions à l'approche de l'ISM Manufacturier américain demain (consensus 54,7) et les élections de mi-mandat US dans 48h. Côté crypto, valider le maintien du pivot BTC à 76 555 $.",
+  "today_watch": "Publication de l'ISM Manufacturier US à 15h00 (consensus 54.5). Une déception accentuerait le mouvement Risk-Off des actions et de la crypto avant les élections législatives US de demain.",
   "thesis_of_the_day": [
     {
       "asset": "BTC",
@@ -426,18 +441,17 @@
       "action_type": "bullish",
       "thesis_type": "conviction",
       "reliability": "partielle",
-      "observation": "BTC consolide autour de 77 759 $ au milieu du canal de Bollinger (médiane 79 214 $). Le support à 74 786 $ (Fibo 0,50) contient la pression vendeuse macro.",
-      "sources_timestamps": "CoinGecko 07h37 · Coin Metrics 31/10 · OKX 07h37",
+      "observation": "BTC évolue à 78 038 $, en hausse modérée de +0,31% sur 24h, au contact du retracement Fibonacci 0.382 (77 746 $). Le positionnement des dérivées montre un Max Pain à 78 000 $ et un Put/Call ratio de 0,66, traduisant un biais d'accumulation d'options d'achat malgré un skew baissier à -4,6.",
+      "sources_timestamps": "CoinGecko 07h36 · Coin Metrics 01/11 · OKX 07h36",
       "reasoning_signals": [
-        "1. MVRV à 1,43 (neutre) offrant un potentiel mesuré de 19,7% vers la médiane historique de cycle (1,71).",
-        "2. Dominance BTC élevée (59,3%) captant l'essentiel de la liquidité en période de risk-off mondial.",
-        "3. Ratio Long/Short dérivés à 2,58 sur OKX montrant la résistance des acheteurs sur le marché perpétuel.",
-        "4. Activité réseau solide avec 757 188 transactions 24h et hashrate à 1 121 EH/s."
+        "1. MVRV à 1,45 (zone neutre) avec prix réalisé à 54 016 $, confirmant un coussin de profit latent sans surchauffe de cycle (CoinMetrics).",
+        "2. Put/Call ratio à 0,66 sur Deribit traduisant une prédominance des positions haussières sur les échéances court terme (Deribit).",
+        "3. Support technique immédiat sur le retracement Fibonacci 0.382 à 77 746 $ testé avec succès (TradingView).",
+        "4. Activité de développement soutenue avec 100 commits sur 30 jours et 14 contributeurs récents sur le dépôt principal (GitHub)."
       ],
-      "self_critique": "Le skew des options à −5,2 pts montre que le marché paie cher la protection baissière à court terme.",
-      "macro_coherence": "Résilience relative face à la chute des marchés actions US (Nasdaq -2,9%), confirmant le statut de valeur refuge crypto.",
-      "counter_thesis": "Une cassure du support à 74 786 $ sous la pression du DXY (101,96) invaliderait la thèse de rebond vers les 81 409 $.",
-      "watch_trigger": null,
+      "self_critique": "Les sorties nettes de 643 M$ sur les ETF spot vendredi et le piratage de Binance maintiennent un risque d'enfoncement vers la bande basse de Bollinger (67 443 $). [chiffre ETF non recoupé — la source structurée (Farside / CoinGlass) était indisponible sur ce run]",
+      "macro_coherence": "La thèse résiste au régime Risk-Off grâce au statut de valeur refuge relative de BTC face aux altcoins (dominance à 60,0%).",
+      "counter_thesis": "Une cassure nette sous le support de 77 746 $ accompagnée d'un sentiment de peur s'aggravant infirmerait la structure de rebond et viserait 74 786 $.",
       "thesis_scoring": {
         "score": 1,
         "eligible": false,
@@ -480,16 +494,16 @@
         }
       },
       "action_plan": {
-        "entry": 77759.0,
+        "entry": 78038.0,
         "position_size_pct": 5.0,
-        "position_size_usd": 163,
+        "position_size_usd": 162,
         "sizing_note": "bande normale cœur 5–10 %"
       },
       "engine_view": {
         "asset": "BTC",
-        "price": 77759.0,
-        "potential_pct": 19.68,
-        "potential_conservative_pct": -10.16,
+        "price": 78038.0,
+        "potential_pct": 18.02,
+        "potential_conservative_pct": -11.4,
         "required_pct": 11.36,
         "required_class": "D",
         "costs_pct": 0.6,
@@ -497,7 +511,7 @@
         "risk_premium_pct": 5.76,
         "multiplier": 0.4,
         "anchor": "mvrv",
-        "basis": "MVRV 1,43 → médiane historique 1,71 (Q1 1,28, 5950 jours, 2010-07-18 → 2026-10-31)",
+        "basis": "MVRV 1,45 → médiane historique 1,71 (Q1 1,28, 5951 jours, 2010-07-18 → 2026-11-01)",
         "evidence_class": "B",
         "size_pct": 5.0,
         "size_band": [
@@ -506,59 +520,59 @@
         ],
         "size_band_label": "normale",
         "size_tier": "core",
-        "size_usd": 163.0,
+        "size_usd": 162.0,
         "size_usd_band": [
-          163.0,
-          327.0
+          162.0,
+          325.0
         ],
         "size_basis": "le potentiel central couvre le requis ; l'ancre prudente ne le couvre pas",
         "coverage_pct": 83,
-        "weight_pct": 43.15,
-        "effective_weight_pct": 25.39,
-        "beta_portfolio": 0.5885,
-        "implied_price": 93061.9712,
-        "required_price": 86592.4224,
+        "weight_pct": 43.56,
+        "effective_weight_pct": 25.69,
+        "beta_portfolio": 0.5899,
+        "implied_price": 92100.4476,
+        "required_price": 86903.11679999999,
         "forecast_30d": {
           "horizon_days": 30,
-          "p10": 67572.85179601998,
-          "p50": 77759.0,
-          "p90": 89480.6408238069,
+          "p10": 67830.5381272154,
+          "p50": 78038.0,
+          "p90": 89781.52926604246,
           "p10_pct": -13.1,
-          "p90_pct": 15.1,
-          "sigma_h_pct": 11.0,
+          "p90_pct": 15.0,
+          "sigma_h_pct": 10.9,
           "hypothese": "dérive nulle (aucun alpha estimable), rendements log-normaux à la volatilité quotidienne mesurée"
         },
         "forecast_365d": {
           "horizon_days": 365,
-          "p10": 47648.95420031577,
-          "p50": 77759.0,
-          "p90": 126896.00815960679,
+          "p10": 47857.400108322036,
+          "p50": 78038.0,
+          "p90": 127251.57301098369,
           "p10_pct": -38.7,
-          "p90_pct": 63.2,
+          "p90_pct": 63.1,
           "sigma_h_pct": 38.2,
           "hypothese": "dérive nulle (aucun alpha estimable), rendements log-normaux à la volatilité quotidienne mesurée"
         },
         "horizon_days": 365.0,
         "funding_case": "A",
         "sell_asset": null,
-        "reason": "potentiel mesuré 19,7% ≥ requis 11,4% (coûts 0,6 + contrefactuel 5,0 + prime 5,8) · MVRV 1,43 → médiane historique 1,71 (Q1 1,28, 5950 jours, 2010-07-18 → 2026-10-31)",
+        "reason": "potentiel mesuré 18,0% ≥ requis 11,4% (coûts 0,6 + contrefactuel 5,0 + prime 5,8) · MVRV 1,45 → médiane historique 1,71 (Q1 1,28, 5951 jours, 2010-07-18 → 2026-11-01)",
         "display": {
-          "band_30d": "67 573–89 481 $",
-          "band_365d": "47 649–126 896 $",
-          "implied": "93 062 $ (+19,7 %)",
-          "required_price": "86 592 $",
-          "pot_req": "+19,7 % / 11,4 %",
-          "potential": "+19,7 %",
-          "potential_conservative": "−10,2 %",
+          "band_30d": "67 831–89 782 $",
+          "band_365d": "47 857–127 252 $",
+          "implied": "92 100 $ (+18 %)",
+          "required_price": "86 903 $",
+          "pot_req": "+18 % / 11,4 %",
+          "potential": "+18 %",
+          "potential_conservative": "−11,4 %",
           "required": "11,4 %",
           "costs": "0,6 %",
           "benchmark": "5 %",
           "premium": "5,8 %",
           "size": "5–10 %",
-          "size_usd": "163–327 $",
-          "weight": "43,1 %",
-          "effective_weight": "25,4 %",
-          "row_note": "⚙ moteur · potentiel +19,7 % ≥ requis 11,4 % · MVRV 1,43 → médiane historique 1,71 (Q1 1,28, 5950 jours, 2010-07-18 → 2026-10-31)"
+          "size_usd": "162–325 $",
+          "weight": "43,6 %",
+          "effective_weight": "25,7 %",
+          "row_note": "⚙ moteur · potentiel +18 % ≥ requis 11,4 % · MVRV 1,45 → médiane historique 1,71 (Q1 1,28, 5951 jours, 2010-07-18 → 2026-11-01)"
         },
         "coverage_missing": [
           "sentiment"
@@ -584,9 +598,9 @@
             15.0,
             20.0
           ],
-          "weight_pct": 43.15,
-          "beta_portfolio": 0.5885,
-          "effective_weight_pct": 25.39
+          "weight_pct": 43.56,
+          "beta_portfolio": 0.5899,
+          "effective_weight_pct": 25.69
         },
         "required": {
           "required_pct": 11.36,
@@ -624,7 +638,7 @@
             "liquidity": {
               "value": 0.8,
               "measured": true,
-              "basis": "volume 24 h 48 395,3 M$ vs médiane 17,3 M$"
+              "basis": "volume 24 h 16 891,4 M$ vs médiane 10,5 M$"
             },
             "dilution": {
               "value": 0.868,
@@ -644,29 +658,29 @@
         },
         "potential": {
           "available": true,
-          "potential_pct": 19.68,
-          "potential_conservative_pct": -10.16,
+          "potential_pct": 18.02,
+          "potential_conservative_pct": -11.4,
           "anchor": "mvrv",
-          "anchor_value": 1.7114,
+          "anchor_value": 1.7113,
           "anchor_conservative_value": 1.2847,
-          "basis": "MVRV 1,43 → médiane historique 1,71 (Q1 1,28, 5950 jours, 2010-07-18 → 2026-10-31)",
+          "basis": "MVRV 1,45 → médiane historique 1,71 (Q1 1,28, 5951 jours, 2010-07-18 → 2026-11-01)",
           "preuve": {
-            "valeur": 19.68,
+            "valeur": 18.02,
             "classe": "B",
             "classe_libelle": "calcul déterministe",
             "source": "Coin Metrics (MVRV) + historique",
-            "calcul": "médiane historique 1,71 / MVRV 1,43 − 1",
+            "calcul": "médiane historique 1,71 / MVRV 1,45 − 1",
             "reserves": [
               "l'ancre est MESURÉE (médiane de la distribution observée) ; qu'elle soit rejointe en 12 mois est la prémisse du moteur, non démontrable"
             ]
           }
         },
         "preuve": {
-          "valeur": 19.68,
+          "valeur": 18.02,
           "classe": "B",
           "classe_libelle": "calcul déterministe",
           "source": "Coin Metrics (MVRV) + historique",
-          "calcul": "médiane historique 1,71 / MVRV 1,43 − 1",
+          "calcul": "médiane historique 1,71 / MVRV 1,45 − 1",
           "reserves": [
             "l'ancre est MESURÉE (médiane de la distribution observée) ; qu'elle soit rejointe en 12 mois est la prémisse du moteur, non démontrable"
           ]
@@ -680,28 +694,28 @@
           ],
           "band_label": "normale",
           "kind": "core",
-          "usd": 163.0,
+          "usd": 162.0,
           "usd_band": [
-            163.0,
-            327.0
+            162.0,
+            325.0
           ],
           "basis": "le potentiel central couvre le requis ; l'ancre prudente ne le couvre pas"
         },
-        "excess_pct": 8.32,
-        "potential_effective_pct": 19.68,
-        "potential_conservative_effective_pct": -10.16,
-        "reason": "potentiel mesuré 19,7% ≥ requis 11,4% (coûts 0,6 + contrefactuel 5,0 + prime 5,8) · MVRV 1,43 → médiane historique 1,71 (Q1 1,28, 5950 jours, 2010-07-18 → 2026-10-31)"
+        "excess_pct": 6.66,
+        "potential_effective_pct": 18.02,
+        "potential_conservative_effective_pct": -11.4,
+        "reason": "potentiel mesuré 18,0% ≥ requis 11,4% (coûts 0,6 + contrefactuel 5,0 + prime 5,8) · MVRV 1,45 → médiane historique 1,71 (Q1 1,28, 5951 jours, 2010-07-18 → 2026-11-01)"
       },
-      "v33_reason": "potentiel mesuré 19,7% ≥ requis 11,4% (coûts 0,6 + contrefactuel 5,0 + prime 5,8) · MVRV 1,43 → médiane historique 1,71 (Q1 1,28, 5950 jours, 2010-07-18 → 2026-10-31)",
-      "current_price": 77759.0,
+      "v33_reason": "potentiel mesuré 18,0% ≥ requis 11,4% (coûts 0,6 + contrefactuel 5,0 + prime 5,8) · MVRV 1,45 → médiane historique 1,71 (Q1 1,28, 5951 jours, 2010-07-18 → 2026-11-01)",
+      "current_price": 78038.0,
       "priority": "action",
       "_expand": true,
       "conviction_delta": {
         "score": 1.0,
-        "prev_score": 6.0,
-        "prev_date": "2026-10-25",
-        "delta": -5.0,
-        "driver": "décote LT (PRU/drawdown) −3.0"
+        "prev_score": 3.0,
+        "prev_date": "2026-10-26",
+        "delta": -2.0,
+        "driver": "structure technique −2.0"
       }
     },
     {
@@ -712,38 +726,32 @@
       "action_type": "bullish",
       "thesis_type": "conviction",
       "reliability": "partielle",
-      "observation": "ETH se stabilise à 2 265,66 $ dans la zone médiane des bandes de Bollinger (2 445 $). Le cours évolue à proximité immédiate de sa valeur réalisée (2 213,43 $), offrant une opportunité d'accumulation long terme.",
-      "sources_timestamps": "CoinGecko 07h37 · Coin Metrics 31/10 · OKX 07h37",
+      "observation": "ETH s'échange à 2 281,19 $, en hausse de +0,67% sur 24h. Le cours se maintient au-dessus du Fibonacci 0.618 à 2 198 $, affichant un MVRV de 1,03 qui indique un prix spot quasi égal au prix réalisé du réseau (2 213,49 $).",
+      "sources_timestamps": "CoinGecko 07h36 · Coin Metrics 01/11 · OKX 07h36",
       "reasoning_signals": [
-        "1. MVRV à 1,02 proche de 1,0 : zone historique de sous-évaluation fondamentale idéale pour l'accumulation LT.",
-        "2. Décote de 27% par rapport au PRU (3 092,84 $) permettant d'optimiser le prix moyen pondéré du portefeuille.",
-        "3. Ratio Put/Call options à 0,54 traduisant une dominance des flux acheteurs sur les calls Deribit.",
-        "4. Activité dev maintenue avec 192 commits sur 30 jours sur les dépôts structurants."
+        "1. MVRV à 1,03 situant l'actif dans sa zone historique d'accumulation long terme au niveau du coût de revient du réseau (CoinMetrics).",
+        "2. Put/Call ratio de 0,55 sur Deribit reflétant un positionnement majoritairement acheteur sur les options (Deribit).",
+        "3. Position en portefeuille actuellement sous le PRU de 3 092,84 $, offrant une opportunité de lissage à long terme (Binance).",
+        "4. Activité de développement très forte avec 194 commits sur 30 jours et 42 contributeurs actifs (GitHub)."
       ],
-      "self_critique": "La baisse des adresses actives (-19,0% sur 7j) et un MACD daily baissier (-9,42) indiquent une absence de momentum immédiat.",
-      "macro_coherence": "Le régime Risk-Off pèse sur les valorisations tech, mais la proximité du prix réalisé limite le risque de baisse profonde sur ETH.",
-      "counter_thesis": "Une cassure nette du support Fibonacci 0,618 à 2 198 $ invaliderait le rebond et exposerait le niveau bas des bandes de Bollinger vers 2 006 $.",
-      "watch_trigger": null,
+      "self_critique": "La série de 23 jours consécutifs de sorties nettes sur les ETF spot ETH fragilise le momentum à court terme.",
+      "macro_coherence": "ETH souffre de la faiblesse sectorielle des L1 (-5,9% sur 7j) et d'un bêtas plus élevé que BTC face au resserrement de la BoJ.",
+      "counter_thesis": "La rupture du support de 2 198 $ (Fibonacci 0.618) invaliderait la structure de rebond et ouvrirait la voie vers la bande basse à 2 006 $.",
       "thesis_scoring": {
-        "score": 4,
-        "eligible": true,
+        "score": 3,
+        "eligible": false,
         "threshold": 2,
         "thesis_type": "conviction",
         "signals": [
           {
-            "label": "position sous PRU de 27% (opportunité de moyenner)",
+            "label": "position sous PRU de 26% (opportunité de moyenner)",
             "category": "fundamental_lt",
             "weight": 3
-          },
-          {
-            "label": "news récente sur l'actif",
-            "category": "short_term",
-            "weight": 1
           }
         ],
-        "dimensions_count": 2,
-        "families_count": 2,
-        "convergent": true,
+        "dimensions_count": 1,
+        "families_count": 1,
+        "convergent": false,
         "strong_fundamental_cluster": false,
         "fundamental_weight": 3,
         "completeness": {
@@ -771,16 +779,16 @@
         }
       },
       "action_plan": {
-        "entry": 2265.66,
+        "entry": 2281.19,
         "position_size_pct": 5.0,
-        "position_size_usd": 163,
+        "position_size_usd": 162,
         "sizing_note": "bande normale cœur 5–10 %"
       },
       "engine_view": {
         "asset": "ETH",
-        "price": 2265.66,
-        "potential_pct": 18.51,
-        "potential_conservative_pct": -5.23,
+        "price": 2281.19,
+        "potential_pct": 17.35,
+        "potential_conservative_pct": -6.15,
         "required_pct": 14.41,
         "required_class": "D",
         "costs_pct": 0.6,
@@ -788,7 +796,7 @@
         "risk_premium_pct": 8.81,
         "multiplier": 0.612,
         "anchor": "mvrv",
-        "basis": "MVRV 1,02 → médiane historique 1,21 (Q1 0,97, 4103 jours, 2015-08-08 → 2026-10-31)",
+        "basis": "MVRV 1,03 → médiane historique 1,21 (Q1 0,97, 4104 jours, 2015-08-08 → 2026-11-01)",
         "evidence_class": "B",
         "size_pct": 5.0,
         "size_band": [
@@ -797,23 +805,23 @@
         ],
         "size_band_label": "normale",
         "size_tier": "core",
-        "size_usd": 163.0,
+        "size_usd": 162.0,
         "size_usd_band": [
-          163.0,
-          327.0
+          162.0,
+          325.0
         ],
         "size_basis": "le potentiel central couvre le requis ; l'ancre prudente ne le couvre pas",
         "coverage_pct": 83,
-        "weight_pct": 20.84,
-        "effective_weight_pct": 19.09,
-        "beta_portfolio": 0.9162,
-        "implied_price": 2685.033666,
-        "required_price": 2592.1416059999997,
+        "weight_pct": 21.11,
+        "effective_weight_pct": 19.47,
+        "beta_portfolio": 0.9223,
+        "implied_price": 2676.976465,
+        "required_price": 2609.909479,
         "forecast_30d": {
           "horizon_days": 30,
-          "p10": 1876.2541411125378,
-          "p50": 2265.66,
-          "p90": 2735.8848266451923,
+          "p10": 1889.1016925830331,
+          "p50": 2281.19,
+          "p90": 2754.657325506193,
           "p10_pct": -17.2,
           "p90_pct": 20.8,
           "sigma_h_pct": 14.7,
@@ -821,9 +829,9 @@
         },
         "forecast_365d": {
           "horizon_days": 365,
-          "p10": 1173.5745435672484,
-          "p50": 2265.66,
-          "p90": 4374.000155113159,
+          "p10": 1181.5898972331238,
+          "p50": 2281.19,
+          "p90": 4404.089632355161,
           "p10_pct": -48.2,
           "p90_pct": 93.1,
           "sigma_h_pct": 51.3,
@@ -832,24 +840,24 @@
         "horizon_days": 365.0,
         "funding_case": "A",
         "sell_asset": null,
-        "reason": "potentiel mesuré 18,5% ≥ requis 14,4% (coûts 0,6 + contrefactuel 5,0 + prime 8,8) · MVRV 1,02 → médiane historique 1,21 (Q1 0,97, 4103 jours, 2015-08-08 → 2026-10-31)",
+        "reason": "potentiel mesuré 17,4% ≥ requis 14,4% (coûts 0,6 + contrefactuel 5,0 + prime 8,8) · MVRV 1,03 → médiane historique 1,21 (Q1 0,97, 4104 jours, 2015-08-08 → 2026-11-01)",
         "display": {
-          "band_30d": "1 876–2 736 $",
-          "band_365d": "1 174–4 374 $",
-          "implied": "2 685 $ (+18,5 %)",
-          "required_price": "2 592 $",
-          "pot_req": "+18,5 % / 14,4 %",
-          "potential": "+18,5 %",
-          "potential_conservative": "−5,2 %",
+          "band_30d": "1 889–2 755 $",
+          "band_365d": "1 182–4 404 $",
+          "implied": "2 677 $ (+17,4 %)",
+          "required_price": "2 610 $",
+          "pot_req": "+17,4 % / 14,4 %",
+          "potential": "+17,4 %",
+          "potential_conservative": "−6,2 %",
           "required": "14,4 %",
           "costs": "0,6 %",
           "benchmark": "5 %",
           "premium": "8,8 %",
           "size": "5–10 %",
-          "size_usd": "163–327 $",
-          "weight": "20,8 %",
-          "effective_weight": "19,1 %",
-          "row_note": "⚙ moteur · potentiel +18,5 % ≥ requis 14,4 % · MVRV 1,02 → médiane historique 1,21 (Q1 0,97, 4103 jours, 2015-08-08 → 2026-10-31)"
+          "size_usd": "162–325 $",
+          "weight": "21,1 %",
+          "effective_weight": "19,5 %",
+          "row_note": "⚙ moteur · potentiel +17,4 % ≥ requis 14,4 % · MVRV 1,03 → médiane historique 1,21 (Q1 0,97, 4104 jours, 2015-08-08 → 2026-11-01)"
         },
         "coverage_missing": [
           "sentiment"
@@ -877,9 +885,9 @@
             15.0,
             20.0
           ],
-          "weight_pct": 20.84,
-          "beta_portfolio": 0.9162,
-          "effective_weight_pct": 19.09
+          "weight_pct": 21.11,
+          "beta_portfolio": 0.9223,
+          "effective_weight_pct": 19.47
         },
         "required": {
           "required_pct": 14.41,
@@ -917,7 +925,7 @@
             "liquidity": {
               "value": 0.8,
               "measured": true,
-              "basis": "volume 24 h 4 339,7 M$ vs médiane 17,3 M$"
+              "basis": "volume 24 h 7 273,5 M$ vs médiane 10,5 M$"
             },
             "dilution": {
               "value": 1.5,
@@ -937,29 +945,29 @@
         },
         "potential": {
           "available": true,
-          "potential_pct": 18.51,
-          "potential_conservative_pct": -5.23,
+          "potential_pct": 17.35,
+          "potential_conservative_pct": -6.15,
           "anchor": "mvrv",
-          "anchor_value": 1.2088,
+          "anchor_value": 1.2087,
           "anchor_conservative_value": 0.9667,
-          "basis": "MVRV 1,02 → médiane historique 1,21 (Q1 0,97, 4103 jours, 2015-08-08 → 2026-10-31)",
+          "basis": "MVRV 1,03 → médiane historique 1,21 (Q1 0,97, 4104 jours, 2015-08-08 → 2026-11-01)",
           "preuve": {
-            "valeur": 18.51,
+            "valeur": 17.35,
             "classe": "B",
             "classe_libelle": "calcul déterministe",
             "source": "Coin Metrics (MVRV) + historique",
-            "calcul": "médiane historique 1,21 / MVRV 1,02 − 1",
+            "calcul": "médiane historique 1,21 / MVRV 1,03 − 1",
             "reserves": [
               "l'ancre est MESURÉE (médiane de la distribution observée) ; qu'elle soit rejointe en 12 mois est la prémisse du moteur, non démontrable"
             ]
           }
         },
         "preuve": {
-          "valeur": 18.51,
+          "valeur": 17.35,
           "classe": "B",
           "classe_libelle": "calcul déterministe",
           "source": "Coin Metrics (MVRV) + historique",
-          "calcul": "médiane historique 1,21 / MVRV 1,02 − 1",
+          "calcul": "médiane historique 1,21 / MVRV 1,03 − 1",
           "reserves": [
             "l'ancre est MESURÉE (médiane de la distribution observée) ; qu'elle soit rejointe en 12 mois est la prémisse du moteur, non démontrable"
           ]
@@ -973,27 +981,27 @@
           ],
           "band_label": "normale",
           "kind": "core",
-          "usd": 163.0,
+          "usd": 162.0,
           "usd_band": [
-            163.0,
-            327.0
+            162.0,
+            325.0
           ],
           "basis": "le potentiel central couvre le requis ; l'ancre prudente ne le couvre pas"
         },
-        "excess_pct": 4.1,
-        "potential_effective_pct": 18.51,
-        "potential_conservative_effective_pct": -5.23,
-        "reason": "potentiel mesuré 18,5% ≥ requis 14,4% (coûts 0,6 + contrefactuel 5,0 + prime 8,8) · MVRV 1,02 → médiane historique 1,21 (Q1 0,97, 4103 jours, 2015-08-08 → 2026-10-31)"
+        "excess_pct": 2.94,
+        "potential_effective_pct": 17.35,
+        "potential_conservative_effective_pct": -6.15,
+        "reason": "potentiel mesuré 17,4% ≥ requis 14,4% (coûts 0,6 + contrefactuel 5,0 + prime 8,8) · MVRV 1,03 → médiane historique 1,21 (Q1 0,97, 4104 jours, 2015-08-08 → 2026-11-01)"
       },
-      "v33_reason": "potentiel mesuré 18,5% ≥ requis 14,4% (coûts 0,6 + contrefactuel 5,0 + prime 8,8) · MVRV 1,02 → médiane historique 1,21 (Q1 0,97, 4103 jours, 2015-08-08 → 2026-10-31)",
-      "current_price": 2265.66,
+      "v33_reason": "potentiel mesuré 17,4% ≥ requis 14,4% (coûts 0,6 + contrefactuel 5,0 + prime 8,8) · MVRV 1,03 → médiane historique 1,21 (Q1 0,97, 4104 jours, 2015-08-08 → 2026-11-01)",
+      "current_price": 2281.19,
       "priority": "action",
       "_expand": true,
       "conviction_delta": {
-        "score": 4.0,
-        "prev_score": 8.0,
-        "prev_date": "2026-10-25",
-        "delta": -4.0,
+        "score": 3.0,
+        "prev_score": 9.0,
+        "prev_date": "2026-10-26",
+        "delta": -6.0,
         "driver": "structure technique −4.0"
       }
     }
@@ -1001,88 +1009,95 @@
   "thesis_empty_reason": "",
   "no_thesis_assets": [
     {
-      "asset": "RSR",
-      "real_confidence_pct": 72,
+      "asset": "TAO",
+      "real_confidence_pct": 65,
       "cap_pct": 75,
-      "why": "Funding très négatif (-72,7%/an) signalant un squeeze potentiel, mais pas de validation du moteur déterministe.",
-      "watch_level": "Au-dessus de 0,001565 $ (médiane Bollinger)"
+      "why": "Invalidation de prix à 292,09 $ franchie ; absence d'ancrage de valorisation mesurable.",
+      "watch_level": "Réintégration confirmée au-dessus de 250,00 $"
     },
     {
       "asset": "RENDER",
-      "real_confidence_pct": 68,
+      "real_confidence_pct": 65,
       "cap_pct": 75,
-      "why": "Fortement sous le PRU (-65%) et corrélé à NVDA (+0,40), mais secteur AI sous pression des indices US.",
-      "watch_level": "Franchissement confirmé des 1,64 $"
+      "why": "Sous-performance relative (-13,5% vs BTC sur 30j) et corrélation aux semi-conducteurs sous pression.",
+      "watch_level": "Support technique à 1,24 $"
     },
     {
-      "asset": "STX",
-      "real_confidence_pct": 65,
+      "asset": "LINK",
+      "real_confidence_pct": 60,
+      "cap_pct": 70,
+      "why": "Invalidation à 12,35 $ franchie ; pas de pair comparable direct pour la métrique MC/TVL.",
+      "watch_level": "Clôture D1 au-dessus du pivot à 12,50 $"
+    },
+    {
+      "asset": "JASMY",
+      "real_confidence_pct": 55,
       "cap_pct": 65,
-      "why": "Pump de +8,1% sur 24h mais absence de données dérivés pour valider la poursuite.",
-      "watch_level": "Rejet ou cassure de 0,3419 $"
+      "why": "Absence de données dérivés et faiblesse structurelle (-29% sur 30j).",
+      "watch_level": "Support à 0,00348 $"
     }
   ],
   "macro_impact": {
-    "intro": "La chute simultanée des indices US et la hausse des taux au Japon créent une tension de liquidité globale, défavorable aux actifs longue duration.",
+    "intro": "Le régime Risk-Off généralisé pèse de façon asymétrique sur le portefeuille en raison de son exposition aux actifs à fort bêta.",
     "exposed_positions": [
       {
-        "asset": "RENDER",
-        "driver": "Chute de NVDA (-4,2%) et AMD (-10,9%)",
-        "effect": "Pression baissière liée au bêta tech (corr 30j +0,40, β 1,44)"
+        "asset": "TAO",
+        "driver": "Baisse des valeurs tech (NVDA -4,2%, AMD -10,9%)",
+        "effect": "pression baissière continue sur le secteur IA (-22,8% sur 30j)"
       },
       {
-        "asset": "TAO",
-        "driver": "Aversion au risque globale / Risk-Off",
-        "effect": "Volatilité accrue sur le secteur IA décentralisée"
+        "asset": "ETH",
+        "driver": "Sorties nettes ETF et hausse des taux BoJ",
+        "effect": "faiblesse relative vs BTC (-6,9% sur 30j)"
       }
     ],
-    "implication": "Le bloc IA (TAO, RENDER, FET) constitue la zone la plus sensible au Risk-Off actuel ; BTC demeure l'ancrage le plus résilient."
+    "implication": "Le portefeuille 100% crypto subit directement la contraction de liquidité Risk-Off. Les lignes IA (TAO, RENDER, FET) restent les plus vulnérables si l'ISM Manufacturier déçoit cet après-midi."
   },
   "all_positions_summary": [
     {
       "asset": "ETH",
       "tier": 0,
-      "change_24h": 0.99195,
-      "change_7d": -3.4733,
-      "change_30d": -16.5632,
-      "price": 2265.66,
-      "volume_24h": 4339697305,
-      "comment": "4 signaux, biais baissier (1↑/3↓)",
-      "action_active": "RENFORCER",
-      "status_short": "🟢 4 signaux"
-    },
-    {
-      "asset": "BTC",
-      "tier": 0,
-      "change_24h": 0.53835,
-      "change_7d": -3.241,
-      "change_30d": -9.3635,
-      "price": 77759,
-      "volume_24h": 48395287599,
-      "comment": "2 signaux, biais haussier (2↑/0↓)",
+      "change_24h": 0.6651,
+      "change_7d": -1.7924,
+      "change_30d": -14.718,
+      "price": 2281.19,
+      "volume_24h": 7273521215,
+      "comment": "2 signaux, neutre (1↑/1↓)",
       "action_active": "RENFORCER",
       "status_short": "🟢 2 signaux"
     },
     {
+      "asset": "BTC",
+      "tier": 0,
+      "change_24h": 0.31192,
+      "change_7d": -2.5961,
+      "change_30d": -7.7286,
+      "price": 78038,
+      "volume_24h": 16891373674,
+      "comment": "5 signaux, biais haussier (3↑/2↓)",
+      "action_active": "RENFORCER",
+      "status_short": "🟢 5 signaux"
+    },
+    {
       "asset": "LINK",
       "tier": 1,
-      "change_24h": 2.7882,
-      "change_7d": 2.9527,
-      "change_30d": -18.5193,
-      "price": 11.74,
-      "volume_24h": 322404885,
-      "comment": "RAS · pas de signal notable · -78% sous ATH",
+      "change_24h": -3.67134,
+      "change_7d": -1.3421,
+      "change_30d": -19.4423,
+      "price": 11.31,
+      "volume_24h": 279732649,
+      "comment": "1 signaux, biais baissier (0↑/1↓) · -79% sous ATH",
       "action_active": "RENFORCER",
-      "status_short": "🟢 conviction"
+      "status_short": "🟢 1 signaux"
     },
     {
       "asset": "TAO",
       "tier": 1,
-      "change_24h": 0.39295,
-      "change_7d": -4.8102,
-      "change_30d": -23.0986,
-      "price": 237.1,
-      "volume_24h": 60200809,
+      "change_24h": -2.8278,
+      "change_7d": -8.7116,
+      "change_30d": -20.9801,
+      "price": 230.37,
+      "volume_24h": 67128420,
       "comment": "2 signaux, biais baissier (0↑/2↓)",
       "action_active": "RENFORCER",
       "status_short": "🟢 2 signaux"
@@ -1090,59 +1105,35 @@
     {
       "asset": "RSR",
       "tier": 1,
-      "change_24h": 5.77844,
-      "change_7d": -4.543,
-      "change_30d": -10.1549,
-      "price": 0.00155026,
-      "volume_24h": 61559823,
-      "comment": "1 signaux, biais haussier (1↑/0↓) · -99% sous ATH",
+      "change_24h": -7.53936,
+      "change_7d": -10.8779,
+      "change_30d": -15.5219,
+      "price": 0.00143131,
+      "volume_24h": 15229852,
+      "comment": "RAS · pas de signal notable · -99% sous ATH",
       "action_active": null,
       "status_short": ""
     },
     {
       "asset": "ANKR",
       "tier": 1,
-      "change_24h": 3.08558,
-      "change_7d": -8.5449,
-      "change_30d": -20.2953,
-      "price": 0.00398627,
-      "volume_24h": 4856800,
+      "change_24h": -3.73829,
+      "change_7d": -5.2404,
+      "change_30d": -22.698,
+      "price": 0.00383759,
+      "volume_24h": 3892898,
       "comment": "RAS · pas de signal notable · -98% sous ATH",
-      "action_active": null,
-      "status_short": ""
-    },
-    {
-      "asset": "JASMY",
-      "tier": 1,
-      "change_24h": -1.79976,
-      "change_7d": -15.0854,
-      "change_30d": -32.2153,
-      "price": 0.00373955,
-      "volume_24h": 9143319,
-      "comment": "1 signaux, biais baissier (0↑/1↓) · -100% sous ATH",
-      "action_active": null,
-      "status_short": ""
-    },
-    {
-      "asset": "INJ",
-      "tier": 1,
-      "change_24h": 1.68738,
-      "change_7d": -5.2053,
-      "change_30d": -2.5066,
-      "price": 7.25,
-      "volume_24h": 72114734,
-      "comment": "RAS · pas de signal notable · -86% sous ATH",
       "action_active": null,
       "status_short": ""
     },
     {
       "asset": "CKB",
       "tier": 1,
-      "change_24h": 1.45335,
-      "change_7d": -13.9728,
-      "change_30d": -5.9012,
-      "price": 0.00123844,
-      "volume_24h": 989008,
+      "change_24h": -2.96861,
+      "change_7d": -13.5524,
+      "change_30d": -8.4497,
+      "price": 0.00120163,
+      "volume_24h": 1326253,
       "comment": "1 signaux, biais baissier (0↑/1↓) · -97% sous ATH",
       "action_active": null,
       "status_short": ""
@@ -1150,11 +1141,11 @@
     {
       "asset": "1000SATS",
       "tier": 1,
-      "change_24h": 0.46348,
-      "change_7d": -6.0762,
-      "change_30d": -25.5656,
-      "price": 9.5e-06,
-      "volume_24h": 282121,
+      "change_24h": -2.40933,
+      "change_7d": -6.9623,
+      "change_30d": -25.6124,
+      "price": 9.27e-06,
+      "volume_24h": 288690,
       "comment": "1 signaux, biais haussier (1↑/0↓) · -99% sous ATH",
       "action_active": null,
       "status_short": ""
@@ -1162,47 +1153,95 @@
     {
       "asset": "RENDER",
       "tier": 1,
-      "change_24h": -0.39389,
-      "change_7d": -6.6906,
-      "change_30d": -20.0252,
-      "price": 1.57,
-      "volume_24h": 25482425,
+      "change_24h": -0.98613,
+      "change_7d": -9.5337,
+      "change_30d": -20.5076,
+      "price": 1.56,
+      "volume_24h": 22656627,
       "comment": "2 signaux, biais baissier (0↑/2↓) · -88% sous ATH",
       "action_active": null,
       "status_short": ""
     },
     {
-      "asset": "STX",
+      "asset": "INJ",
+      "tier": 1,
+      "change_24h": -0.53188,
+      "change_7d": -6.5617,
+      "change_30d": -7.4819,
+      "price": 7.22,
+      "volume_24h": 51308718,
+      "comment": "1 signaux, biais baissier (0↑/1↓) · -86% sous ATH",
+      "action_active": null,
+      "status_short": ""
+    },
+    {
+      "asset": "JASMY",
+      "tier": 1,
+      "change_24h": 0.23326,
+      "change_7d": -13.1361,
+      "change_30d": -29.0543,
+      "price": 0.00374874,
+      "volume_24h": 5843881,
+      "comment": "1 signaux, biais baissier (0↑/1↓) · -100% sous ATH",
+      "action_active": null,
+      "status_short": ""
+    },
+    {
+      "asset": "FET",
       "tier": 2,
-      "change_24h": 8.11432,
-      "change_7d": 8.3846,
-      "change_30d": -13.5611,
-      "price": 0.327858,
-      "volume_24h": 79247394,
-      "comment": "2 signaux, biais haussier (2↑/0↓) · -92% sous ATH",
+      "change_24h": -2.69093,
+      "change_7d": -9.5649,
+      "change_30d": -27.0333,
+      "price": 0.159269,
+      "volume_24h": 44306651,
+      "comment": "RAS · pas de signal notable · -95% sous ATH",
       "action_active": null,
       "status_short": ""
     },
     {
       "asset": "ATOM",
       "tier": 2,
-      "change_24h": -1.33547,
-      "change_7d": -7.7097,
-      "change_30d": -13.7502,
-      "price": 1.49,
-      "volume_24h": 26622770,
+      "change_24h": -2.66526,
+      "change_7d": -11.8678,
+      "change_30d": -13.604,
+      "price": 1.45,
+      "volume_24h": 36826305,
       "comment": "1 signaux, biais haussier (1↑/0↓) · -97% sous ATH",
+      "action_active": null,
+      "status_short": ""
+    },
+    {
+      "asset": "IMX",
+      "tier": 2,
+      "change_24h": -2.47611,
+      "change_7d": -13.9361,
+      "change_30d": -35.5583,
+      "price": 0.120202,
+      "volume_24h": 4304092,
+      "comment": "RAS · pas de signal notable · -99% sous ATH",
+      "action_active": null,
+      "status_short": ""
+    },
+    {
+      "asset": "ACH",
+      "tier": 2,
+      "change_24h": -2.19909,
+      "change_7d": -7.2091,
+      "change_30d": -26.5956,
+      "price": 0.00465473,
+      "volume_24h": 1754197,
+      "comment": "RAS · pas de signal notable · -98% sous ATH",
       "action_active": null,
       "status_short": ""
     },
     {
       "asset": "CFX",
       "tier": 2,
-      "change_24h": 1.01979,
-      "change_7d": -1.9493,
-      "change_30d": -14.0154,
-      "price": 0.04667498,
-      "volume_24h": 2237217,
+      "change_24h": -1.64876,
+      "change_7d": -2.2102,
+      "change_30d": -13.6197,
+      "price": 0.04590254,
+      "volume_24h": 2031123,
       "comment": "RAS · pas de signal notable · -97% sous ATH",
       "action_active": null,
       "status_short": ""
@@ -1210,155 +1249,131 @@
     {
       "asset": "HBAR",
       "tier": 2,
-      "change_24h": 0.83499,
-      "change_7d": -6.6833,
-      "change_30d": -30.8542,
-      "price": 0.071953,
-      "volume_24h": 43509389,
-      "comment": "1 signaux, biais haussier (1↑/0↓) · -87% sous ATH",
+      "change_24h": -1.29649,
+      "change_7d": -8.3764,
+      "change_30d": -30.1187,
+      "price": 0.071005,
+      "volume_24h": 38788006,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -88% sous ATH",
+      "action_active": null,
+      "status_short": ""
+    },
+    {
+      "asset": "STX",
+      "tier": 2,
+      "change_24h": -0.6515,
+      "change_7d": 7.2714,
+      "change_30d": -11.7384,
+      "price": 0.326123,
+      "volume_24h": 22422932,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -92% sous ATH",
       "action_active": null,
       "status_short": ""
     },
     {
       "asset": "XRP",
       "tier": 2,
-      "change_24h": 0.42679,
-      "change_7d": -3.5362,
-      "change_30d": -17.3637,
+      "change_24h": -0.10949,
+      "change_7d": -3.2048,
+      "change_30d": -15.8875,
       "price": 1.25,
-      "volume_24h": 699850506,
+      "volume_24h": 1069137860,
       "comment": "1 signaux, biais haussier (1↑/0↓)",
-      "action_active": null,
-      "status_short": ""
-    },
-    {
-      "asset": "FET",
-      "tier": 2,
-      "change_24h": 0.4265,
-      "change_7d": -7.2025,
-      "change_30d": -30.3632,
-      "price": 0.163641,
-      "volume_24h": 60339000,
-      "comment": "RAS · pas de signal notable · -95% sous ATH",
-      "action_active": null,
-      "status_short": ""
-    },
-    {
-      "asset": "ACH",
-      "tier": 2,
-      "change_24h": -0.20534,
-      "change_7d": -7.4586,
-      "change_30d": -23.9758,
-      "price": 0.00475976,
-      "volume_24h": 1899828,
-      "comment": "1 signaux, biais haussier (1↑/0↓) · -98% sous ATH",
-      "action_active": null,
-      "status_short": ""
-    },
-    {
-      "asset": "IMX",
-      "tier": 2,
-      "change_24h": 0.18161,
-      "change_7d": -12.3063,
-      "change_30d": -29.1515,
-      "price": 0.123246,
-      "volume_24h": 3775269,
-      "comment": "RAS · pas de signal notable · -99% sous ATH",
-      "action_active": null,
-      "status_short": ""
-    },
-    {
-      "asset": "ZK",
-      "tier": 3,
-      "change_24h": 2.22987,
-      "change_7d": -13.9099,
-      "change_30d": -20.4656,
-      "price": 0.01042901,
-      "volume_24h": 6030073,
-      "comment": "RAS · pas de signal notable · -97% sous ATH",
-      "action_active": null,
-      "status_short": ""
-    },
-    {
-      "asset": "AXL",
-      "tier": 3,
-      "change_24h": -1.82626,
-      "change_7d": -7.1846,
-      "change_30d": -12.4755,
-      "price": 0.04546098,
-      "volume_24h": 6164692,
-      "comment": "RAS · pas de signal notable · -98% sous ATH",
-      "action_active": null,
-      "status_short": ""
-    },
-    {
-      "asset": "ARB",
-      "tier": 3,
-      "change_24h": 1.51625,
-      "change_7d": -0.9991,
-      "change_30d": -19.4014,
-      "price": 0.164029,
-      "volume_24h": 80870384,
-      "comment": "RAS · pas de signal notable · -93% sous ATH",
-      "action_active": null,
-      "status_short": ""
-    },
-    {
-      "asset": "W",
-      "tier": 3,
-      "change_24h": 1.13963,
-      "change_7d": -5.6483,
-      "change_30d": -15.3447,
-      "price": 0.01146339,
-      "volume_24h": 3945065,
-      "comment": "1 signaux, biais haussier (1↑/0↓) · -99% sous ATH",
       "action_active": null,
       "status_short": ""
     },
     {
       "asset": "NOT",
       "tier": 3,
-      "change_24h": 0.36281,
-      "change_7d": -2.2091,
-      "change_30d": -26.9971,
-      "price": 0.00036619,
-      "volume_24h": 2451618,
-      "comment": "1 signaux, biais haussier (1↑/0↓) · -99% sous ATH",
+      "change_24h": -3.90094,
+      "change_7d": -4.9597,
+      "change_30d": -31.2136,
+      "price": 0.00035225,
+      "volume_24h": 2704331,
+      "comment": "RAS · pas de signal notable · -99% sous ATH",
       "action_active": null,
       "status_short": ""
     },
     {
-      "asset": "GRT",
+      "asset": "AXL",
       "tier": 3,
-      "change_24h": 0.28575,
-      "change_7d": -10.2085,
-      "change_30d": -29.362,
-      "price": 0.02035762,
-      "volume_24h": 4538685,
-      "comment": "RAS · pas de signal notable · -99% sous ATH",
+      "change_24h": -3.3687,
+      "change_7d": -9.6252,
+      "change_30d": -17.3436,
+      "price": 0.04391605,
+      "volume_24h": 2301237,
+      "comment": "RAS · pas de signal notable · -98% sous ATH",
+      "action_active": null,
+      "status_short": ""
+    },
+    {
+      "asset": "W",
+      "tier": 3,
+      "change_24h": -3.35258,
+      "change_7d": -6.5199,
+      "change_30d": -18.153,
+      "price": 0.01107856,
+      "volume_24h": 4430364,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -99% sous ATH",
       "action_active": null,
       "status_short": ""
     },
     {
       "asset": "AR",
       "tier": 3,
-      "change_24h": 0.26418,
-      "change_7d": -6.5495,
-      "change_30d": -28.2799,
-      "price": 3.16,
-      "volume_24h": 4326120,
-      "comment": "1 signaux, biais haussier (1↑/0↓) · -96% sous ATH",
+      "change_24h": -3.1825,
+      "change_7d": -9.7352,
+      "change_30d": -28.3922,
+      "price": 3.06,
+      "volume_24h": 4800966,
+      "comment": "1 signaux, biais haussier (1↑/0↓) · -97% sous ATH",
+      "action_active": null,
+      "status_short": ""
+    },
+    {
+      "asset": "ZK",
+      "tier": 3,
+      "change_24h": -2.75243,
+      "change_7d": -14.5592,
+      "change_30d": -17.711,
+      "price": 0.01016597,
+      "volume_24h": 4133628,
+      "comment": "RAS · pas de signal notable · -97% sous ATH",
+      "action_active": null,
+      "status_short": ""
+    },
+    {
+      "asset": "GRT",
+      "tier": 3,
+      "change_24h": -2.39358,
+      "change_7d": -11.5942,
+      "change_30d": -30.4038,
+      "price": 0.01986743,
+      "volume_24h": 4521600,
+      "comment": "RAS · pas de signal notable · -99% sous ATH",
+      "action_active": null,
+      "status_short": ""
+    },
+    {
+      "asset": "ARB",
+      "tier": 3,
+      "change_24h": -1.97313,
+      "change_7d": -5.1361,
+      "change_30d": -18.6727,
+      "price": 0.160843,
+      "volume_24h": 110431845,
+      "comment": "RAS · pas de signal notable · -93% sous ATH",
       "action_active": null,
       "status_short": ""
     },
     {
       "asset": "ADA",
       "tier": 3,
-      "change_24h": -0.15043,
-      "change_7d": -6.2284,
-      "change_30d": -23.7253,
-      "price": 0.193099,
-      "volume_24h": 131803989,
+      "change_24h": -1.23877,
+      "change_7d": -6.7512,
+      "change_30d": -22.6017,
+      "price": 0.190656,
+      "volume_24h": 155492862,
       "comment": "1 signaux, biais haussier (1↑/0↓) · -94% sous ATH",
       "action_active": null,
       "status_short": ""
@@ -1366,11 +1381,11 @@
     {
       "asset": "SXT",
       "tier": 4,
-      "change_24h": 0.19554,
-      "change_7d": -2.8228,
-      "change_30d": -15.0804,
-      "price": 0.00818759,
-      "volume_24h": 1059940,
+      "change_24h": -2.03275,
+      "change_7d": -3.1868,
+      "change_30d": -13.7879,
+      "price": 0.00801862,
+      "volume_24h": 1127306,
       "comment": "RAS · pas de signal notable · -95% sous ATH",
       "action_active": null,
       "status_short": ""
@@ -1413,46 +1428,27 @@
     "regime": "risk-off",
     "confidence_pct": 85,
     "drivers": [
-      "Chute du Nasdaq (-747.73)",
-      "VIX en hausse (+2.22)",
-      "Relèvement du taux BoJ (+0.066)",
-      "Chute du S&P 500 (-140.32)"
+      "S&P 500 en baisse (Δ-140.32)",
+      "Nasdaq en baisse (Δ-747.70)",
+      "VIX en hausse (Δ+2.22)",
+      "Taux BoJ en hausse (Δ+0.066)",
+      "Fear & Greed 37 (Peur)"
     ],
     "crypto_bias": "défavorable",
-    "rate_path_read": "L'inflation CPI et Core PCE restent élevées (4.0% et 3.1% avec une légère hausse), tandis que le chômage US est à 4.20% et la création d'emplois non-agricoles ralentit (+29,000k), suggérant que la Fed pourrait maintenir une posture prudente, ce qui implique une pression neutre à légèrement baissière sur les actifs risqués.",
+    "rate_path_read": "Malgré un chômage US stable à 4.20% et une croissance de l'emploi, l'inflation (CPI 4.0%, Core PCE 3.1%) reste élevée, suggérant que la Fed maintiendra une posture prudente sans hâte de baisser les taux, d'autant que la BoJ a relevé son taux, ajoutant une pression de resserrement global.",
     "key_risks": [
-      "Congressional Elections (US) dans 2j",
-      "JOLTS Job Openings (US) dans 2j",
-      "ISM Manufacturing PMI (US) demain"
+      "Résultats de l'ISM Manufacturing PMI (US) aujourd'hui",
+      "Impact des élections du Congrès (US) demain",
+      "Effets du relèvement du taux BoJ sur la liquidité globale"
     ],
-    "synthesis": "Le régime de marché macro est clairement orienté risk-off, marqué par une chute généralisée des marchés actions mondiaux (Nasdaq, S&P 500, Nikkei, Stoxx 50, DAX) et une hausse du VIX, signalant une augmentation de la peur et de la volatilité. Le relèvement du taux de la BoJ agit comme un vent contraire majeur pour les actifs risqués. Bien que la courbe des taux US reste positive et que le DXY soit en légère hausse avec un lien ténu au BTC, ces éléments ne compensent pas le sentiment baissier dominant."
+    "synthesis": "Le marché est clairement en régime de 'risk-off' avec une baisse généralisée des actions mondiales (S&P, Nasdaq, Nikkei, Stoxx50, DAX), une hausse du VIX et de l'or, et un sentiment de 'Peur' (Fear & Greed 37). Le relèvement du taux de la BoJ ajoute une pression baissière significative sur les actifs risqués. Bien que les corrélations BTC/macro soient ténues, le contexte macroéconomique global est défavorable."
   },
   "macro_agenda": {
     "available": true,
     "events": [
       {
-        "label": "ISM Manufacturing PMI (US)",
-        "when": "demain",
-        "date_label": "lundi 2 novembre",
-        "time": "15:00",
-        "importance": "medium",
-        "forecast": "54.7",
-        "previous": "54.5",
-        "estimated": false
-      },
-      {
-        "label": "JOLTS Job Openings (US)",
-        "when": "dans 2j",
-        "date_label": "mardi 3 novembre",
-        "time": "15:00",
-        "importance": "medium",
-        "forecast": "7.11M",
-        "previous": "7.08M",
-        "estimated": false
-      },
-      {
         "label": "Congressional Elections (US)",
-        "when": "dans 2j",
+        "when": "demain",
         "date_label": "mardi 3 novembre",
         "time": "15:16",
         "importance": "high",
@@ -1461,23 +1457,53 @@
         "estimated": false
       },
       {
-        "label": "Core CPI Flash Estimate y/y (Zone euro)",
+        "label": "BOE Monetary Policy Report (UK)",
         "when": "dans 3j",
-        "date_label": "mercredi 4 novembre",
-        "time": "10:00",
-        "importance": "medium",
-        "forecast": "2.5%",
-        "previous": "2.5%",
+        "date_label": "jeudi 5 novembre",
+        "time": "12:00",
+        "importance": "high",
+        "forecast": null,
+        "previous": null,
         "estimated": false
       },
       {
-        "label": "ISM Services PMI (US)",
+        "label": "MPC Official Bank Rate Votes (UK)",
         "when": "dans 3j",
-        "date_label": "mercredi 4 novembre",
-        "time": "15:00",
-        "importance": "medium",
-        "forecast": "54.9",
-        "previous": "54.9",
+        "date_label": "jeudi 5 novembre",
+        "time": "12:00",
+        "importance": "high",
+        "forecast": "7-0-2",
+        "previous": "3-0-6",
+        "estimated": false
+      },
+      {
+        "label": "Monetary Policy Summary (UK)",
+        "when": "dans 3j",
+        "date_label": "jeudi 5 novembre",
+        "time": "12:00",
+        "importance": "high",
+        "forecast": null,
+        "previous": null,
+        "estimated": false
+      },
+      {
+        "label": "Official Bank Rate (UK)",
+        "when": "dans 3j",
+        "date_label": "jeudi 5 novembre",
+        "time": "12:00",
+        "importance": "high",
+        "forecast": "4.00%",
+        "previous": "3.75%",
+        "estimated": false
+      },
+      {
+        "label": "BOE Gov Bailey Speaks (UK)",
+        "when": "dans 3j",
+        "date_label": "jeudi 5 novembre",
+        "time": "12:30",
+        "importance": "high",
+        "forecast": null,
+        "previous": null,
         "estimated": false
       }
     ]
@@ -1557,18 +1583,18 @@
       {
         "equity": "NVDA",
         "crypto": "TAO",
-        "corr": 0.12,
+        "corr": 0.11,
         "mechanism": "cycle d'investissement IA",
         "significant": false,
-        "reading": "corr 30j +0.12 — lien cycle d'investissement IA non significatif sur la fenêtre"
+        "reading": "corr 30j +0.11 — lien cycle d'investissement IA non significatif sur la fenêtre"
       },
       {
         "equity": "TSM",
         "crypto": "TAO",
-        "corr": 0.09,
+        "corr": 0.11,
         "mechanism": "amont fonderie des puces IA",
         "significant": false,
-        "reading": "corr 30j +0.09 — lien amont fonderie des puces IA non significatif sur la fenêtre"
+        "reading": "corr 30j +0.11 — lien amont fonderie des puces IA non significatif sur la fenêtre"
       }
     ],
     "summary_line": "NVDA↔RENDER corr 30j +0.40 · β 1.44 — demande GPU / calcul IA"
@@ -1614,23 +1640,23 @@
   "crypto_price_status": {
     "BTC": {
       "status": "confirmed",
-      "gap_pct": 0.0,
+      "gap_pct": 0.1,
       "sources": [
         "CoinGecko",
         "CoinMarketCap",
         "Yahoo"
       ],
-      "price": 77759.0
+      "price": 78038.0
     },
     "ETH": {
       "status": "confirmed",
-      "gap_pct": 0.0,
+      "gap_pct": 0.1,
       "sources": [
         "CoinGecko",
         "CoinMarketCap",
         "Yahoo"
       ],
-      "price": 2265.66
+      "price": 2281.19
     },
     "XRP": {
       "status": "confirmed",
@@ -1650,36 +1676,36 @@
         "CoinMarketCap",
         "Yahoo"
       ],
-      "price": 11.74
+      "price": 11.31
     },
     "ADA": {
       "status": "confirmed",
-      "gap_pct": 0.1,
+      "gap_pct": 0.2,
       "sources": [
         "CoinGecko",
         "CoinMarketCap",
         "Yahoo"
       ],
-      "price": 0.193099
+      "price": 0.190656
     },
     "HBAR": {
       "status": "confirmed",
-      "gap_pct": 0.1,
+      "gap_pct": 0.2,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.071953
+      "price": 0.071005
     },
     "TAO": {
       "status": "confirmed",
-      "gap_pct": 0.1,
+      "gap_pct": 0.2,
       "sources": [
         "CoinGecko",
         "CoinMarketCap",
         "Yahoo"
       ],
-      "price": 237.1
+      "price": 230.37
     },
     "ARB": {
       "status": "confirmed",
@@ -1688,55 +1714,55 @@
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.164029
+      "price": 0.160843
     },
     "RENDER": {
       "status": "confirmed",
-      "gap_pct": 0.1,
+      "gap_pct": 0.4,
       "sources": [
         "CoinGecko",
         "CoinMarketCap",
         "Yahoo"
       ],
-      "price": 1.57
+      "price": 1.56
     },
     "ATOM": {
       "status": "confirmed",
-      "gap_pct": 0.0,
+      "gap_pct": 0.7,
       "sources": [
         "CoinGecko",
         "CoinMarketCap",
         "Yahoo"
       ],
-      "price": 1.49
+      "price": 1.45
     },
     "INJ": {
       "status": "confirmed",
-      "gap_pct": 0.0,
+      "gap_pct": 0.6,
       "sources": [
         "CoinGecko",
         "CoinMarketCap",
         "Yahoo"
       ],
-      "price": 7.25
+      "price": 7.22
     },
     "STX": {
-      "status": "confirmed",
-      "gap_pct": 0.1,
-      "sources": [
-        "CoinGecko",
-        "CoinMarketCap"
-      ],
-      "price": 0.327858
-    },
-    "FET": {
       "status": "confirmed",
       "gap_pct": 0.0,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.163641
+      "price": 0.326123
+    },
+    "FET": {
+      "status": "confirmed",
+      "gap_pct": 0.3,
+      "sources": [
+        "CoinGecko",
+        "CoinMarketCap"
+      ],
+      "price": 0.159269
     },
     "CFX": {
       "status": "confirmed",
@@ -1745,25 +1771,25 @@
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.04667498
+      "price": 0.04590254
     },
     "GRT": {
       "status": "confirmed",
-      "gap_pct": 0.1,
+      "gap_pct": 0.0,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.02035762
+      "price": 0.01986743
     },
     "AR": {
       "status": "confirmed",
-      "gap_pct": 0.1,
+      "gap_pct": 0.0,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 3.16
+      "price": 3.06
     },
     "JASMY": {
       "status": "confirmed",
@@ -1772,16 +1798,16 @@
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.00373955
+      "price": 0.00374874
     },
     "ZK": {
       "status": "confirmed",
-      "gap_pct": 0.2,
+      "gap_pct": 0.1,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.01042901
+      "price": 0.01016597
     },
     "IMX": {
       "status": "confirmed",
@@ -1790,25 +1816,25 @@
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.123246
+      "price": 0.120202
     },
     "RSR": {
       "status": "confirmed",
-      "gap_pct": 0.4,
+      "gap_pct": 0.0,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.00155026
+      "price": 0.00143131
     },
     "W": {
       "status": "confirmed",
-      "gap_pct": 0.6,
+      "gap_pct": 0.8,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.01146339
+      "price": 0.01107856
     },
     "CKB": {
       "status": "confirmed",
@@ -1817,34 +1843,34 @@
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.00123844
+      "price": 0.00120163
     },
     "AXL": {
       "status": "confirmed",
-      "gap_pct": 0.2,
+      "gap_pct": 0.0,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.04546098
+      "price": 0.04391605
     },
     "ANKR": {
       "status": "confirmed",
-      "gap_pct": 0.1,
+      "gap_pct": 0.0,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.00398627
+      "price": 0.00383759
     },
     "SXT": {
       "status": "confirmed",
-      "gap_pct": 1.2,
+      "gap_pct": 0.4,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.00818759
+      "price": 0.00801862
     },
     "NOT": {
       "status": "confirmed",
@@ -1853,16 +1879,16 @@
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.00036619
+      "price": 0.00035225
     },
     "ACH": {
       "status": "confirmed",
-      "gap_pct": 0.1,
+      "gap_pct": 0.2,
       "sources": [
         "CoinGecko",
         "CoinMarketCap"
       ],
-      "price": 0.00475976
+      "price": 0.00465473
     },
     "1000SATS": {
       "status": "single",
@@ -1870,13 +1896,13 @@
       "sources": [
         "CoinGecko"
       ],
-      "price": 9.5e-06
+      "price": 9.27e-06
     }
   },
   "macro_source_status": {
     "gold_usd": "single",
-    "brent_usd": "confirmed",
-    "wti_usd": "single",
+    "brent_usd": "single",
+    "wti_usd": "confirmed",
     "sp500": "confirmed",
     "nasdaq": "confirmed",
     "vix": "single",
@@ -1894,263 +1920,263 @@
   "portfolio_heatmap": {
     "cells": [
       {
-        "symbol": "BTC",
-        "value_usd": 1408.99,
-        "change_24h": 0.53835,
-        "ptf_pct": 43.1
-      },
-      {
-        "symbol": "ETH",
-        "value_usd": 680.6,
-        "change_24h": 0.99195,
-        "ptf_pct": 20.8
-      },
-      {
-        "symbol": "STX",
-        "value_usd": 76.16,
-        "change_24h": 8.11432,
-        "ptf_pct": 2.3
+        "symbol": "TAO",
+        "value_usd": 368.59,
+        "change_24h": -2.8278,
+        "ptf_pct": 11.4
       },
       {
         "symbol": "RSR",
-        "value_usd": 66.19,
-        "change_24h": 5.77844,
-        "ptf_pct": 2.0
+        "value_usd": 61.11,
+        "change_24h": -7.53936,
+        "ptf_pct": 1.9
+      },
+      {
+        "symbol": "ETH",
+        "value_usd": 685.27,
+        "change_24h": 0.6651,
+        "ptf_pct": 21.1
+      },
+      {
+        "symbol": "BTC",
+        "value_usd": 1414.05,
+        "change_24h": 0.31192,
+        "ptf_pct": 43.6
       },
       {
         "symbol": "LINK",
-        "value_usd": 93.8,
-        "change_24h": 2.7882,
-        "ptf_pct": 2.9
+        "value_usd": 90.37,
+        "change_24h": -3.67134,
+        "ptf_pct": 2.8
       },
       {
         "symbol": "ANKR",
-        "value_usd": 53.23,
-        "change_24h": 3.08558,
-        "ptf_pct": 1.6
-      },
-      {
-        "symbol": "TAO",
-        "value_usd": 379.36,
-        "change_24h": 0.39295,
-        "ptf_pct": 11.6
-      },
-      {
-        "symbol": "INJ",
-        "value_usd": 73.01,
-        "change_24h": 1.68738,
-        "ptf_pct": 2.2
-      },
-      {
-        "symbol": "JASMY",
-        "value_usd": 52.46,
-        "change_24h": -1.79976,
+        "value_usd": 51.25,
+        "change_24h": -3.73829,
         "ptf_pct": 1.6
       },
       {
         "symbol": "CKB",
-        "value_usd": 61.98,
-        "change_24h": 1.45335,
+        "value_usd": 60.14,
+        "change_24h": -2.96861,
         "ptf_pct": 1.9
       },
       {
-        "symbol": "CFX",
-        "value_usd": 31.32,
-        "change_24h": 1.01979,
-        "ptf_pct": 1.0
-      },
-      {
-        "symbol": "ATOM",
-        "value_usd": 23.5,
-        "change_24h": -1.33547,
-        "ptf_pct": 0.7
-      },
-      {
-        "symbol": "ARB",
-        "value_usd": 16.81,
-        "change_24h": 1.51625,
-        "ptf_pct": 0.5
+        "symbol": "FET",
+        "value_usd": 29.66,
+        "change_24h": -2.69093,
+        "ptf_pct": 0.9
       },
       {
         "symbol": "RENDER",
-        "value_usd": 62.17,
-        "change_24h": -0.39389,
+        "value_usd": 61.78,
+        "change_24h": -0.98613,
         "ptf_pct": 1.9
       },
       {
-        "symbol": "XRP",
-        "value_usd": 44.19,
-        "change_24h": 0.42679,
-        "ptf_pct": 1.4
+        "symbol": "ATOM",
+        "value_usd": 22.87,
+        "change_24h": -2.66526,
+        "ptf_pct": 0.7
+      },
+      {
+        "symbol": "STX",
+        "value_usd": 75.76,
+        "change_24h": -0.6515,
+        "ptf_pct": 2.3
+      },
+      {
+        "symbol": "CFX",
+        "value_usd": 30.8,
+        "change_24h": -1.64876,
+        "ptf_pct": 0.9
+      },
+      {
+        "symbol": "INJ",
+        "value_usd": 72.71,
+        "change_24h": -0.53188,
+        "ptf_pct": 2.2
+      },
+      {
+        "symbol": "ACH",
+        "value_usd": 16.6,
+        "change_24h": -2.19909,
+        "ptf_pct": 0.5
+      },
+      {
+        "symbol": "ARB",
+        "value_usd": 16.49,
+        "change_24h": -1.97313,
+        "ptf_pct": 0.5
       }
     ],
     "total_count": 28,
     "remaining": 13,
     "extra": {
       "count": 13,
-      "value_usd": 141.84,
-      "ptf_pct": 4.3,
-      "avg_change_24h": 0.3
+      "value_usd": 188.96,
+      "ptf_pct": 5.8,
+      "avg_change_24h": -1.1
     }
   },
   "market_movers": {
     "available": true,
     "gainers": [
       {
-        "symbol": "BEAM",
-        "name": "Beam",
-        "change_1h": 7.6,
-        "change_24h": 26.3,
-        "change_7d": 100.5,
-        "change_30d": 195.6,
-        "rank": 130,
-        "market_cap": 315887940.0
-      },
-      {
-        "symbol": "LIT",
-        "name": "Lighter",
-        "change_1h": -1.5,
-        "change_24h": 14.8,
-        "change_7d": -3.8,
-        "change_30d": -19.1,
-        "rank": 83,
-        "market_cap": 776393496.0
-      },
-      {
-        "symbol": "ALEO",
-        "name": "ALEO",
-        "change_1h": -0.0,
-        "change_24h": 13.5,
-        "change_7d": -1.0,
-        "change_30d": 12.6,
-        "rank": 412,
-        "market_cap": 50000590.0
-      }
-    ],
-    "losers": [
-      {
-        "symbol": "AKE",
-        "name": "Akedo",
-        "change_1h": -3.4,
-        "change_24h": -19.7,
-        "change_7d": -67.9,
-        "change_30d": -70.1,
-        "rank": 160,
-        "market_cap": 215901973.0
-      },
-      {
-        "symbol": "CAP",
-        "name": "Cap",
-        "change_1h": 0.7,
-        "change_24h": -18.4,
-        "change_7d": -21.4,
-        "change_30d": 4.3,
-        "rank": 243,
-        "market_cap": 112384344.0
+        "symbol": "IDOL",
+        "name": "MEET48",
+        "change_1h": 0.1,
+        "change_24h": 32.8,
+        "change_7d": 232.8,
+        "change_30d": 143.3,
+        "rank": 379,
+        "market_cap": 55267478.0
       },
       {
         "symbol": "HASH",
         "name": "Provenance Blockchain",
-        "change_1h": -0.7,
-        "change_24h": -15.0,
-        "change_7d": -1.2,
-        "change_30d": 8.9,
-        "rank": 120,
-        "market_cap": 368799196.0
+        "change_1h": -0.0,
+        "change_24h": 20.9,
+        "change_7d": 17.1,
+        "change_30d": 53.6,
+        "rank": 113,
+        "market_cap": 446349861.0
+      },
+      {
+        "symbol": "CASHCAT",
+        "name": "Cash Cat",
+        "change_1h": 2.6,
+        "change_24h": 8.4,
+        "change_7d": 12.0,
+        "change_30d": -34.2,
+        "rank": 266,
+        "market_cap": 98584287.0
+      }
+    ],
+    "losers": [
+      {
+        "symbol": "A7A5",
+        "name": "A7A5",
+        "change_1h": -85.2,
+        "change_24h": -85.2,
+        "change_7d": -85.1,
+        "change_30d": -84.9,
+        "rank": 335,
+        "market_cap": 69411246.0
+      },
+      {
+        "symbol": "AKE",
+        "name": "Akedo",
+        "change_1h": -0.1,
+        "change_24h": -33.5,
+        "change_7d": -80.1,
+        "change_30d": -80.8,
+        "rank": 206,
+        "market_cap": 143913533.0
+      },
+      {
+        "symbol": "JCT",
+        "name": "Janction",
+        "change_1h": 1.9,
+        "change_24h": -28.8,
+        "change_7d": -31.7,
+        "change_30d": 165.6,
+        "rank": 398,
+        "market_cap": 50605984.0
       }
     ],
     "portfolio_movers": [
       {
-        "symbol": "STX",
-        "change_24h": 8.11432,
-        "value_usd": 76.16
+        "symbol": "RSR",
+        "change_24h": -7.53936,
+        "value_usd": 61.11
       },
       {
-        "symbol": "RSR",
-        "change_24h": 5.77844,
-        "value_usd": 66.19
+        "symbol": "NOT",
+        "change_24h": -3.90094,
+        "value_usd": 5.62
       },
       {
         "symbol": "ANKR",
-        "change_24h": 3.08558,
-        "value_usd": 53.23
+        "change_24h": -3.73829,
+        "value_usd": 51.25
       },
       {
         "symbol": "LINK",
-        "change_24h": 2.7882,
-        "value_usd": 93.8
-      },
-      {
-        "symbol": "ZK",
-        "change_24h": 2.22987,
-        "value_usd": 3.21
+        "change_24h": -3.67134,
+        "value_usd": 90.37
       },
       {
         "symbol": "AXL",
-        "change_24h": -1.82626,
-        "value_usd": 5.87
-      },
-      {
-        "symbol": "JASMY",
-        "change_24h": -1.79976,
-        "value_usd": 52.46
-      },
-      {
-        "symbol": "INJ",
-        "change_24h": 1.68738,
-        "value_usd": 73.01
-      },
-      {
-        "symbol": "ARB",
-        "change_24h": 1.51625,
-        "value_usd": 16.81
-      },
-      {
-        "symbol": "CKB",
-        "change_24h": 1.45335,
-        "value_usd": 61.98
-      },
-      {
-        "symbol": "ATOM",
-        "change_24h": -1.33547,
-        "value_usd": 23.5
+        "change_24h": -3.3687,
+        "value_usd": 5.67
       },
       {
         "symbol": "W",
-        "change_24h": 1.13963,
-        "value_usd": 2.61
+        "change_24h": -3.35258,
+        "value_usd": 2.52
+      },
+      {
+        "symbol": "AR",
+        "change_24h": -3.1825,
+        "value_usd": 12.39
+      },
+      {
+        "symbol": "CKB",
+        "change_24h": -2.96861,
+        "value_usd": 60.14
+      },
+      {
+        "symbol": "TAO",
+        "change_24h": -2.8278,
+        "value_usd": 368.59
+      },
+      {
+        "symbol": "ZK",
+        "change_24h": -2.75243,
+        "value_usd": 3.13
+      },
+      {
+        "symbol": "FET",
+        "change_24h": -2.69093,
+        "value_usd": 29.66
+      },
+      {
+        "symbol": "ATOM",
+        "change_24h": -2.66526,
+        "value_usd": 22.87
       }
     ],
     "total_tracked": 1187
   },
   "btc_network": {
     "available": true,
-    "hash_rate_ehs": 1121.04,
-    "n_tx_24h": 757188,
+    "hash_rate_ehs": 958.78,
+    "n_tx_24h": 500204,
     "miners_revenue_usd": 0.0,
     "difficulty": 148364561003867,
-    "market_price_usd": 77707.53,
+    "market_price_usd": 78269.84,
     "mempool_size": 53197
   },
   "stablecoin_supply": {
     "available": true,
-    "total_mcap_usd": 256281507659.0,
-    "total_change_7d_pct": 0.047,
+    "total_mcap_usd": 255785923057.0,
+    "total_change_7d_pct": -0.033,
     "components": [
       {
         "symbol": "USDT",
-        "market_cap_usd": 180031959749,
-        "change_7d_pct": 0.05
+        "market_cap_usd": 179941621979,
+        "change_7d_pct": -0.04
       },
       {
         "symbol": "USDC",
-        "market_cap_usd": 71695347760,
-        "change_7d_pct": 0.05
+        "market_cap_usd": 71308565257,
+        "change_7d_pct": -0.03
       },
       {
         "symbol": "DAI",
-        "market_cap_usd": 4554200150,
-        "change_7d_pct": 0.03
+        "market_cap_usd": 4535735821,
+        "change_7d_pct": -0.03
       }
     ],
     "interpretation": "supply stablecoins stable · pas de signal directionnel"
@@ -2175,12 +2201,12 @@
       {
         "a": "1000SATS",
         "b": "LINK",
-        "corr": 0.87
+        "corr": 0.86
       },
       {
         "a": "ETH",
         "b": "TAO",
-        "corr": 0.87
+        "corr": 0.86
       },
       {
         "a": "1000SATS",
@@ -2193,28 +2219,28 @@
         "corr": 0.84
       },
       {
-        "a": "1000SATS",
-        "b": "ETH",
+        "a": "INJ",
+        "b": "TAO",
         "corr": 0.83
       },
       {
-        "a": "ETH",
-        "b": "LINK",
-        "corr": 0.82
-      },
-      {
-        "a": "INJ",
-        "b": "TAO",
-        "corr": 0.82
-      },
-      {
         "a": "1000SATS",
-        "b": "BTC",
-        "corr": 0.79
+        "b": "ETH",
+        "corr": 0.81
       },
       {
         "a": "BTC",
         "b": "TAO",
+        "corr": 0.79
+      },
+      {
+        "a": "ETH",
+        "b": "LINK",
+        "corr": 0.79
+      },
+      {
+        "a": "1000SATS",
+        "b": "BTC",
         "corr": 0.78
       }
     ],
@@ -2229,50 +2255,51 @@
           "LINK",
           "TAO"
         ],
-        "ptf_pct": 82.6,
-        "value_usd": 2696.47
+        "ptf_pct": 82.8,
+        "value_usd": 2689.54
       }
     ],
-    "max_cluster_pct": 82.6,
-    "concentration_reading": "7 positions à forte corrélation de rendements (≥ 0,70 sur 30j) — 1000SATS, ANKR, BTC, ETH, INJ, LINK, TAO — pèsent 82,6% du portefeuille et tendent à bouger ensemble. Un choc commun les impacterait simultanément — risque de concentration réel au-delà de la diversification apparente.",
+    "max_cluster_pct": 82.8,
+    "concentration_reading": "7 positions à forte corrélation de rendements (≥ 0,70 sur 30j) — 1000SATS, ANKR, BTC, ETH, INJ, LINK, TAO — pèsent 82,8% du portefeuille et tendent à bouger ensemble. Un choc commun les impacterait simultanément — risque de concentration réel au-delà de la diversification apparente.",
     "threshold": 0.7
   },
   "portfolio_risk": {
     "available": true,
     "beta_to_btc": {
       "ETH": 1.22,
-      "JASMY": 1.24,
+      "JASMY": 1.26,
       "RENDER": 1.45,
-      "CKB": 3.0,
-      "ANKR": 1.45,
-      "INJ": 2.58,
-      "STX": 1.63,
-      "FET": 2.63,
-      "ATOM": 1.26,
-      "CFX": 2.03,
-      "ACH": 1.11,
-      "IMX": 1.65,
-      "AR": 2.35,
-      "NOT": 1.77,
-      "W": 2.35,
-      "1000SATS": 1.47
+      "CKB": 2.93,
+      "ANKR": 1.38,
+      "INJ": 2.56,
+      "STX": 1.53,
+      "XRP": 1.43,
+      "FET": 2.6,
+      "ATOM": 1.24,
+      "CFX": 1.99,
+      "ACH": 1.1,
+      "IMX": 1.64,
+      "ADA": 1.89,
+      "AR": 2.32,
+      "W": 2.31,
+      "1000SATS": 1.44
     },
     "concentration": {
-      "hhi": 0.2472,
+      "hhi": 0.2511,
       "effective_bets": 4.0,
       "positions": 28,
       "top_asset": "BTC",
-      "top_weight_pct": 43.1
+      "top_weight_pct": 43.6
     },
     "stress_test": {
       "btc_shock_pct": -20.0,
       "ptf_beta_to_btc": 1.19,
       "ptf_estimated_move_pct": -23.9,
-      "estimated_loss_usd": -780.0
+      "estimated_loss_usd": -776.0
     },
-    "var_95_pct": -3.09,
+    "var_95_pct": -3.12,
     "readings": [
-      "Concentration : 28 positions mais seulement ~4,0 paris EFFECTIFs (HHI) — BTC pèse 43,1%.",
+      "Concentration : 28 positions mais seulement ~4,0 paris EFFECTIFs (HHI) — BTC pèse 43,6%.",
       "Stress-test : un choc BTC de -20% entraînerait ≈ -24% sur le portefeuille (bêta PTF 1,19).",
       "VaR 95% (historique 30j) : journée de queue ≈ -3,1%."
     ]
@@ -2283,8 +2310,8 @@
     "total": 28,
     "measurable": 2,
     "measurable_assets": [
-      "ETH",
-      "BTC"
+      "BTC",
+      "ETH"
     ],
     "reference_pct": 20.0,
     "cash_pct": 5.0,
@@ -2302,9 +2329,9 @@
     "empty_line": ""
   },
   "quant_reference": {
-    "onchain": "BTC: MVRV 1.43 (neutre), prix/realized 1.43 (profit latent), adresses actives +1.6% / 7j | ETH: MVRV 1.02 (neutre), prix/realized 1.02 (profit latent), adresses actives -19.0% / 7j",
-    "options": "BTC: put/call 0.67 (appétit calls), max pain 78000.0 (+0.3% vs spot), DVOL 39.7, skew 25Δ -5.2 (protection baissière chère) | ETH: put/call 0.54 (appétit calls), max pain 2240.0 (-1.1% vs spot), DVOL 54.5, skew 25Δ -5.2 (protection baissière chère)",
-    "correlations": "Corrélations 30j BTC ↔ fed_assets -0.46, reverse_repo -0.33, S&P 500 +0.21, us_2y -0.15, US 10Y -0.14, hy_spread -0.04, VIX +0.03, DXY (dollar) -0.02 · régime: lien BTC/dollar ténu"
+    "onchain": "BTC: MVRV 1.45 (neutre), prix/realized 1.45 (profit latent), adresses actives +12.1% / 7j | ETH: MVRV 1.03 (neutre), prix/realized 1.03 (profit latent), adresses actives -0.9% / 7j",
+    "options": "BTC: put/call 0.66 (appétit calls), max pain 78000.0 (-0.0% vs spot), DVOL 38.9, skew 25Δ -4.6 (protection baissière chère) | ETH: put/call 0.55 (appétit calls), max pain 2260.0 (-0.9% vs spot), DVOL 53.4, skew 25Δ -4.9 (protection baissière chère)",
+    "correlations": "Corrélations 30j BTC ↔ fed_assets -0.46, reverse_repo -0.33, S&P 500 +0.21, real_10y -0.19, us_2y -0.15, US 10Y -0.14, hy_spread -0.04, VIX +0.03, DXY (dollar) -0.02 · régime: lien BTC/dollar ténu"
   },
   "data_contradictions": {
     "has_any": true,
@@ -2313,16 +2340,16 @@
     ]
   },
   "risk_score": {
-    "score": 3.4,
+    "score": 2.9,
     "level": "maîtrisé",
     "level_color": "#3B6D11",
     "factors": [
-      "concentration L1 70%"
+      "concentration L1 71%"
     ],
     "components": [
       {
         "label": "Drawdown 7j",
-        "pts": 0.7,
+        "pts": 0.1,
         "max": 3.0
       },
       {
@@ -2332,7 +2359,7 @@
       },
       {
         "label": "Volatilité 24h",
-        "pts": 0.3,
+        "pts": 0.4,
         "max": 2.0
       },
       {
@@ -2349,10 +2376,10 @@
         "ratio_pct": 100
       },
       {
-        "label": "Drawdown 7j",
-        "pts": 0.7,
-        "max": 3.0,
-        "ratio_pct": 23
+        "label": "Volatilité 24h",
+        "pts": 0.4,
+        "max": 2.0,
+        "ratio_pct": 20
       }
     ],
     "holdings_snapshot": [
@@ -2393,15 +2420,15 @@
     "axes": [
       {
         "label": "Diversification",
-        "score": 0.9,
+        "score": 0.8,
         "max": 10.0,
-        "detail": "top secteur 70% du PTF"
+        "detail": "top secteur 71% du PTF"
       },
       {
         "label": "Momentum vs BTC",
-        "score": 4.9,
+        "score": 4.8,
         "max": 10.0,
-        "detail": "-0,2 pts vs BTC 7j"
+        "detail": "-0,4 pts vs BTC 7j"
       },
       {
         "label": "Solidité (vs ATH)",
@@ -2410,29 +2437,29 @@
         "detail": "drawdown -58% vs ATH"
       }
     ],
-    "driver": "Moins pénalisée par Momentum vs BTC (4,9/10), pénalisée par Diversification (0,9/10).",
-    "improve": "La diversification progresse par les renforts décidés hors du secteur dominant — aucun allègement n'est déclenché par ce seuil (axe Diversification à 0,9/10 ce jour)."
+    "driver": "Moins pénalisée par Momentum vs BTC (4,8/10), pénalisée par Diversification (0,8/10).",
+    "improve": "La diversification progresse par les renforts décidés hors du secteur dominant — aucun allègement n'est déclenché par ce seuil (axe Diversification à 0,8/10 ce jour)."
   },
   "market_regime": {
     "available": true,
     "regime": "bull",
     "label_fr": "HAUSSIER",
     "reasons": [
-      "prix +6,4% vs MM200",
+      "prix +6,7% vs MM200",
       "MM50 +12,0% vs MM200",
-      "pente MM50 14j +0,7%"
+      "pente MM50 14j +0,6%"
     ],
-    "price_vs_ma200_pct": 6.4,
+    "price_vs_ma200_pct": 6.7,
     "ma50_vs_ma200_pct": 12.0,
-    "ma50_slope_14d_pct": 0.7,
+    "ma50_slope_14d_pct": 0.6,
     "since": "2026-09-23",
     "changed": false,
-    "days_in_regime": 39
+    "days_in_regime": 40
   },
   "top_action": {
     "asset": "BTC",
     "action": "RENFORCER",
-    "line": "RENFORCER BTC · potentiel +19,7% vs requis 11,4% · bande normale 5%–10% du PTF",
+    "line": "RENFORCER BTC · potentiel +18,0% vs requis 11,4% · bande normale 5%–10% du PTF",
     "rr": null,
     "ev_pct": null,
     "invalidation": null,
@@ -2451,16 +2478,16 @@
   "firm_postures": {
     "BTC": {
       "action": "RENFORCER",
-      "entry": 77759.0,
+      "entry": 78038.0,
       "stop_loss": null,
-      "target": 86592.4224,
+      "target": 86903.11679999999,
       "confidence": null
     },
     "ETH": {
       "action": "RENFORCER",
-      "entry": 2265.66,
+      "entry": 2281.19,
       "stop_loss": null,
-      "target": 2592.1416059999997,
+      "target": 2609.909479,
       "confidence": null
     }
   },
@@ -2490,6 +2517,11 @@
         "spread": 0.37,
         "reading": "Courbe des taux plate (10Y−2Y = +0.37 pt) : cycle en transition, pas de signal franc."
       },
+      "real_rates": {
+        "available": true,
+        "real_10y": 2.63,
+        "reading": "Taux réel 10Y élevé (2,63%) : coût d'opportunité fort, vent de face structurel pour les actifs sans rendement (dont le crypto)."
+      },
       "fed_liquidity": {
         "available": true,
         "trend": "expansion",
@@ -2499,8 +2531,8 @@
       },
       "altseason": {
         "available": true,
-        "btc_dominance_pct": 59.3,
-        "reading": "Dominance BTC élevée (59%) : capital concentré sur BTC, conditions DÉFAVORABLES aux alts (pas de saison des alts)."
+        "btc_dominance_pct": 60.0,
+        "reading": "Dominance BTC élevée (60%) : capital concentré sur BTC, conditions DÉFAVORABLES aux alts (pas de saison des alts)."
       },
       "seasonality": {
         "available": true,
@@ -2510,16 +2542,16 @@
       "realized_vol_regime": {
         "available": true,
         "regime": "stable",
-        "recent_vol": 1.9,
-        "prior_vol": 1.8,
-        "reading": "Volatilité réalisée stable (1,9%) : pas de changement de régime notable."
+        "recent_vol": 1.8,
+        "prior_vol": 1.6,
+        "reading": "Volatilité réalisée stable (1,8%) : pas de changement de régime notable."
       },
       "market_structure": {
         "available": true,
         "structures": {
           "BTC": "baissière",
           "ETH": "baissière",
-          "TAO": "range",
+          "TAO": "baissière",
           "JASMY": "baissière",
           "RENDER": "range",
           "LINK": "baissière",
@@ -2527,10 +2559,9 @@
           "CKB": "range",
           "ANKR": "baissière",
           "INJ": "range",
-          "STX": "baissière",
-          "1000SATS": "range"
+          "1000SATS": "baissière"
         },
-        "reading": "Structure de marché D1 — structure baissière (LH/LL) : ANKR, BTC, ETH, JASMY, LINK"
+        "reading": "Structure de marché D1 — structure baissière (LH/LL) : 1000SATS, ANKR, BTC, ETH, JASMY"
       },
       "confirmation_bias": {
         "active": true,
@@ -2546,25 +2577,14 @@
       "mvrv_context": {
         "available": true,
         "zone": "neutre",
-        "reading": "MVRV BTC à 1,43 : zone intermédiaire, ni survente de cycle ni euphorie."
+        "reading": "MVRV BTC à 1,45 : zone intermédiaire, ni survente de cycle ni euphorie."
       },
       "implied_move": {
         "available": true,
-        "dvol": 39.7,
+        "dvol": 38.9,
         "move_2d_pct": 2.9,
-        "move_7d_pct": 5.5,
-        "reading": "Move implicite options BTC (DVOL 40%) : le marché price un mouvement attendu de ±2,9% sur 48h. Avec « ISM Manufacturing PMI (US) » imminent, c'est la mesure objective du risque événementiel — dimensionner les positions en conséquence."
-      },
-      "derivatives_signal": {
-        "available": true,
-        "signals": [
-          {
-            "asset": "RSR",
-            "funding_pct": -72.7,
-            "state": "shorts en excès"
-          }
-        ],
-        "reading": "Dérivés (funding) — shorts en excès (potentiel short squeeze) : RSR"
+        "move_7d_pct": 5.4,
+        "reading": "Move implicite options BTC (DVOL 39%) : le marché price un mouvement attendu de ±2,9% sur 48h. Avec « ISM Manufacturing PMI (US) » imminent, c'est la mesure objective du risque événementiel — dimensionner les positions en conséquence."
       },
       "narrative_lifecycle": {
         "available": true,
@@ -2572,32 +2592,32 @@
           {
             "sector": "L1",
             "stage": "consolidation",
-            "c7": -4.9,
-            "c30": -17.8
+            "c7": -5.9,
+            "c30": -17.2
           },
           {
             "sector": "Oracle/Infra",
             "stage": "consolidation",
-            "c7": 3.0,
-            "c30": -18.5
+            "c7": -1.3,
+            "c30": -19.4
           },
           {
             "sector": "AI",
             "stage": "consolidation",
-            "c7": -6.2,
-            "c30": -24.5
+            "c7": -9.3,
+            "c30": -22.8
           },
           {
             "sector": "L2",
             "stage": "consolidation",
-            "c7": -7.3,
-            "c30": -20.8
+            "c7": -9.0,
+            "c30": -21.4
           },
           {
             "sector": "DeFi",
             "stage": "consolidation",
-            "c7": -4.9,
-            "c30": -6.3
+            "c7": -8.7,
+            "c30": -11.5
           }
         ],
         "reading": "Cycle des narratifs (momentum 7j/30j) : L1 en consolidation, Oracle/Infra en consolidation, AI en consolidation, L2 en consolidation. Euphorie = sortie possible ; émergence = upside potentiel."
@@ -2608,17 +2628,17 @@
       "Dollar (DXY) en cycle HAUSSIER (+2,5%) : pression structurelle sur les actifs risqués, dont le crypto.",
       "Spreads high yield en ÉCARTEMENT (3,26% vs moyenne 2,96%) : signal de risk-off structurel, prudence accrue — le crypto suit souvent avec retard.",
       "Courbe des taux plate (10Y−2Y = +0.37 pt) : cycle en transition, pas de signal franc.",
+      "Taux réel 10Y élevé (2,63%) : coût d'opportunité fort, vent de face structurel pour les actifs sans rendement (dont le crypto).",
       "Bilan Fed en EXPANSION (+2,5%, QE) : liquidité injectée, contexte porteur. Reverse repo à 4 Mds$ (liquidité parquée).",
-      "Dominance BTC élevée (59%) : capital concentré sur BTC, conditions DÉFAVORABLES aux alts (pas de saison des alts).",
+      "Dominance BTC élevée (60%) : capital concentré sur BTC, conditions DÉFAVORABLES aux alts (pas de saison des alts).",
       "Saisonnalité (BTC, ~10 ans) : novembre souvent haussier (saison Q4). Contexte probabiliste indicatif, jamais déterministe.",
-      "Volatilité réalisée stable (1,9%) : pas de changement de régime notable.",
-      "Structure de marché D1 — structure baissière (LH/LL) : ANKR, BTC, ETH, JASMY, LINK",
+      "Volatilité réalisée stable (1,8%) : pas de changement de régime notable.",
+      "Structure de marché D1 — structure baissière (LH/LL) : 1000SATS, ANKR, BTC, ETH, JASMY",
       "Biais de confirmation potentiel sur : RENDER (3 dernières thèses dans le même sens). Argumente EXPLICITEMENT le scénario contraire avant de confirmer la direction — évite le momentum bias.",
-      "MVRV BTC à 1,43 : zone intermédiaire, ni survente de cycle ni euphorie.",
-      "Move implicite options BTC (DVOL 40%) : le marché price un mouvement attendu de ±2,9% sur 48h. Avec « ISM Manufacturing PMI (US) » imminent, c'est la mesure objective du risque événementiel — dimensionner les positions en conséquence.",
-      "Dérivés (funding) — shorts en excès (potentiel short squeeze) : RSR",
+      "MVRV BTC à 1,45 : zone intermédiaire, ni survente de cycle ni euphorie.",
+      "Move implicite options BTC (DVOL 39%) : le marché price un mouvement attendu de ±2,9% sur 48h. Avec « ISM Manufacturing PMI (US) » imminent, c'est la mesure objective du risque événementiel — dimensionner les positions en conséquence.",
       "Cycle des narratifs (momentum 7j/30j) : L1 en consolidation, Oracle/Infra en consolidation, AI en consolidation, L2 en consolidation. Euphorie = sortie possible ; émergence = upside potentiel."
     ]
   },
-  "_saved_at": "2026-11-01T07:37:18.903584+00:00"
+  "_saved_at": "2026-11-02T07:36:19.779886+00:00"
 }
