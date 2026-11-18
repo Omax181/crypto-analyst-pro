@@ -1,85 +1,92 @@
 {
   "header": {
-    "date": "mardi 17 novembre 2026 · 19:02 Casablanca",
-    "time_casablanca": "mardi 17 novembre 2026 · 19:02 Casablanca",
+    "date": "mercredi 18 novembre 2026 · 19:02 Casablanca",
+    "time_casablanca": "mercredi 18 novembre 2026 · 19:02 Casablanca",
     "hours_since_morning": 11,
-    "morning_time_label": "07h40",
+    "morning_time_label": "07h39",
     "since_morning_label": "il y a 11h",
     "win_rate_30d": 0,
     "win_rate_total": "0/2",
     "win_rate_calibration": "2/5",
     "evening_time_label": "19h01",
-    "timing_line": "matin 07h40 · soir 19h01 · Δ11h",
+    "timing_line": "matin 07h39 · soir 19h01 · Δ11h",
     "is_evening_slot": true,
     "closing_greeting": "Bonne soirée.",
     "levels_window_label": "Niveaux à surveiller cette nuit",
     "checklist_title": "Demain matin · check list",
     "us_market_open": true,
     "us_session_label": "fin de séance (en cours)",
-    "ptf_value_delta_since_morning": -43.82,
-    "ptf_value_pct_since_morning": -1.63
+    "ptf_value_delta_since_morning": -60.51,
+    "ptf_value_pct_since_morning": -2.24
   },
   "portfolio_snapshot": {
-    "value_usd": 2646.23,
-    "change_since_morning_pct": -1.63
+    "value_usd": 2637.8,
+    "change_since_morning_pct": -2.24
   },
   "market_changes": [
     {
-      "status": "confirmed",
+      "status": "new",
       "tag": "Macro",
       "importance": 5,
-      "description": "Le VIX a bondi à 25,77 points (+2,86 points depuis ce matin), signalant une forte augmentation de l'aversion au risque. Les indices actions mondiaux ont accentué leurs pertes : le S&P 500 a reculé de 90,33 points supplémentaires et le Nasdaq de 274,09 points.",
-      "source": "Yahoo Finance"
+      "description": "Les minutes du FOMC ont été publiées à 19h00 Casablanca, leur contenu est désormais le principal catalyseur pour l'orientation des taux et la liquidité mondiale.",
+      "source": "ForexFactory 19h00"
     },
     {
       "status": "confirmed",
-      "tag": "Risque",
+      "tag": "Macro",
       "importance": 4,
-      "description": "Le Bitcoin a chuté de 1,4% (à 63 723 $) et l'Ethereum de 2,3% (à 1 789 $) depuis le rapport du matin, amplifiant la pression baissière observée sur le portefeuille.",
-      "source": "CoinGecko"
+      "description": "Le VIX recule à 23,48 points (−1,98 points) et le Nasdaq progresse à 24 495,16 points (+166,78 points), signalant un léger apaisement de la pression sur les actions US et modérant le régime risk-off du matin.",
+      "source": "Yahoo Finance"
     },
     {
       "status": "confirmed",
       "tag": "Macro",
       "importance": 3,
-      "description": "Les proxies actions du marché crypto ont subi des baisses marquées : COIN a perdu 3,38%, MSTR 5,79% et MARA 3,69% depuis la clôture précédente, reflétant la faiblesse générale des actifs risqués.",
+      "description": "Les actifs cœur BTC et ETH ont poursuivi leur repli depuis le matin, BTC à 63 128 $ (−2,4%) et ETH à 1 769 $ (−2,4%), confirmant la pression baissière dans l'attente des annonces Fed.",
+      "source": "CoinGecko"
+    },
+    {
+      "status": "changed",
+      "tag": "Info",
+      "importance": 3,
+      "description": "L'or recule fortement à 3 740,40 $ (−123,80 $), indiquant une fuite des capitaux même des actifs refuges traditionnels, potentiellement vers le dollar.",
       "source": "Yahoo Finance"
     },
     {
-      "status": "unchanged",
+      "status": "changed",
       "tag": "Macro",
       "importance": 2,
-      "description": "Le DXY est resté stable à 103,43 points (−0,1% depuis le matin) et l'indice Fear & Greed est maintenu à 12 (Peur extrême), sans évolution notable.",
-      "source": "FRED · Fear & Greed Index"
+      "description": "Le DXY a légèrement progressé à 103,775 points (+0,09 point depuis le matin), maintenant une pression sur les actifs risqués.",
+      "source": "Yahoo Finance"
     },
     {
-      "status": "unchanged",
-      "tag": "Macro",
-      "importance": 1,
-      "description": "La probabilité d'une hausse des taux de la Fed en décembre a très légèrement augmenté à 96,4% sur Polymarket (+0,1 point depuis le matin), confirmant le biais hawkish.",
-      "source": "Polymarket"
+      "status": "new",
+      "tag": "Info",
+      "importance": 2,
+      "description": "Les proxys boursiers crypto COIN (−2,1%) et MSTR (−4,25%) sont en baisse, tandis que MARA (+3,43%) et AMD (+3,84%) affichent une résilience, reflétant des signaux mitigés sur les actions liées au secteur.",
+      "source": "Yahoo Finance"
     }
   ],
   "news_today": [
     {
-      "title": "BlackRock met fin à l'exode des ETF Bitcoin ; Wells Fargo double sa participation",
-      "source": "CryptoSlate · Bitcoin Magazine",
-      "time": "16h20 / 16h00",
-      "impact": "Ces flux institutionnels positifs sur les ETF Bitcoin (BlackRock stoppe l'exode de 1,9 Md$, Wells Fargo double à 2,35 Md$) sont un contre-signal haussier pour BTC, potentiellement actionnable sur un horizon plus long terme malgré la pression actuelle. [chiffre ETF non recoupé — la source structurée (Farside / CoinGlass) était indisponible sur ce run]",
-      "status": "à suivre"
-    },
-    {
-      "title": "Les portefeuilles du hack Binance déplacent 137 M$ en Ethereum",
-      "source": "Decrypt",
-      "time": "17h18",
-      "impact": "Le mouvement de 137 M$ d'ETH depuis les portefeuilles liés au hack Binance pourrait accroître la pression vendeuse sur Ethereum, déjà sous forte pression technique.",
+      "title": "Déclarations hawkish des membres de la Fed",
+      "source": "Investing.com, Decrypt, Cointelegraph",
+      "time": "18h16-18h47",
+      "impact": "Plusieurs membres de la Fed (Waller, Barr, Daly) ont réaffirmé leur soutien à de futures hausses de taux, Waller évoquant même une hausse de 50 points de base, renforçant le biais hawkish du marché.",
       "status": "intégré"
     },
     {
-      "title": "Le gouverneur de la Fed Waller cite le hack Binance pour alerter sur la finance tokenisée",
-      "source": "CoinDesk · Cointelegraph",
-      "time": "17h00 / 17h39",
-      "impact": "Les déclarations de Waller soulignent les risques réglementaires perçus par les autorités, renforçant le narratif de prudence autour de la finance décentralisée et des actifs numériques.",
+      "title": "Options Bitcoin signalent une prudence accrue",
+      "source": "CryptoSlate",
+      "time": "16h55",
+      "impact": "Les options Bitcoin montrent une augmentation des primes pour les puts (downside premiums), signalant une prudence accrue des traders avant les minutes du FOMC.",
+      "status": "intégré"
+    },
+    {
+      "title": "Binance obtient une ordonnance de justice pour récupérer des fonds piratés",
+      "source": "Bitcoin Magazine",
+      "time": "18h47",
+      "impact": "Un développement positif pour la sécurité de l'écosystème, renforçant la confiance dans la capacité des plateformes à protéger les fonds.",
       "status": "intégré"
     }
   ],
@@ -88,72 +95,60 @@
       "asset": "BTC",
       "level": "62 773 $",
       "type": "support",
-      "trigger": "sous 62 773 $ → risque de test du seuil psychologique des 62 000 $ et accélération baissière. Le RSI à 23 confirme une survente."
+      "trigger": "Sous ce niveau, le risque de capitulation augmente, avec le support suivant à 61 967 $."
     },
     {
       "asset": "BTC",
-      "level": "64 743 $",
+      "level": "63 701 $",
       "type": "resistance",
-      "trigger": "au-dessus de 64 743 $ → pourrait viser la résistance Fibo 61,8% à 72 461 $."
+      "trigger": "Une cassure au-dessus de ce niveau pourrait indiquer un rebond tactique, mais la tendance reste baissière sous 64 743 $."
     },
     {
       "asset": "ETH",
-      "level": "1 768 $",
+      "level": "1 694 $",
       "type": "support",
-      "trigger": "sous 1 768 $ → test du support Bollinger à 1 734 $. Le RSI à 25 indique une survente."
+      "trigger": "Une cassure sous ce support Bollinger renforcerait la survente (RSI 24) et ouvrirait la voie à de nouvelles baisses."
     },
     {
       "asset": "ETH",
       "level": "1 800 $",
       "type": "resistance",
-      "trigger": "au-dessus de 1 800 $ → pourrait viser la résistance pivot à 1 843 $."
+      "trigger": "Le franchissement de ce seuil psychologique serait un premier signal de reprise, mais la résistance majeure est à 1 843 $."
     },
     {
       "asset": "DXY",
-      "level": "103,0",
-      "type": "support",
-      "trigger": "sous 103,0 → soulagement temporaire pour les actifs risqués."
+      "level": "103,85",
+      "type": "resistance",
+      "trigger": "Un DXY au-dessus de ce niveau maintiendrait une pression baissière sur les actifs risqués, exacerbant le risk-off."
     },
     {
       "asset": "DXY",
-      "level": "104,0",
-      "type": "resistance",
-      "trigger": "au-dessus de 104,0 → pression accrue sur les cryptos, en particulier les alts."
-    },
-    {
-      "asset": "INJ",
-      "level": "7,3 $",
-      "type": "resistance",
-      "trigger": "au-dessus de 7,3 $ → pourrait confirmer un rebond tactique et attirer de nouveaux acheteurs."
-    },
-    {
-      "asset": "INJ",
-      "level": "6,9 $",
+      "level": "103,50",
       "type": "support",
-      "trigger": "sous 6,9 $ → annulerait le rebond du jour et signalerait une faiblesse persistante."
+      "trigger": "Une cassure sous ce support pourrait offrir un léger répit aux marchés crypto, signalant une faiblesse temporaire du dollar."
     }
   ],
   "actions_tonight": [
     {
       "action": "RENFORCER BTC",
-      "rationale": "Le Bitcoin a continué de baisser de 1,4% depuis le matin, accentuant la survente (RSI 23) et le drawdown (-22,7% depuis l'entrée).",
+      "rationale": "Le prix du BTC a encore baissé à 63 128 $ (−2,4% depuis le matin), renforçant la thèse d'accumulation contrarienne en zone MVRV bas (1,21) malgré la pression macro. La recommandation du moteur reste active.",
       "horizon": "long terme"
     },
     {
       "action": "RENFORCER ETH",
-      "rationale": "L'Ethereum a également chuté de 2,3% depuis le matin, avec un RSI à 25 et un MVRV de 0,90, le maintenant en zone d'accumulation.",
+      "rationale": "Le prix de l'ETH a continué de chuter à 1 769 $ (−2,4% depuis le matin), confirmant la zone d'accumulation fondamentale (MVRV 0,88) et la survente (RSI 24). La recommandation du moteur reste active.",
       "horizon": "long terme"
     }
   ],
   "tomorrow_checklist": {
-    "calendar": "Mercredi 18 novembre : CPI y/y (UK) à 07h00, BOE Gov Bailey Speaks (UK) à 15h00, FOMC Meeting Minutes (US) à 19h00.",
-    "checks": "Le VIX se maintient-il sous 25,77 points, signalant une stabilisation de la peur ? · Les flux ETF Bitcoin institutionnels continuent-ils de montrer des signes de reprise malgré la baisse des prix ? · INJ maintient-il son rebond overnight ?",
-    "scenario": "Le marché crypto devrait rester sous pression baissière et volatil cette nuit, avec une attention particulière aux FOMC Meeting Minutes de demain qui pourraient confirmer le biais hawkish de la Fed.",
-    "invalidation": "Une cassure de BTC sous 62 773 $ combinée à un VIX > 26 confirmerait une accélération de la capitulation."
+    "calendar": "jeudi 19 novembre : Discours de la Présidente de la BCE Lagarde (Zone euro, 13h30), Indice manufacturier de la Fed de Philadelphie (US, 13h30), Demandes d'allocations chômage (US, 13h30).",
+    "checks": "Surveiller la réaction du marché aux minutes du FOMC et aux déclarations des membres de la Fed. Vérifier le maintien de BTC au-dessus de 62 773 $ et ETH au-dessus de 1 694 $. Suivre l'évolution du VIX et du Nasdaq pour confirmer un éventuel apaisement du risk-off.",
+    "scenario": "Le marché crypto devrait rester sous pression à court terme, mais les niveaux actuels sur BTC et ETH représentent des zones d'accumulation contrariennes pour Omar, en ligne avec son profil long terme.",
+    "invalidation": "BTC sous 61 967 $ ou S&P 500 sous 7 200 points entraînerait une capitulation plus large et invaliderait le scénario de rebond tactique."
   },
-  "blind_spots": "Les flux ETF Bitcoin et Ethereum restent indisponibles, limitant la visibilité sur l'appétit institutionnel en temps réel.",
+  "blind_spots": "Les sources de flux ETF au comptant restent indisponibles, réduisant la visibilité temps réel sur les souscriptions institutionnelles.",
   "footer": {
-    "next_morning_time": "mardi 18 novembre 2026 · 07:40 Casablanca",
+    "next_morning_time": "jeudi 19 novembre 2026 · 07:39 Casablanca",
     "sources_down": [
       "ETF flows"
     ],
@@ -165,40 +160,40 @@
     "reason": "Espérance mathématique disponible dès 5 recos clôturées avec niveaux (actuellement 0)."
   },
   "daily_pnl": {
-    "value_usd": 2646.23,
-    "day_change_usd": -43.82,
-    "day_change_pct": -1.63,
+    "value_usd": 2637.8,
+    "day_change_usd": -60.51,
+    "day_change_pct": -2.24,
     "day_change_label": null,
     "top_movers": [
       {
         "symbol": "BTC",
-        "change": -1.9,
-        "pnl_usd": -21.88,
-        "value_usd": 1154.66
+        "change": -0.9,
+        "pnl_usd": -10.0,
+        "value_usd": 1143.88
+      },
+      {
+        "symbol": "TAO",
+        "change": 2.0,
+        "pnl_usd": 6.19,
+        "value_usd": 308.75
       },
       {
         "symbol": "ETH",
-        "change": -1.6,
-        "pnl_usd": -8.78,
-        "value_usd": 537.33
+        "change": -1.0,
+        "pnl_usd": -5.26,
+        "value_usd": 531.52
       },
       {
-        "symbol": "INJ",
-        "change": 3.1,
-        "pnl_usd": 2.21,
-        "value_usd": 71.5
+        "symbol": "RENDER",
+        "change": 3.8,
+        "pnl_usd": 2.1,
+        "value_usd": 55.84
       },
       {
-        "symbol": "LINK",
-        "change": -1.5,
-        "pnl_usd": -1.06,
-        "value_usd": 72.47
-      },
-      {
-        "symbol": "CKB",
-        "change": 1.8,
-        "pnl_usd": 0.79,
-        "value_usd": 44.03
+        "symbol": "ANKR",
+        "change": 2.4,
+        "pnl_usd": 1.07,
+        "value_usd": 44.21
       }
     ]
   },
@@ -207,21 +202,21 @@
       "asset": "BTC",
       "action": "RENFORCER",
       "confidence": null,
-      "entry": 64651.0,
-      "target": 71995.3536,
-      "current": 63723.0,
-      "delta_pct": -1.44,
-      "status": "stable",
-      "reason": "proche de l'entrée (bruit court terme) · pas de niveau d'invalidation"
+      "entry": 64680.0,
+      "target": 72027.648,
+      "current": 63128.0,
+      "delta_pct": -2.4,
+      "status": "under_pressure",
+      "reason": "repli sous l'entrée · pas de niveau d'invalidation"
     },
     {
       "asset": "ETH",
       "action": "RENFORCER",
       "confidence": null,
-      "entry": 2406.72,
-      "target": 2760.267168,
-      "current": 1788.72,
-      "delta_pct": -25.68,
+      "entry": 1813.4,
+      "target": 2084.86598,
+      "current": 1769.37,
+      "delta_pct": -2.43,
       "status": "under_pressure",
       "reason": "repli sous l'entrée · pas de niveau d'invalidation"
     }
@@ -229,57 +224,56 @@
   "polymarket_facts": {
     "fed_bars": {
       "cut_pct": 0.4,
-      "hold_pct": 3.2,
-      "hike_pct": 96.4,
+      "hold_pct": 3.0,
+      "hike_pct": 96.6,
       "dominant": "hausse",
-      "dominant_pct": 96.4,
+      "dominant_pct": 96.6,
       "meeting_hint": "réunion décembre 2026"
     },
     "extra_markets": [
       {
-        "question": "Will Bitcoin dip to $45,000 by December 31, 2026?",
-        "probability_pct": 10,
-        "volume_usd": 10156514,
-        "end_date": "2027-01-01T05:00:00Z"
-      },
-      {
         "question": "Will Bitcoin dip to $50,000 by December 31, 2026?",
-        "probability_pct": 19,
-        "volume_usd": 6220593,
+        "probability_pct": 20,
+        "volume_usd": 6327785,
         "end_date": "2027-01-01T05:00:00Z"
       },
       {
-        "question": "Will Bitcoin dip to $62,000 on November 17?",
-        "probability_pct": 15,
-        "volume_usd": 74957,
-        "end_date": "2026-11-18T05:00:00Z"
+        "question": "Will Bitcoin dip to $60,000 by December 31, 2026?",
+        "probability_pct": 70,
+        "volume_usd": 2563655,
+        "end_date": "2027-01-01T05:00:00Z"
       },
       {
-        "question": "Israel x Iran ceasefire continues through December 31?",
-        "probability_pct": 66,
-        "volume_usd": 2793611,
-        "end_date": "2026-12-31T20:29:00Z"
+        "question": "Will Bitcoin dip to $60,000 on November 18?",
+        "probability_pct": 3,
+        "volume_usd": 79625,
+        "end_date": "2026-11-19T05:00:00Z"
+      },
+      {
+        "question": "Will Bitcoin dip to $62,000 on November 18?",
+        "probability_pct": 24,
+        "volume_usd": 67020,
+        "end_date": "2026-11-19T05:00:00Z"
       }
     ]
   },
   "since_morning_facts": {
     "available": true,
-    "window_label": "depuis le matin (07h40)",
-    "line": "BTC 64 651 $ → 63 723 $ (−1,4%) · ETH 1 830 $ → 1 789 $ (−2,3%) · F&G 12 → 12 (stable) · DXY 103,48 → 103,43 (−0,1%) · Fed hausse 96,3% → 96,4% (+0,1 pts)"
+    "window_label": "depuis le matin (07h39)",
+    "line": "BTC 64 680 $ → 63 128 $ (−2,4%) · ETH 1 813 $ → 1 769 $ (−2,4%) · F&G 11 → 11 (stable) · DXY 103,69 → 103,78 (+0,1%) · Fed hausse 96,5% → 96,6% (+0,1 pts)"
   },
-  "derivatives_flows_line": "Funding BTC +2,6%/an · L/S 2,99",
+  "derivatives_flows_line": "Funding BTC +5,3%/an · L/S 3,39",
   "levels_readout": {
-    "BTC": "RSI 23 (survente) · MACD baissier · Bollinger médiane · ATR 2,7% (≈1 695 $/j) · −19,3% vs MM50 · volume 7j +22% vs 30j",
-    "ETH": "RSI 25 (survente) · MACD baissier · Bollinger médiane · ATR 3,8% (≈67,61 $/j) · −23,7% vs MM50 · volume 7j +12% vs 30j"
+    "BTC": "RSI 22 (survente) · MACD baissier · Bollinger médiane · ATR 2,4% (≈1 528 $/j) · −19,7% vs MM50 · volume 7j +23% vs 30j",
+    "ETH": "RSI 24 (survente) · MACD baissier · Bollinger médiane · ATR 3,3% (≈59,10 $/j) · −23,9% vs MM50 · volume 7j +14% vs 30j"
   },
   "risk_score": {
-    "score": 4.2,
-    "level": "modéré",
-    "level_color": "#BA7517",
+    "score": 3.7,
+    "level": "maîtrisé",
+    "level_color": "#3B6D11",
     "factors": [
       "concentration L1 70%",
-      "sentiment Peur Extrême (F&G 12)",
-      "VIX tendu (26)"
+      "sentiment Peur Extrême (F&G 11)"
     ],
     "components": [
       {
@@ -299,7 +293,7 @@
       },
       {
         "label": "Sentiment",
-        "pts": 1.5,
+        "pts": 1.0,
         "max": 1.5
       }
     ],
@@ -312,9 +306,9 @@
       },
       {
         "label": "Sentiment",
-        "pts": 1.5,
+        "pts": 1.0,
         "max": 1.5,
-        "ratio_pct": 100
+        "ratio_pct": 67
       }
     ],
     "holdings_snapshot": [
@@ -349,7 +343,7 @@
     ]
   },
   "risk_score_readout": {
-    "driver": "Score tiré par Concentration (2.5/2.5) et Sentiment (1.5/1.5).",
+    "driver": "Score tiré par Concentration (2.5/2.5) et Sentiment (1.0/1.5).",
     "reco": "Concentration sectorielle élevée — information de risque, aucun seuil ne déclenche de vente.",
     "caveat": "Note indicative et déterministe (concentration, drawdown, volatilité, sentiment) : elle ne capte ni le risque spécifique projet ni les corrélations cachées ou chocs exogènes."
   },
@@ -360,15 +354,15 @@
     "axes": [
       {
         "label": "Diversification",
-        "score": 1.0,
+        "score": 1.1,
         "max": 10.0,
         "detail": "top secteur 70% du PTF"
       },
       {
         "label": "Momentum vs BTC",
-        "score": 5.4,
+        "score": 5.5,
         "max": 10.0,
-        "detail": "+0,8 pts vs BTC 7j"
+        "detail": "+1,1 pts vs BTC 7j"
       },
       {
         "label": "Solidité (vs ATH)",
@@ -377,43 +371,43 @@
         "detail": "drawdown -65% vs ATH"
       }
     ],
-    "driver": "Portée par Momentum vs BTC (5,4/10), pénalisée par Diversification (1,0/10).",
-    "improve": "La diversification progresse par les renforts décidés hors du secteur dominant — aucun allègement n'est déclenché par ce seuil (axe Diversification à 1,0/10 ce jour)."
+    "driver": "Portée par Momentum vs BTC (5,5/10), pénalisée par Diversification (1,1/10).",
+    "improve": "La diversification progresse par les renforts décidés hors du secteur dominant — aucun allègement n'est déclenché par ce seuil (axe Diversification à 1,1/10 ce jour)."
   },
   "health_unchanged_since_morning": {
     "active": true,
     "note": "Santé stable depuis ce matin (3.2/10 → 3.2/10) — composition du portefeuille non modifiée à ce jour — voir « Actions à poser ce soir »."
   },
   "evening_macro": {
-    "btc_price": 63723,
-    "btc_change_24h": -1.89486,
-    "eth_price": 1788.72,
-    "eth_change_24h": -1.63475,
-    "fear_greed": 12,
+    "btc_price": 63128,
+    "btc_change_24h": -0.87432,
+    "eth_price": 1769.37,
+    "eth_change_24h": -0.99036,
+    "fear_greed": 11,
     "fear_greed_label": "Peur extrême",
     "fear_greed_delta": 0,
-    "gold_usd": 3858.1,
-    "gold_delta": 5.099999999999909,
-    "sp500": 7326.26,
-    "sp500_delta": -90.32999999999993,
-    "nasdaq": 24235.664,
-    "nasdaq_delta": -274.09400000000096,
-    "vix": 25.77,
-    "vix_delta": 2.8599999999999994,
-    "brent_usd": 93.56,
-    "brent_delta": 1.1200000000000045,
-    "dxy": 103.429,
+    "gold_usd": 3740.4,
+    "gold_delta": -123.79999999999973,
+    "sp500": 7341.32,
+    "sp500_delta": 0.7899999999999636,
+    "nasdaq": 24495.16,
+    "nasdaq_delta": 166.77699999999822,
+    "vix": 23.48,
+    "vix_delta": -1.9800000000000004,
+    "brent_usd": 88.52,
+    "brent_delta": -1.8500000000000085,
+    "dxy": 103.775,
     "dxy_broad": 122.6503,
     "dxy_broad_as_of": "2026-11-13",
-    "dxy_broad_freshness": null,
-    "dxy_ice": 103.429,
-    "dxy_delta": -0.12000000000000455,
-    "nikkei": 58860.43,
-    "nikkei_delta": -801.5899999999965,
-    "stoxx50": 6212.11,
-    "stoxx50_delta": -136.2400000000007,
-    "eur_usd": 1.1016,
-    "usd_jpy": 159.319,
+    "dxy_broad_freshness": " · au 13/11",
+    "dxy_ice": 103.775,
+    "dxy_delta": 0.29000000000000625,
+    "nikkei": 59024.28,
+    "nikkei_delta": 163.84999999999854,
+    "stoxx50": 6154.39,
+    "stoxx50_delta": -57.719999999999345,
+    "eur_usd": 1.0976,
+    "usd_jpy": 159.366,
     "ecb_deposit_rate": 2.5,
     "boj_rate": 1.227
   },
@@ -423,7 +417,7 @@
     "wti_usd": "confirmed",
     "sp500": "confirmed",
     "nasdaq": "confirmed",
-    "vix": "single",
+    "vix": "confirmed",
     "us_10y": "confirmed",
     "dxy_ice": "single",
     "dxy": "single",
@@ -437,65 +431,10 @@
   },
   "tomorrow_macro_events": [
     {
-      "label": "BOE Gov Bailey Speaks (UK)",
-      "date": "2026-11-18",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "mercredi",
-      "date_label": "mercredi 18 novembre",
-      "time": "15:00"
-    },
-    {
-      "label": "CPI y/y (UK)",
-      "date": "2026-11-18",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "mercredi",
-      "date_label": "mercredi 18 novembre",
-      "time": "07:00"
-    },
-    {
-      "label": "ECB Financial Stability Review (Zone euro)",
-      "date": "2026-11-18",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "medium",
-      "weekday_label": "mercredi",
-      "date_label": "mercredi 18 novembre",
-      "time": "09:00"
-    },
-    {
-      "label": "ECB President Lagarde Speaks (Zone euro)",
-      "date": "2026-11-18",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "medium",
-      "weekday_label": "mercredi",
-      "date_label": "mercredi 18 novembre",
-      "time": "14:25"
-    },
-    {
-      "label": "FOMC Meeting Minutes (US)",
-      "date": "2026-11-18",
-      "when": "demain",
-      "days_ahead": 1,
-      "source": "ForexFactory",
-      "importance": "high",
-      "weekday_label": "mercredi",
-      "date_label": "mercredi 18 novembre",
-      "time": "19:00"
-    },
-    {
       "label": "ECB President Lagarde Speaks (Zone euro)",
       "date": "2026-11-19",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "jeudi",
@@ -505,8 +444,8 @@
     {
       "label": "Philly Fed Manufacturing Index (US)",
       "date": "2026-11-19",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "jeudi",
@@ -516,40 +455,84 @@
     {
       "label": "Unemployment Claims (US)",
       "date": "2026-11-19",
-      "when": "dans 2j",
-      "days_ahead": 2,
+      "when": "demain",
+      "days_ahead": 1,
       "source": "ForexFactory",
       "importance": "medium",
       "weekday_label": "jeudi",
       "date_label": "jeudi 19 novembre",
       "time": "13:30"
+    },
+    {
+      "label": "ECB President Lagarde Speaks (Zone euro)",
+      "date": "2026-11-20",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 20 novembre",
+      "time": "08:15"
+    },
+    {
+      "label": "Retail Sales m/m (UK)",
+      "date": "2026-11-20",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 20 novembre",
+      "time": "07:00"
+    },
+    {
+      "label": "Revised UoM Consumer Sentiment (US)",
+      "date": "2026-11-20",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 20 novembre",
+      "time": "15:00"
+    },
+    {
+      "label": "Revised UoM Inflation Expectations (US)",
+      "date": "2026-11-20",
+      "when": "dans 2j",
+      "days_ahead": 2,
+      "source": "ForexFactory",
+      "importance": "medium",
+      "weekday_label": "vendredi",
+      "date_label": "vendredi 20 novembre",
+      "time": "15:00"
     }
   ],
   "intraday_news": [
     {
-      "title": "Lawyer for Fed’s Cook says she may not participate in ’unfair’ White House hearing",
+      "title": "Binance Says It Won Court Order to Recover Frozen Hack Funds",
+      "source": "Bitcoin Magazine",
+      "timestamp": "18h47"
+    },
+    {
+      "title": "Fed’s Barr says rate rises likely lie ahead for economy",
       "source": "Investing.com",
-      "timestamp": "18h55"
+      "timestamp": "18h42"
     },
     {
-      "title": "Fed’s Waller says central bank will work with private sector on digital finance",
+      "title": "Fed’s Barr backs further rate hikes if economy stays on track",
       "source": "Investing.com",
-      "timestamp": "18h54"
+      "timestamp": "18h38"
     },
     {
-      "title": "Ethereum Price Analysis: Are Whales Preparing for a Rebound as Retail Traders Exit - Coinpedia",
-      "source": "Stocktwits",
-      "timestamp": "17h59"
+      "title": "Fed’s Daly urges cautious additional rate hikes",
+      "source": "Investing.com",
+      "timestamp": "18h35"
     },
     {
-      "title": "Fed’s Waller cites Binance hack in warning over tokenized finance",
-      "source": "Cointelegraph",
-      "timestamp": "17h39"
-    },
-    {
-      "title": "Binance Hack Wallets Move $137 Million in Ethereum After Two Weeks of Silence",
+      "title": "Fed's Waller Calls for 50-Basis-Point Rate Hike, Says Tokenized Finance Still Needs Traditional Banks",
       "source": "Decrypt",
-      "timestamp": "17h18"
+      "timestamp": "18h16"
     }
   ],
   "market_regime": {
@@ -557,16 +540,16 @@
     "regime": "range",
     "label_fr": "RANGE",
     "reasons": [
-      "prix −12,6% vs MM200",
-      "MM50 +8,9% vs MM200",
-      "pente MM50 14j −3,1%"
+      "prix −13,5% vs MM200",
+      "MM50 +8,5% vs MM200",
+      "pente MM50 14j −3,6%"
     ],
-    "price_vs_ma200_pct": -12.6,
-    "ma50_vs_ma200_pct": 8.9,
-    "ma50_slope_14d_pct": -3.1,
+    "price_vs_ma200_pct": -13.5,
+    "ma50_vs_ma200_pct": 8.5,
+    "ma50_slope_14d_pct": -3.6,
     "since": "2026-11-09",
     "changed": false,
-    "days_in_regime": 8
+    "days_in_regime": 9
   },
-  "_saved_at": "2026-11-17T19:02:27.304828+00:00"
+  "_saved_at": "2026-11-18T19:02:47.163762+00:00"
 }
